@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Генерал</title>
+<style>
+  :root {
+    --bg: #0f1320;
+    --panel: #1a2034;
+    --panel-2: #222a44;
+    --line: #313a5c;
+    --text: #e8ecf8;
+    --muted: #95a0c4;
+    --accent: #6c8cff;
+    --good: #46c98b;
+    --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 800px at 70% -10%, #1c2a55 0%, transparent 60%), var(--bg);
+    color: var(--text);
+    font: 15px/1.45 system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  h1, h2, h3 { margin: 0 0 .4em; }
+  button {
+    font: inherit; color: inherit; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 14px; transition: .12s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary {
+    background: var(--accent); border-color: var(--accent); color: #0b1024; font-weight: 600;
+  }
+  input[type=text] {
+    font: inherit; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 22px 18px 60px; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+
+  /* ---------------- setup ---------------- */
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+  .setup { padding: 24px; max-width: 620px; margin: 6vh auto 0; }
+  .player-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .player-row input[type=color] {
+    width: 42px; height: 42px; padding: 0; border: 1px solid var(--line);
+    border-radius: 10px; background: none; cursor: pointer;
+  }
+  .player-row .del { padding: 9px 11px; }
+  .row-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+  /* ---------------- game layout ---------------- */
+  .game { display: grid; grid-template-columns: 1fr 280px; gap: 18px; align-items: start; }
+  @media (max-width: 820px) { .game { grid-template-columns: 1fr; } }
+
+  .turnbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+  .who { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+  .pill { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; color: var(--muted); }
+
+  .dice { display: flex; gap: 12px; flex-wrap: wrap; margin: 6px 0 16px; }
+  .die {
+    width: 64px; height: 64px; border-radius: 14px; background: #f3f5ff; color: #1a2034;
+    display: grid; place-items: center; font-size: 44px; line-height: 1;
+    border: 3px solid transparent; cursor: pointer; user-select: none;
+    box-shadow: var(--shadow); transition: transform .08s, border-color .12s;
+  }
+  .die.empty { background: var(--panel-2); color: var(--muted); font-size: 30px; cursor: default; box-shadow: none; border: 2px dashed var(--line); }
+  .die.held { border-color: var(--good); transform: translateY(-4px); }
+  .die.rolling { animation: shake .35s; }
+  @keyframes shake { 25%{transform:rotate(-9deg)} 75%{transform:rotate(9deg)} }
+  .hint { color: var(--muted); font-size: 13px; margin: -6px 0 14px; }
+
+  .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .rolls { color: var(--muted); }
+
+  /* ---------------- scoreboard ---------------- */
+  table.score { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+  table.score th { text-align: left; padding: 10px 14px; background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: .04em; }
+  table.score td { padding: 0; border-top: 1px solid var(--line); }
+  .cat { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 11px 14px; background: none; border: none; border-radius: 0; text-align: left; }
+  .cat .label { font-weight: 600; }
+  .cat .val { font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+  .cat.filled { cursor: default; }
+  .cat.filled .val { color: var(--text); font-weight: 700; }
+  .cat.filled.zero .val { color: var(--muted); }
+  .cat.open .val { color: var(--accent); }
+  .cat.open:hover { background: var(--panel-2); }
+  .cat.open.cannot .val { color: var(--muted); }
+  .cat.disabled { opacity: .55; }
+  .totrow td { padding: 12px 14px; background: var(--panel-2); font-weight: 700; display: flex; justify-content: space-between; }
+
+  /* ---------------- sidebar ---------------- */
+  .side h3 { color: var(--muted); font-size: 13px; letter-spacing: .05em; text-transform: uppercase; }
+  .peeklist { display: flex; flex-direction: column; gap: 8px; }
+  .peek {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  }
+  .peek.active { border-color: var(--accent); }
+  .peek .nm { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .peek .tt { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+  /* ---------------- modal ---------------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(6,9,18,.7); display: grid; place-items: center; padding: 20px; z-index: 20; }
+  .modal { max-width: 420px; width: 100%; max-height: 86vh; overflow: auto; padding: 18px; }
+  .modal .close { float: right; }
+  .winner { display: flex; align-items: center; gap: 12px; margin: 6px 0 14px; font-size: 22px; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ SETUP ============ -->
+  <section id="setup" class="card setup">
+    <h1>🎲 Генерал</h1>
+    <p class="muted">Добавете играчите, изберете имена и цветове, и започнете.</p>
+    <div id="playerList"></div>
+    <div class="row-actions">
+      <button id="addPlayer">+ Играч</button>
+      <button id="startGame" class="primary">Започни играта</button>
+    </div>
+    <p id="setupErr" class="muted" style="color:#ff8c8c"></p>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="game" class="game hidden">
+    <div class="main">
+      <div class="turnbar">
+        <span class="who"><span id="curDot" class="dot"></span><span id="curName"></span></span>
+        <span class="pill" id="roundPill">Рунд 1</span>
+        <span class="pill" id="rollsPill">3 хвърляния</span>
+      </div>
+
+      <div id="dice" class="dice"></div>
+      <p class="hint" id="diceHint">Натиснете „Хвърли“, за да започнете хода си.</p>
+
+      <div class="controls">
+        <button id="rollBtn" class="primary">🎲 Хвърли</button>
+        <span class="rolls muted" id="rollsLeft"></span>
+      </div>
+
+      <table class="score" id="scoreTable"></table>
+    </div>
+
+    <aside class="side">
+      <h3>Играчи</h3>
+      <div class="peeklist" id="peekList"></div>
+      <p class="muted" style="font-size:13px;margin-top:12px">Натиснете играч, за да видите неговата дъска.</p>
+    </aside>
+  </section>
+</div>
+
+<!-- peek modal -->
+<div id="peekModal" class="modal-bg hidden">
+  <div class="card modal">
+    <button class="close" id="peekClose">✕</button>
+    <h2 id="peekTitle"></h2>
+    <table class="score" id="peekTable"></table>
+  </div>
+</div>
+
+<!-- game over modal -->
+<div id="overModal" class="modal-bg hidden">
+  <div class="card modal">
+    <h2>🏆 Край на играта</h2>
+    <div id="winner" class="winner"></div>
+    <table class="score" id="finalTable"></table>
+    <div class="row-actions">
+      <button id="playAgain" class="primary">Нова игра</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+<script>
+(function () {
+  'use strict';
+  var G = window.General;
+  var DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+  var PRESET_COLORS = ['#6c8cff', '#46c98b', '#ff8c5a', '#e85d9b', '#c98be8', '#f2c14e'];
+
+  // ---- element refs ----
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ============================================================ SETUP
+  var setupPlayers = [];
+
+  function addSetupPlayer(name, color) {
+    setupPlayers.push({ name: name, color: color });
+    renderSetup();
+  }
+
+  function renderSetup() {
+    var list = $('playerList');
+    list.innerHTML = '';
+    setupPlayers.forEach(function (p, i) {
+      var row = document.createElement('div');
+      row.className = 'player-row';
+
+      var color = document.createElement('input');
+      color.type = 'color';
+      color.value = p.color;
+      color.addEventListener('input', function () { p.color = color.value; });
+
+      var name = document.createElement('input');
+      name.type = 'text';
+      name.value = p.name;
+      name.placeholder = 'Име на играч';
+      name.addEventListener('input', function () { p.name = name.value; });
+
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '✕';
+      del.title = 'Премахни';
+      del.addEventListener('click', function () {
+        setupPlayers.splice(i, 1);
+        renderSetup();
+      });
+
+      row.appendChild(color);
+      row.appendChild(name);
+      if (setupPlayers.length > 1) row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+
+  $('addPlayer').addEventListener('click', function () {
+    var n = setupPlayers.length;
+    addSetupPlayer('Играч ' + (n + 1), PRESET_COLORS[n % PRESET_COLORS.length]);
+  });
+
+  $('startGame').addEventListener('click', function () {
+    var names = setupPlayers.map(function (p) { return (p.name || '').trim(); });
+    if (names.some(function (n) { return !n; })) {
+      $('setupErr').textContent = 'Всеки играч трябва да има име.';
+      return;
+    }
+    $('setupErr').textContent = '';
+    startGame(setupPlayers.map(function (p) {
+      return G.createPlayer(p.name.trim(), p.color);
+    }));
+  });
+
+  // seed two players to start
+  addSetupPlayer('Играч 1', PRESET_COLORS[0]);
+  addSetupPlayer('Играч 2', PRESET_COLORS[1]);
+
+  // ============================================================ GAME
+  var game = null;
+  // per-turn dice state
+  var dice = [];                 // current dice values
+  var holds = [false, false, false, false, false];
+  var rollsUsed = 0;             // 0..MAX_ROLLS
+
+  function startGame(players) {
+    game = G.createGame(players);
+    $('setup').classList.add('hidden');
+    $('game').classList.remove('hidden');
+    $('overModal').classList.add('hidden');
+    beginTurn();
+  }
+
+  function beginTurn() {
+    dice = [];
+    holds = [false, false, false, false, false];
+    rollsUsed = 0;
+    renderAll();
+  }
+
+  function rolling() { return rollsUsed > 0; }
+  function rollsLeft() { return G.MAX_ROLLS - rollsUsed; }
+
+  $('rollBtn').addEventListener('click', function () {
+    if (rollsLeft() <= 0) return;
+    if (rollsUsed === 0) {
+      dice = G.rollAll();
+    } else {
+      dice = G.reroll(dice, holds, null);
+    }
+    rollsUsed++;
+    // un-hold nothing; holds persist between rerolls intentionally
+    renderAll();
+    animateDice();
+  });
+
+  function animateDice() {
+    var els = $('dice').querySelectorAll('.die');
+    els.forEach(function (el, i) {
+      if (!holds[i]) {
+        el.classList.remove('rolling');
+        // force reflow to restart animation
+        void el.offsetWidth;
+        el.classList.add('rolling');
+      }
+    });
+  }
+
+  function toggleHold(i) {
+    if (!rolling() || rollsLeft() <= 0) return; // nothing to hold for
+    holds[i] = !holds[i];
+    renderDice();
+  }
+
+  // ---- rendering ----
+  function renderAll() {
+    renderTurnbar();
+    renderDice();
+    renderScoreTable();
+    renderPeekList();
+  }
+
+  function renderTurnbar() {
+    var p = G.currentPlayer(game);
+    $('curDot').style.background = p.color;
+    $('curName').textContent = p.name;
+    $('roundPill').textContent = 'Рунд ' + game.round;
+    var left = rollsLeft();
+    $('rollsPill').textContent = left + (left === 1 ? ' хвърляне' : ' хвърляния');
+
+    var rollBtn = $('rollBtn');
+    rollBtn.disabled = left <= 0;
+    rollBtn.textContent = rollsUsed === 0 ? '🎲 Хвърли' : '🎲 Хвърли отново';
+    $('rollsLeft').textContent = rolling()
+      ? 'Използвани ' + rollsUsed + ' / ' + G.MAX_ROLLS
+      : '';
+    $('diceHint').textContent = !rolling()
+      ? 'Натиснете „Хвърли“, за да започнете хода си.'
+      : (left > 0
+          ? 'Натиснете зар, за да го задържите, или изберете категория за точкуване.'
+          : 'Няма повече хвърляния — изберете категория за точкуване.');
+  }
+
+  function renderDice() {
+    var box = $('dice');
+    box.innerHTML = '';
+    for (var i = 0; i < G.DICE_COUNT; i++) {
+      var el = document.createElement('div');
+      if (!rolling()) {
+        el.className = 'die empty';
+        el.textContent = '?';
+      } else {
+        el.className = 'die' + (holds[i] ? ' held' : '');
+        el.textContent = DICE_FACES[dice[i]];
+        el.title = holds[i] ? 'Задържан' : 'Натиснете, за да задържите';
+        (function (idx) {
+          el.addEventListener('click', function () { toggleHold(idx); });
+        })(i);
+      }
+      box.appendChild(el);
+    }
+  }
+
+  function renderScoreTable() {
+    var p = G.currentPlayer(game);
+    $('scoreTable').innerHTML = buildBoard(p, true);
+    // wire up clickable open categories
+    $('scoreTable').querySelectorAll('.cat.open').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        chooseCategory(btn.getAttribute('data-key'));
+      });
+    });
+  }
+
+  // build a scoreboard table. interactive=true => current player's live board.
+  function buildBoard(player, interactive) {
+    var html = '';
+    var sections = [
+      { title: 'Горна секция', group: 'upper' },
+      { title: 'Долна секция', group: 'lower' },
+    ];
+    sections.forEach(function (sec) {
+      html += '<tr><th colspan="2">' + sec.title + '</th></tr>';
+      G.CATEGORIES.filter(function (c) { return c.group === sec.group; }).forEach(function (c) {
+        var filled = G.isCategoryFilled(player, c.key);
+        var val, cls;
+        if (filled) {
+          val = player.scores[c.key];
+          cls = 'cat filled' + (val === 0 ? ' zero' : '');
+        } else if (interactive && rolling()) {
+          val = G.scoreFor(c.key, dice);
+          cls = 'cat open' + (val === 0 ? ' cannot' : '');
+        } else {
+          val = '–';
+          cls = 'cat' + (interactive ? ' disabled' : '');
+        }
+        html += '<tr><td>'
+          + '<' + (interactive && !filled && rolling() ? 'button' : 'div') + ' class="' + cls + '" data-key="' + c.key + '">'
+          + '<span class="label">' + c.label + '</span>'
+          + '<span class="val">' + val + '</span>'
+          + '</' + (interactive && !filled && rolling() ? 'button' : 'div') + '>'
+          + '</td></tr>';
+      });
+    });
+    html += '<tr class="totrow"><td><span>Общо</span><span>' + G.playerTotal(player) + '</span></td></tr>';
+    return html;
+  }
+
+  function chooseCategory(key) {
+    var p = G.currentPlayer(game);
+    if (!rolling() || G.isCategoryFilled(p, key)) return;
+    G.assignScore(p, key, dice);
+
+    if (G.isGameOver(game)) {
+      showGameOver();
+      return;
+    }
+    G.nextTurn(game);
+    beginTurn();
+  }
+
+  function renderPeekList() {
+    var box = $('peekList');
+    box.innerHTML = '';
+    game.players.forEach(function (p, i) {
+      var b = document.createElement('button');
+      b.className = 'peek' + (i === game.current ? ' active' : '');
+      b.innerHTML = '<span class="dot" style="background:' + p.color + '"></span>'
+        + '<span class="nm">' + escapeHtml(p.name) + (i === game.current ? ' • на ход' : '') + '</span>'
+        + '<span class="tt">' + G.playerTotal(p) + '</span>';
+      b.addEventListener('click', function () { openPeek(i); });
+      box.appendChild(b);
+    });
+  }
+
+  function openPeek(i) {
+    var p = game.players[i];
+    $('peekTitle').textContent = p.name;
+    $('peekTable').innerHTML = buildBoard(p, false);
+    $('peekModal').classList.remove('hidden');
+  }
+  $('peekClose').addEventListener('click', function () { $('peekModal').classList.add('hidden'); });
+  $('peekModal').addEventListener('click', function (e) {
+    if (e.target === $('peekModal')) $('peekModal').classList.add('hidden');
+  });
+
+  function showGameOver() {
+    var r = G.ranking(game);
+    var win = r[0];
+    $('winner').innerHTML = '<span class="dot" style="background:' + win.player.color + '"></span>'
+      + escapeHtml(win.player.name) + ' — ' + win.total + ' т.';
+    var html = '<tr><th>Класиране</th><th></th></tr>';
+    r.forEach(function (x, idx) {
+      html += '<tr class="totrow"><td><span>' + (idx + 1) + '. ' + escapeHtml(x.player.name) + '</span><span>' + x.total + '</span></td></tr>';
+    });
+    $('finalTable').innerHTML = html;
+    $('overModal').classList.remove('hidden');
+  }
+
+  $('playAgain').addEventListener('click', function () {
+    $('overModal').classList.add('hidden');
+    $('game').classList.add('hidden');
+    $('setup').classList.remove('hidden');
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+})();
+</script>
+</body>
+</html>
