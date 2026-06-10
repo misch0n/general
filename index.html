@@ -6,110 +6,187 @@
 <title>Генерал</title>
 <style>
   :root {
-    --bg: #0f1320;
-    --panel: #1a2034;
-    --panel-2: #222a44;
-    --line: #313a5c;
-    --text: #e8ecf8;
-    --muted: #95a0c4;
-    --accent: #6c8cff;
-    --good: #46c98b;
-    --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+    --bg-0: #0b0e17;
+    --bg-1: #121726;
+    --surface: rgba(255, 255, 255, .045);
+    --surface-2: rgba(255, 255, 255, .08);
+    --stroke: rgba(255, 255, 255, .10);
+    --stroke-strong: rgba(255, 255, 255, .22);
+    --text: #eef1fb;
+    --muted: #9aa3c4;
+    --faint: #5b6488;
+    --accent: #7aa2ff;          /* overridden per current player */
+    --good: #4bd6a0;
+    --danger: #ff7a8a;
+    --radius: 16px;
+    --shadow: 0 10px 40px rgba(0, 0, 0, .45);
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; min-height: 100%; }
   body {
-    background: radial-gradient(1200px 800px at 70% -10%, #1c2a55 0%, transparent 60%), var(--bg);
+    font: 15px/1.5 var(--font);
     color: var(--text);
-    font: 15px/1.45 system-ui, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(1000px 700px at 12% -8%, rgba(122,162,255,.18), transparent 55%),
+      radial-gradient(900px 700px at 98% 0%, rgba(75,214,160,.12), transparent 50%),
+      var(--bg-0);
+    -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3 { margin: 0 0 .4em; }
-  button {
-    font: inherit; color: inherit; cursor: pointer;
-    background: var(--panel-2); border: 1px solid var(--line);
-    border-radius: 10px; padding: 9px 14px; transition: .12s;
-  }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  button.primary {
-    background: var(--accent); border-color: var(--accent); color: #0b1024; font-weight: 600;
-  }
-  input[type=text] {
-    font: inherit; color: inherit; background: var(--bg);
-    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%;
-  }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 22px 18px 60px; }
+  h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
   .hidden { display: none !important; }
   .muted { color: var(--muted); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 70px; }
 
-  /* ---------------- setup ---------------- */
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
-  .setup { padding: 24px; max-width: 620px; margin: 6vh auto 0; }
-  .player-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .player-row input[type=color] {
-    width: 42px; height: 42px; padding: 0; border: 1px solid var(--line);
-    border-radius: 10px; background: none; cursor: pointer;
+  .card {
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(8px);
   }
-  .player-row .del { padding: 9px 11px; }
-  .row-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .btn {
+    background: var(--surface-2); border: 1px solid var(--stroke);
+    border-radius: 12px; padding: 10px 16px; transition: .15s; font-weight: 600;
+  }
+  .btn:hover { border-color: var(--stroke-strong); transform: translateY(-1px); }
+  .btn.primary {
+    background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 78%, #000));
+    border-color: transparent; color: #0a0e1c; box-shadow: 0 6px 20px rgba(122,162,255,.35);
+  }
+  .btn.primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; transform: none; }
+  .btn.ghost { background: transparent; }
 
-  /* ---------------- game layout ---------------- */
-  .game { display: grid; grid-template-columns: 1fr 280px; gap: 18px; align-items: start; }
-  @media (max-width: 820px) { .game { grid-template-columns: 1fr; } }
+  /* ===================== SETUP ===================== */
+  .setup { max-width: 640px; margin: 5vh auto 0; padding: 30px; }
+  .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .brand .logo { font-size: 40px; filter: drop-shadow(0 6px 14px rgba(122,162,255,.5)); }
+  .brand h1 { font-size: 34px; }
+  .sub { color: var(--muted); margin: 2px 0 24px; }
 
-  .turnbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-  .who { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
-  .dot { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
-  .pill { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; color: var(--muted); }
+  .prow { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .prow input[type=color] {
+    -webkit-appearance: none; appearance: none; width: 40px; height: 40px;
+    border: 1px solid var(--stroke); border-radius: 11px; background: none; cursor: pointer; padding: 0;
+  }
+  .prow input[type=color]::-webkit-color-swatch { border: none; border-radius: 9px; }
+  .prow input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
+  .prow .name {
+    flex: 1; min-width: 0; font: inherit; color: inherit; background: rgba(0,0,0,.25);
+    border: 1px solid var(--stroke); border-radius: 11px; padding: 10px 12px;
+  }
+  .prow .name:focus { outline: none; border-color: var(--accent); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; user-select: none; cursor: pointer; font-size: 13px; color: var(--muted); }
+  .switch { width: 42px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.12); position: relative; transition: .18s; border: 1px solid var(--stroke); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: .18s; }
+  .toggle.on .switch { background: var(--good); }
+  .toggle.on .switch::after { transform: translateX(18px); }
+  .toggle.on { color: var(--good); }
+  .prow .del { width: 36px; height: 36px; border-radius: 10px; color: var(--muted); font-size: 18px; }
+  .prow .del:hover { color: var(--danger); background: var(--surface-2); }
+  .setup-actions { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+  .err { color: var(--danger); min-height: 20px; margin-top: 10px; font-size: 14px; }
 
-  .dice { display: flex; gap: 12px; flex-wrap: wrap; margin: 6px 0 16px; }
+  /* ===================== GAME ===================== */
+  .game { display: grid; grid-template-columns: 1fr 300px; gap: 22px; align-items: start; }
+  @media (max-width: 900px) { .game { grid-template-columns: 1fr; } }
+
+  .topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .turnchip {
+    display: flex; align-items: center; gap: 11px; padding: 8px 16px 8px 10px;
+    border-radius: 999px; background: var(--surface-2); border: 1px solid var(--stroke);
+  }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #0a0e1c; font-size: 14px; }
+  .turnchip .nm { font-weight: 700; }
+  .badge { font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: rgba(122,162,255,.18); color: var(--accent); border: 1px solid rgba(122,162,255,.35); }
+  .meta { color: var(--muted); font-size: 13px; }
+  .rollpips { display: inline-flex; gap: 5px; vertical-align: middle; margin-left: 4px; }
+  .rollpips i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.18); display: inline-block; }
+  .rollpips i.live { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  /* dice stage */
+  .stage { padding: 30px 20px 26px; text-align: center; margin-bottom: 22px; }
+  .dice { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
   .die {
-    width: 64px; height: 64px; border-radius: 14px; background: #f3f5ff; color: #1a2034;
-    display: grid; place-items: center; font-size: 44px; line-height: 1;
-    border: 3px solid transparent; cursor: pointer; user-select: none;
-    box-shadow: var(--shadow); transition: transform .08s, border-color .12s;
+    --sz: 78px; width: var(--sz); height: var(--sz); border-radius: 18px;
+    background: linear-gradient(155deg, #ffffff, #dfe4f5);
+    box-shadow: 0 8px 18px rgba(0,0,0,.4), inset 0 2px 2px rgba(255,255,255,.9), inset 0 -6px 10px rgba(60,70,110,.25);
+    padding: 12px; cursor: pointer; transition: transform .12s, box-shadow .15s;
+    border: 3px solid transparent; position: relative;
   }
-  .die.empty { background: var(--panel-2); color: var(--muted); font-size: 30px; cursor: default; box-shadow: none; border: 2px dashed var(--line); }
-  .die.held { border-color: var(--good); transform: translateY(-4px); }
-  .die.rolling { animation: shake .35s; }
-  @keyframes shake { 25%{transform:rotate(-9deg)} 75%{transform:rotate(9deg)} }
-  .hint { color: var(--muted); font-size: 13px; margin: -6px 0 14px; }
-
-  .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
-  .rolls { color: var(--muted); }
-
-  /* ---------------- scoreboard ---------------- */
-  table.score { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
-  table.score th { text-align: left; padding: 10px 14px; background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: .04em; }
-  table.score td { padding: 0; border-top: 1px solid var(--line); }
-  .cat { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 11px 14px; background: none; border: none; border-radius: 0; text-align: left; }
-  .cat .label { font-weight: 600; }
-  .cat .val { font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
-  .cat.filled { cursor: default; }
-  .cat.filled .val { color: var(--text); font-weight: 700; }
-  .cat.filled.zero .val { color: var(--muted); }
-  .cat.open .val { color: var(--accent); }
-  .cat.open:hover { background: var(--panel-2); }
-  .cat.open.cannot .val { color: var(--muted); }
-  .cat.disabled { opacity: .55; }
-  .totrow td { padding: 12px 14px; background: var(--panel-2); font-weight: 700; display: flex; justify-content: space-between; }
-
-  /* ---------------- sidebar ---------------- */
-  .side h3 { color: var(--muted); font-size: 13px; letter-spacing: .05em; text-transform: uppercase; }
-  .peeklist { display: flex; flex-direction: column; gap: 8px; }
-  .peek {
-    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  .die .pips { width: 100%; height: 100%; display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: repeat(3,1fr); gap: 2px; }
+  .die .pip { border-radius: 50%; }
+  .die .pip.on { background: radial-gradient(circle at 35% 30%, #4a5278, #1b2138); box-shadow: inset 0 1px 1px rgba(0,0,0,.5); align-self: center; justify-self: center; width: 72%; height: 72%; }
+  .die.held { border-color: var(--accent); transform: translateY(-8px); box-shadow: 0 14px 26px rgba(0,0,0,.45), 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .die.held::after { content: "ЗАДЪРЖАН"; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .08em; color: var(--accent); font-weight: 800; }
+  .die.ghost { background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 2px var(--stroke); cursor: default; }
+  .die.ghost .q { width: 100%; height: 100%; display: grid; place-items: center; font-size: 30px; color: var(--faint); }
+  .die.roll { animation: tumble .5s ease; }
+  @keyframes tumble {
+    0% { transform: translateY(0) rotate(0); }
+    30% { transform: translateY(-16px) rotate(-110deg); }
+    60% { transform: translateY(-6px) rotate(80deg); }
+    100% { transform: translateY(0) rotate(0); }
   }
-  .peek.active { border-color: var(--accent); }
-  .peek .nm { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .peek .tt { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .stage .hint { color: var(--muted); font-size: 13px; min-height: 18px; margin: 28px 0 18px; }
+  .stage .controls { display: flex; gap: 12px; justify-content: center; align-items: center; }
+  .thinking { color: var(--accent); font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+  .thinking .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:.25} 50%{opacity:1} }
 
-  /* ---------------- modal ---------------- */
-  .modal-bg { position: fixed; inset: 0; background: rgba(6,9,18,.7); display: grid; place-items: center; padding: 20px; z-index: 20; }
-  .modal { max-width: 420px; width: 100%; max-height: 86vh; overflow: auto; padding: 18px; }
-  .modal .close { float: right; }
-  .winner { display: flex; align-items: center; gap: 12px; margin: 6px 0 14px; font-size: 22px; font-weight: 800; }
+  /* scoreboard */
+  .board-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .board-cols { grid-template-columns: 1fr; } }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 2px 4px 10px; }
+  .cat {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px;
+    border: 1px solid transparent; margin-bottom: 6px; transition: .12s; min-height: 46px;
+  }
+  .cat .clabel { font-weight: 700; flex: 1; }
+  .cat .cval { font-variant-numeric: tabular-nums; color: var(--faint); font-weight: 700; }
+  .cat.filled { background: rgba(255,255,255,.03); }
+  .cat.filled .cval { color: var(--text); }
+  .cat.filled.zeroed .cval { color: var(--muted); }
+  .cat.suggest { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .cat.sacrifice { opacity: .8; }
+  .chip {
+    font: inherit; font-weight: 800; font-variant-numeric: tabular-nums;
+    padding: 6px 11px; border-radius: 10px; background: var(--surface-2);
+    border: 1px solid var(--stroke); transition: .12s;
+  }
+  .cat.suggest .chip { background: var(--accent); color: #0a0e1c; border-color: transparent; }
+  .chip:hover { transform: translateY(-1px); filter: brightness(1.07); }
+  .chip.zero { background: transparent; color: var(--muted); border-style: dashed; }
+  .totbar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 14px 16px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--stroke); }
+  .totbar b { font-size: 20px; }
+
+  /* sidebar */
+  .side .section-title { margin-left: 2px; }
+  .plist { display: flex; flex-direction: column; gap: 9px; }
+  .pcard { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 11px 12px; border-radius: 13px; border: 1px solid var(--stroke); background: var(--surface); transition: .14s; }
+  .pcard:hover { border-color: var(--stroke-strong); }
+  .pcard.current { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .pcard .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .pcard .tt { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .pcard .mini { font-size: 10px; font-weight: 800; color: var(--accent); }
+  .side .note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+
+  /* modal */
+  .overlay { position: fixed; inset: 0; background: rgba(5,7,14,.72); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 20px; z-index: 30; }
+  .modal { max-width: 440px; width: 100%; max-height: 88vh; overflow: auto; padding: 22px; }
+  .modal .x { float: right; width: 34px; height: 34px; border-radius: 9px; color: var(--muted); font-size: 18px; }
+  .modal .x:hover { background: var(--surface-2); }
+  .winner { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 800; margin: 8px 0 18px; }
+  .rank { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; background: var(--surface); margin-bottom: 8px; border: 1px solid var(--stroke); }
+  .rank .pos { width: 26px; font-weight: 800; color: var(--muted); }
+  .rank.first { border-color: var(--good); }
+  .rank .nm { flex: 1; font-weight: 600; }
+  .rank .tt { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .peekrow { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 9px; }
+  .peekrow:nth-child(odd) { background: rgba(255,255,255,.03); }
+  .peekrow .pv { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .peekrow.empty .pv { color: var(--faint); }
 </style>
 </head>
 <body>
@@ -117,62 +194,80 @@
 
   <!-- ============ SETUP ============ -->
   <section id="setup" class="card setup">
-    <h1>🎲 Генерал</h1>
-    <p class="muted">Добавете играчите, изберете имена и цветове, и започнете.</p>
+    <div class="brand"><span class="logo">🎲</span><h1>Генерал</h1></div>
+    <p class="sub">Български зарничен генерал. Добавете играчи, дайте им имена и цветове, включете AI противници — и започвайте.</p>
     <div id="playerList"></div>
-    <div class="row-actions">
-      <button id="addPlayer">+ Играч</button>
-      <button id="startGame" class="primary">Започни играта</button>
+    <div class="setup-actions">
+      <button id="addPlayer" class="btn">+ Играч</button>
+      <button id="startGame" class="btn primary">▶ Започни играта</button>
     </div>
-    <p id="setupErr" class="muted" style="color:#ff8c8c"></p>
+    <div id="setupErr" class="err"></div>
   </section>
 
   <!-- ============ GAME ============ -->
   <section id="game" class="game hidden">
     <div class="main">
-      <div class="turnbar">
-        <span class="who"><span id="curDot" class="dot"></span><span id="curName"></span></span>
-        <span class="pill" id="roundPill">Рунд 1</span>
-        <span class="pill" id="rollsPill">3 хвърляния</span>
+      <div class="topbar">
+        <div class="turnchip">
+          <span id="curAvatar" class="avatar"></span>
+          <span id="curName" class="nm"></span>
+          <span id="curAi" class="badge hidden">AI</span>
+        </div>
+        <span class="meta" id="roundMeta">Рунд 1</span>
+        <span class="meta">Хвърляния <span id="rollPips" class="rollpips"></span></span>
       </div>
 
-      <div id="dice" class="dice"></div>
-      <p class="hint" id="diceHint">Натиснете „Хвърли“, за да започнете хода си.</p>
-
-      <div class="controls">
-        <button id="rollBtn" class="primary">🎲 Хвърли</button>
-        <span class="rolls muted" id="rollsLeft"></span>
+      <div class="card stage">
+        <div id="dice" class="dice"></div>
+        <p id="hint" class="hint"></p>
+        <div class="controls">
+          <button id="rollBtn" class="btn primary">🎲 Хвърли</button>
+          <span id="thinking" class="thinking hidden"><span class="dot"></span>AI мисли…</span>
+        </div>
       </div>
 
-      <table class="score" id="scoreTable"></table>
+      <div class="card" style="padding:18px">
+        <div class="board-cols">
+          <div>
+            <div class="section-title">Горна секция</div>
+            <div id="boardUpper"></div>
+          </div>
+          <div>
+            <div class="section-title">Долна секция</div>
+            <div id="boardLower"></div>
+          </div>
+        </div>
+        <div class="totbar"><span>Общо</span><b id="curTotal">0</b></div>
+      </div>
     </div>
 
     <aside class="side">
-      <h3>Играчи</h3>
-      <div class="peeklist" id="peekList"></div>
-      <p class="muted" style="font-size:13px;margin-top:12px">Натиснете играч, за да видите неговата дъска.</p>
+      <div class="card" style="padding:16px">
+        <div class="section-title">Играчи</div>
+        <div id="plist" class="plist"></div>
+        <p class="note">Натиснете играч, за да надникнете в дъската му.</p>
+      </div>
     </aside>
   </section>
 </div>
 
 <!-- peek modal -->
-<div id="peekModal" class="modal-bg hidden">
+<div id="peekModal" class="overlay hidden">
   <div class="card modal">
-    <button class="close" id="peekClose">✕</button>
-    <h2 id="peekTitle"></h2>
-    <table class="score" id="peekTable"></table>
+    <button class="x" id="peekClose">✕</button>
+    <h2 id="peekTitle" style="margin-bottom:14px"></h2>
+    <div id="peekBody"></div>
+    <div class="totbar"><span>Общо</span><b id="peekTotal">0</b></div>
   </div>
 </div>
 
 <!-- game over modal -->
-<div id="overModal" class="modal-bg hidden">
+<div id="overModal" class="overlay hidden">
   <div class="card modal">
     <h2>🏆 Край на играта</h2>
     <div id="winner" class="winner"></div>
-    <table class="score" id="finalTable"></table>
-    <div class="row-actions">
-      <button id="playAgain" class="primary">Нова игра</button>
-    </div>
+    <div id="ranks"></div>
+    <div class="setup-actions"><button id="playAgain" class="btn primary">↻ Нова игра</button></div>
   </div>
 </div>
 
@@ -181,17 +276,34 @@
 (function () {
   'use strict';
   var G = window.General;
-  var DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-  var PRESET_COLORS = ['#6c8cff', '#46c98b', '#ff8c5a', '#e85d9b', '#c98be8', '#f2c14e'];
-
-  // ---- element refs ----
   var $ = function (id) { return document.getElementById(id); };
 
-  // ============================================================ SETUP
+  var PIPS = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
+  var PRESET_COLORS = ['#7aa2ff', '#4bd6a0', '#ff9d5c', '#ec6aa6', '#b98bff', '#f2cb55', '#5fd0e0', '#ff7a8a'];
+  var AI_DELAY = 700;
+
+  function initials(name) {
+    var parts = name.trim().split(/\s+/);
+    return ((parts[0] || '?')[0] + (parts[parts.length - 1] || '')[0] || '?').toUpperCase();
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  // ===================================================== SETUP
+  var humanNames = G.nameGenerator('human');
+  var aiNames = G.nameGenerator('ai');
   var setupPlayers = [];
 
-  function addSetupPlayer(name, color) {
-    setupPlayers.push({ name: name, color: color });
+  function addSetupPlayer(isAI) {
+    var n = setupPlayers.length;
+    setupPlayers.push({
+      name: isAI ? aiNames() : humanNames(),
+      color: PRESET_COLORS[n % PRESET_COLORS.length],
+      isAI: !!isAI,
+    });
     renderSetup();
   }
 
@@ -200,62 +312,61 @@
     list.innerHTML = '';
     setupPlayers.forEach(function (p, i) {
       var row = document.createElement('div');
-      row.className = 'player-row';
+      row.className = 'prow';
 
       var color = document.createElement('input');
-      color.type = 'color';
-      color.value = p.color;
-      color.addEventListener('input', function () { p.color = color.value; });
+      color.type = 'color'; color.value = p.color;
+      color.oninput = function () { p.color = color.value; };
 
       var name = document.createElement('input');
-      name.type = 'text';
-      name.value = p.name;
+      name.type = 'text'; name.className = 'name'; name.value = p.name;
       name.placeholder = 'Име на играч';
-      name.addEventListener('input', function () { p.name = name.value; });
+      name.oninput = function () { p.name = name.value; };
+
+      var toggle = document.createElement('button');
+      toggle.className = 'toggle' + (p.isAI ? ' on' : '');
+      toggle.title = 'Превключи между човек и AI';
+      toggle.innerHTML = '<span class="switch"></span><span>AI</span>';
+      toggle.onclick = function () {
+        p.isAI = !p.isAI;
+        // give the player a name fitting its new kind
+        p.name = p.isAI ? aiNames() : humanNames();
+        renderSetup();
+      };
 
       var del = document.createElement('button');
-      del.className = 'del';
-      del.textContent = '✕';
-      del.title = 'Премахни';
-      del.addEventListener('click', function () {
-        setupPlayers.splice(i, 1);
-        renderSetup();
-      });
+      del.className = 'del'; del.textContent = '✕'; del.title = 'Премахни';
+      del.onclick = function () { setupPlayers.splice(i, 1); renderSetup(); };
 
       row.appendChild(color);
       row.appendChild(name);
+      row.appendChild(toggle);
       if (setupPlayers.length > 1) row.appendChild(del);
       list.appendChild(row);
     });
   }
 
-  $('addPlayer').addEventListener('click', function () {
-    var n = setupPlayers.length;
-    addSetupPlayer('Играч ' + (n + 1), PRESET_COLORS[n % PRESET_COLORS.length]);
-  });
-
-  $('startGame').addEventListener('click', function () {
-    var names = setupPlayers.map(function (p) { return (p.name || '').trim(); });
-    if (names.some(function (n) { return !n; })) {
+  $('addPlayer').onclick = function () { addSetupPlayer(false); };
+  $('startGame').onclick = function () {
+    if (setupPlayers.some(function (p) { return !(p.name || '').trim(); })) {
       $('setupErr').textContent = 'Всеки играч трябва да има име.';
       return;
     }
     $('setupErr').textContent = '';
     startGame(setupPlayers.map(function (p) {
-      return G.createPlayer(p.name.trim(), p.color);
+      return G.createPlayer(p.name.trim(), p.color, p.isAI);
     }));
-  });
+  };
 
-  // seed two players to start
-  addSetupPlayer('Играч 1', PRESET_COLORS[0]);
-  addSetupPlayer('Играч 2', PRESET_COLORS[1]);
+  addSetupPlayer(false);
+  addSetupPlayer(false);
 
-  // ============================================================ GAME
+  // ===================================================== GAME STATE
   var game = null;
-  // per-turn dice state
-  var dice = [];                 // current dice values
+  var dice = [];
   var holds = [false, false, false, false, false];
-  var rollsUsed = 0;             // 0..MAX_ROLLS
+  var rollsUsed = 0;
+  var aiBusy = false;
 
   function startGame(players) {
     game = G.createGame(players);
@@ -269,198 +380,236 @@
     dice = [];
     holds = [false, false, false, false, false];
     rollsUsed = 0;
+    var p = G.currentPlayer(game);
+    document.documentElement.style.setProperty('--accent', p.color);
     renderAll();
+    if (p.isAI) runAiTurn();
   }
 
   function rolling() { return rollsUsed > 0; }
   function rollsLeft() { return G.MAX_ROLLS - rollsUsed; }
 
-  $('rollBtn').addEventListener('click', function () {
-    if (rollsLeft() <= 0) return;
-    if (rollsUsed === 0) {
-      dice = G.rollAll();
-    } else {
-      dice = G.reroll(dice, holds, null);
-    }
+  function doRoll() {
+    dice = rollsUsed === 0 ? G.rollAll() : G.reroll(dice, holds, null);
     rollsUsed++;
-    // un-hold nothing; holds persist between rerolls intentionally
     renderAll();
     animateDice();
-  });
+  }
+
+  $('rollBtn').onclick = function () {
+    if (aiBusy || rollsLeft() <= 0) return;
+    doRoll();
+  };
 
   function animateDice() {
-    var els = $('dice').querySelectorAll('.die');
-    els.forEach(function (el, i) {
-      if (!holds[i]) {
-        el.classList.remove('rolling');
-        // force reflow to restart animation
-        void el.offsetWidth;
-        el.classList.add('rolling');
-      }
+    $('dice').querySelectorAll('.die').forEach(function (el, i) {
+      if (!holds[i]) { el.classList.remove('roll'); void el.offsetWidth; el.classList.add('roll'); }
     });
   }
 
   function toggleHold(i) {
-    if (!rolling() || rollsLeft() <= 0) return; // nothing to hold for
+    if (aiBusy || !rolling() || rollsLeft() <= 0) return;
     holds[i] = !holds[i];
     renderDice();
   }
 
   // ---- rendering ----
-  function renderAll() {
-    renderTurnbar();
-    renderDice();
-    renderScoreTable();
-    renderPeekList();
+  function renderAll() { renderTop(); renderDice(); renderBoard(); renderSide(); }
+
+  function renderTop() {
+    var p = G.currentPlayer(game);
+    var av = $('curAvatar');
+    av.style.background = p.color; av.textContent = initials(p.name);
+    $('curName').textContent = p.name;
+    $('curAi').classList.toggle('hidden', !p.isAI);
+    $('roundMeta').textContent = 'Рунд ' + game.round;
+
+    var pips = '';
+    for (var i = 0; i < G.MAX_ROLLS; i++) pips += '<i class="' + (i < rollsLeft() ? 'live' : '') + '"></i>';
+    $('rollPips').innerHTML = pips;
+
+    var btn = $('rollBtn');
+    btn.disabled = aiBusy || rollsLeft() <= 0;
+    btn.textContent = rollsUsed === 0 ? '🎲 Хвърли' : '🎲 Хвърли отново (' + rollsLeft() + ')';
+    btn.classList.toggle('hidden', p.isAI);
+    $('thinking').classList.toggle('hidden', !p.isAI || !aiBusy);
+
+    $('hint').textContent = p.isAI ? ''
+      : !rolling() ? 'Натиснете „Хвърли“, за да започнете хода си.'
+      : rollsLeft() > 0 ? 'Натиснете зар, за да го задържите. Изберете предложение от дъската, за да точкувате.'
+      : 'Няма повече хвърляния — изберете категория за точкуване.';
   }
 
-  function renderTurnbar() {
-    var p = G.currentPlayer(game);
-    $('curDot').style.background = p.color;
-    $('curName').textContent = p.name;
-    $('roundPill').textContent = 'Рунд ' + game.round;
-    var left = rollsLeft();
-    $('rollsPill').textContent = left + (left === 1 ? ' хвърляне' : ' хвърляния');
-
-    var rollBtn = $('rollBtn');
-    rollBtn.disabled = left <= 0;
-    rollBtn.textContent = rollsUsed === 0 ? '🎲 Хвърли' : '🎲 Хвърли отново';
-    $('rollsLeft').textContent = rolling()
-      ? 'Използвани ' + rollsUsed + ' / ' + G.MAX_ROLLS
-      : '';
-    $('diceHint').textContent = !rolling()
-      ? 'Натиснете „Хвърли“, за да започнете хода си.'
-      : (left > 0
-          ? 'Натиснете зар, за да го задържите, или изберете категория за точкуване.'
-          : 'Няма повече хвърляния — изберете категория за точкуване.');
+  function dieEl(value, held, idx, interactive) {
+    var el = document.createElement('div');
+    if (value == null) {
+      el.className = 'die ghost';
+      el.innerHTML = '<div class="q">?</div>';
+      return el;
+    }
+    el.className = 'die' + (held ? ' held' : '');
+    var pips = '';
+    for (var c = 0; c < 9; c++) pips += '<span class="pip' + (PIPS[value].indexOf(c) > -1 ? ' on' : '') + '"></span>';
+    el.innerHTML = '<div class="pips">' + pips + '</div>';
+    if (interactive) el.onclick = function () { toggleHold(idx); };
+    else el.style.cursor = 'default';
+    return el;
   }
 
   function renderDice() {
-    var box = $('dice');
-    box.innerHTML = '';
+    var box = $('dice'); box.innerHTML = '';
+    var p = G.currentPlayer(game);
+    var interactive = !p.isAI && rolling() && rollsLeft() > 0;
     for (var i = 0; i < G.DICE_COUNT; i++) {
-      var el = document.createElement('div');
-      if (!rolling()) {
-        el.className = 'die empty';
-        el.textContent = '?';
-      } else {
-        el.className = 'die' + (holds[i] ? ' held' : '');
-        el.textContent = DICE_FACES[dice[i]];
-        el.title = holds[i] ? 'Задържан' : 'Натиснете, за да задържите';
-        (function (idx) {
-          el.addEventListener('click', function () { toggleHold(idx); });
-        })(i);
-      }
-      box.appendChild(el);
+      box.appendChild(dieEl(rolling() ? dice[i] : null, holds[i], i, interactive));
     }
   }
 
-  function renderScoreTable() {
+  function renderBoard() {
     var p = G.currentPlayer(game);
-    $('scoreTable').innerHTML = buildBoard(p, true);
-    // wire up clickable open categories
-    $('scoreTable').querySelectorAll('.cat.open').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        chooseCategory(btn.getAttribute('data-key'));
-      });
-    });
+    var canScore = !p.isAI && rolling();
+    fillBoard('boardUpper', 'upper', p, canScore);
+    fillBoard('boardLower', 'lower', p, canScore);
+    $('curTotal').textContent = G.playerTotal(p);
   }
 
-  // build a scoreboard table. interactive=true => current player's live board.
-  function buildBoard(player, interactive) {
-    var html = '';
-    var sections = [
-      { title: 'Горна секция', group: 'upper' },
-      { title: 'Долна секция', group: 'lower' },
-    ];
-    sections.forEach(function (sec) {
-      html += '<tr><th colspan="2">' + sec.title + '</th></tr>';
-      G.CATEGORIES.filter(function (c) { return c.group === sec.group; }).forEach(function (c) {
-        var filled = G.isCategoryFilled(player, c.key);
-        var val, cls;
-        if (filled) {
-          val = player.scores[c.key];
-          cls = 'cat filled' + (val === 0 ? ' zero' : '');
-        } else if (interactive && rolling()) {
-          val = G.scoreFor(c.key, dice);
-          cls = 'cat open' + (val === 0 ? ' cannot' : '');
+  function fillBoard(elId, group, player, canScore) {
+    var host = $(elId); host.innerHTML = '';
+    G.CATEGORIES.filter(function (c) { return c.group === group; }).forEach(function (c) {
+      var row = document.createElement('div');
+      var filled = G.isCategoryFilled(player, c.key);
+      row.className = 'cat';
+
+      var label = document.createElement('span');
+      label.className = 'clabel'; label.textContent = c.label;
+      row.appendChild(label);
+
+      if (filled) {
+        var v = player.scores[c.key];
+        row.className += ' filled' + (v === 0 ? ' zeroed' : '');
+        var val = document.createElement('span');
+        val.className = 'cval'; val.textContent = v;
+        row.appendChild(val);
+      } else if (canScore) {
+        var cands = G.candidates(c.key, dice);
+        var best = Math.max.apply(null, cands);
+        if (best > 0) {
+          row.className += ' suggest';
+          cands.forEach(function (v) {
+            var chip = document.createElement('button');
+            chip.className = 'chip'; chip.textContent = v;
+            chip.onclick = function () { fillCategory(c.key, v); };
+            row.appendChild(chip);
+          });
         } else {
-          val = '–';
-          cls = 'cat' + (interactive ? ' disabled' : '');
+          row.className += ' sacrifice';
+          var z = document.createElement('button');
+          z.className = 'chip zero'; z.textContent = '0';
+          z.title = 'Запиши 0 (изразходва категорията)';
+          z.onclick = function () {
+            if (confirm('Да запиша ли 0 в „' + c.label + '“? Това изразходва категорията.')) {
+              fillCategory(c.key, 0);
+            }
+          };
+          row.appendChild(z);
         }
-        html += '<tr><td>'
-          + '<' + (interactive && !filled && rolling() ? 'button' : 'div') + ' class="' + cls + '" data-key="' + c.key + '">'
-          + '<span class="label">' + c.label + '</span>'
-          + '<span class="val">' + val + '</span>'
-          + '</' + (interactive && !filled && rolling() ? 'button' : 'div') + '>'
-          + '</td></tr>';
-      });
+      } else {
+        var dash = document.createElement('span');
+        dash.className = 'cval'; dash.textContent = '–';
+        row.appendChild(dash);
+      }
+      host.appendChild(row);
     });
-    html += '<tr class="totrow"><td><span>Общо</span><span>' + G.playerTotal(player) + '</span></td></tr>';
-    return html;
   }
 
-  function chooseCategory(key) {
+  function fillCategory(key, value) {
     var p = G.currentPlayer(game);
-    if (!rolling() || G.isCategoryFilled(p, key)) return;
-    G.assignScore(p, key, dice);
+    if (aiBusy || p.isAI || !rolling() || G.isCategoryFilled(p, key)) return;
+    G.assignScore(p, key, dice, value);
+    advance();
+  }
 
-    if (G.isGameOver(game)) {
-      showGameOver();
-      return;
-    }
+  function advance() {
+    if (G.isGameOver(game)) { showGameOver(); return; }
     G.nextTurn(game);
     beginTurn();
   }
 
-  function renderPeekList() {
-    var box = $('peekList');
-    box.innerHTML = '';
+  function renderSide() {
+    var box = $('plist'); box.innerHTML = '';
     game.players.forEach(function (p, i) {
       var b = document.createElement('button');
-      b.className = 'peek' + (i === game.current ? ' active' : '');
-      b.innerHTML = '<span class="dot" style="background:' + p.color + '"></span>'
-        + '<span class="nm">' + escapeHtml(p.name) + (i === game.current ? ' • на ход' : '') + '</span>'
-        + '<span class="tt">' + G.playerTotal(p) + '</span>';
-      b.addEventListener('click', function () { openPeek(i); });
+      b.className = 'pcard' + (i === game.current ? ' current' : '');
+      var av = '<span class="avatar" style="background:' + p.color + ';width:26px;height:26px;font-size:12px">' + initials(p.name) + '</span>';
+      var mini = p.isAI ? '<span class="mini">AI</span>' : '';
+      b.innerHTML = av + '<span class="nm">' + escapeHtml(p.name) + '</span>' + mini + '<span class="tt">' + G.playerTotal(p) + '</span>';
+      b.onclick = function () { openPeek(i); };
       box.appendChild(b);
     });
   }
 
+  // ---- peek ----
   function openPeek(i) {
     var p = game.players[i];
     $('peekTitle').textContent = p.name;
-    $('peekTable').innerHTML = buildBoard(p, false);
+    var html = '';
+    G.CATEGORIES.forEach(function (c) {
+      var filled = G.isCategoryFilled(p, c.key);
+      html += '<div class="peekrow' + (filled ? '' : ' empty') + '">'
+        + '<span>' + c.label + '</span>'
+        + '<span class="pv">' + (filled ? p.scores[c.key] : '–') + '</span></div>';
+    });
+    $('peekBody').innerHTML = html;
+    $('peekTotal').textContent = G.playerTotal(p);
     $('peekModal').classList.remove('hidden');
   }
-  $('peekClose').addEventListener('click', function () { $('peekModal').classList.add('hidden'); });
-  $('peekModal').addEventListener('click', function (e) {
-    if (e.target === $('peekModal')) $('peekModal').classList.add('hidden');
-  });
+  $('peekClose').onclick = function () { $('peekModal').classList.add('hidden'); };
+  $('peekModal').onclick = function (e) { if (e.target === $('peekModal')) $('peekModal').classList.add('hidden'); };
 
+  // ---- game over ----
   function showGameOver() {
     var r = G.ranking(game);
-    var win = r[0];
-    $('winner').innerHTML = '<span class="dot" style="background:' + win.player.color + '"></span>'
-      + escapeHtml(win.player.name) + ' — ' + win.total + ' т.';
-    var html = '<tr><th>Класиране</th><th></th></tr>';
-    r.forEach(function (x, idx) {
-      html += '<tr class="totrow"><td><span>' + (idx + 1) + '. ' + escapeHtml(x.player.name) + '</span><span>' + x.total + '</span></td></tr>';
-    });
-    $('finalTable').innerHTML = html;
+    $('winner').innerHTML = '<span class="avatar" style="background:' + r[0].player.color + '">' + initials(r[0].player.name) + '</span>'
+      + escapeHtml(r[0].player.name) + ' — ' + r[0].total + ' т.';
+    $('ranks').innerHTML = r.map(function (x, idx) {
+      return '<div class="rank' + (idx === 0 ? ' first' : '') + '"><span class="pos">' + (idx + 1) + '</span>'
+        + '<span class="avatar" style="background:' + x.player.color + ';width:26px;height:26px;font-size:12px">' + initials(x.player.name) + '</span>'
+        + '<span class="nm">' + escapeHtml(x.player.name) + '</span><span class="tt">' + x.total + '</span></div>';
+    }).join('');
     $('overModal').classList.remove('hidden');
   }
-
-  $('playAgain').addEventListener('click', function () {
+  $('playAgain').onclick = function () {
     $('overModal').classList.add('hidden');
     $('game').classList.add('hidden');
     $('setup').classList.remove('hidden');
-  });
+  };
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
+  // ---- AI autoplay ----
+  function runAiTurn() {
+    aiBusy = true;
+    renderTop();
+    setTimeout(aiStep, AI_DELAY);
+  }
+  function aiStep() {
+    if (rollsLeft() > 0) {
+      if (rollsUsed > 0) holds = G.aiChooseHolds(dice);
+      doRoll();
+      // decide whether to keep rolling: keep going while rolls remain
+      if (rollsLeft() > 0) {
+        holds = G.aiChooseHolds(dice);
+        renderDice();
+        setTimeout(aiStep, AI_DELAY);
+        return;
+      }
+    }
+    setTimeout(aiFinish, AI_DELAY);
+  }
+  function aiFinish() {
+    var p = G.currentPlayer(game);
+    var choice = G.aiChooseCategory(p, dice);
+    G.assignScore(p, choice.category, dice, choice.value);
+    aiBusy = false;
+    advance();
   }
 })();
 </script>

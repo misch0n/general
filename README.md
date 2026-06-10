@@ -8,65 +8,58 @@ This is the base version; it will be expanded later.
 
 ## Features
 
-- **Any number of players**, with customizable **names** and **colours**.
-- 5 dice, up to **3 rolls** per turn:
-  - 1st roll throws all dice;
-  - 2nd / 3rd roll re-throws all dice or any subset you choose (click a die to
-    hold it).
-- A **separate scoreboard per player**. The board on screen is always the
-  current player's; turns rotate automatically after a category is scored.
-- **Peek** at any other player's board from the sidebar — it stays off to the
-  side and read-only, so you can glance without disturbing your turn.
-- Live score **previews**: after rolling, each open category shows what it would
-  score if you picked it.
+- **Dice front and centre.** Five large, tactile dice are the focus of the
+  screen. Players roll manually, then click dice to **hold** them and re-roll
+  the rest — up to **3 rolls** per turn.
+- **A suggestion engine.** After every roll the scoreboard detects all the
+  combinations the dice make and highlights each scorable category with its
+  value. Categories that can be filled several ways (e.g. two different pairs
+  for `2x`) show **one chip per option** so you can pick which to record.
+- **Any number of players**, with customizable **names** and **colours**, plus a
+  separate, rotating scoreboard for each.
+- **AI players.** Flip the toggle next to any player before the game to make
+  them computer-controlled; the AI rolls, holds and scores on its own.
+- **Themed names.** Humans are seeded with silly Bulgarian military names
+  (_Генерал Малка Пишка_, _Майор Черен Петел_); AIs get electric / metallic ones
+  (_Генерал Електро Камила_, _Майор Продупчено Тенеке_). All editable.
+- **Peek** at any player's board from the sidebar — read-only, off to the side.
 - End-of-game ranking screen.
 
 ## Scoreboard & scoring
 
-The categories, in board order:
-
 | Category        | Bulgarian      | Scores |
 | --------------- | -------------- | ------ |
-| Ones            | 1              | Sum of dice showing **1** |
-| Twos            | 2              | Sum of dice showing **2** |
-| Threes          | 3              | Sum of dice showing **3** |
-| Fours           | 4              | Sum of dice showing **4** |
-| Fives           | 5              | Sum of dice showing **5** |
-| Sixes           | 6              | Sum of dice showing **6** |
-| Two of a kind   | 2x             | Sum of **all** dice, if ≥2 of a kind (else 0) |
-| Three of a kind | 3x             | Sum of **all** dice, if ≥3 of a kind (else 0) |
-| Four of a kind  | 4x             | Sum of **all** dice, if ≥4 of a kind (else 0) |
-| Full house      | фул хаус       | **25**, for a triple + a pair |
-| Small straight  | малка кента    | **30**, for four in a row (1-2-3-4, 2-3-4-5 or 3-4-5-6) |
-| Large straight  | голяма кента   | **40**, for five in a row (1-2-3-4-5 or 2-3-4-5-6) |
-| General         | генерал        | **50**, for all five dice equal |
-| Chance          | шанс           | Sum of all dice |
+| Ones … Sixes    | 1 … 6          | Sum of the dice showing that face (or 0) |
+| Two of a kind   | 2x             | Sum of **two** equal dice (you choose which pair) |
+| Three of a kind | 3x             | Sum of the **three** equal dice |
+| Four of a kind  | 4x             | Sum of the **four** equal dice |
+| Full house      | фул хаус       | A pair + a triple → **sum of all five dice** |
+| Small straight  | малка кента    | Exactly **1-2-3-4-5** → 15 |
+| Large straight  | голяма кента   | Exactly **2-3-4-5-6** → 20 |
+| General         | генерал        | All five dice equal → **50 + the dice total** |
+| Chance          | шанс           | Sum of all five dice |
 
-Each category is scored exactly once per player. You may "sacrifice" a category
-by scoring it as 0 when nothing else fits.
+Each category is scored exactly once per player. When nothing qualifies you can
+**sacrifice** a category by recording it as 0.
 
-### Rules I had to decide (please confirm / correct)
+The point values live in one place — the `SCORING` object and the `candidates()`
+function near the top of [`game.js`](game.js) — so they're easy to tune later.
 
-A few details weren't fully specified, so I picked sensible defaults. They all
-live in one place — the `SCORING` object and the `SCORERS` map near the top of
-[`game.js`](game.js) — so they're easy to change:
+## AI strategy (base version)
 
-- **`генерал` = five of a kind.** You described it as "6 same sides", but the
-  game uses 5 dice, so I implemented it as **all 5 dice equal** (a Yahtzee).
-  If генерал should mean something else, this is the thing to revisit.
-- **`2x` / `3x` / `4x` score the sum of all five dice** (not just the matching
-  dice). Switch the `twoKind`/`threeKind`/`fourKind` scorers if you'd rather
-  sum only the matching dice.
-- **`малка/голяма кента`** are interpreted Yahtzee-style: small = any **four**
-  consecutive dice, large = all **five** consecutive.
-- **Fixed point values** (full house 25, small straight 30, large straight 40,
-  general 50) — tune them in `SCORING`.
-- **No upper-section bonus** is included (the scoreboard you gave didn't list
-  one). Easy to add later if Генерал uses one.
+A deliberately simple, greedy bot, all in pure functions in `game.js`
+(`aiChooseHolds`, `aiChooseCategory`):
+
+- **Holds** the largest matching group of dice (chasing x-of-a-kind / general);
+  with no pair, it keeps the high dice (5s and 6s).
+- **Scores** the highest-value open category; if nothing scores, it sacrifices
+  in a fixed order (hardest combos first).
+
+It's intentionally beatable and a clean starting point to improve later.
 
 ## Running locally
 
-It's a static page — just open `index.html` in a browser. Or serve the folder:
+It's a static page — open `index.html`, or serve the folder:
 
 ```bash
 python3 -m http.server 8000   # then visit http://localhost:8000
@@ -74,33 +67,30 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 
 ## Tests
 
-All game rules and workflows live in dependency-free, DOM-free code in
-[`game.js`](game.js) and are covered by the test suite using Node's built-in
-test runner (no `npm install` needed):
+All rules, the suggestion engine, the AI and the name generators live in
+dependency-free, DOM-free code in [`game.js`](game.js) and are covered by Node's
+built-in test runner (no `npm install` needed):
 
 ```bash
-node --test
-# or
-npm test
+node --test     # or: npm test
 ```
 
-The suite covers every scoring category (hits and misses), dice rolling /
-holding, score assignment, turn rotation, game-over detection, ranking, and a
-full play-through.
+The suite covers every scoring category (including multi-option suggestions and
+the worked examples `1 2 2 5 5` and `2 2 4 4 4`), dice rolling / holding, score
+assignment and sacrifice, turn rotation, game-over, ranking, the AI's hold and
+category choices, and the name generators.
 
 ## Deployment
 
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs the tests
-and then deploys the site to **GitHub Pages** on every push to `main`.
-
-To turn it on: repo **Settings → Pages → Build and deployment → Source:
-GitHub Actions**. The next push to `main` will publish the page.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs the tests and
+then deploys the site to **GitHub Pages** on every push to `main`. Pages is
+already enabled for this repo, so a push publishes the latest build.
 
 ## Project layout
 
 ```
-index.html   # the single-page app (UI + controller)
-game.js      # pure game logic, shared by the page and the tests
+index.html   # single-page app (UI + controller)
+game.js      # pure game logic, suggestion engine, AI, name generators
 test/        # node:test unit tests
 .github/     # CI + Pages deploy workflow
 ```
