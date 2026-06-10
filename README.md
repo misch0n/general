@@ -57,6 +57,9 @@ edition): camouflage field, classification banner, brass medals and stencil type
   around the real table.
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
+- **Gender switch.** Each seat has a male/female toggle (restroom pictograms,
+  blue/pink). It's assigned at random and re-generates a **gender-matching name**;
+  callouts agree too (the agreement engine handles the grammar).
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).

@@ -465,8 +465,9 @@
     ],
   };
 
-  // Brutal, comic-book roasts shown when a turn ends in disappointment. These
-  // are standalone lines (no combo reference), so they need no agreement.
+  // Brutal, comic-book roasts shown when a turn ends in disappointment. Standalone
+  // lines (no combo reference). A {word} token is gender-inflected for the player
+  // (masculine as written, +а for feminine) so callouts agree with the player.
   ROASTS.flop = [
     'Майка ти съжалява, че те е родила.',
     'Това беше позор за целия род.',
@@ -479,8 +480,17 @@
     'Това хвърляне е обида към армията.',
     'Генералът въздъхна и се обърна на другата страна.',
     'Заровете те предадоха. Като всички останали.',
-    'Дано поне в живота си по-костелив от това.',
+    'Дано поне в живота си по-{костелив} от това.',
+    '{Роден} си за поражения, личи си.',
   ];
+
+  // Fill a roast's {adj} tokens for the player's gender (m as written, f = +а).
+  function genderFill(template, gender) {
+    return template.replace(/\{([^}]+)\}/g, function (_, w) {
+      return gender === 'f' ? w + 'а' : w;
+    });
+  }
+  function randomGender(rng) { return (rng || Math.random)() < 0.5 ? 'm' : 'f'; }
 
   // Was a commit genuinely disappointing (worth a roast)? Either the player
   // ended up with (next to) nothing, or they re-rolled everything and still
@@ -527,13 +537,17 @@
     { base: 'нано', inv: true }, { base: 'мега', inv: true },
   ];
 
-  // Nouns carry their grammatical gender (display form, capitalized).
+  // Nouns carry their grammatical gender (display form, capitalized). New ones
+  // appended at the end (keeps the first m/f stable). Gendered name generation
+  // picks a noun matching the player's gender, so the whole name agrees.
   var NOUNS = [
     { w: 'Пишка', g: 'f' }, { w: 'Петел', g: 'm' }, { w: 'Краставица', g: 'f' },
     { w: 'Тиква', g: 'f' }, { w: 'Мотика', g: 'f' }, { w: 'Чорап', g: 'm' },
     { w: 'Баклава', g: 'f' }, { w: 'Магаре', g: 'n' }, { w: 'Кашкавал', g: 'm' },
     { w: 'Лопата', g: 'f' }, { w: 'Бухал', g: 'm' }, { w: 'Геврек', g: 'm' },
     { w: 'Таралеж', g: 'm' }, { w: 'Дюшек', g: 'm' },
+    { w: 'Метла', g: 'f' }, { w: 'Кокошка', g: 'f' }, { w: 'Патка', g: 'f' },
+    { w: 'Маймуна', g: 'f' }, { w: 'Кранта', g: 'f' }, { w: 'Пън', g: 'm' }, { w: 'Чук', g: 'm' },
   ];
   var AI_NOUNS = [
     { w: 'Камила', g: 'f' }, { w: 'Тенеке', g: 'n' }, { w: 'Робот', g: 'm' },
@@ -541,6 +555,8 @@
     { w: 'Тостер', g: 'm' }, { w: 'Прахосмукачка', g: 'f' }, { w: 'Ютия', g: 'f' },
     { w: 'Котлон', g: 'm' }, { w: 'Бойлер', g: 'm' }, { w: 'Динамо', g: 'n' },
     { w: 'Реотан', g: 'm' }, { w: 'Ключ', g: 'm' },
+    { w: 'Турбина', g: 'f' }, { w: 'Платка', g: 'f' }, { w: 'Антена', g: 'f' },
+    { w: 'Жица', g: 'f' }, { w: 'Батерия', g: 'f' }, { w: 'Кабел', g: 'm' }, { w: 'Винт', g: 'm' },
   ];
 
   // Self-contained (already grammatical) wagers for the "Залага X" line.
@@ -553,16 +569,20 @@
 
   function pick(arr, rng) { return arr[Math.floor((rng || Math.random)() * arr.length)]; }
 
-  // Name = Title + Adjective (agreeing with the noun's gender) + Noun.
-  // e.g. "Ефрейтор Смотана Пишка" (f), "Майор Смотан Петел" (m).
-  function randomName(adjs, nouns, rng) {
-    var noun = pick(nouns, rng);
+  // Name = Title + Adjective (agreeing with the noun's gender) + Noun. When a
+  // `gender` ('m'/'f') is given, the noun is picked to match it, so the whole
+  // name agrees with the player — "Ефрейтор Смотана Пишка" (f), "Майор Смотан
+  // Петел" (m).
+  function randomName(adjs, nouns, rng, gender) {
+    var pool = gender ? nouns.filter(function (n) { return n.g === gender; }) : nouns;
+    if (!pool.length) pool = nouns;
+    var noun = pick(pool, rng);
     var raw = pick(adjs, rng);
     var adj = typeof raw === 'string' ? { base: raw } : raw;
     return pick(TITLES, rng) + ' ' + capitalize(inflectAdj(adj, noun.g)) + ' ' + noun.w;
   }
-  function randomHumanName(rng) { return randomName(ADJS, NOUNS, rng); }
-  function randomAiName(rng) { return randomName(AI_ADJS, AI_NOUNS, rng); }
+  function randomHumanName(rng, gender) { return randomName(ADJS, NOUNS, rng, gender); }
+  function randomAiName(rng, gender) { return randomName(AI_ADJS, AI_NOUNS, rng, gender); }
   function randomBet(rng) { return pick(BETS, rng); }
 
   // ----------------------------------------------------- bot personas & ranks
@@ -606,12 +626,12 @@
   function nameGenerator(kind) {
     var used = {};
     var make = kind === 'ai' ? randomAiName : randomHumanName;
-    return function (rng) {
+    return function (rng, gender) {
       for (var i = 0; i < 60; i++) {
-        var n = make(rng);
+        var n = make(rng, gender);
         if (!used[n]) { used[n] = true; return n; }
       }
-      return make(rng);
+      return make(rng, gender);
     };
   }
 
@@ -664,6 +684,8 @@
     randomHumanName: randomHumanName,
     randomAiName: randomAiName,
     randomBet: randomBet,
+    randomGender: randomGender,
+    genderFill: genderFill,
     nameGenerator: nameGenerator,
     PERSONAS: PERSONAS,
     personaById: personaById,

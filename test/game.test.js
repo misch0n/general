@@ -410,6 +410,28 @@ test('generated names agree: adjective matches noun gender', function () {
   assert.strictEqual(G.randomHumanName(zero), 'Генерал Смотана Пишка');
 });
 
+test('randomGender returns m or f', function () {
+  assert.strictEqual(G.randomGender(function () { return 0.3; }), 'm');
+  assert.strictEqual(G.randomGender(function () { return 0.7; }), 'f');
+});
+
+test('genderFill inflects {adj} tokens by player gender', function () {
+  assert.strictEqual(G.genderFill('по-{костелив} от това', 'm'), 'по-костелив от това');
+  assert.strictEqual(G.genderFill('по-{костелив} от това', 'f'), 'по-костелива от това');
+  assert.strictEqual(G.genderFill('{Роден} си за провал', 'f'), 'Родена си за провал');
+  assert.strictEqual(G.genderFill('без токени', 'f'), 'без токени');
+});
+
+test('gendered names pick a matching-gender noun + agreeing adjective', function () {
+  var zero = function () { return 0; };
+  // female -> first feminine noun (Пишка) + feminine adjective (смотана)
+  assert.strictEqual(G.randomHumanName(zero, 'f'), 'Генерал Смотана Пишка');
+  // male -> first masculine noun (Петел) + masculine adjective (смотан)
+  assert.strictEqual(G.randomHumanName(zero, 'm'), 'Генерал Смотан Петел');
+  // a feminine AI name must also resolve to a feminine noun
+  assert.strictEqual(G.randomAiName(zero, 'f').split(' ').length, 3);
+});
+
 // ----------------------------------------------------------------- names
 
 test('name generators follow Title + Adjective + Noun', function () {
