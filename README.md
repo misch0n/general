@@ -13,14 +13,17 @@ edition): camouflage field, classification banner, brass medals and stencil type
   **dice console** at the bottom — designed to fit a phone (360–414px).
 - **Select-to-reroll.** Dice default to **kept**. Tap the ones you want to
   re-roll (a ✛ reticle marks them) and hit **ОГЪН**; selection clears after every
-  throw. Up to **3 throws** per turn (one automatic roll + two rerolls).
+  throw. Up to **3 throws** per turn (one automatic roll + two rerolls). Thrown
+  dice are always **sorted by face** for easy scanning.
 - **Suggestions live inside the scoreboard.** After each throw every open
   category shows the points the dice would score as a tappable brass chip; combos
   fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
   small **×** forfeits a slot. The single best move is flagged with a ★.
-- **Hit-chance toggle.** Tap **ШАНСОВЕ** to overlay each open category's live
-  probability of hitting — computed from the current dice and throws left,
-  updating as you roll. Off by default; subtle when on.
+- **Odds toggle.** Tap **ШАНСОВЕ** to overlay each open category's live chance of
+  **improving** its score — i.e. the probability that keeping the useful dice and
+  re-rolling some of the rest betters what you already have (with one 2, that's
+  the chance of rolling another 2; not certainty). Updates as you roll; only
+  `шанс` ever reads 100%. Off by default.
 - **Roasts.** Gamble a made combo away (re-rolling a full house, straight, four
   of a kind…) and the game taunts you — a lighter jab when you take the risk,
   the harshest lines when it backfires. Fully gender-agreed Bulgarian (below).
@@ -29,8 +32,8 @@ edition): camouflage field, classification banner, brass medals and stencil type
   reachable from the player pills (tap to peek).
 - **AI players.** Flip a toggle in setup; the AI marks targets, fires and scores
   on its own.
-- **Stupid bets.** Every player wagers something idiotic (_Залага кучето си_,
-  _майка си_, _достойнството си_…), re-rollable in setup.
+- **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
+  _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).

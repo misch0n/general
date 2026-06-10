@@ -347,6 +347,36 @@
     return p;
   }
 
+  // Probability of IMPROVING this category's current score, by keeping the dice
+  // that help it and re-rolling some of the others over `rerolls` throws. This
+  // is the number shown to the player: it answers "is it worth re-rolling for
+  // this?", not "do I already have it". Notes:
+  //   - already having a combo is NOT 100% — e.g. with one 2, this is the chance
+  //     of rolling another 2 (a higher score), not certainty.
+  //   - a made fixed-value combo (a straight, a five-of-a-kind) can't be bettered
+  //     by re-rolling, so it reads 0.
+  //   - it never re-rolls ALL the dice toward a fresh start; it keeps what helps.
+  //   - `chance` is the guaranteed catch-all, so it always reads 1.
+  function improveProbability(category, dice, rerolls) {
+    if (category === 'chance') return 1;
+    return probAbove(category, dice, rerolls, scoreFor(category, dice), {});
+  }
+  function probAbove(category, dice, rerolls, threshold, memo) {
+    if (scoreFor(category, dice) > threshold) return 1; // already bettered — lock it in
+    if (rerolls <= 0) return 0;
+    var keep = keepToward(category, dice);
+    if (keep.length >= DICE_COUNT) return 0; // nothing to re-roll toward improvement
+    var key = dice.slice().sort().join('') + '|' + rerolls;
+    if (memo[key] != null) return memo[key];
+    var dist = REROLL_DIST[DICE_COUNT - keep.length];
+    var p = 0;
+    for (var i = 0; i < dist.length; i++) {
+      p += dist[i].prob * probAbove(category, keep.concat(dist[i].faces), rerolls - 1, threshold, memo);
+    }
+    memo[key] = p;
+    return p;
+  }
+
   // ----------------------------------------------------------- risk & roasts
 
   // Best score available across a player's unfilled categories for these dice.
@@ -543,6 +573,7 @@
     keepToward: keepToward,
     hitProbability: hitProbability,
     hitProbabilityFresh: hitProbabilityFresh,
+    improveProbability: improveProbability,
     bestOpenScore: bestOpenScore,
     atRiskPremium: atRiskPremium,
     ROASTS: ROASTS,

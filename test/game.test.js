@@ -279,6 +279,35 @@ test('chance to roll a face with one reroll of five dice', function () {
   approx(G.hitProbability('ones', [2, 3, 4, 5, 6], 1), 1 - Math.pow(5 / 6, 5), 1e-12);
 });
 
+test('improveProbability: only chance is ever 100%, made combos are not', function () {
+  assert.strictEqual(G.improveProbability('chance', [1, 1, 1, 1, 1], 2), 1);
+  // having one 2 is NOT certainty — it is the chance of rolling another 2
+  approx(G.improveProbability('twos', [2, 3, 4, 5, 6], 2), 1 - Math.pow(25 / 36, 4), 1e-9);
+  assert.ok(G.improveProbability('twos', [2, 3, 4, 5, 6], 2) < 1);
+});
+
+test('improveProbability rises as you get closer to a general', function () {
+  var three = G.improveProbability('general', [6, 6, 6, 1, 2], 2);
+  var four = G.improveProbability('general', [6, 6, 6, 6, 1], 2);
+  assert.ok(four > three, 'four sixes should beat three sixes');
+  approx(G.improveProbability('general', [6, 6, 6, 6, 1], 1), 1 / 6, 1e-9); // one die, one reroll
+});
+
+test('improveProbability is 0 for a combo that cannot be bettered', function () {
+  assert.strictEqual(G.improveProbability('general', [6, 6, 6, 6, 6], 2), 0); // already maxed
+  assert.strictEqual(G.improveProbability('smallStraight', [1, 2, 3, 4, 5], 2), 0); // fixed value
+  assert.strictEqual(G.improveProbability('ones', [2, 3, 4, 5, 6], 0), 0); // no rerolls
+});
+
+test('improveProbability stays within [0,1] for every category', function () {
+  G.CATEGORIES.forEach(function (c) {
+    [0, 1, 2].forEach(function (r) {
+      var p = G.improveProbability(c.key, [1, 2, 2, 5, 6], r);
+      assert.ok(p >= 0 && p <= 1, c.key + '@' + r + ' = ' + p);
+    });
+  });
+});
+
 test('hitProbabilityFresh is a valid probability for every category', function () {
   G.CATEGORIES.forEach(function (c) {
     var p = G.hitProbabilityFresh(c.key);

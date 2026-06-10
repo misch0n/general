@@ -168,8 +168,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .prow2 .del{ margin-left:auto; width:34px; height:34px; border-radius:7px; color:var(--gen-muted); font-size:17px; }
 .prow2 .del:hover{ color:var(--gen-alert); }
 .betline{ margin-top:10px; font-size:12px; color:var(--gen-muted); display:flex; align-items:center; gap:7px; }
-.betline .betval{ color:var(--gen-text); font-weight:700; background:transparent; border:1px dashed var(--gen-pill-line); border-radius:7px; padding:3px 9px; cursor:pointer; }
-.betline .betval:hover{ border-color:var(--gen-brass); color:var(--gen-brass); }
+.betline .betval{ color:var(--gen-text); font-weight:700; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); border-radius:7px; padding:3px 9px; }
 .setup-actions{ display:flex; gap:10px; margin-top:4px; }
 .btn{ flex:1; font-family:var(--gen-font-display); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; font-size:14px;
   border:2px solid var(--gen-ink-line); border-radius:8px; padding:12px; background:var(--gen-pill); color:var(--gen-text); }
@@ -238,7 +237,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     </span>
     <span class="totalbox">
       <span id="curTotal" class="ptotal">0</span>
-      <span class="tcap">ОЧКИ</span>
+      <span class="tcap">ТОЧКИ</span>
     </span>
   </div>
 
@@ -397,9 +396,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       card.appendChild(row);
 
       var bet = document.createElement('div'); bet.className = 'betline';
-      var bv = document.createElement('button'); bv.className = 'betval'; bv.textContent = p.bet; bv.title = 'Друг облог';
-      bv.onclick = function () { p.bet = G.randomBet(); renderSetup(); };
-      bet.appendChild(document.createTextNode('Залага ')); bet.appendChild(bv);
+      // the wager is fixed at draw — you're stuck with whatever you got
+      bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
       card.appendChild(bet);
       list.appendChild(card);
     });
@@ -437,11 +435,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     throwsLeft = ROLLS - 1;            // one automatic roll happened; rerolls remain
     locked = false;
     clearRoast();
-    dice = G.rollAll();
+    dice = G.rollAll(); sortDice();
     var p = G.currentPlayer(game);
     document.documentElement.style.setProperty('--pc', p.color);
     renderAll();
-    shakeDice([true,true,true,true,true]);
+    shakeDice();
     if (p.isAI) runAiTurn();
   }
 
@@ -481,7 +479,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function oddsBadge(key) {
     if (!oddsOn) return '';
-    var pr = G.hitProbability(key, dice, throwsLeft);
+    // chance of improving this category by re-rolling some of the current dice
+    var pr = G.improveProbability(key, dice, throwsLeft);
     return '<span class="odds">' + Math.round(pr * 100) + '%</span>';
   }
 
@@ -578,20 +577,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var holds = selected.map(function (s) { return !s; });
     var risk = G.atRiskPremium(p, dice, holds);
     var bestBefore = G.bestOpenScore(p, dice);
-    var mask = selected.slice();
     dice = dice.map(function (v, i) { return selected[i] ? G.rollDie() : v; });
+    sortDice();
     selected = [false,false,false,false,false];
     throwsLeft--;
-    renderAll(); shakeDice(mask);
+    renderAll(); shakeDice();
     if (risk.length) {
       showRoast('risk', risk[0].key);
       if (G.bestOpenScore(p, dice) < bestBefore) setTimeout(function () { showRoast('fail', risk[0].key); }, 1400);
     }
   }
 
-  function shakeDice(mask) {
-    var els = $('dice').querySelectorAll('.die');
-    els.forEach(function (el, i) { if (mask[i]) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); } });
+  function sortDice() { dice.sort(function (a, b) { return a - b; }); }
+  // dice are re-sorted after every throw, so the whole tray resettles
+  function shakeDice() {
+    $('dice').querySelectorAll('.die').forEach(function (el) {
+      el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    });
   }
 
   // ---------- commit / turn flow ----------
@@ -637,10 +639,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       if (sel.some(Boolean)) {
         selected = sel; renderDice();
         setTimeout(function () {
-          var mask = selected.slice();
           dice = dice.map(function (v, i) { return selected[i] ? G.rollDie() : v; });
+          sortDice();
           selected = [false,false,false,false,false]; throwsLeft--;
-          renderAll(); shakeDice(mask);
+          renderAll(); shakeDice();
           setTimeout(throwsLeft > 0 ? aiStep : aiFinish, AI_DELAY);
         }, AI_DELAY * 0.65);
         return;
