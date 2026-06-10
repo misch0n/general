@@ -97,3 +97,102 @@ test('keepValue equals the EV of the matching ranked keep', function () {
   var kv = EV.keepValue(0, dice, 2, a.best_keep);
   approx(kv, a.keep_ranked[0].ev, 1e-9);
 });
+
+// ---- §2 luck/skill decomposition ----
+
+// play a full game with real dice, logging every node; the identity
+// final_score = par + Σluck + Σskill must hold exactly.
+function simulateLoggedGame(rng, decide) {
+  var scores = {}, total = 0, turns = [];
+  function roll5() { var d = []; for (var i = 0; i < 5; i++) d.push(1 + Math.floor(rng() * 6)); return d.sort(function (a, b) { return a - b; }); }
+  for (var t = 0; t < EV.NCAT; t++) {
+    var mask = EV.maskOfScores(scores);
+    var rolls = [roll5()], keeps = [];
+    var nThrows = 1 + Math.floor(rng() * 3); // stop after 1..3 throws (varied)
+    for (var r = 1; r < nThrows; r++) {
+      var rl = 2 - (r - 1);
+      var keep = decide ? decide(scores, rolls[r - 1], rl) : rolls[r - 1].map(function () { return rng() < 0.5; });
+      keeps.push(keep);
+      rolls.push(rolls[r - 1].map(function (v, i) { return keep[i] ? v : 1 + Math.floor(rng() * 6); }).sort(function (a, b) { return a - b; }));
+    }
+    var last = rolls[rolls.length - 1];
+    // pick a random open category
+    var open = EV.CATS.filter(function (c) { return typeof scores[c.key] !== 'number'; });
+    var cat = open[Math.floor(rng() * open.length)].key;
+    var got = General.scoreFor(cat, last);
+    scores[cat] = got; total += got;
+    turns.push({ mask: mask, rolls: rolls, keeps: keeps, category: cat });
+  }
+  return { total: total, turns: turns };
+}
+
+test('luck/skill identity holds: par + luck + skill == final score', function () {
+  var seed = 12345;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (var g = 0; g < 25; g++) {
+    var game = simulateLoggedGame(rng);
+    var a = EV.analyzeGame(game.turns);
+    approx(a.projectedFinal, game.total, 1e-6);
+    assert.ok(a.skill <= 1e-6, 'skill must be <= 0 (EV given up): ' + a.skill);
+  }
+});
+
+test('analyzeGame reports accuracy, blunder and sharpest', function () {
+  var seed = 999;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  var game = simulateLoggedGame(rng);
+  var a = EV.analyzeGame(game.turns);
+  assert.ok(a.accuracy >= 0 && a.accuracy <= 1);
+  assert.ok(a.blunder && a.blunder.cost <= 1e-6);
+  assert.strictEqual(a.nDecisions, a.decisions.length);
+});
+
+test('an optimal player leaves ~0 skill on the table', function () {
+  var seed = 7;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  var decide = function (scores, dice, rl) { return EV.botKeep(scores, dice, rl, { type: 'optimal' }, rng); };
+  // optimal keeps + optimal category
+  function game() {
+    var scores = {}, turns = [], total = 0;
+    function roll5() { var d = []; for (var i = 0; i < 5; i++) d.push(1 + Math.floor(rng() * 6)); return d.sort(function (a, b) { return a - b; }); }
+    for (var t = 0; t < EV.NCAT; t++) {
+      var mask = EV.maskOfScores(scores), rolls = [roll5()], keeps = [];
+      for (var r = 1; r < 3; r++) { var k = decide(scores, rolls[r - 1], 2 - (r - 1)); keeps.push(k); rolls.push(rolls[r - 1].map(function (v, i) { return k[i] ? v : 1 + Math.floor(rng() * 6); }).sort(function (a, b) { return a - b; })); }
+      var last = rolls[2], cat = EV.botCategory(scores, last, { type: 'optimal' }, rng);
+      scores[cat] = General.scoreFor(cat, last); total += scores[cat];
+      turns.push({ mask: mask, rolls: rolls, keeps: keeps, category: cat });
+    }
+    return { turns: turns, total: total };
+  }
+  var gg = game();
+  var a = EV.analyzeGame(gg.turns);
+  assert.ok(a.accuracy === 1, 'optimal player should be 100% accurate, got ' + a.accuracy);
+  approx(a.skill, 0, 1e-6);
+});
+
+// ---- §3 bot policy ----
+
+test('softmax with τ=0 is argmax; bots return legal actions', function () {
+  var top = EV.evaluate({}, [6, 6, 6, 1, 2], 0).category_ranked[0].key;
+  assert.strictEqual(EV.botCategory({}, [6, 6, 6, 1, 2], { type: 'optimal' }), top);
+  var keep = EV.botKeep({}, [6, 6, 6, 1, 2], 2, { type: 'softmax', tau: 5 }, Math.random);
+  assert.strictEqual(keep.length, 5);
+});
+
+// ---- §3.4 personas + §6 ranks (game.js) ----
+
+test('personas bind names to fixed strengths; Господ бог is optimal', function () {
+  var g = General.personaById('gospod');
+  assert.strictEqual(g.name, 'Господ бог');
+  assert.strictEqual(g.policy.type, 'optimal');
+  assert.strictEqual(General.personaById('komar').strength < General.personaById('lyubitel').strength, true);
+});
+
+test('rank ladder: winner is Генерал, last is Редник', function () {
+  assert.strictEqual(General.rankForPlacement(0, 2), 'Генерал');
+  assert.strictEqual(General.rankForPlacement(1, 2), 'Редник');
+  assert.strictEqual(General.rankForPlacement(0, 4), 'Генерал');
+  assert.strictEqual(General.rankForPlacement(3, 4), 'Редник');
+  assert.strictEqual(General.rankForAccuracy(1), 'Генерал');
+  assert.strictEqual(General.rankForAccuracy(0.5), 'Редник');
+});

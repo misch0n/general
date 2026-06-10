@@ -204,7 +204,40 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .peektot b{ font-family:var(--gen-font-display); color:var(--gen-brass); }
 .modal .x-close{ float:right; width:32px; height:32px; border-radius:7px; color:var(--gen-muted); font-size:17px; }
 
-@media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .msg{ animation:none; } }
+/* persona picker (setup) */
+.minibtn{ margin-left:auto; font-family:var(--gen-font-display); font-size:10px; font-weight:700; letter-spacing:1px;
+  color:var(--gen-label); background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:var(--gen-r-pill); padding:4px 8px; }
+.minibtn.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
+.personas{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+.persona{ display:flex; align-items:center; gap:8px; text-align:left; padding:8px 10px; border-radius:8px;
+  background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); color:var(--gen-text); }
+.persona.sel{ border-color:var(--gen-brass); box-shadow:inset 0 0 0 1px var(--gen-brass); }
+.persona .pn2{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:13px; }
+.persona .pf{ flex:1; color:var(--gen-muted); font-size:11px; }
+.persona .pstr{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:12px; font-variant-numeric:tabular-nums; }
+
+/* live hint line */
+.hintline{ text-align:center; font-family:var(--gen-font-display); font-weight:600; font-size:12px; letter-spacing:.4px;
+  color:var(--gen-brass-bright); background:rgba(0,0,0,.3); border:1px solid var(--gen-alert-line); border-radius:8px; padding:6px 10px; }
+
+/* summary: ranks + EV panel */
+.rkbadge{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:11px;
+  color:var(--gen-ink); background:var(--gen-brass); border-radius:5px; padding:3px 7px; min-width:62px; text-align:center; }
+.rankrow.first .rkbadge{ background:var(--gen-brass-bright); box-shadow:0 0 10px rgba(232,195,86,.5); }
+.rankrow .nm{ display:flex; flex-direction:column; }
+.rsub{ font-family:var(--gen-font-body); font-weight:500; text-transform:none; letter-spacing:0; font-size:10px; color:var(--gen-muted); }
+.evpanel{ margin-top:12px; padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); }
+.evhead{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px; color:var(--gen-brass); font-size:13px; margin-bottom:8px; }
+.evline{ font-family:var(--gen-font-display); font-size:15px; letter-spacing:.3px; margin-bottom:6px; }
+.evline b{ color:var(--gen-text); } .evline .luck{ color:#9bd17e; } .evline .skill{ color:#e8b06a; }
+.evsub{ font-size:11px; color:var(--gen-muted); margin:3px 0; }
+.evsub b{ color:var(--gen-brass-bright); }
+.evpick{ font-size:12px; margin-top:6px; padding:5px 8px; border-radius:6px; }
+.evpick.sharp{ background:rgba(75,140,60,.16); color:#9bd17e; }
+.evpick.blunder{ background:rgba(178,58,46,.16); color:#e88; }
+.evpick .gap{ font-weight:700; }
+
+@media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble{ animation:none; } }
 </style>
 </head>
 <body>
@@ -243,6 +276,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   <div class="pstrip">
     <span id="pillWrap" style="display:contents"></span>
+    <button id="hintBtn" class="minibtn" title="Покажи съвет от щаба (оптимален ход)">СЪВЕТ</button>
   </div>
 
   <div class="sheet">
@@ -261,6 +295,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="dock">
     <div id="throws" class="throws"></div>
     <div id="dice" class="dice"></div>
+    <div id="hintLine" class="hintline hidden"></div>
     <button id="fire" class="fire">ОГЪН</button>
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
   </div>
@@ -291,16 +326,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="modal">
     <h2>🏆 ОТБОЙ — КРАЙ НА БИТКАТА</h2>
     <div id="ranks"></div>
+    <div id="evPanel"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions"><button id="playAgain" class="btn primary">↻ Нов набор</button></div>
   </div>
 </div>
 
 <script src="game.js"></script>
+<script src="ev-table.js"></script>
+<script src="engine.js"></script>
 <script>
 (function () {
   'use strict';
   var G = window.General;
+  var EV = window.GeneralEV;
+  // load the precomputed optimal-value table (powers hints, luck/skill, bots)
+  var evReady = false;
+  try {
+    if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
+  } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
 
   var PIPS = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
@@ -383,7 +427,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var toggle = document.createElement('button');
       toggle.className = 'toggle' + (p.isAI ? ' on' : '');
       toggle.innerHTML = '<span class="switch"></span><span>AI</span>';
-      toggle.onclick = function () { p.isAI = !p.isAI; p.name = p.isAI ? aiNames() : humanNames(); renderSetup(); };
+      toggle.onclick = function () {
+        p.isAI = !p.isAI;
+        if (p.isAI) { var d = G.personaById('lelia'); p.personaId = d.id; p.name = d.name; p.personaOpen = true; }
+        else { p.personaId = null; p.name = humanNames(); }
+        renderSetup();
+      };
       row.appendChild(color); row.appendChild(toggle);
       if (setupPlayers.length > 1) {
         var del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
@@ -391,6 +440,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         row.appendChild(del);
       }
       card.appendChild(row);
+
+      // persona list (only for AI seats) — collapses to the chosen line
+      if (p.isAI) {
+        var box = document.createElement('div'); box.className = 'personas';
+        var shown = p.personaOpen ? G.PERSONAS : G.PERSONAS.filter(function (x) { return x.id === p.personaId; });
+        shown.forEach(function (per) {
+          var b = document.createElement('button');
+          b.className = 'persona' + (per.id === p.personaId ? ' sel' : '');
+          b.innerHTML = '<span class="pn2">' + per.name + '</span><span class="pf">' + per.flavor + '</span>'
+            + '<span class="pstr">' + Math.round(per.strength * 100) + '%</span>';
+          b.onclick = function () {
+            if (p.personaOpen) { p.personaId = per.id; p.name = per.name; p.personaOpen = false; }
+            else { p.personaOpen = true; }
+            renderSetup();
+          };
+          box.appendChild(b);
+        });
+        card.appendChild(box);
+      }
 
       var bet = document.createElement('div'); bet.className = 'betline';
       // the wager is fixed at draw — you're stuck with whatever you got
@@ -406,6 +474,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     startGame(setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet;
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
+      if (p.isAI) pl.persona = G.personaById(p.personaId);
       return pl;
     }));
   };
@@ -416,14 +485,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ===================================================== GAME STATE
   var game = null, dice = [], selected = [false,false,false,false,false], throwsLeft = 0;
   var aiBusy = false, locked = false, rerolledAll = false, roastIx = 0, roastTimer = null;
+  var moveLog = [];   // per player index: array of completed turn logs
+  var curLog = null;  // the in-progress turn log
+  var hintsOn = false;
 
   function startGame(players) {
     game = G.createGame(players);
+    moveLog = players.map(function () { return []; });
     $('setup').classList.add('hidden');
     $('game').classList.remove('hidden');
     $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
+    $('hintBtn').classList.toggle('hidden', !evReady);
     beginTurn();
   }
 
@@ -436,6 +510,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     dice = G.rollAll(); sortDice();
     var p = G.currentPlayer(game);
     document.documentElement.style.setProperty('--pc', p.color);
+    // open a move-log entry for this turn (mask = scorecard before the turn)
+    curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     renderAll();
     shakeDice();
     showOrder(p);
@@ -456,7 +532,28 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   // ---------- render ----------
-  function renderAll() { renderHeader(); renderPills(); renderBoard(); renderDice(); renderFire(); }
+  function renderAll() { renderHeader(); renderPills(); renderBoard(); renderDice(); renderFire(); renderHint(); }
+
+  // §1 live "best move" hint (toggle; off for serious play)
+  $('hintBtn').onclick = function () {
+    if (!evReady) return;
+    hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); renderHint();
+  };
+  function renderHint() {
+    var line = $('hintLine');
+    var p = G.currentPlayer(game);
+    if (!hintsOn || !evReady || p.isAI || locked) { line.classList.add('hidden'); return; }
+    var ev = EV.evaluate(p.scores, dice, throwsLeft);
+    var txt;
+    if (throwsLeft > 0) {
+      var keepFaces = dice.filter(function (v, i) { return ev.best_keep[i]; });
+      txt = 'Щабът съветва: дръж ' + (keepFaces.length ? keepFaces.join('-') : 'нищо')
+        + ' · цел ' + (CAT_LABEL[ev.best_category.key] || ev.best_category.key);
+    } else {
+      txt = 'Щабът съветва: играй ' + (CAT_LABEL[ev.best_category.key] || ev.best_category.key);
+    }
+    line.textContent = txt; line.classList.remove('hidden');
+  }
 
   function renderHeader() {
     var p = G.currentPlayer(game);
@@ -566,8 +663,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function humanFire() {
     if (aiBusy || locked || throwsLeft <= 0 || !selected.some(Boolean)) return;
     if (selected.every(Boolean)) rerolledAll = true; // re-rolled the whole hand
+    var kept = selected.map(function (s) { return !s; });
     dice = dice.map(function (v, i) { return selected[i] ? G.rollDie() : v; });
     sortDice();
+    if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
     selected = [false,false,false,false,false];
     throwsLeft--;
     renderAll(); shakeDice();
@@ -596,6 +695,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function afterCommit(key, value) {
     var p = G.currentPlayer(game);  // still the player who just committed
+    if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     locked = true;
     renderAll();
     flashTile(key);
@@ -619,16 +719,34 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   // ---------- AI ----------
+  // engine-backed persona policy when the EV table is ready; else heuristic.
+  function aiKeepMask(p) {
+    if (evReady && p.persona) {
+      var keep = EV.botKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
+      return keep; // boolean[5], true = keep
+    }
+    return G.aiChooseHolds(dice); // heuristic fallback (true = keep)
+  }
+  function aiCategory(p) {
+    if (evReady && p.persona) {
+      var key = EV.botCategory(p.scores, dice, p.persona.policy, Math.random);
+      return { category: key, value: G.scoreFor(key, dice) };
+    }
+    return G.aiChooseCategory(p, dice);
+  }
   function runAiTurn() { aiBusy = true; renderFire(); setTimeout(aiStep, AI_DELAY); }
   function aiStep() {
+    var p = G.currentPlayer(game);
     if (throwsLeft > 0) {
-      var holds = G.aiChooseHolds(dice);
+      var holds = aiKeepMask(p);
       var sel = holds.map(function (h) { return !h; });
       if (sel.some(Boolean)) {
         selected = sel; renderDice();
         setTimeout(function () {
+          var kept = selected.map(function (s) { return !s; });
           dice = dice.map(function (v, i) { return selected[i] ? G.rollDie() : v; });
           sortDice();
+          if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
           selected = [false,false,false,false,false]; throwsLeft--;
           renderAll(); shakeDice();
           setTimeout(throwsLeft > 0 ? aiStep : aiFinish, AI_DELAY);
@@ -640,7 +758,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function aiFinish() {
     var p = G.currentPlayer(game);
-    var choice = G.aiChooseCategory(p, dice);
+    var choice = aiCategory(p);
     aiBusy = false;
     if (choice.value > 0) G.assignScore(p, choice.category, dice, choice.value);
     else G.forfeitScore(p, choice.category);
@@ -724,20 +842,88 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     }
   };
 
+  var CAT_LABEL = {};
+  G.CATEGORIES.forEach(function (c) { CAT_LABEL[c.key] = c.label; });
+
   function showGameOver(winner) {
     var others = game.players.filter(function (p) { return p !== winner; })
       .sort(function (a, b) { return G.playerTotal(b) - G.playerTotal(a); });
     var ordered = [winner].concat(others);
+    var n = game.players.length;
+
+    // §2 analysis per player (luck/skill/accuracy) from the move log
+    var analysis = ordered.map(function (p) {
+      var idx = game.players.indexOf(p);
+      return (evReady && moveLog[idx] && moveLog[idx].length) ? EV.analyzeGame(moveLog[idx]) : null;
+    });
+
+    // §6 ranking with military ranks instead of 1/2/3
     $('ranks').innerHTML = ordered.map(function (p, idx) {
-      return '<div class="rankrow' + (idx === 0 ? ' first' : '') + '"><span class="pos">' + (idx + 1) + '</span>'
-        + '<span class="pdot" style="width:18px;height:18px;border-radius:50%;background:' + p.color + '"></span>'
-        + '<span class="nm">' + esc(p.name) + '</span><span class="tt">' + G.playerTotal(p) + '</span></div>';
+      var a = analysis[idx];
+      var rank = G.rankForPlacement(idx, n);
+      var sub = a ? ('<div class="rsub">точност ' + Math.round(a.accuracy * 100) + '% · решения '
+        + a.skill.toFixed(0) + ' · късмет ' + (a.luck >= 0 ? '+' : '') + a.luck.toFixed(0) + '</div>') : '';
+      return '<div class="rankrow' + (idx === 0 ? ' first' : '') + '">'
+        + '<span class="rkbadge">' + esc(rank) + '</span>'
+        + '<span class="pdot" style="width:16px;height:16px;border-radius:50%;background:' + p.color + '"></span>'
+        + '<span class="nm">' + esc(p.name) + sub + '</span>'
+        + '<span class="tt">' + G.playerTotal(p) + '</span></div>';
     }).join('');
+
+    // §1 + §2 + §4 focus panel for the top human (or the winner)
+    var focusI = ordered.map(function (p) { return game.players.indexOf(p); })
+                        .filter(function (i) { return !game.players[i].isAI; })[0];
+    if (focusI == null) focusI = game.players.indexOf(winner);
+    var fa = (evReady && moveLog[focusI] && moveLog[focusI].length) ? EV.analyzeGame(moveLog[focusI]) : null;
+    var fp = game.players[focusI];
+    var panel = '';
+    if (fa) {
+      var perfRank = G.rankForAccuracy(fa.accuracy);
+      panel += '<div class="evpanel">';
+      panel += '<div class="evhead">📋 Рапорт за ' + esc(fp.name) + '</div>';
+      panel += '<div class="evline"><b>' + Math.round(fa.par) + '</b> норма '
+        + '<span class="luck">' + (fa.luck >= 0 ? '+' : '') + fa.luck.toFixed(0) + ' късмет</span> '
+        + '<span class="skill">' + fa.skill.toFixed(0) + ' решения</span> → <b>' + G.playerTotal(fp) + '</b></div>';
+      panel += '<div class="evsub">Игра като <b>' + esc(perfRank) + '</b> — точност ' + Math.round(fa.accuracy * 100) + '%'
+        + ' (средно −' + fa.avgLostPerDecision.toFixed(1) + ' т./решение)</div>';
+      if (fa.sharpest) panel += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
+      if (fa.blunder && fa.blunder.cost < -0.5) panel += '<div class="evpick blunder">✗ Най-скъпа грешка: ' + decisionLabel(fa.blunder)
+        + ' <span class="gap">(−' + (-fa.blunder.cost).toFixed(1) + ' т.)</span></div>';
+      // §4 per-game slice
+      var genVal = fp.scores.general;
+      panel += '<div class="evsub">генерал: ' + (typeof genVal === 'number' && genVal > 0 ? 'хвърлен (' + genVal + ')' : 'не') + '</div>';
+      panel += '</div>';
+    }
+    $('evPanel').innerHTML = panel;
+
     var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
     others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
     $('betMsgs').innerHTML = msgs;
+
+    if (fa) recordCareer(fa, fp === winner);
     $('overModal').classList.remove('hidden');
   }
+
+  function decisionLabel(d) {
+    if (d.type === 'category') {
+      return 'игра ' + (CAT_LABEL[d.chosenKey] || d.chosenKey)
+        + (d.chosenKey !== d.optimalKey ? ' (по-добре ' + (CAT_LABEL[d.optimalKey] || d.optimalKey) + ')' : '');
+    }
+    return 'задържане на заровете';
+  }
+
+  // §4 minimal persistent career stats (local, hotseat-aggregate)
+  function recordCareer(a, won) {
+    try {
+      var c = JSON.parse(localStorage.getItem('general_career') || '{}');
+      c.games = (c.games || 0) + 1;
+      c.wins = (c.wins || 0) + (won ? 1 : 0);
+      c.accSum = (c.accSum || 0) + a.accuracy;
+      c.luckSum = (c.luckSum || 0) + a.luck;
+      localStorage.setItem('general_career', JSON.stringify(c));
+    } catch (e) { /* storage unavailable — ignore */ }
+  }
+
   $('playAgain').onclick = function () {
     $('overModal').classList.add('hidden'); $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
   };

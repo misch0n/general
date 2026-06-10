@@ -565,6 +565,41 @@
   function randomAiName(rng) { return randomName(AI_ADJS, AI_NOUNS, rng); }
   function randomBet(rng) { return pick(BETS, rng); }
 
+  // ----------------------------------------------------- bot personas & ranks
+
+  // Persona = preset row feeding the EV engine's bot policy. Name→strength is a
+  // FIXED binding (the joke needs Господ бог to be unbeatable). τ values are from
+  // tools/calibrate-bots.js. Малък калпазан is the risk-seeking exception.
+  var PERSONAS = [
+    { id: 'komar',    name: 'Комар',              flavor: 'Бръмчи, но не хапе.',          policy: { type: 'softmax', tau: 20 },            strength: 0.06 },
+    { id: 'kalpazan', name: 'Малък калпазан',     flavor: 'Дребен хазартен дявол.',        policy: { type: 'risk', tau: 2, lambda: 1.4 },   strength: 0.32 },
+    { id: 'lelia',    name: 'Леля ти',            flavor: 'Играе на семейни вечери.',      policy: { type: 'softmax', tau: 3 },             strength: 0.50 },
+    { id: 'lyubitel', name: 'Кварталния любител', flavor: 'Бива го, бутка кокала.',        policy: { type: 'softmax', tau: 1.5 },           strength: 0.75 },
+    { id: 'gospod',   name: 'Господ бог',         flavor: 'Вижда всичко. Не прощава.',     policy: { type: 'optimal', tau: 0 },             strength: 1.0 },
+  ];
+  function personaById(id) {
+    for (var i = 0; i < PERSONAS.length; i++) if (PERSONAS[i].id === id) return PERSONAS[i];
+    return PERSONAS[2]; // sensible mid default
+  }
+
+  // Bulgarian military ladder, low → high. Top = Генерал (the game's namesake).
+  var RANKS = [
+    'Редник', 'Ефрейтор', 'Младши сержант', 'Сержант', 'Старши сержант', 'Старшина',
+    'Младши лейтенант', 'Лейтенант', 'Старши лейтенант', 'Капитан', 'Майор',
+    'Подполковник', 'Полковник', 'Бригаден генерал', 'Генерал-майор', 'Генерал-лейтенант', 'Генерал',
+  ];
+  // §6 placement mapping: winner → Генерал, last → Редник, spread between.
+  function rankForPlacement(place, nPlayers) {
+    if (nPlayers <= 1) return RANKS[RANKS.length - 1];
+    var top = RANKS.length - 1;
+    return RANKS[Math.round(top * (nPlayers - 1 - place) / (nPlayers - 1))];
+  }
+  // §6 performance mapping: decision accuracy → a rank title (solo promotions).
+  function rankForAccuracy(acc) {
+    var t = Math.max(0, Math.min(1, (acc - 0.6) / 0.4)); // spread the useful 60–100% band
+    return RANKS[Math.round(t * (RANKS.length - 1))];
+  }
+
   // A generator that avoids repeating names it has already handed out.
   function nameGenerator(kind) {
     var used = {};
@@ -628,5 +663,10 @@
     randomAiName: randomAiName,
     randomBet: randomBet,
     nameGenerator: nameGenerator,
+    PERSONAS: PERSONAS,
+    personaById: personaById,
+    RANKS: RANKS,
+    rankForPlacement: rankForPlacement,
+    rankForAccuracy: rankForAccuracy,
   };
 });

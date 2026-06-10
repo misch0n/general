@@ -221,7 +221,9 @@
 
   // 0.6 query API — powers live hints and post-game analysis.
   function evaluate(scores, dice, rollsLeft) {
-    var mask = maskOfScores(scores);
+    return evaluateMask(maskOfScores(scores), dice, rollsLeft);
+  }
+  function evaluateMask(mask, dice, rollsLeft) {
     var arr = arraysFor(mask);
     var dIdx = idxOfDice(dice);
     var out = { state_value: 0, best_keep: null, keep_ranked: [], best_category: null, category_ranked: [] };
@@ -265,13 +267,121 @@
     return dot(entry, arraysFor(mask)[rollsLeft - 1]);
   }
 
+  // ============================================================ §2 luck/skill
+
+  function catBit(key) {
+    for (var i = 0; i < NCAT; i++) if (CATS[i].key === key) return 1 << i;
+    return 0;
+  }
+
+  // Decompose one realised turn into luck (roll) and skill (decision) deltas.
+  // rolls = dice arrays after each throw (length R, 1..3); keeps = keep bool[5]
+  // for each reroll taken (length R-1); category = key committed.
+  function analyzeTurn(mask, rolls, keeps, category) {
+    var luck = 0, skill = 0, decisions = [];
+    var R = rolls.length;
+    // first roll: chance delta vs the about-to-roll value V*(mask)
+    luck += nodeValue(mask, rolls[0], 2) - vstar(mask);
+    for (var i = 0; i < keeps.length; i++) {
+      var rl = 2 - i;
+      var node = nodeValue(mask, rolls[i], rl);
+      var chosenEV = keepValue(mask, rolls[i], rl, keeps[i]);
+      var e = evaluateMask(mask, rolls[i], rl);
+      var second = e.keep_ranked.length > 1 ? e.keep_ranked[1].ev : node;
+      skill += chosenEV - node;
+      decisions.push({ type: 'keep', cost: chosenEV - node, chosenEV: chosenEV, optimalEV: node, margin: node - second, optimal: e.best_keep });
+      luck += nodeValue(mask, rolls[i + 1], rl - 1) - chosenEV; // reroll chance delta
+    }
+    // category decision at the dice the player stopped on
+    var rlStop = 2 - (R - 1);
+    var last = rolls[R - 1];
+    var eStop = evaluateMask(mask, last, rlStop);
+    var nodeVal = eStop.state_value;
+    var chosen = eStop.category_ranked.filter(function (c) { return c.key === category; })[0];
+    var secondCat = eStop.category_ranked.length > 1 ? eStop.category_ranked[1].ev : eStop.category_ranked[0].ev;
+    skill += chosen.ev - nodeVal;
+    decisions.push({ type: 'category', cost: chosen.ev - nodeVal, chosenEV: chosen.ev, optimalEV: nodeVal,
+                     margin: eStop.category_ranked[0].ev - secondCat, chosenKey: category, optimalKey: eStop.category_ranked[0].key });
+    return { luck: luck, skill: skill, decisions: decisions };
+  }
+
+  // Aggregate a whole game's turns (in play order) into the §2 identity:
+  // final_score = par + Σ luck + Σ skill.
+  function analyzeGame(turns) {
+    var luck = 0, skill = 0, decisions = [];
+    turns.forEach(function (t) {
+      var a = analyzeTurn(t.mask, t.rolls, t.keeps, t.category);
+      luck += a.luck; skill += a.skill;
+      a.decisions.forEach(function (d) { d.turnCategory = t.category; decisions.push(d); });
+    });
+    var EPS = 0.05;
+    var optimalCount = decisions.filter(function (d) { return d.cost > -EPS; }).length;
+    var blunder = null, sharpest = null;
+    decisions.forEach(function (d) {
+      if (!blunder || d.cost < blunder.cost) blunder = d;
+      // sharpest = an optimal (cost≈0) decision that mattered most (largest margin)
+      if (d.cost > -EPS && (!sharpest || d.margin > sharpest.margin)) sharpest = d;
+    });
+    return {
+      par: PAR, luck: luck, skill: skill, projectedFinal: PAR + luck + skill,
+      decisions: decisions, nDecisions: decisions.length,
+      accuracy: decisions.length ? optimalCount / decisions.length : 1,
+      avgLostPerDecision: decisions.length ? -skill / decisions.length : 0,
+      blunder: blunder, sharpest: sharpest,
+    };
+  }
+
+  // ============================================================ §3 bot policy
+
+  // ceiling score per category — used by the risk-seeking persona
+  var CEIL = { ones: 5, twos: 10, threes: 15, fours: 20, fives: 25, sixes: 30,
+    twoKind: 12, threeKind: 18, fourKind: 24, fullHouse: 30, smallStraight: 15, largeStraight: 20, general: 80, chance: 30 };
+
+  function softmaxPick(actions, getEv, tau, rng) {
+    if (tau <= 0) {
+      var best = actions[0]; for (var i = 1; i < actions.length; i++) if (getEv(actions[i]) > getEv(best)) best = actions[i]; return best;
+    }
+    var max = -Infinity; for (var i = 0; i < actions.length; i++) max = Math.max(max, getEv(actions[i]));
+    var ws = [], sum = 0;
+    for (var i = 0; i < actions.length; i++) { var w = Math.exp((getEv(actions[i]) - max) / tau); ws.push(w); sum += w; }
+    var r = (rng || Math.random)() * sum, acc = 0;
+    for (var i = 0; i < actions.length; i++) { acc += ws[i]; if (r <= acc) return actions[i]; }
+    return actions[actions.length - 1];
+  }
+
+  // policy: { type:'optimal'|'softmax'|'risk', tau, lambda }
+  function botCategory(scores, dice, policy, rng) {
+    var ranked = evaluate(scores, dice, 0).category_ranked;
+    if (policy.type === 'risk') {
+      var lambda = policy.lambda == null ? 1.4 : policy.lambda;
+      return softmaxPick(ranked, function (a) { return a.ev + lambda * (CEIL[a.key] || 0); }, policy.tau || 2, rng).key;
+    }
+    return softmaxPick(ranked, function (a) { return a.ev; }, policy.type === 'optimal' ? 0 : policy.tau, rng).key;
+  }
+  function botKeep(scores, dice, rollsLeft, policy, rng) {
+    var ranked = evaluate(scores, dice, rollsLeft).keep_ranked;
+    if (policy.type === 'risk') {
+      // bias toward holding the biggest matching group (chase General / straights)
+      var lambda = policy.lambda == null ? 1.4 : policy.lambda;
+      var pick = softmaxPick(ranked, function (a) {
+        var c = [0, 0, 0, 0, 0, 0, 0], mx = 0;
+        for (var i = 0; i < dice.length; i++) if (a.keep[i]) { c[dice[i]]++; if (c[dice[i]] > mx) mx = c[dice[i]]; }
+        return a.ev + lambda * mx;
+      }, policy.tau || 2, rng);
+      return pick.keep;
+    }
+    return softmaxPick(ranked, function (a) { return a.ev; }, policy.type === 'optimal' ? 0 : policy.tau, rng).keep;
+  }
+
   return {
     CATS: CATS, NCAT: NCAT, NMS: NMS, FULL_MASK: FULL_MASK,
     MULTISETS: MULTISETS, ROLL_PROB: ROLL_PROB, idxOfDice: idxOfDice,
     KEEPS: KEEPS, keepResult: keepResult, dot: dot,
     turnArrays: turnArrays, expectRoll: expectRoll, computeTable: computeTable, popcount: popcount,
     setTable: setTable, hasTable: hasTable, par: par, vstar: vstar,
-    maskOfScores: maskOfScores, evaluate: evaluate,
+    maskOfScores: maskOfScores, evaluate: evaluate, evaluateMask: evaluateMask, catBit: catBit,
     nodeValue: nodeValue, keepValue: keepValue, keepPositions: keepPositions,
+    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame,
+    softmaxPick: softmaxPick, botCategory: botCategory, botKeep: botKeep,
   };
 });
