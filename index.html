@@ -313,8 +313,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* drag-to-reorder setup cards */
 .pcardtop{ display:flex; align-items:center; gap:8px; }
-.grip{ flex:none; width:34px; height:40px; display:grid; place-items:center; cursor:grab; color:var(--gen-brass); font-size:20px; line-height:1;
+.grip{ flex:none; width:34px; height:40px; display:grid; place-items:center; cursor:grab; color:var(--gen-brass);
   background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; -webkit-user-select:none; }
+.grip .gripdots{ display:grid; grid-template-columns:repeat(2,4px); grid-template-rows:repeat(3,4px); gap:4px; }
+.grip .gripdots i{ width:4px; height:4px; border-radius:50%; background:currentColor; }
 .grip:active{ cursor:grabbing; background:var(--gen-brass); color:var(--gen-ink); }
 .pcard.dragging{ opacity:.85; box-shadow:0 10px 26px rgba(0,0,0,.5); outline:2px solid var(--gen-brass); }
 
@@ -523,7 +525,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
       var top = document.createElement('div'); top.className = 'pcardtop';
       if (setupPlayers.length > 1) {
-        var grip = document.createElement('div'); grip.className = 'grip'; grip.title = 'Влачи, за да подредиш'; grip.textContent = '⠿';
+        var grip = document.createElement('div'); grip.className = 'grip'; grip.title = 'Влачи, за да подредиш';
+        grip.innerHTML = '<span class="gripdots"><i></i><i></i><i></i><i></i><i></i><i></i></span>';
         grip.onpointerdown = function (e) { startCardDrag(card, e); };
         top.appendChild(grip);
       }
