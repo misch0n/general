@@ -4,44 +4,51 @@ A web player for **Генерал** (General), the Bulgarian dice game in the fa
 Yahtzee / Generala. Single-page, no build step, no dependencies — just open
 `index.html`.
 
-This is the base version; it will be expanded later.
+The UI is a phone-first, comically over-decorated **military parody** (ЩАБ
+edition): camouflage field, classification banner, brass medals and stencil type.
 
 ## Features
 
-- **Dice front and centre.** Five large, tactile dice are the focus of the
-  screen. Players roll manually, then click dice to **hold** them and re-roll
-  the rest — up to **3 rolls** per turn.
-- **A suggestion panel under the dice** (never covering them). After each roll
-  it lists every scoring entry the dice make — respecting categories you've
-  already used — as a tap-to-score button. Combos that can be filled several
-  ways (e.g. two different pairs for `2x`) show **one button per option**.
-- **Hit-chance on tap.** Tap any category name on the scoreboard to reveal its
-  live probability of hitting — computed from the current dice and rolls left,
-  updating as you roll. Subtle and on-demand, never in the way.
-- **Roasts.** Gamble a made combo away (rerolling a full house, straight, four
-  of a kind…) and the game taunts you with rotating brutal messages — a lighter
-  jab when you take the risk, and the harshest ones when it backfires.
-- **Forfeit.** A "Откажи се" button opens a selector to write **0** into any
-  unfilled category (a deliberate sacrifice to save a better one). When the dice
-  make no combinations at all, forfeiting is mandatory.
-- **Full scoreboard on scroll.** Below the dice the complete board shows every
-  category with its score/suggestion next to it and a running **total**
-  underneath — score or forfeit from here too.
-- **Turn-switch animation.** Picking or forfeiting ends the turn; after a brief
-  pause an animated card announces the next player and play continues.
-- **Any number of players**, each set up on its own card — name on its own line,
-  with colour and AI toggle below — plus a separate, rotating scoreboard.
-- **AI players.** Flip the toggle next to any player before the game to make
-  them computer-controlled; the AI rolls, holds and scores on its own.
-- **English UI**, with themed names: Title + Noun — humans get silly military
-  names (_General Willy_, _Major Rooster_); AIs get electric / metallic ones
-  (_General Camel_, _Major TinCan_). All editable.
-- **Stupid bets.** Every player wagers something idiotic (_Bets his dog_,
-  _his mother_, _his dignity_…), re-rollable in setup.
-- **Peek** at any player's board from the sidebar — read-only, off to the side.
+- **One screen, no scroll.** Scoreboard on top, a **medal divider**, then the
+  **dice console** at the bottom — designed to fit a phone (360–414px).
+- **Select-to-reroll.** Dice default to **kept**. Tap the ones you want to
+  re-roll (a ✛ reticle marks them) and hit **ОГЪН**; selection clears after every
+  throw. Up to **3 throws** per turn (one automatic roll + two rerolls).
+- **Suggestions live inside the scoreboard.** After each throw every open
+  category shows the points the dice would score as a tappable brass chip; combos
+  fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
+  small **×** forfeits a slot. The single best move is flagged with a ★.
+- **Hit-chance toggle.** Tap **ШАНСОВЕ** to overlay each open category's live
+  probability of hitting — computed from the current dice and throws left,
+  updating as you roll. Off by default; subtle when on.
+- **Roasts.** Gamble a made combo away (re-rolling a full house, straight, four
+  of a kind…) and the game taunts you — a lighter jab when you take the risk,
+  the harshest lines when it backfires. Fully gender-agreed Bulgarian (below).
+- **Any number of players** with custom names, colours and AI toggles; a
+  separate scoreboard each, with the current player's shown and the rest
+  reachable from the player pills (tap to peek).
+- **AI players.** Flip a toggle in setup; the AI marks targets, fires and scores
+  on its own.
+- **Stupid bets.** Every player wagers something idiotic (_Залага кучето си_,
+  _майка си_, _достойнството си_…), re-rollable in setup.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).
+
+## Bulgarian agreement engine
+
+Names and roasts are generated from word lists, so they must be grammatically
+coherent. A small morphology engine in [`game.js`](game.js) handles agreement:
+
+- **Names** are _Title + Adjective + Noun_, and the **adjective agrees with the
+  noun's gender** — _Ефрейтор Смотан**а** Пишка_ (f), _Майор Смотан Петел_ (m),
+  _Капитан Стоманен**о** Динамо_ (n). Indeclinable prefixes (_Електро_, _Турбо_)
+  stay put. AIs draw from electric / metallic word lists.
+- **Roasts** agree with the staked combo's gender via possessive forms — _Твоят
+  генерал си замина_ (m), _Твоята малка кента си замина_ (f), _Твоето каре_ (n).
+
+`inflectAdj`, `possessive`, `renderRoast` and the word/grammar tables are all
+pure and unit-tested.
 
 ## Scoreboard & scoring
 
@@ -94,9 +101,14 @@ node --test     # or: npm test
 ```
 
 The suite covers every scoring category (including multi-option suggestions and
-the worked examples `1 2 2 5 5` and `2 2 4 4 4`), dice rolling / holding, score
-assignment and sacrifice, turn rotation, game-over, ranking, the AI's hold and
-category choices, and the name generators.
+the worked examples `1 2 2 5 5` and `2 2 4 4 4`), dice rolling, score assignment
+and forfeit, turn rotation, game-over, ranking, hit-probabilities, risk
+detection, the AI's choices, and the Bulgarian agreement engine (adjective /
+possessive agreement, name coherence, roast rendering).
+
+The game screen itself (`index.html`) is verified separately with an ad-hoc
+jsdom smoke test during development; it is not part of the dependency-free CI
+suite.
 
 ## Deployment
 
@@ -107,8 +119,8 @@ already enabled for this repo, so a push publishes the latest build.
 ## Project layout
 
 ```
-index.html   # single-page app (UI + controller)
-game.js      # pure game logic, suggestion engine, AI, name generators
+index.html   # single-page app: military UI + controller
+game.js      # pure logic: scoring, AI, probabilities, roasts, BG agreement engine
 test/        # node:test unit tests
 .github/     # CI + Pages deploy workflow
 ```

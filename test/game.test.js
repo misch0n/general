@@ -317,11 +317,61 @@ test('roast pools are non-empty', function () {
   assert.ok(G.ROASTS.risk.length > 0 && G.ROASTS.fail.length > 0);
 });
 
+// --------------------------------------------------- Bulgarian agreement engine
+
+test('inflectAdj agrees with gender (regular pattern)', function () {
+  assert.strictEqual(G.inflectAdj({ base: 'смотан' }, 'm'), 'смотан');
+  assert.strictEqual(G.inflectAdj({ base: 'смотан' }, 'f'), 'смотана');
+  assert.strictEqual(G.inflectAdj({ base: 'смотан' }, 'n'), 'смотано');
+});
+
+test('inflectAdj leaves indeclinable adjectives untouched', function () {
+  var inv = { base: 'електро', inv: true };
+  assert.strictEqual(G.inflectAdj(inv, 'm'), 'електро');
+  assert.strictEqual(G.inflectAdj(inv, 'f'), 'електро');
+  assert.strictEqual(G.inflectAdj(inv, 'n'), 'електро');
+});
+
+test('possessive agrees with gender (subject vs object for masc)', function () {
+  assert.strictEqual(G.possessive('m', true), 'твоят');
+  assert.strictEqual(G.possessive('m', false), 'твоя');
+  assert.strictEqual(G.possessive('f', true), 'твоята');
+  assert.strictEqual(G.possessive('n', false), 'твоето');
+});
+
+test('renderRoast fills grammar tokens coherently per combo gender', function () {
+  // feminine combo: малка кента (sentence-cased)
+  assert.strictEqual(G.renderRoast('{ps} {c} замина.', 'smallStraight'), 'Твоята малка кента замина.');
+  // masculine combo: генерал (subject form)
+  assert.strictEqual(G.renderRoast('{ps} {c} замина.', 'general'), 'Твоят генерал замина.');
+  // neuter combo: каре (object form)
+  assert.strictEqual(G.renderRoast('Сбогом на {po} {c}.', 'fourKind'), 'Сбогом на твоето каре.');
+});
+
+test('every premium combo has roast grammar', function () {
+  G.PREMIUM.forEach(function (k) {
+    assert.ok(G.COMBO_GRAMMAR[k], 'missing grammar for ' + k);
+  });
+});
+
+test('generated names agree: adjective matches noun gender', function () {
+  // a feminine noun must get a feminine adjective (ends in 'а' for our set)
+  // sample many names and check coherence holds structurally
+  for (var i = 0; i < 50; i++) {
+    var name = G.randomHumanName();
+    assert.strictEqual(name.split(' ').length, 3, 'Title + Adj + Noun: ' + name);
+  }
+  // deterministic check via a forced rng that always picks index 0:
+  //   TITLES[0]=Генерал, ADJS[0]=смотан, NOUNS[0]=Пишка (feminine)
+  var zero = function () { return 0; };
+  assert.strictEqual(G.randomHumanName(zero), 'Генерал Смотана Пишка');
+});
+
 // ----------------------------------------------------------------- names
 
-test('name generators follow Title + Noun', function () {
-  assert.strictEqual(G.randomHumanName().split(' ').length, 2);
-  assert.strictEqual(G.randomAiName().split(' ').length, 2);
+test('name generators follow Title + Adjective + Noun', function () {
+  assert.strictEqual(G.randomHumanName().split(' ').length, 3);
+  assert.strictEqual(G.randomAiName().split(' ').length, 3);
 });
 
 test('randomBet returns a non-empty wager', function () {

@@ -25,20 +25,20 @@
 
   // The scoreboard, in display order.
   var CATEGORIES = [
-    { key: 'ones',          label: '1',              group: 'upper' },
-    { key: 'twos',          label: '2',              group: 'upper' },
-    { key: 'threes',        label: '3',              group: 'upper' },
-    { key: 'fours',         label: '4',              group: 'upper' },
-    { key: 'fives',         label: '5',              group: 'upper' },
-    { key: 'sixes',         label: '6',              group: 'upper' },
-    { key: 'twoKind',       label: '2x',             group: 'lower' },
-    { key: 'threeKind',     label: '3x',             group: 'lower' },
-    { key: 'fourKind',      label: '4x',             group: 'lower' },
-    { key: 'fullHouse',     label: 'Full House',     group: 'lower' },
-    { key: 'smallStraight', label: 'Small Straight', group: 'lower' },
-    { key: 'largeStraight', label: 'Large Straight', group: 'lower' },
-    { key: 'general',       label: 'General',        group: 'lower' },
-    { key: 'chance',        label: 'Chance',         group: 'lower' },
+    { key: 'ones',          label: '1',           group: 'upper' },
+    { key: 'twos',          label: '2',           group: 'upper' },
+    { key: 'threes',        label: '3',           group: 'upper' },
+    { key: 'fours',         label: '4',           group: 'upper' },
+    { key: 'fives',         label: '5',           group: 'upper' },
+    { key: 'sixes',         label: '6',           group: 'upper' },
+    { key: 'twoKind',       label: '2x',          group: 'lower' },
+    { key: 'threeKind',     label: '3x',          group: 'lower' },
+    { key: 'fourKind',      label: '4x',          group: 'lower' },
+    { key: 'fullHouse',     label: 'фул хаус',     group: 'lower' },
+    { key: 'smallStraight', label: 'малка кента',  group: 'lower' },
+    { key: 'largeStraight', label: 'голяма кента', group: 'lower' },
+    { key: 'general',       label: 'генерал',      group: 'lower' },
+    { key: 'chance',        label: 'шанс',         group: 'lower' },
   ];
 
   // Premium combinations — the ones worth roasting a player for gambling away.
@@ -370,50 +370,129 @@
       .sort(function (a, b) { return b.score - a.score; });
   }
 
+  // ------------------------------------------------- Bulgarian agreement engine
+  //
+  // Generated phrases (player names, roasts) must be grammatically coherent:
+  // adjectives and possessives agree with the GENDER of the noun they modify.
+  // Genders: 'm' (мъжки), 'f' (женски), 'n' (среден).
+
+  function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // Inflect a regular Bulgarian adjective for a gender. Our curated adjectives
+  // follow the regular pattern (masc base + 'а' for f, + 'о' for n). Adjectives
+  // flagged `inv` (indeclinable foreign prefixes like "електро") never change.
+  function inflectAdj(adj, gender) {
+    if (adj.inv) return adj.base;
+    if (gender === 'f') return adj.base + 'а';
+    if (gender === 'n') return adj.base + 'о';
+    return adj.base; // masculine
+  }
+
+  // Possessive "your" (2nd person singular), agreeing with gender.
+  // `subject` form is used when the noun is the grammatical subject (твоят…),
+  // the object/short form otherwise (твоя…).
+  function possessive(gender, subject) {
+    if (gender === 'f') return 'твоята';
+    if (gender === 'n') return 'твоето';
+    return subject ? 'твоят' : 'твоя'; // masculine: full vs short article
+  }
+
+  // Spoken grammar for each premium combo, so roasts can agree with it.
+  var COMBO_GRAMMAR = {
+    general:       { g: 'm', phrase: 'генерал' },
+    fullHouse:     { g: 'm', phrase: 'фул хаус' },
+    fourKind:      { g: 'n', phrase: 'каре' },
+    smallStraight: { g: 'f', phrase: 'малка кента' },
+    largeStraight: { g: 'f', phrase: 'голяма кента' },
+  };
+
+  // Roast templates. Tokens, filled by renderRoast for the staked combo:
+  //   {c}  — the combo phrase (генерал / малка кента / каре)
+  //   {ps} — possessive, subject form (твоят / твоята / твоето)
+  //   {po} — possessive, object form  (твоя  / твоята / твоето)
   var ROASTS = {
     // shown the moment a player gambles a made combo away
     risk: [
-      "You don't seem to value your {X} much.",
-      'Throwing back a {X}? Living dangerously.',
-      'You like losing, eh?',
-      'Sure, reroll the {X}. What could possibly go wrong.',
-      'Fortune favors the foolish, allegedly.',
-      'Big risk energy. The dice are already laughing.',
-      'Bold of you to assume the dice are on your side.',
+      'Изглежда не цениш особено {po} {c}.',
+      'Жертваш {po} {c}? Колко смело.',
+      'Обичаш да губиш, а?',
+      'Хвърляш {po} {c} на вятъра. Браво.',
+      'Късметът бил с глупавите, разправят.',
+      'Голям кураж. Заровете вече се хилят.',
+      'Дързостта да мислиш, че заровете са на твоя страна.',
     ],
     // the brutal ones, shown when the gamble made things worse
     fail: [
-      'Your {X} packed its bags and left.',
-      'And there goes the {X}. Hope it was worth it.',
-      'Spectacular. You turned gold into gravel.',
-      'The dice have spoken, and they are disappointed in you.',
-      'That is a self-inflicted wound if ever there was one.',
-      'You had it. You really had it. Now you have nothing.',
-      'Somewhere, a statistician just wept.',
-      'Bold move. Catastrophic result. Iconic.',
-      'You fumbled a {X}. Frame this moment.',
+      '{ps} {c} си стегна багажа и замина.',
+      'Сбогом на {po} {c}. Дано си е струвало.',
+      'Превърна злато в чакъл. Впечатляващо.',
+      'Заровете говориха и са дълбоко разочаровани от теб.',
+      '{ps} {c} вече е само спомен.',
+      'Имаше го. Наистина го имаше. Сега нямаш нищо.',
+      'Някъде един статистик тихо заплака.',
+      'Смело. Катастрофално. Култово.',
+      'Изпусна {po} {c}. Снимай този момент за поколенията.',
     ],
   };
 
+  // Fill a roast template's grammar tokens for the given (premium) combo.
+  function renderRoast(template, comboKey) {
+    var gr = COMBO_GRAMMAR[comboKey] || { g: 'm', phrase: 'комбинация' };
+    return capitalize(template
+      .replace('{ps}', possessive(gr.g, true))
+      .replace('{po}', possessive(gr.g, false))
+      .replace('{c}', gr.phrase));
+  }
+
   // ----------------------------------------------------------------- names & bets
 
-  var TITLES   = ['General', 'Major', 'Colonel', 'Captain', 'Admiral', 'Sergeant', 'Corporal', 'Lieutenant'];
-  var NOUNS    = ['Willy', 'Rooster', 'Cucumber', 'Pumpkin', 'Hoe', 'Sock', 'Donkey', 'Cheese', 'Shovel', 'Owl', 'Bagel', 'Hedgehog', 'Mattress', 'Goose'];
-  var AI_NOUNS = ['Camel', 'TinCan', 'Robot', 'Kettle', 'Transformer', 'Bolt', 'Toaster', 'Vacuum', 'Iron', 'Hotplate', 'Boiler', 'Dynamo', 'Coil', 'Wrench'];
+  var TITLES = ['Генерал', 'Майор', 'Полковник', 'Капитан', 'Адмирал', 'Сержант', 'Ефрейтор', 'Лейтенант'];
 
-  // The stupid thing a player wagers, used in the "Bets X" line.
+  // Adjectives that inflect regularly (masc base; f = +а, n = +о).
+  var ADJS = ['смотан', 'сополив', 'космат', 'тлъст', 'тромав', 'кьорав', 'проклет', 'опърпан', 'дебел', 'рунтав', 'скапан', 'луд', 'крив', 'вмирисан'];
+  var AI_ADJS = [
+    { base: 'ръждив' }, { base: 'цинков' }, { base: 'хромиран' }, { base: 'искрящ' },
+    { base: 'продупчен' }, { base: 'стоманен' }, { base: 'наелектризиран' },
+    { base: 'електро', inv: true }, { base: 'турбо', inv: true }, { base: 'кибер', inv: true },
+    { base: 'нано', inv: true }, { base: 'мега', inv: true },
+  ];
+
+  // Nouns carry their grammatical gender (display form, capitalized).
+  var NOUNS = [
+    { w: 'Пишка', g: 'f' }, { w: 'Петел', g: 'm' }, { w: 'Краставица', g: 'f' },
+    { w: 'Тиква', g: 'f' }, { w: 'Мотика', g: 'f' }, { w: 'Чорап', g: 'm' },
+    { w: 'Баклава', g: 'f' }, { w: 'Магаре', g: 'n' }, { w: 'Кашкавал', g: 'm' },
+    { w: 'Лопата', g: 'f' }, { w: 'Бухал', g: 'm' }, { w: 'Геврек', g: 'm' },
+    { w: 'Таралеж', g: 'm' }, { w: 'Дюшек', g: 'm' },
+  ];
+  var AI_NOUNS = [
+    { w: 'Камила', g: 'f' }, { w: 'Тенеке', g: 'n' }, { w: 'Робот', g: 'm' },
+    { w: 'Чайник', g: 'm' }, { w: 'Трансформатор', g: 'm' }, { w: 'Болт', g: 'm' },
+    { w: 'Тостер', g: 'm' }, { w: 'Прахосмукачка', g: 'f' }, { w: 'Ютия', g: 'f' },
+    { w: 'Котлон', g: 'm' }, { w: 'Бойлер', g: 'm' }, { w: 'Динамо', g: 'n' },
+    { w: 'Реотан', g: 'm' }, { w: 'Ключ', g: 'm' },
+  ];
+
+  // Self-contained (already grammatical) wagers for the "Залага X" line.
   var BETS = [
-    'his dog', 'his mother', 'his dignity', 'his mother-in-law', 'his mustache',
-    'his last dollar', 'his honor', 'his car', 'his grandma', 'his socks',
-    'his kidney', 'his soul', 'his marriage', 'the neighbor\'s cat', 'his good name',
-    'his favorite fork', 'the summer house', 'his entire pension',
+    'кучето си', 'майка си', 'достойнството си', 'тъщата си', 'мустака си',
+    'ракията си', 'последния си лев', 'честта си', 'колата си', 'баба си',
+    'чорапите си', 'бъбрека си', 'душата си', 'брака си', 'мерцедеса си',
+    'вилата на село', 'любимата си вилица', 'котката на съседа',
   ];
 
   function pick(arr, rng) { return arr[Math.floor((rng || Math.random)() * arr.length)]; }
 
-  // Names are Title + Noun, e.g. "General Willy" / "Major TinCan".
-  function randomHumanName(rng) { return pick(TITLES, rng) + ' ' + pick(NOUNS, rng); }
-  function randomAiName(rng) { return pick(TITLES, rng) + ' ' + pick(AI_NOUNS, rng); }
+  // Name = Title + Adjective (agreeing with the noun's gender) + Noun.
+  // e.g. "Ефрейтор Смотана Пишка" (f), "Майор Смотан Петел" (m).
+  function randomName(adjs, nouns, rng) {
+    var noun = pick(nouns, rng);
+    var raw = pick(adjs, rng);
+    var adj = typeof raw === 'string' ? { base: raw } : raw;
+    return pick(TITLES, rng) + ' ' + capitalize(inflectAdj(adj, noun.g)) + ' ' + noun.w;
+  }
+  function randomHumanName(rng) { return randomName(ADJS, NOUNS, rng); }
+  function randomAiName(rng) { return randomName(AI_ADJS, AI_NOUNS, rng); }
   function randomBet(rng) { return pick(BETS, rng); }
 
   // A generator that avoids repeating names it has already handed out.
@@ -467,6 +546,10 @@
     bestOpenScore: bestOpenScore,
     atRiskPremium: atRiskPremium,
     ROASTS: ROASTS,
+    COMBO_GRAMMAR: COMBO_GRAMMAR,
+    inflectAdj: inflectAdj,
+    possessive: possessive,
+    renderRoast: renderRoast,
     randomHumanName: randomHumanName,
     randomAiName: randomAiName,
     randomBet: randomBet,
