@@ -63,26 +63,30 @@
   .brand .logo { font-size: 40px; filter: drop-shadow(0 6px 14px rgba(122,162,255,.5)); }
   .brand h1 { font-size: 34px; }
   .sub { color: var(--muted); margin: 2px 0 24px; }
-  .prow { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-  .prow input[type=color] {
+  .pcard-setup { background: rgba(0,0,0,.18); border: 1px solid var(--stroke); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .name {
+    width: 100%; font: inherit; font-size: 16px; font-weight: 700; color: inherit;
+    background: rgba(0,0,0,.25); border: 1px solid var(--stroke); border-radius: 11px; padding: 10px 12px;
+  }
+  .name:focus { outline: none; border-color: var(--accent); }
+  .prow2 { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .prow2 input[type=color] {
     -webkit-appearance: none; appearance: none; width: 40px; height: 40px;
     border: 1px solid var(--stroke); border-radius: 11px; background: none; cursor: pointer; padding: 0;
   }
-  .prow input[type=color]::-webkit-color-swatch { border: none; border-radius: 9px; }
-  .prow input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
-  .prow .name {
-    flex: 1; min-width: 0; font: inherit; color: inherit; background: rgba(0,0,0,.25);
-    border: 1px solid var(--stroke); border-radius: 11px; padding: 10px 12px;
-  }
-  .prow .name:focus { outline: none; border-color: var(--accent); }
+  .prow2 input[type=color]::-webkit-color-swatch { border: none; border-radius: 9px; }
+  .prow2 input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
   .toggle { display: inline-flex; align-items: center; gap: 8px; user-select: none; cursor: pointer; font-size: 13px; color: var(--muted); }
   .switch { width: 42px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.12); position: relative; transition: .18s; border: 1px solid var(--stroke); }
   .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: .18s; }
   .toggle.on .switch { background: var(--good); }
   .toggle.on .switch::after { transform: translateX(18px); }
   .toggle.on { color: var(--good); }
-  .prow .del { width: 36px; height: 36px; border-radius: 10px; color: var(--muted); font-size: 18px; }
-  .prow .del:hover { color: var(--danger); background: var(--surface-2); }
+  .prow2 .del { margin-left: auto; width: 36px; height: 36px; border-radius: 10px; color: var(--muted); font-size: 18px; }
+  .prow2 .del:hover { color: var(--danger); background: var(--surface-2); }
+  .betline { margin-top: 11px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .betline .betval { color: var(--text); font-weight: 700; background: transparent; border: 1px dashed var(--stroke); border-radius: 8px; padding: 3px 10px; cursor: pointer; transition: .12s; }
+  .betline .betval:hover { border-color: var(--accent); color: var(--accent); }
   .setup-actions { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
   .err { color: var(--danger); min-height: 20px; margin-top: 10px; font-size: 14px; }
 
@@ -191,6 +195,22 @@
   .peekrow:nth-child(odd) { background: rgba(255,255,255,.03); }
   .peekrow .pv { font-variant-numeric: tabular-nums; font-weight: 700; }
   .peekrow.empty .pv { color: var(--faint); }
+  .betmsgs { margin: 16px 0 4px; }
+  .bet { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 10px; margin-bottom: 7px; font-weight: 600; }
+  .bet::before { font-weight: 800; }
+  .bet.kept { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .bet.kept::before { content: "✓"; }
+  .bet.lost { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+  .bet.lost::before { content: "✗"; }
+
+  .tierow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--stroke); margin-bottom: 8px; }
+  .tierow.win { border-color: var(--good); }
+  .tierow .nm { flex: 1; font-weight: 600; }
+  .tiedie { width: 44px; height: 44px; border-radius: 11px; background: linear-gradient(155deg,#fff,#dfe4f5); padding: 7px; box-shadow: 0 4px 10px rgba(0,0,0,.35); }
+  .tiedie .pips { width: 100%; height: 100%; display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: repeat(3,1fr); gap: 1px; }
+  .tiedie .pip { border-radius: 50%; }
+  .tiedie .pip.on { background: radial-gradient(circle at 35% 30%, #4a5278, #1b2138); align-self: center; justify-self: center; width: 70%; height: 70%; }
+  .tiedie.empty { background: var(--surface-2); box-shadow: none; display: grid; place-items: center; color: var(--faint); font-size: 20px; }
   .ffhint { color: var(--muted); font-size: 13px; margin: 4px 0 14px; }
   .ffrow { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 11px 14px; border-radius: 11px; background: var(--surface); border: 1px solid var(--stroke); margin-bottom: 7px; }
   .ffrow:hover { border-color: var(--danger); }
@@ -291,12 +311,23 @@
   </div>
 </div>
 
+<!-- tie-break -->
+<div id="tieModal" class="overlay hidden">
+  <div class="card modal">
+    <h2 id="tieTitle">Равенство!</h2>
+    <p class="ffhint">Равен резултат за първото място — хвърлете зар. Най-високият печели.</p>
+    <div id="tieBody"></div>
+    <div class="setup-actions"><button id="tieRoll" class="btn primary">🎲 Хвърли зара</button></div>
+  </div>
+</div>
+
 <!-- game over -->
 <div id="overModal" class="overlay hidden">
   <div class="card modal">
     <h2>🏆 Край на играта</h2>
     <div id="winner" class="winner"></div>
     <div id="ranks"></div>
+    <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions"><button id="playAgain" class="btn primary">↻ Нова игра</button></div>
   </div>
 </div>
@@ -344,6 +375,7 @@
       name: isAI ? aiNames() : humanNames(),
       color: PRESET_COLORS[n % PRESET_COLORS.length],
       isAI: !!isAI,
+      bet: G.randomBet(),
     });
     renderSetup();
   }
@@ -352,17 +384,23 @@
     var list = $('playerList');
     list.innerHTML = '';
     setupPlayers.forEach(function (p, i) {
-      var row = document.createElement('div');
-      row.className = 'prow';
+      var card = document.createElement('div');
+      card.className = 'pcard-setup';
 
-      var color = document.createElement('input');
-      color.type = 'color'; color.value = p.color;
-      color.oninput = function () { p.color = color.value; };
-
+      // line 1: the name (title), full width and prominent
       var name = document.createElement('input');
       name.type = 'text'; name.className = 'name'; name.value = p.name;
       name.placeholder = 'Име на играч';
       name.oninput = function () { p.name = name.value; };
+      card.appendChild(name);
+
+      // line 2: colour + AI toggle (+ delete)
+      var row = document.createElement('div');
+      row.className = 'prow2';
+
+      var color = document.createElement('input');
+      color.type = 'color'; color.value = p.color;
+      color.oninput = function () { p.color = color.value; };
 
       var toggle = document.createElement('button');
       toggle.className = 'toggle' + (p.isAI ? ' on' : '');
@@ -374,15 +412,28 @@
         renderSetup();
       };
 
-      var del = document.createElement('button');
-      del.className = 'del'; del.textContent = '✕'; del.title = 'Премахни';
-      del.onclick = function () { setupPlayers.splice(i, 1); renderSetup(); };
-
       row.appendChild(color);
-      row.appendChild(name);
       row.appendChild(toggle);
-      if (setupPlayers.length > 1) row.appendChild(del);
-      list.appendChild(row);
+      if (setupPlayers.length > 1) {
+        var del = document.createElement('button');
+        del.className = 'del'; del.textContent = '✕'; del.title = 'Премахни';
+        del.onclick = function () { setupPlayers.splice(i, 1); renderSetup(); };
+        row.appendChild(del);
+      }
+      card.appendChild(row);
+
+      // line 3: the stupid bet
+      var bet = document.createElement('div');
+      bet.className = 'betline';
+      var betVal = document.createElement('button');
+      betVal.className = 'betval'; betVal.textContent = p.bet;
+      betVal.title = 'Друг облог';
+      betVal.onclick = function () { p.bet = G.randomBet(); renderSetup(); };
+      bet.appendChild(document.createTextNode('Залага '));
+      bet.appendChild(betVal);
+      card.appendChild(bet);
+
+      list.appendChild(card);
     });
   }
 
@@ -394,7 +445,9 @@
     }
     $('setupErr').textContent = '';
     startGame(setupPlayers.map(function (p) {
-      return G.createPlayer(p.name.trim(), p.color, p.isAI);
+      var pl = G.createPlayer(p.name.trim(), p.color, p.isAI);
+      pl.bet = p.bet;
+      return pl;
     }));
   };
 
@@ -477,7 +530,7 @@
     setTimeout(endTurn, END_DELAY);
   }
   function endTurn() {
-    if (G.isGameOver(game)) { showGameOver(); return; }
+    if (G.isGameOver(game)) { endGame(); return; }
     G.nextTurn(game);
     playTransition(G.currentPlayer(game), beginTurn);
   }
@@ -690,15 +743,78 @@
   }
 
   // ---- game over ----
-  function showGameOver() {
-    var r = G.ranking(game);
-    $('winner').innerHTML = '<span class="avatar" style="background:' + r[0].player.color + '">' + initials(r[0].player.name) + '</span>'
-      + escapeHtml(r[0].player.name) + ' — ' + r[0].total + ' т.';
-    $('ranks').innerHTML = r.map(function (x, idx) {
+  function endGame() {
+    var top = G.ranking(game)[0].total;
+    var tied = game.players.filter(function (p) { return G.playerTotal(p) === top; });
+    if (tied.length > 1) startTieBreak(tied, showGameOver);
+    else showGameOver(tied[0]);
+  }
+
+  // tie-break: the tied players roll a die; highest wins, re-roll on ties.
+  var tieState = null;
+  function startTieBreak(tied, done) {
+    tieState = { tied: tied, rolls: null, done: done };
+    $('tieTitle').textContent = 'Равенство!';
+    renderTie();
+    $('tieModal').classList.remove('hidden');
+  }
+  function renderTie() {
+    var body = $('tieBody'); body.innerHTML = '';
+    tieState.tied.forEach(function (p, i) {
+      var roll = tieState.rolls ? tieState.rolls[i] : null;
+      var win = tieState.rolls && roll === Math.max.apply(null, tieState.rolls);
+      var die = roll
+        ? '<div class="tiedie"><div class="pips">' + pipSpans(roll) + '</div></div>'
+        : '<div class="tiedie empty">?</div>';
+      body.innerHTML += '<div class="tierow' + (win ? ' win' : '') + '">'
+        + '<span class="avatar" style="background:' + p.color + ';width:28px;height:28px;font-size:12px">' + initials(p.name) + '</span>'
+        + '<span class="nm">' + escapeHtml(p.name) + '</span>' + die + '</div>';
+    });
+  }
+  function pipSpans(value) {
+    var s = '';
+    for (var c = 0; c < 9; c++) s += '<span class="pip' + (PIPS[value].indexOf(c) > -1 ? ' on' : '') + '"></span>';
+    return s;
+  }
+  $('tieRoll').onclick = function () {
+    if (!tieState) return;
+    tieState.rolls = tieState.tied.map(function () { return G.rollDie(); });
+    renderTie();
+    var max = Math.max.apply(null, tieState.rolls);
+    var winners = tieState.tied.filter(function (p, i) { return tieState.rolls[i] === max; });
+    if (winners.length === 1) {
+      var done = tieState.done, w = winners[0];
+      setTimeout(function () { $('tieModal').classList.add('hidden'); tieState = null; done(w); }, 1000);
+    } else {
+      setTimeout(function () {
+        tieState.tied = winners; tieState.rolls = null;
+        $('tieTitle').textContent = 'Пак равенство! Хвърлете отново.';
+        renderTie();
+      }, 1000);
+    }
+  };
+
+  function showGameOver(winner) {
+    var others = game.players.filter(function (p) { return p !== winner; })
+      .sort(function (a, b) { return G.playerTotal(b) - G.playerTotal(a); });
+    var ordered = [winner].concat(others);
+
+    $('winner').innerHTML = '<span class="avatar" style="background:' + winner.color + '">' + initials(winner.name) + '</span>'
+      + escapeHtml(winner.name) + ' — ' + G.playerTotal(winner) + ' т.';
+
+    $('ranks').innerHTML = ordered.map(function (p, idx) {
       return '<div class="rank' + (idx === 0 ? ' first' : '') + '"><span class="pos">' + (idx + 1) + '</span>'
-        + '<span class="avatar" style="background:' + x.player.color + ';width:26px;height:26px;font-size:12px">' + initials(x.player.name) + '</span>'
-        + '<span class="nm">' + escapeHtml(x.player.name) + '</span><span class="tt">' + x.total + '</span></div>';
+        + '<span class="avatar" style="background:' + p.color + ';width:26px;height:26px;font-size:12px">' + initials(p.name) + '</span>'
+        + '<span class="nm">' + escapeHtml(p.name) + '</span><span class="tt">' + G.playerTotal(p) + '</span></div>';
     }).join('');
+
+    // bet outcomes: the winner keeps their wager, everyone else loses theirs.
+    var msgs = '<div class="bet kept">' + escapeHtml(winner.name) + ' запази ' + escapeHtml(winner.bet || '...') + '</div>';
+    others.forEach(function (p) {
+      msgs += '<div class="bet lost">' + escapeHtml(p.name) + ' загуби ' + escapeHtml(p.bet || '...') + '</div>';
+    });
+    $('betMsgs').innerHTML = msgs;
+
     $('overModal').classList.remove('hidden');
   }
   $('playAgain').onclick = function () {

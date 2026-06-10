@@ -254,22 +254,26 @@
     return { category: best.key, value: best.value };
   }
 
-  // ----------------------------------------------------------------- names
+  // ----------------------------------------------------------------- names & bets
 
   var TITLES   = ['Генерал', 'Майор', 'Полковник', 'Капитан', 'Адмирал', 'Сержант', 'Ефрейтор', 'Лейтенант'];
-  var ADJS     = ['Малка', 'Черен', 'Лудия', 'Дебел', 'Кривия', 'Смотан', 'Космат', 'Тлъст', 'Бясна', 'Сополив', 'Кьорав', 'Намусен', 'Тромав', 'Гръмогласен'];
   var NOUNS    = ['Пишка', 'Петел', 'Краставица', 'Тиква', 'Мотика', 'Чорап', 'Баклава', 'Магаре', 'Кашкавал', 'Лопата', 'Бухал', 'Геврек', 'Таралеж', 'Дюшек'];
-  var AI_ADJS  = ['Електро', 'Продупчено', 'Ръждиво', 'Магнитно', 'Волтово', 'Стоманено', 'Цинково', 'Наелектризирано', 'Хромирано', 'Искрящо', 'Турбо', 'Атомно', 'Дигитално', 'Късо'];
   var AI_NOUNS = ['Камила', 'Тенеке', 'Робот', 'Чайник', 'Трансформатор', 'Болт', 'Тостер', 'Прахосмукачка', 'Ютия', 'Котлон', 'Бойлер', 'Динамо', 'Реотан', 'Ключ'];
+
+  // The stupid thing a player wagers, used in the "Залага X" line.
+  var BETS = [
+    'кучето си', 'майка си', 'достойнството си', 'тъщата си', 'мустака си',
+    'ракията си', 'последния си лев', 'честта си', 'колата си', 'баба си',
+    'чорапите си', 'бъбрека си', 'душата си', 'брака си', 'мерцедеса си',
+    'вилата на село', 'любимата си вилица', 'котката на съседа',
+  ];
 
   function pick(arr, rng) { return arr[Math.floor((rng || Math.random)() * arr.length)]; }
 
-  function randomHumanName(rng) {
-    return pick(TITLES, rng) + ' ' + pick(ADJS, rng) + ' ' + pick(NOUNS, rng);
-  }
-  function randomAiName(rng) {
-    return pick(TITLES, rng) + ' ' + pick(AI_ADJS, rng) + ' ' + pick(AI_NOUNS, rng);
-  }
+  // Names are Title + Noun, e.g. "Генерал Пишка" / "Майор Тенеке".
+  function randomHumanName(rng) { return pick(TITLES, rng) + ' ' + pick(NOUNS, rng); }
+  function randomAiName(rng) { return pick(TITLES, rng) + ' ' + pick(AI_NOUNS, rng); }
+  function randomBet(rng) { return pick(BETS, rng); }
 
   // A generator that avoids repeating names it has already handed out.
   function nameGenerator(kind) {
@@ -317,6 +321,7 @@
     aiChooseCategory: aiChooseCategory,
     randomHumanName: randomHumanName,
     randomAiName: randomAiName,
+    randomBet: randomBet,
     nameGenerator: nameGenerator,
   };
 });

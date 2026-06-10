@@ -23,15 +23,19 @@ This is the base version; it will be expanded later.
   underneath — score or forfeit from here too.
 - **Turn-switch animation.** Picking or forfeiting ends the turn; after a brief
   pause an animated card announces the next player and play continues.
-- **Any number of players**, with customizable **names** and **colours**, plus a
-  separate, rotating scoreboard for each.
+- **Any number of players**, each set up on its own card — name on its own line,
+  with colour and AI toggle below — plus a separate, rotating scoreboard.
 - **AI players.** Flip the toggle next to any player before the game to make
   them computer-controlled; the AI rolls, holds and scores on its own.
-- **Themed names.** Humans are seeded with silly Bulgarian military names
-  (_Генерал Малка Пишка_, _Майор Черен Петел_); AIs get electric / metallic ones
-  (_Генерал Електро Камила_, _Майор Продупчено Тенеке_). All editable.
+- **Themed names.** Title + Noun — humans get silly Bulgarian military names
+  (_Генерал Пишка_, _Майор Петел_); AIs get electric / metallic ones
+  (_Генерал Камила_, _Майор Тенеке_). All editable.
+- **Stupid bets.** Every player wagers something idiotic (_Залага кучето си_,
+  _Залага майка си_, _Залага достойнството си_…), re-rollable in setup.
 - **Peek** at any player's board from the sidebar — read-only, off to the side.
-- End-of-game ranking screen.
+- **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
+  (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
+  first is settled with a **manual dice roll** (highest wins, re-roll on ties).
 
 ## Scoreboard & scoring
 

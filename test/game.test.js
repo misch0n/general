@@ -244,11 +244,14 @@ test('aiChooseCategory only ever picks an open category', function () {
 
 // ----------------------------------------------------------------- names
 
-test('name generators follow Title + Adjective + Noun', function () {
-  var h = G.randomHumanName();
-  var a = G.randomAiName();
-  assert.strictEqual(h.split(' ').length >= 3, true);
-  assert.strictEqual(a.split(' ').length >= 3, true);
+test('name generators follow Title + Noun', function () {
+  assert.strictEqual(G.randomHumanName().split(' ').length, 2);
+  assert.strictEqual(G.randomAiName().split(' ').length, 2);
+});
+
+test('randomBet returns a non-empty wager', function () {
+  assert.strictEqual(typeof G.randomBet(), 'string');
+  assert.ok(G.randomBet().length > 0);
 });
 
 test('nameGenerator yields distinct names', function () {
