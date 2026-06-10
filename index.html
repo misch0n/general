@@ -132,6 +132,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .fire:disabled{ background:var(--gen-disabled); color:#cfcca8; box-shadow:none; border-color:var(--gen-disabled-line); cursor:default; }
 .aithinking{ height:54px; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; color:var(--gen-brass);
   border:2px dashed var(--gen-brass-dark); border-radius:var(--gen-r-tag); }
+/* pre-roll placeholder: keeps the dock the same height as after the throw */
+.rollhint{ height:54px; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:600; letter-spacing:1.5px;
+  text-transform:uppercase; font-size:12px; color:var(--gen-muted); }
 
 .shake{ animation:sh var(--gen-dur-roll) ease; }
 @keyframes sh{ 0%{ transform:translateY(0) rotate(0); } 25%{ transform:translateY(-10px) rotate(-13deg); } 55%{ transform:translateY(-3px) rotate(11deg); } 100%{ transform:translateY(0) rotate(0); } }
@@ -387,6 +390,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="dice" class="dice"></div>
     <div id="hintLine" class="hintline hidden"></div>
     <button id="fire" class="fire">ОГЪН</button>
+    <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
   </div>
 
@@ -1015,7 +1019,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function renderFire() {
     if (manualMode) return;
-    if (awaitingRoll) { $('fire').classList.add('hidden'); $('aiThinking').classList.add('hidden'); return; }
+    if (awaitingRoll) {
+      $('fire').classList.add('hidden'); $('aiThinking').classList.add('hidden');
+      $('rollHint').classList.remove('hidden'); // keeps the footer the same height as after the roll
+      return;
+    }
+    $('rollHint').classList.add('hidden');
     var p = G.currentPlayer(game);
     var fire = $('fire'), think = $('aiThinking');
     if (p.isAI) { fire.classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
