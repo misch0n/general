@@ -294,7 +294,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* unrolled placeholder dice (tap to make the first throw) */
 .die.ghost{ background:linear-gradient(155deg,#e9e4cf,#c9c2a0); cursor:pointer; animation:ghostpulse 1.4s ease-in-out infinite; }
-.die.ghost .ghostq{ width:100%; height:100%; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:700; font-size:30px; color:#8a8463; }
+.die.ghost .ghostq{ display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(6,1fr); gap:2.5px; width:21px; height:34px; }
+.die.ghost .ghostq span{ border-radius:2px; }
+.die.ghost .ghostq span.on{ background:var(--gen-pip); box-shadow:inset 0 1px 1px rgba(0,0,0,.5); }
 @keyframes ghostpulse{ 0%,100%{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 3px 0 rgba(0,0,0,.4); } 50%{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 3px 0 rgba(0,0,0,.4),0 0 14px rgba(200,166,75,.6); } }
 
 /* manual console: tap-the-dice entry */
@@ -455,6 +457,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var $ = function (id) { return document.getElementById(id); };
 
   var PIPS = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
+  // a blocky "?" drawn from square pip-coloured blocks (3 cols x 6 rows)
+  var QMARK = [1,1,1, 0,0,1, 0,1,1, 0,1,0, 0,0,0, 0,1,0];
+  function qmarkHTML() {
+    var s = '';
+    for (var i = 0; i < QMARK.length; i++) s += '<span class="' + (QMARK[i] ? 'on' : '') + '"></span>';
+    return '<span class="ghostq">' + s + '</span>';
+  }
   var PRESET_COLORS = ['#c8a64b', '#b23a2e', '#3f6b3a', '#2f4a6b', '#9a6b2f', '#7a4632', '#5f7a3a', '#a23a6b'];
   var RIBBON_COLORS = ['#b23a2e', '#2f4a6b', '#c8a64b', '#3f6b3a', '#7a4632', '#c8a64b'];
   var AI_DELAY = 680, END_DELAY = 620, AI_VIEW_DELAY = 1500, ROLLS = G.MAX_ROLLS; // 1 auto roll + (ROLLS-1) rerolls
@@ -975,7 +984,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       for (var k = 0; k < G.DICE_COUNT; k++) {
         var g = document.createElement('button');
         g.className = 'die ghost'; g.setAttribute('aria-label', 'Хвърли заровете');
-        g.innerHTML = '<span class="ghostq">?</span>';
+        g.innerHTML = qmarkHTML();
         g.onclick = firstRoll;
         box.appendChild(g);
       }
