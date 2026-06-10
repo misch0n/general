@@ -55,7 +55,11 @@ function strength(S) { return (S - Srandom) / (par - Srandom); }
   var S = meanOf(softmaxPolicy(tau), N);
   console.log('softmax τ=' + tau + '\tmean=' + S.toFixed(1) + '\tstrength=' + (100 * strength(S)).toFixed(0) + '%');
 });
-var Sr = meanOf(riskPolicy(), N);
-console.log('risk(τ=2,λ=1.4)\tmean=' + Sr.toFixed(1) + '\tstrength=' + (100 * strength(Sr)).toFixed(0) + '%');
+[[2, 1.4], [5, 2.5], [8, 2.5], [10, 3]].forEach(function (rp) {
+  var pol = { keep: function (s, d, rl) { return EV.botKeep(s, d, rl, { type: 'risk', tau: rp[0], lambda: rp[1] }); },
+              cat: function (s, d) { return EV.botCategory(s, d, { type: 'risk', tau: rp[0], lambda: rp[1] }); } };
+  var Sr = meanOf(pol, N);
+  console.log('risk(τ=' + rp[0] + ',λ=' + rp[1] + ')\tmean=' + Sr.toFixed(1) + '\tstrength=' + (100 * strength(Sr)).toFixed(0) + '%');
+});
 var So = meanOf(softmaxPolicy(0), N);
 console.log('optimal τ=0\tmean=' + So.toFixed(1) + '\tstrength=' + (100 * strength(So)).toFixed(0) + '%');

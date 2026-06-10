@@ -573,10 +573,10 @@
   // Комар = комарджия (a gambler) → the risk-seeking exception; Мушица is the
   // harmless near-random weakling.
   var PERSONAS = [
-    { id: 'mushica',  name: 'Мушица',             flavor: 'Дребна и безобидна.',           policy: { type: 'softmax', tau: 20 },            strength: 0.06 },
-    { id: 'komar',    name: 'Комар',              flavor: 'Комарджия — залага и на дъжда.', policy: { type: 'risk', tau: 2, lambda: 1.4 },   strength: 0.32 },
-    { id: 'lelia',    name: 'Леля ти',            flavor: 'Играе на семейни вечери.',      policy: { type: 'softmax', tau: 3 },             strength: 0.50 },
-    { id: 'lyubitel', name: 'Кварталния любител', flavor: 'Бива го, бутка кокала.',        policy: { type: 'softmax', tau: 1.5 },           strength: 0.75 },
+    { id: 'mushica',  name: 'Мушица',             flavor: 'Дребна и безобидна.',           policy: { type: 'softmax', tau: 40 },           strength: 0.20 },
+    { id: 'komar',    name: 'Комар',              flavor: 'Комарджия — залага и на дъжда.', policy: { type: 'risk', tau: 8, lambda: 2.5 },  strength: 0.32 },
+    { id: 'lelia',    name: 'Леля ти',            flavor: 'Играе на семейни вечери.',      policy: { type: 'softmax', tau: 3 },             strength: 0.53 },
+    { id: 'lyubitel', name: 'Кварталния любител', flavor: 'Бива го, бутка кокала.',        policy: { type: 'softmax', tau: 1.3 },          strength: 0.75 },
     { id: 'gospod',   name: 'Господ бог',         flavor: 'Вижда всичко. Не прощава.',     policy: { type: 'optimal', tau: 0 },             strength: 1.0 },
   ];
   function personaById(id) {

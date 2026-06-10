@@ -368,13 +368,19 @@
   }
 
   // policy: { type:'optimal'|'softmax'|'risk', tau, lambda }
+  // Non-optimal personas play WEAK DICE but still bank points: they only scratch
+  // a category for 0 when nothing scores (no random/repeated forfeits). The
+  // weakness lives in their keeps and in suboptimal-but-positive placement.
   function botCategory(scores, dice, policy, rng) {
     var ranked = evaluate(scores, dice, 0).category_ranked;
+    if (policy.type === 'optimal') return ranked[0].key; // may strategically scratch
+    var positive = ranked.filter(function (r) { return r.immediate > 0; });
+    var pool = positive.length ? positive : ranked; // forfeit only when forced
     if (policy.type === 'risk') {
       var lambda = policy.lambda == null ? 1.4 : policy.lambda;
-      return softmaxPick(ranked, function (a) { return a.ev + lambda * (CEIL[a.key] || 0); }, policy.tau || 2, rng).key;
+      return softmaxPick(pool, function (a) { return a.ev + lambda * (CEIL[a.key] || 0); }, policy.tau || 2, rng).key;
     }
-    return softmaxPick(ranked, function (a) { return a.ev; }, policy.type === 'optimal' ? 0 : policy.tau, rng).key;
+    return softmaxPick(pool, function (a) { return a.ev; }, policy.tau, rng).key;
   }
   function botKeep(scores, dice, rollsLeft, policy, rng) {
     var ranked = evaluate(scores, dice, rollsLeft).keep_ranked;
