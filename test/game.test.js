@@ -343,7 +343,15 @@ test('atRiskPremium is empty when the combo is preserved or already filled', fun
 });
 
 test('roast pools are non-empty', function () {
-  assert.ok(G.ROASTS.risk.length > 0 && G.ROASTS.fail.length > 0);
+  assert.ok(G.ROASTS.risk.length > 0 && G.ROASTS.fail.length > 0 && G.ROASTS.flop.length > 0);
+});
+
+test('isDisappointing flags nothing-scores and all-in flops', function () {
+  assert.strictEqual(G.isDisappointing(0, false), true);   // forfeit
+  assert.strictEqual(G.isDisappointing(3, false), true);   // a measly 3
+  assert.strictEqual(G.isDisappointing(12, false), false); // a fine score
+  assert.strictEqual(G.isDisappointing(10, true), true);   // re-rolled everything for 10
+  assert.strictEqual(G.isDisappointing(20, true), false);  // re-rolled everything but landed it
 });
 
 // --------------------------------------------------- Bulgarian agreement engine

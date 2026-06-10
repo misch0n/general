@@ -465,6 +465,32 @@
     ],
   };
 
+  // Brutal, comic-book roasts shown when a turn ends in disappointment. These
+  // are standalone lines (no combo reference), so they need no agreement.
+  ROASTS.flop = [
+    'Майка ти съжалява, че те е родила.',
+    'Това беше позор за целия род.',
+    'Дори заровете ти се присмиват.',
+    'Баба ти хвърля по-добре. И тя е покойница.',
+    'Засрами се и си върни пагоните.',
+    'Виждал съм по-сполучливи хвърляния на гробище.',
+    'Щабът единодушно поиска да те разжалват.',
+    'Късметът те погледна веднъж и си тръгна.',
+    'Това хвърляне е обида към армията.',
+    'Генералът въздъхна и се обърна на другата страна.',
+    'Заровете те предадоха. Като всички останали.',
+    'Дано поне в живота си по-костелив от това.',
+  ];
+
+  // Was a commit genuinely disappointing (worth a roast)? Either the player
+  // ended up with (next to) nothing, or they re-rolled everything and still
+  // scraped together almost no points.
+  function isDisappointing(value, rerolledAll) {
+    if (value <= 3) return true;            // ended up with nothing
+    if (rerolledAll && value < 15) return true; // gambled the lot for scraps
+    return false;
+  }
+
   // Fill a roast template's grammar tokens for the given (premium) combo.
   function renderRoast(template, comboKey) {
     var gr = COMBO_GRAMMAR[comboKey] || { g: 'm', phrase: 'комбинация' };
@@ -577,6 +603,7 @@
     bestOpenScore: bestOpenScore,
     atRiskPremium: atRiskPremium,
     ROASTS: ROASTS,
+    isDisappointing: isDisappointing,
     COMBO_GRAMMAR: COMBO_GRAMMAR,
     inflectAdj: inflectAdj,
     possessive: possessive,

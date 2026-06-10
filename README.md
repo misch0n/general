@@ -9,8 +9,8 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
 ## Features
 
-- **One screen, no scroll.** Scoreboard on top, a **medal divider**, then the
-  **dice console** at the bottom — designed to fit a phone (360–414px).
+- **Full-screen board.** Fills the viewport with a thin margin: scoreboard up
+  top, a **medal divider**, and the **dice console** anchored at the bottom.
 - **Select-to-reroll.** Dice default to **kept**. Tap the ones you want to
   re-roll (a ✛ reticle marks them) and hit **ОГЪН**; selection clears after every
   throw. Up to **3 throws** per turn (one automatic roll + two rerolls). Thrown
@@ -19,14 +19,10 @@ edition): camouflage field, classification banner, brass medals and stencil type
   category shows the points the dice would score as a tappable brass chip; combos
   fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
   small **×** forfeits a slot. The single best move is flagged with a ★.
-- **Odds toggle.** Tap **ШАНСОВЕ** to overlay each open category's live chance of
-  **improving** its score — i.e. the probability that keeping the useful dice and
-  re-rolling some of the rest betters what you already have (with one 2, that's
-  the chance of rolling another 2; not certainty). Updates as you roll; only
-  `шанс` ever reads 100%. Off by default.
-- **Roasts.** Gamble a made combo away (re-rolling a full house, straight, four
-  of a kind…) and the game taunts you — a lighter jab when you take the risk,
-  the harshest lines when it backfires. Fully gender-agreed Bulgarian (below).
+- **Roasts.** End a turn in disappointment — re-roll the whole hand, or commit
+  next to nothing — and a brutal comic-book **speech bubble** pops up for a
+  couple of seconds (_Майка ти съжалява, че те е родила…_). The criterion lives
+  in `isDisappointing()`.
 - **Any number of players** with custom names, colours and AI toggles; a
   separate scoreboard each, with the current player's shown and the rest
   reachable from the player pills (tap to peek).
