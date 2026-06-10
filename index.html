@@ -394,7 +394,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="manualDice" class="dice"></div>
     <div class="manualbtns">
       <button id="forfeitBtn" class="btn ghostbtn hidden">Отказ (0)</button>
-      <button id="undoBottom" class="btn opabtn" title="Отмени последното" disabled>↩ ОПА!</button>
+      <button id="undoBottom" class="btn opabtn" title="Отмени последното" disabled>ОПА!</button>
       <button id="recordBtn" class="fire hidden">✍ Запиши!</button>
     </div>
   </div>
@@ -433,7 +433,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="evPanel"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
-      <button id="overUndo" class="btn hidden">↩ ОПА</button>
+      <button id="overUndo" class="btn hidden">ОПА!</button>
       <button id="playAgain" class="btn primary">↻ Нов набор</button>
     </div>
   </div>
@@ -901,14 +901,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   function renderManualDock() {
-    var sel = $('manualSel'), diceBox = $('manualDice'), rec = $('recordBtn'), forf = $('forfeitBtn');
+    var sel = $('manualSel'), diceBox = $('manualDice'), rec = $('recordBtn'), forf = $('forfeitBtn'), opa = $('undoBottom');
     if (!manualCat) {
+      // before picking a combo: only ОПА (under the tooltip)
       sel.textContent = 'Избери категория ↑';
       diceBox.innerHTML = ''; rec.classList.add('hidden'); forf.classList.add('hidden');
+      opa.classList.remove('hidden');
       return;
     }
     var label = CAT_LABEL[manualCat];
-    rec.classList.remove('hidden'); forf.classList.remove('hidden');
+    // during point selection: only Отказ / Запиши! (no ОПА — avoids 3 buttons)
+    rec.classList.remove('hidden'); forf.classList.remove('hidden'); opa.classList.add('hidden');
     if (FIXED[manualCat] != null) {
       sel.innerHTML = '<b>' + label + '</b> — ' + FIXED[manualCat] + ' т. (ако е направена)';
       diceBox.innerHTML = '';
