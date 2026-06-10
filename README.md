@@ -19,6 +19,9 @@ edition): camouflage field, classification banner, brass medals and stencil type
   category shows the points the dice would score as a tappable brass chip; combos
   fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
   small **×** forfeits a slot. The single best move is flagged with a ★.
+- **Marching orders.** Each turn opens with a brass comic **speech bubble** —
+  _🎖 Майор, генералът ти заповядва да хвърлиш каре!_ — naming one of your still
+  open categories to aim for (flavour only). Shows for ~4s.
 - **Roasts.** End a turn in disappointment — re-roll the whole hand, or commit
   next to nothing — and a brutal comic-book **speech bubble** pops up for a
   couple of seconds (_Майка ти съжалява, че те е родила…_). The criterion lives

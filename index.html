@@ -145,6 +145,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .roast .bubble::before{ content:''; position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); border:7px solid transparent; border-top-color:#f7f3e3; z-index:1; }
 .roast.show .bubble{ animation:roastpop .3s cubic-bezier(.2,1.4,.4,1); }
 @keyframes roastpop{ 0%{ transform:scale(.6) translateY(10px); opacity:0; } 60%{ transform:scale(1.06); opacity:1; } 100%{ transform:none; } }
+/* the general's marching order at turn start — brass-rimmed bubble */
+.roast.order .bubble{ background:#f3ead0; border-color:var(--gen-brass-stroke); color:#2a230c; box-shadow:0 7px 0 rgba(110,84,24,.4); }
+.roast.order .bubble::after{ border-top-color:var(--gen-brass-stroke); }
+.roast.order .bubble::before{ border-top-color:#f3ead0; }
 
 /* ===== setup ===== */
 .setup-body{ padding:18px 16px 22px; display:flex; flex-direction:column; gap:12px; }
@@ -434,6 +438,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     document.documentElement.style.setProperty('--pc', p.color);
     renderAll();
     shakeDice();
+    showOrder(p);
     if (p.isAI) runAiTurn();
   }
 
@@ -642,8 +647,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     afterCommit(choice.category, choice.value);
   }
 
-  // ---------- roasts (comic speech bubble on a disappointing commit) ----------
-  var ROAST_MS = 2600;
+  // ---------- speech bubbles ----------
+  var ROAST_MS = 2600, ORDER_MS = 4000;
+
+  // the general's order at turn start: aim for a still-open category
+  function showOrder(player) {
+    var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(player, c.key); });
+    if (!open.length) return;
+    var cat = open[Math.floor(Math.random() * open.length)];
+    var addressee = player.name.trim().split(/\s+/)[0]; // their military title
+    var box = $('roast');
+    box.className = 'roast show order';
+    box.innerHTML = '<span class="bubble">🎖 ' + esc(G.orderText(addressee, cat.key)) + '</span>';
+    clearTimeout(roastTimer);
+    roastTimer = setTimeout(clearRoast, ORDER_MS);
+  }
+
   function showRoast() {
     var line = G.ROASTS.flop[roastIx % G.ROASTS.flop.length]; roastIx++;
     var box = $('roast');

@@ -491,6 +491,20 @@
     return false;
   }
 
+  // Spoken name for each category, fitting "...да хвърлиш {X}" (go roll {X}).
+  var ORDER_NAMES = {
+    ones: 'единици', twos: 'двойки', threes: 'тройки', fours: 'четворки',
+    fives: 'петици', sixes: 'шестици',
+    twoKind: 'чифт', threeKind: 'три еднакви', fourKind: 'каре',
+    fullHouse: 'фул хаус', smallStraight: 'малка кента', largeStraight: 'голяма кента',
+    general: 'генерал', chance: 'шанс',
+  };
+
+  // The general's marching order shown at the start of a turn.
+  function orderText(addressee, categoryKey) {
+    return addressee + ', генералът ти заповядва да хвърлиш ' + (ORDER_NAMES[categoryKey] || '...') + '!';
+  }
+
   // Fill a roast template's grammar tokens for the given (premium) combo.
   function renderRoast(template, comboKey) {
     var gr = COMBO_GRAMMAR[comboKey] || { g: 'm', phrase: 'комбинация' };
@@ -604,6 +618,8 @@
     atRiskPremium: atRiskPremium,
     ROASTS: ROASTS,
     isDisappointing: isDisappointing,
+    ORDER_NAMES: ORDER_NAMES,
+    orderText: orderText,
     COMBO_GRAMMAR: COMBO_GRAMMAR,
     inflectAdj: inflectAdj,
     possessive: possessive,

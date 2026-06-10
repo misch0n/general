@@ -346,6 +346,12 @@ test('roast pools are non-empty', function () {
   assert.ok(G.ROASTS.risk.length > 0 && G.ROASTS.fail.length > 0 && G.ROASTS.flop.length > 0);
 });
 
+test('orderText builds a coherent command, every category has a name', function () {
+  assert.strictEqual(G.orderText('Майор', 'fullHouse'), 'Майор, генералът ти заповядва да хвърлиш фул хаус!');
+  assert.strictEqual(G.orderText('Ефрейтор', 'sixes'), 'Ефрейтор, генералът ти заповядва да хвърлиш шестици!');
+  G.CATEGORIES.forEach(function (c) { assert.ok(G.ORDER_NAMES[c.key], 'missing order name for ' + c.key); });
+});
+
 test('isDisappointing flags nothing-scores and all-in flops', function () {
   assert.strictEqual(G.isDisappointing(0, false), true);   // forfeit
   assert.strictEqual(G.isDisappointing(3, false), true);   // a measly 3
