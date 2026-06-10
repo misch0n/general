@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Генерал</title>
+<title>General</title>
 <style>
   :root {
     --bg-0: #0b0e17;
@@ -118,7 +118,7 @@
   .die .pip { border-radius: 50%; }
   .die .pip.on { background: radial-gradient(circle at 35% 30%, #4a5278, #1b2138); box-shadow: inset 0 1px 1px rgba(0,0,0,.5); align-self: center; justify-self: center; width: 72%; height: 72%; }
   .die.held { border-color: var(--accent); transform: translateY(-8px); box-shadow: 0 14px 26px rgba(0,0,0,.45), 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
-  .die.held::after { content: "ЗАДЪРЖАН"; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .08em; color: var(--accent); font-weight: 800; }
+  .die.held::after { content: "HELD"; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .12em; color: var(--accent); font-weight: 800; }
   .die.ghost { background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 2px var(--stroke); cursor: default; }
   .die.ghost .q { width: 100%; height: 100%; display: grid; place-items: center; font-size: 30px; color: var(--faint); }
   .die.roll { animation: tumble .5s ease; }
@@ -133,6 +133,17 @@
   .thinking { color: var(--accent); font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
   .thinking .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
   @keyframes blink { 0%,100%{opacity:.25} 50%{opacity:1} }
+
+  /* roast toast (appears near the dice, fades out) */
+  .roast { min-height: 0; margin: 14px auto 0; max-width: 460px; overflow: hidden; }
+  .roast .msg {
+    display: inline-block; padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 13.5px;
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger);
+  }
+  .roast.show .msg { animation: roastpop .4s cubic-bezier(.2,.9,.2,1); }
+  .roast.brutal .msg { background: var(--danger); color: #1a0408; border-color: transparent; box-shadow: 0 6px 22px rgba(255,122,138,.4); }
+  @keyframes roastpop { 0%{ transform: translateY(8px) scale(.9); opacity: 0 } 100%{ transform: none; opacity: 1 } }
 
   /* suggestions (under the dice) */
   .suggest { margin-top: 22px; border-top: 1px solid var(--stroke); padding-top: 18px; }
@@ -156,7 +167,10 @@
   @media (max-width: 560px) { .board-cols { grid-template-columns: 1fr; } }
   .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 2px 4px 10px; }
   .cat { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; border: 1px solid transparent; margin-bottom: 6px; transition: .12s; min-height: 44px; }
-  .cat .clabel { font-weight: 700; flex: 1; }
+  .cat .clabel { font-weight: 700; flex: 1; display: flex; align-items: center; gap: 8px; text-align: left; }
+  .cat .clabel.tappable { cursor: pointer; }
+  .cat .clabel.tappable .ctext { border-bottom: 1px dotted var(--faint); }
+  .cat .prob { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; background: var(--surface-2); border: 1px solid var(--stroke); border-radius: 999px; padding: 1px 7px; }
   .cat .cval { font-variant-numeric: tabular-nums; color: var(--faint); font-weight: 700; }
   .cat.filled { background: rgba(255,255,255,.03); }
   .cat.filled .cval { color: var(--text); }
@@ -232,12 +246,12 @@
 
   <!-- ============ SETUP ============ -->
   <section id="setup" class="card setup">
-    <div class="brand"><span class="logo">🎲</span><h1>Генерал</h1></div>
-    <p class="sub">Български зарничен генерал. Добавете играчи, дайте им имена и цветове, включете AI противници — и започвайте.</p>
+    <div class="brand"><span class="logo">🎲</span><h1>General</h1></div>
+    <p class="sub">The Bulgarian dice game. Add players, give them names and colours, switch on a few AI opponents — and roll.</p>
     <div id="playerList"></div>
     <div class="setup-actions">
-      <button id="addPlayer" class="btn">+ Играч</button>
-      <button id="startGame" class="btn primary">▶ Започни играта</button>
+      <button id="addPlayer" class="btn">+ Player</button>
+      <button id="startGame" class="btn primary">▶ Start game</button>
     </div>
     <div id="setupErr" class="err"></div>
   </section>
@@ -251,41 +265,42 @@
           <span id="curName" class="nm"></span>
           <span id="curAi" class="badge hidden">AI</span>
         </div>
-        <span class="meta" id="roundMeta">Рунд 1</span>
-        <span class="meta">Хвърляния <span id="rollPips" class="rollpips"></span></span>
+        <span class="meta" id="roundMeta">Round 1</span>
+        <span class="meta">Rolls <span id="rollPips" class="rollpips"></span></span>
       </div>
 
       <div class="card stage">
         <div id="dice" class="dice"></div>
         <p id="hint" class="hint"></p>
         <div class="controls">
-          <button id="rollBtn" class="btn primary">🎲 Хвърли</button>
-          <span id="thinking" class="thinking hidden"><span class="dot"></span>AI мисли…</span>
+          <button id="rollBtn" class="btn primary">🎲 Roll</button>
+          <span id="thinking" class="thinking hidden"><span class="dot"></span>AI is thinking…</span>
         </div>
+        <div id="roast" class="roast"></div>
         <div id="suggest" class="suggest"></div>
       </div>
 
       <div class="card" style="padding:18px">
-        <div class="board-head">Пълна таблица</div>
+        <div class="board-head">Scoreboard — tap a name for its odds</div>
         <div class="board-cols">
           <div>
-            <div class="section-title">Горна секция</div>
+            <div class="section-title">Upper</div>
             <div id="boardUpper"></div>
           </div>
           <div>
-            <div class="section-title">Долна секция</div>
+            <div class="section-title">Lower</div>
             <div id="boardLower"></div>
           </div>
         </div>
-        <div class="totbar"><span>Общо</span><b id="curTotal">0</b></div>
+        <div class="totbar"><span>Total</span><b id="curTotal">0</b></div>
       </div>
     </div>
 
     <aside class="side">
       <div class="card" style="padding:16px">
-        <div class="section-title">Играчи</div>
+        <div class="section-title">Players</div>
         <div id="plist" class="plist"></div>
-        <p class="note">Натиснете играч, за да надникнете в дъската му.</p>
+        <p class="note">Tap a player to peek at their board.</p>
       </div>
     </aside>
   </section>
@@ -295,8 +310,8 @@
 <div id="forfeitModal" class="overlay hidden">
   <div class="card modal">
     <button class="x" id="forfeitClose">✕</button>
-    <h2>Откажи се от категория</h2>
-    <p class="ffhint">Запиши 0 в избрана незаета категория и приключи хода.</p>
+    <h2>Forfeit a category</h2>
+    <p class="ffhint">Write 0 in any unused category and end your turn.</p>
     <div id="forfeitBody"></div>
   </div>
 </div>
@@ -307,28 +322,28 @@
     <button class="x" id="peekClose">✕</button>
     <h2 id="peekTitle" style="margin-bottom:14px"></h2>
     <div id="peekBody"></div>
-    <div class="totbar"><span>Общо</span><b id="peekTotal">0</b></div>
+    <div class="totbar"><span>Total</span><b id="peekTotal">0</b></div>
   </div>
 </div>
 
 <!-- tie-break -->
 <div id="tieModal" class="overlay hidden">
   <div class="card modal">
-    <h2 id="tieTitle">Равенство!</h2>
-    <p class="ffhint">Равен резултат за първото място — хвърлете зар. Най-високият печели.</p>
+    <h2 id="tieTitle">Tie!</h2>
+    <p class="ffhint">Tied for first place — roll a die. Highest wins.</p>
     <div id="tieBody"></div>
-    <div class="setup-actions"><button id="tieRoll" class="btn primary">🎲 Хвърли зара</button></div>
+    <div class="setup-actions"><button id="tieRoll" class="btn primary">🎲 Roll</button></div>
   </div>
 </div>
 
 <!-- game over -->
 <div id="overModal" class="overlay hidden">
   <div class="card modal">
-    <h2>🏆 Край на играта</h2>
+    <h2>🏆 Game over</h2>
     <div id="winner" class="winner"></div>
     <div id="ranks"></div>
     <div id="betMsgs" class="betmsgs"></div>
-    <div class="setup-actions"><button id="playAgain" class="btn primary">↻ Нова игра</button></div>
+    <div class="setup-actions"><button id="playAgain" class="btn primary">↻ New game</button></div>
   </div>
 </div>
 
@@ -390,7 +405,7 @@
       // line 1: the name (title), full width and prominent
       var name = document.createElement('input');
       name.type = 'text'; name.className = 'name'; name.value = p.name;
-      name.placeholder = 'Име на играч';
+      name.placeholder = 'Player name';
       name.oninput = function () { p.name = name.value; };
       card.appendChild(name);
 
@@ -404,7 +419,7 @@
 
       var toggle = document.createElement('button');
       toggle.className = 'toggle' + (p.isAI ? ' on' : '');
-      toggle.title = 'Превключи между човек и AI';
+      toggle.title = 'Toggle human / AI';
       toggle.innerHTML = '<span class="switch"></span><span>AI</span>';
       toggle.onclick = function () {
         p.isAI = !p.isAI;
@@ -416,7 +431,7 @@
       row.appendChild(toggle);
       if (setupPlayers.length > 1) {
         var del = document.createElement('button');
-        del.className = 'del'; del.textContent = '✕'; del.title = 'Премахни';
+        del.className = 'del'; del.textContent = '✕'; del.title = 'Remove';
         del.onclick = function () { setupPlayers.splice(i, 1); renderSetup(); };
         row.appendChild(del);
       }
@@ -427,9 +442,9 @@
       bet.className = 'betline';
       var betVal = document.createElement('button');
       betVal.className = 'betval'; betVal.textContent = p.bet;
-      betVal.title = 'Друг облог';
+      betVal.title = 'Reroll bet';
       betVal.onclick = function () { p.bet = G.randomBet(); renderSetup(); };
-      bet.appendChild(document.createTextNode('Залага '));
+      bet.appendChild(document.createTextNode('Bets '));
       bet.appendChild(betVal);
       card.appendChild(bet);
 
@@ -440,7 +455,7 @@
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
   $('startGame').onclick = function () {
     if (setupPlayers.some(function (p) { return !(p.name || '').trim(); })) {
-      $('setupErr').textContent = 'Всеки играч трябва да има име.';
+      $('setupErr').textContent = 'Every player needs a name.';
       return;
     }
     $('setupErr').textContent = '';
@@ -461,6 +476,8 @@
   var rollsUsed = 0;
   var aiBusy = false;     // an AI is taking its turn
   var locked = false;     // turn is ending / transitioning — block input
+  var shownProbs = {};    // category keys whose hit-chance is currently revealed
+  var roastIx = { risk: 0, fail: 0 }; // rotate through the roast pools
 
   function startGame(players) {
     game = G.createGame(players);
@@ -475,6 +492,7 @@
     holds = [false, false, false, false, false];
     rollsUsed = 0;
     locked = false;
+    clearRoast();
     var p = G.currentPlayer(game);
     document.documentElement.style.setProperty('--accent', p.color);
     renderAll();
@@ -493,8 +511,41 @@
 
   $('rollBtn').onclick = function () {
     if (aiBusy || locked || rollsLeft() <= 0) return;
-    doRoll();
+    humanRoll();
   };
+
+  // A human roll, with roast detection for gambling away a made combo.
+  function humanRoll() {
+    var p = G.currentPlayer(game);
+    var wasReroll = rollsUsed > 0;
+    var risk = wasReroll ? G.atRiskPremium(p, dice, holds) : [];
+    var bestBefore = wasReroll ? G.bestOpenScore(p, dice) : 0;
+    doRoll();
+    if (risk.length) {
+      var staked = risk[0];
+      showRoast('risk', staked.label);
+      if (G.bestOpenScore(p, dice) < bestBefore) {
+        // the gamble made things worse — bring out the brutal one
+        setTimeout(function () { showRoast('fail', staked.label); }, 1400);
+      }
+    }
+  }
+
+  var roastTimer = null;
+  function showRoast(pool, label) {
+    var arr = G.ROASTS[pool];
+    var msg = arr[roastIx[pool] % arr.length].replace('{X}', label || 'combo');
+    roastIx[pool]++;
+    var box = $('roast');
+    box.className = 'roast show' + (pool === 'fail' ? ' brutal' : '');
+    box.innerHTML = '<span class="msg">' + escapeHtml(msg) + '</span>';
+    clearTimeout(roastTimer);
+    roastTimer = setTimeout(clearRoast, pool === 'fail' ? 4200 : 3200);
+  }
+  function clearRoast() {
+    var box = $('roast'); box.className = 'roast'; box.innerHTML = '';
+    clearTimeout(roastTimer);
+  }
 
   function animateDice() {
     $('dice').querySelectorAll('.die').forEach(function (el, i) {
@@ -544,7 +595,7 @@
     av.style.background = p.color; av.textContent = initials(p.name);
     $('curName').textContent = p.name;
     $('curAi').classList.toggle('hidden', !p.isAI);
-    $('roundMeta').textContent = 'Рунд ' + game.round;
+    $('roundMeta').textContent = 'Round ' + game.round;
 
     var pips = '';
     for (var i = 0; i < G.MAX_ROLLS; i++) pips += '<i class="' + (i < rollsLeft() ? 'live' : '') + '"></i>';
@@ -552,14 +603,14 @@
 
     var btn = $('rollBtn');
     btn.disabled = aiBusy || locked || rollsLeft() <= 0;
-    btn.textContent = rollsUsed === 0 ? '🎲 Хвърли' : '🎲 Хвърли отново (' + rollsLeft() + ')';
+    btn.textContent = rollsUsed === 0 ? '🎲 Roll' : '🎲 Reroll (' + rollsLeft() + ')';
     btn.classList.toggle('hidden', p.isAI);
     $('thinking').classList.toggle('hidden', !p.isAI || !aiBusy);
 
     $('hint').textContent = p.isAI ? ''
-      : !rolling() ? 'Натиснете „Хвърли“, за да започнете хода си.'
-      : rollsLeft() > 0 ? 'Натиснете зар, за да го задържите, или изберете точкуване по-долу.'
-      : 'Няма повече хвърляния — изберете точкуване.';
+      : !rolling() ? 'Press “Roll” to start your turn.'
+      : rollsLeft() > 0 ? 'Tap a die to hold it, or pick a score below.'
+      : 'No rolls left — pick a score.';
   }
 
   function dieEl(value, held, idx, interactive) {
@@ -591,8 +642,8 @@
   function renderSuggest() {
     var panel = $('suggest'); panel.innerHTML = '';
     var p = G.currentPlayer(game);
-    if (p.isAI) { panel.innerHTML = '<div class="sgmsg">AI избира своя ход…</div>'; return; }
-    if (!rolling()) { panel.innerHTML = '<div class="sgmsg">Хвърлете заровете, за да видите възможните точкувания.</div>'; return; }
+    if (p.isAI) { panel.innerHTML = '<div class="sgmsg">AI is choosing its move…</div>'; return; }
+    if (!rolling()) { panel.innerHTML = '<div class="sgmsg">Roll the dice to see what you can score.</div>'; return; }
 
     var entries = [];
     G.CATEGORIES.forEach(function (c) {
@@ -606,7 +657,7 @@
 
     var title = document.createElement('div');
     title.className = 'sgtitle';
-    title.textContent = entries.length ? 'Възможни точкувания' : 'Няма комбинации — задължителен отказ';
+    title.textContent = entries.length ? 'You can score' : 'No combinations — you must forfeit';
     panel.appendChild(title);
 
     var wrap = document.createElement('div'); wrap.className = 'sgwrap';
@@ -618,7 +669,7 @@
     });
     var f = document.createElement('button');
     f.className = 'sg forfeit' + (entries.length ? '' : ' must');
-    f.innerHTML = '<span class="sgl">Откажи се</span><span class="sgv">0</span>';
+    f.innerHTML = '<span class="sgl">Forfeit</span><span class="sgv">0</span>';
     f.onclick = openForfeit;
     wrap.appendChild(f);
     panel.appendChild(wrap);
@@ -633,6 +684,11 @@
     $('curTotal').textContent = G.playerTotal(p);
   }
 
+  // probability of hitting a category from the current dice & rolls left.
+  function currentHitProb(key) {
+    return rolling() ? G.hitProbability(key, dice, rollsLeft()) : G.hitProbabilityFresh(key);
+  }
+
   function fillBoard(elId, group, player, canScore) {
     var host = $(elId); host.innerHTML = '';
     G.CATEGORIES.filter(function (c) { return c.group === group; }).forEach(function (c) {
@@ -640,8 +696,20 @@
       var filled = G.isCategoryFilled(player, c.key);
       row.className = 'cat';
 
-      var label = document.createElement('span');
-      label.className = 'clabel'; label.textContent = c.label;
+      // tappable name reveals the live chance of hitting the combo
+      var label = document.createElement('button');
+      label.className = 'clabel';
+      var ctext = '<span class="ctext">' + c.label + '</span>';
+      if (!filled && !player.isAI) {
+        label.className += ' tappable';
+        var prob = shownProbs[c.key]
+          ? '<span class="prob">' + Math.round(currentHitProb(c.key) * 100) + '%</span>' : '';
+        label.innerHTML = ctext + prob;
+        label.title = 'Tap for the chance to hit this';
+        label.onclick = function () { shownProbs[c.key] = !shownProbs[c.key]; renderBoard(); };
+      } else {
+        label.innerHTML = ctext;
+      }
       row.appendChild(label);
 
       if (filled) {
@@ -663,7 +731,7 @@
         } else {
           var z = document.createElement('button');
           z.className = 'chip zero'; z.textContent = '0';
-          z.title = 'Откажи се (запиши 0)';
+          z.title = 'Forfeit (write 0)';
           z.onclick = function () { chooseForfeit(c.key); };
           row.appendChild(z);
         }
@@ -698,7 +766,7 @@
       if (G.isCategoryFilled(p, c.key)) return;
       var v = G.scoreFor(c.key, dice);
       var b = document.createElement('button'); b.className = 'ffrow';
-      b.innerHTML = '<span>' + c.label + '</span><span class="ffv">' + (v > 0 ? 'жертваш ' + v : '0') + '</span>';
+      b.innerHTML = '<span>' + c.label + '</span><span class="ffv">' + (v > 0 ? 'sacrifice ' + v : '0') + '</span>';
       b.onclick = function () {
         $('forfeitModal').classList.add('hidden');
         chooseForfeit(c.key);
@@ -734,7 +802,7 @@
     $('turnAvatar').style.background = player.color;
     $('turnAvatar').textContent = initials(player.name);
     $('turnName').textContent = player.name;
-    $('turnSub').textContent = player.isAI ? 'AI — на ход' : 'на ход';
+    $('turnSub').textContent = player.isAI ? 'AI — up next' : 'up next';
     var ov = $('turnOverlay');
     ov.classList.remove('hidden', 'play');
     void ov.offsetWidth;
@@ -754,7 +822,7 @@
   var tieState = null;
   function startTieBreak(tied, done) {
     tieState = { tied: tied, rolls: null, done: done };
-    $('tieTitle').textContent = 'Равенство!';
+    $('tieTitle').textContent = 'Tie!';
     renderTie();
     $('tieModal').classList.remove('hidden');
   }
@@ -788,7 +856,7 @@
     } else {
       setTimeout(function () {
         tieState.tied = winners; tieState.rolls = null;
-        $('tieTitle').textContent = 'Пак равенство! Хвърлете отново.';
+        $('tieTitle').textContent = 'Still tied! Roll again.';
         renderTie();
       }, 1000);
     }
@@ -800,7 +868,7 @@
     var ordered = [winner].concat(others);
 
     $('winner').innerHTML = '<span class="avatar" style="background:' + winner.color + '">' + initials(winner.name) + '</span>'
-      + escapeHtml(winner.name) + ' — ' + G.playerTotal(winner) + ' т.';
+      + escapeHtml(winner.name) + ' — ' + G.playerTotal(winner) + ' pts';
 
     $('ranks').innerHTML = ordered.map(function (p, idx) {
       return '<div class="rank' + (idx === 0 ? ' first' : '') + '"><span class="pos">' + (idx + 1) + '</span>'
@@ -809,9 +877,9 @@
     }).join('');
 
     // bet outcomes: the winner keeps their wager, everyone else loses theirs.
-    var msgs = '<div class="bet kept">' + escapeHtml(winner.name) + ' запази ' + escapeHtml(winner.bet || '...') + '</div>';
+    var msgs = '<div class="bet kept">' + escapeHtml(winner.name) + ' kept ' + escapeHtml(winner.bet || 'the bet') + '</div>';
     others.forEach(function (p) {
-      msgs += '<div class="bet lost">' + escapeHtml(p.name) + ' загуби ' + escapeHtml(p.bet || '...') + '</div>';
+      msgs += '<div class="bet lost">' + escapeHtml(p.name) + ' lost ' + escapeHtml(p.bet || 'the bet') + '</div>';
     });
     $('betMsgs').innerHTML = msgs;
 

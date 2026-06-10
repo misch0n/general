@@ -15,6 +15,12 @@ This is the base version; it will be expanded later.
   it lists every scoring entry the dice make — respecting categories you've
   already used — as a tap-to-score button. Combos that can be filled several
   ways (e.g. two different pairs for `2x`) show **one button per option**.
+- **Hit-chance on tap.** Tap any category name on the scoreboard to reveal its
+  live probability of hitting — computed from the current dice and rolls left,
+  updating as you roll. Subtle and on-demand, never in the way.
+- **Roasts.** Gamble a made combo away (rerolling a full house, straight, four
+  of a kind…) and the game taunts you with rotating brutal messages — a lighter
+  jab when you take the risk, and the harshest ones when it backfires.
 - **Forfeit.** A "Откажи се" button opens a selector to write **0** into any
   unfilled category (a deliberate sacrifice to save a better one). When the dice
   make no combinations at all, forfeiting is mandatory.
@@ -27,11 +33,11 @@ This is the base version; it will be expanded later.
   with colour and AI toggle below — plus a separate, rotating scoreboard.
 - **AI players.** Flip the toggle next to any player before the game to make
   them computer-controlled; the AI rolls, holds and scores on its own.
-- **Themed names.** Title + Noun — humans get silly Bulgarian military names
-  (_Генерал Пишка_, _Майор Петел_); AIs get electric / metallic ones
-  (_Генерал Камила_, _Майор Тенеке_). All editable.
-- **Stupid bets.** Every player wagers something idiotic (_Залага кучето си_,
-  _Залага майка си_, _Залага достойнството си_…), re-rollable in setup.
+- **English UI**, with themed names: Title + Noun — humans get silly military
+  names (_General Willy_, _Major Rooster_); AIs get electric / metallic ones
+  (_General Camel_, _Major TinCan_). All editable.
+- **Stupid bets.** Every player wagers something idiotic (_Bets his dog_,
+  _his mother_, _his dignity_…), re-rollable in setup.
 - **Peek** at any player's board from the sidebar — read-only, off to the side.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for

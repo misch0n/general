@@ -1,5 +1,5 @@
 /*
- * Генерал — core game logic.
+ * General (Генерал) — core game logic.
  *
  * DOM-free and dependency-free so every rule, the suggestion engine, the AI and
  * the name generators can be unit tested under Node (`node --test`).
@@ -25,21 +25,24 @@
 
   // The scoreboard, in display order.
   var CATEGORIES = [
-    { key: 'ones',          label: '1',           group: 'upper' },
-    { key: 'twos',          label: '2',           group: 'upper' },
-    { key: 'threes',        label: '3',           group: 'upper' },
-    { key: 'fours',         label: '4',           group: 'upper' },
-    { key: 'fives',         label: '5',           group: 'upper' },
-    { key: 'sixes',         label: '6',           group: 'upper' },
-    { key: 'twoKind',       label: '2x',          group: 'lower' },
-    { key: 'threeKind',     label: '3x',          group: 'lower' },
-    { key: 'fourKind',      label: '4x',          group: 'lower' },
-    { key: 'fullHouse',     label: 'фул хаус',     group: 'lower' },
-    { key: 'smallStraight', label: 'малка кента',  group: 'lower' },
-    { key: 'largeStraight', label: 'голяма кента', group: 'lower' },
-    { key: 'general',       label: 'генерал',      group: 'lower' },
-    { key: 'chance',        label: 'шанс',         group: 'lower' },
+    { key: 'ones',          label: '1',              group: 'upper' },
+    { key: 'twos',          label: '2',              group: 'upper' },
+    { key: 'threes',        label: '3',              group: 'upper' },
+    { key: 'fours',         label: '4',              group: 'upper' },
+    { key: 'fives',         label: '5',              group: 'upper' },
+    { key: 'sixes',         label: '6',              group: 'upper' },
+    { key: 'twoKind',       label: '2x',             group: 'lower' },
+    { key: 'threeKind',     label: '3x',             group: 'lower' },
+    { key: 'fourKind',      label: '4x',             group: 'lower' },
+    { key: 'fullHouse',     label: 'Full House',     group: 'lower' },
+    { key: 'smallStraight', label: 'Small Straight', group: 'lower' },
+    { key: 'largeStraight', label: 'Large Straight', group: 'lower' },
+    { key: 'general',       label: 'General',        group: 'lower' },
+    { key: 'chance',        label: 'Chance',         group: 'lower' },
   ];
+
+  // Premium combinations — the ones worth roasting a player for gambling away.
+  var PREMIUM = ['general', 'largeStraight', 'smallStraight', 'fullHouse', 'fourKind'];
 
   var FACE = { ones: 1, twos: 2, threes: 3, fours: 4, fives: 5, sixes: 6 };
 
@@ -254,23 +257,161 @@
     return { category: best.key, value: best.value };
   }
 
+  // ----------------------------------------------------------- hit probabilities
+
+  // For m re-rolled dice (0..5): every resulting sorted face-multiset with its
+  // probability. Precomputed once so the recursion below is cheap.
+  var REROLL_DIST = (function () {
+    var dist = [];
+    for (var m = 0; m <= DICE_COUNT; m++) {
+      if (m === 0) { dist.push([{ faces: [], prob: 1 }]); continue; }
+      var acc = {};
+      (function rec(i, arr) {
+        if (i === m) {
+          var key = arr.slice().sort(function (a, b) { return a - b; }).join('');
+          acc[key] = (acc[key] || 0) + 1;
+          return;
+        }
+        for (var f = 1; f <= 6; f++) { arr.push(f); rec(i + 1, arr); arr.pop(); }
+      })(0, []);
+      var total = Math.pow(6, m), list = [];
+      for (var key in acc) {
+        list.push({ faces: key.split('').map(Number), prob: acc[key] / total });
+      }
+      dist.push(list);
+    }
+    return dist;
+  })();
+
+  function repeat(v, n) { var a = []; for (var i = 0; i < n; i++) a.push(v); return a; }
+
+  // The dice a sensible player keeps when chasing `category`.
+  function keepToward(category, dice) {
+    var c = counts(dice), f;
+    if (FACE[category]) {
+      var face = FACE[category];
+      return dice.filter(function (d) { return d === face; });
+    }
+    switch (category) {
+      case 'chance':
+        return dice.slice();
+      case 'twoKind': case 'threeKind': case 'fourKind': case 'general': {
+        var bestFace = 0, best = 0;
+        for (f = 6; f >= 1; f--) if (c[f] > best) { best = c[f]; bestFace = f; }
+        if (best >= 2) return dice.filter(function (d) { return d === bestFace; });
+        return [Math.max.apply(null, dice)]; // all distinct: keep the highest
+      }
+      case 'fullHouse': {
+        var order = [6, 5, 4, 3, 2, 1].sort(function (a, b) { return c[b] - c[a] || b - a; });
+        return repeat(order[0], Math.min(3, c[order[0]]))
+          .concat(repeat(order[1], Math.min(2, c[order[1]])));
+      }
+      case 'smallStraight': return keepStraight(dice, [1, 2, 3, 4, 5]);
+      case 'largeStraight': return keepStraight(dice, [2, 3, 4, 5, 6]);
+      default: return [];
+    }
+  }
+  function keepStraight(dice, need) {
+    var keep = [], seen = {};
+    dice.forEach(function (d) {
+      if (need.indexOf(d) > -1 && !seen[d]) { seen[d] = true; keep.push(d); }
+    });
+    return keep;
+  }
+
+  // Probability of eventually scoring `category` (> 0), starting from `dice`
+  // with `rerolls` re-rolls left, keeping the dice that help the category.
+  // Exact under that keep strategy (a sensible play, not provably optimal).
+  function hitProbability(category, dice, rerolls, memo) {
+    memo = memo || {};
+    if (scoreFor(category, dice) > 0) return 1;
+    if (rerolls <= 0) return 0;
+    var key = dice.slice().sort().join('') + '|' + rerolls;
+    if (memo[key] != null) return memo[key];
+    var keep = keepToward(category, dice);
+    var dist = REROLL_DIST[DICE_COUNT - keep.length];
+    var p = 0;
+    for (var i = 0; i < dist.length; i++) {
+      p += dist[i].prob * hitProbability(category, keep.concat(dist[i].faces), rerolls - 1, memo);
+    }
+    memo[key] = p;
+    return p;
+  }
+
+  // Probability from scratch (no dice yet) with the full allotment of rolls.
+  function hitProbabilityFresh(category) {
+    var dist = REROLL_DIST[DICE_COUNT], memo = {}, p = 0;
+    for (var i = 0; i < dist.length; i++) {
+      p += dist[i].prob * hitProbability(category, dist[i].faces, MAX_ROLLS - 1, memo);
+    }
+    return p;
+  }
+
+  // ----------------------------------------------------------- risk & roasts
+
+  // Best score available across a player's unfilled categories for these dice.
+  function bestOpenScore(player, dice) {
+    return CATEGORIES.reduce(function (m, c) {
+      return isCategoryFilled(player, c.key) ? m : Math.max(m, scoreFor(c.key, dice));
+    }, 0);
+  }
+
+  // Premium combos the player has MADE but is about to gamble away: made on the
+  // full dice, but not preserved by the dice they're holding.
+  function atRiskPremium(player, dice, holds) {
+    var held = dice.filter(function (d, i) { return holds[i]; });
+    return PREMIUM
+      .filter(function (k) { return !isCategoryFilled(player, k); })
+      .filter(function (k) { return scoreFor(k, dice) > 0 && scoreFor(k, held) === 0; })
+      .map(function (k) {
+        var cat = CATEGORIES.filter(function (c) { return c.key === k; })[0];
+        return { key: k, label: cat.label, score: scoreFor(k, dice) };
+      })
+      .sort(function (a, b) { return b.score - a.score; });
+  }
+
+  var ROASTS = {
+    // shown the moment a player gambles a made combo away
+    risk: [
+      "You don't seem to value your {X} much.",
+      'Throwing back a {X}? Living dangerously.',
+      'You like losing, eh?',
+      'Sure, reroll the {X}. What could possibly go wrong.',
+      'Fortune favors the foolish, allegedly.',
+      'Big risk energy. The dice are already laughing.',
+      'Bold of you to assume the dice are on your side.',
+    ],
+    // the brutal ones, shown when the gamble made things worse
+    fail: [
+      'Your {X} packed its bags and left.',
+      'And there goes the {X}. Hope it was worth it.',
+      'Spectacular. You turned gold into gravel.',
+      'The dice have spoken, and they are disappointed in you.',
+      'That is a self-inflicted wound if ever there was one.',
+      'You had it. You really had it. Now you have nothing.',
+      'Somewhere, a statistician just wept.',
+      'Bold move. Catastrophic result. Iconic.',
+      'You fumbled a {X}. Frame this moment.',
+    ],
+  };
+
   // ----------------------------------------------------------------- names & bets
 
-  var TITLES   = ['Генерал', 'Майор', 'Полковник', 'Капитан', 'Адмирал', 'Сержант', 'Ефрейтор', 'Лейтенант'];
-  var NOUNS    = ['Пишка', 'Петел', 'Краставица', 'Тиква', 'Мотика', 'Чорап', 'Баклава', 'Магаре', 'Кашкавал', 'Лопата', 'Бухал', 'Геврек', 'Таралеж', 'Дюшек'];
-  var AI_NOUNS = ['Камила', 'Тенеке', 'Робот', 'Чайник', 'Трансформатор', 'Болт', 'Тостер', 'Прахосмукачка', 'Ютия', 'Котлон', 'Бойлер', 'Динамо', 'Реотан', 'Ключ'];
+  var TITLES   = ['General', 'Major', 'Colonel', 'Captain', 'Admiral', 'Sergeant', 'Corporal', 'Lieutenant'];
+  var NOUNS    = ['Willy', 'Rooster', 'Cucumber', 'Pumpkin', 'Hoe', 'Sock', 'Donkey', 'Cheese', 'Shovel', 'Owl', 'Bagel', 'Hedgehog', 'Mattress', 'Goose'];
+  var AI_NOUNS = ['Camel', 'TinCan', 'Robot', 'Kettle', 'Transformer', 'Bolt', 'Toaster', 'Vacuum', 'Iron', 'Hotplate', 'Boiler', 'Dynamo', 'Coil', 'Wrench'];
 
-  // The stupid thing a player wagers, used in the "Залага X" line.
+  // The stupid thing a player wagers, used in the "Bets X" line.
   var BETS = [
-    'кучето си', 'майка си', 'достойнството си', 'тъщата си', 'мустака си',
-    'ракията си', 'последния си лев', 'честта си', 'колата си', 'баба си',
-    'чорапите си', 'бъбрека си', 'душата си', 'брака си', 'мерцедеса си',
-    'вилата на село', 'любимата си вилица', 'котката на съседа',
+    'his dog', 'his mother', 'his dignity', 'his mother-in-law', 'his mustache',
+    'his last dollar', 'his honor', 'his car', 'his grandma', 'his socks',
+    'his kidney', 'his soul', 'his marriage', 'the neighbor\'s cat', 'his good name',
+    'his favorite fork', 'the summer house', 'his entire pension',
   ];
 
   function pick(arr, rng) { return arr[Math.floor((rng || Math.random)() * arr.length)]; }
 
-  // Names are Title + Noun, e.g. "Генерал Пишка" / "Майор Тенеке".
+  // Names are Title + Noun, e.g. "General Willy" / "Major TinCan".
   function randomHumanName(rng) { return pick(TITLES, rng) + ' ' + pick(NOUNS, rng); }
   function randomAiName(rng) { return pick(TITLES, rng) + ' ' + pick(AI_NOUNS, rng); }
   function randomBet(rng) { return pick(BETS, rng); }
@@ -319,6 +460,13 @@
     ranking: ranking,
     aiChooseHolds: aiChooseHolds,
     aiChooseCategory: aiChooseCategory,
+    PREMIUM: PREMIUM,
+    keepToward: keepToward,
+    hitProbability: hitProbability,
+    hitProbabilityFresh: hitProbabilityFresh,
+    bestOpenScore: bestOpenScore,
+    atRiskPremium: atRiskPremium,
+    ROASTS: ROASTS,
     randomHumanName: randomHumanName,
     randomAiName: randomAiName,
     randomBet: randomBet,

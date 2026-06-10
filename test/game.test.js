@@ -242,6 +242,81 @@ test('aiChooseCategory only ever picks an open category', function () {
   assert.strictEqual(G.isCategoryFilled(p, choice.category), false);
 });
 
+// ----------------------------------------------------------------- probabilities
+
+function approx(actual, expected, eps) {
+  assert.ok(Math.abs(actual - expected) <= (eps || 1e-9),
+    'expected ~' + expected + ' got ' + actual);
+}
+
+test('hitProbability with no rerolls is 1 if made, else 0', function () {
+  assert.strictEqual(G.hitProbability('general', [6, 6, 6, 6, 6], 0), 1);
+  assert.strictEqual(G.hitProbability('general', [6, 6, 6, 6, 1], 0), 0);
+  assert.strictEqual(G.hitProbability('smallStraight', [1, 2, 3, 4, 5], 2), 1); // already made
+});
+
+test('hitProbability stays within [0,1] and never decreases with more rerolls', function () {
+  G.CATEGORIES.forEach(function (c) {
+    var dice = [1, 2, 3, 4, 6];
+    var p1 = G.hitProbability(c.key, dice, 1);
+    var p2 = G.hitProbability(c.key, dice, 2);
+    assert.ok(p1 >= 0 && p1 <= 1 && p2 >= 0 && p2 <= 1);
+    assert.ok(p2 >= p1 - 1e-12, c.key + ': more rerolls should not lower the chance');
+  });
+});
+
+test('chance is always certain', function () {
+  assert.strictEqual(G.hitProbability('chance', [1, 1, 1, 1, 1], 0), 1);
+  assert.strictEqual(G.hitProbability('chance', [2, 4, 6, 1, 3], 2), 1);
+});
+
+test('one reroll for the last die of a general is exactly 1/6', function () {
+  approx(G.hitProbability('general', [6, 6, 6, 6, 1], 1), 1 / 6, 1e-12);
+});
+
+test('chance to roll a face with one reroll of five dice', function () {
+  // need at least one 1, currently none, reroll all five
+  approx(G.hitProbability('ones', [2, 3, 4, 5, 6], 1), 1 - Math.pow(5 / 6, 5), 1e-12);
+});
+
+test('hitProbabilityFresh is a valid probability for every category', function () {
+  G.CATEGORIES.forEach(function (c) {
+    var p = G.hitProbabilityFresh(c.key);
+    assert.ok(p >= 0 && p <= 1, c.key + ' fresh prob out of range: ' + p);
+  });
+  approx(G.hitProbabilityFresh('chance'), 1, 1e-9);
+});
+
+// ----------------------------------------------------------------- risk & roasts
+
+test('bestOpenScore ignores already-filled categories', function () {
+  var p = G.createPlayer('A', '#0');
+  assert.strictEqual(G.bestOpenScore(p, [5, 5, 5, 1, 2]), 18); // 3x = 15? no: threeKind 15, chance 18
+  p.scores.chance = 0; // remove chance from the pool
+  assert.strictEqual(G.bestOpenScore(p, [5, 5, 5, 1, 2]), 15); // now threeKind 15 leads
+});
+
+test('atRiskPremium flags a made combo not preserved by the holds', function () {
+  var p = G.createPlayer('A', '#0');
+  // full house held only by the triple -> the pair is being rerolled
+  var risk = G.atRiskPremium(p, [3, 3, 3, 2, 2], [true, true, true, false, false]);
+  assert.strictEqual(risk.length, 1);
+  assert.strictEqual(risk[0].key, 'fullHouse');
+});
+
+test('atRiskPremium is empty when the combo is preserved or already filled', function () {
+  var p = G.createPlayer('A', '#0');
+  // four of a kind kept, only the fifth die rerolled -> not at risk
+  assert.strictEqual(G.atRiskPremium(p, [5, 5, 5, 5, 2], [true, true, true, true, false]).length, 0);
+  // same gamble but four-of-a-kind already scored -> nothing to lose
+  p.scores.fourKind = 20;
+  assert.strictEqual(G.atRiskPremium(p, [5, 5, 5, 5, 2], [true, true, true, false, false]).length, 0);
+});
+
+test('roast pools are non-empty', function () {
+  assert.ok(G.ROASTS.risk.length > 0 && G.ROASTS.fail.length > 0);
+});
+
 // ----------------------------------------------------------------- names
 
 test('name generators follow Title + Noun', function () {
