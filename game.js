@@ -181,6 +181,16 @@
     return v;
   }
 
+  // Forfeit (scratch) a category for 0 points. Always legal for any unfilled
+  // category, including one that could currently score — a deliberate sacrifice.
+  function forfeitScore(player, category) {
+    if (isCategoryFilled(player, category)) {
+      throw new Error('Category already filled: ' + category);
+    }
+    player.scores[category] = 0;
+    return 0;
+  }
+
   // ----------------------------------------------------------------- game
 
   function createGame(players) { return { players: players, current: 0, round: 1 }; }
@@ -297,6 +307,7 @@
     isBoardComplete: isBoardComplete,
     playerTotal: playerTotal,
     assignScore: assignScore,
+    forfeitScore: forfeitScore,
     createGame: createGame,
     currentPlayer: currentPlayer,
     nextTurn: nextTurn,

@@ -11,10 +11,18 @@ This is the base version; it will be expanded later.
 - **Dice front and centre.** Five large, tactile dice are the focus of the
   screen. Players roll manually, then click dice to **hold** them and re-roll
   the rest — up to **3 rolls** per turn.
-- **A suggestion engine.** After every roll the scoreboard detects all the
-  combinations the dice make and highlights each scorable category with its
-  value. Categories that can be filled several ways (e.g. two different pairs
-  for `2x`) show **one chip per option** so you can pick which to record.
+- **A suggestion panel under the dice** (never covering them). After each roll
+  it lists every scoring entry the dice make — respecting categories you've
+  already used — as a tap-to-score button. Combos that can be filled several
+  ways (e.g. two different pairs for `2x`) show **one button per option**.
+- **Forfeit.** A "Откажи се" button opens a selector to write **0** into any
+  unfilled category (a deliberate sacrifice to save a better one). When the dice
+  make no combinations at all, forfeiting is mandatory.
+- **Full scoreboard on scroll.** Below the dice the complete board shows every
+  category with its score/suggestion next to it and a running **total**
+  underneath — score or forfeit from here too.
+- **Turn-switch animation.** Picking or forfeiting ends the turn; after a brief
+  pause an animated card announces the next player and play continues.
 - **Any number of players**, with customizable **names** and **colours**, plus a
   separate, rotating scoreboard for each.
 - **AI players.** Flip the toggle next to any player before the game to make

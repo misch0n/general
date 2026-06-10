@@ -56,7 +56,6 @@
     border-color: transparent; color: #0a0e1c; box-shadow: 0 6px 20px rgba(122,162,255,.35);
   }
   .btn.primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; transform: none; }
-  .btn.ghost { background: transparent; }
 
   /* ===================== SETUP ===================== */
   .setup { max-width: 640px; margin: 5vh auto 0; padding: 30px; }
@@ -64,7 +63,6 @@
   .brand .logo { font-size: 40px; filter: drop-shadow(0 6px 14px rgba(122,162,255,.5)); }
   .brand h1 { font-size: 34px; }
   .sub { color: var(--muted); margin: 2px 0 24px; }
-
   .prow { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
   .prow input[type=color] {
     -webkit-appearance: none; appearance: none; width: 40px; height: 40px;
@@ -93,10 +91,7 @@
   @media (max-width: 900px) { .game { grid-template-columns: 1fr; } }
 
   .topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
-  .turnchip {
-    display: flex; align-items: center; gap: 11px; padding: 8px 16px 8px 10px;
-    border-radius: 999px; background: var(--surface-2); border: 1px solid var(--stroke);
-  }
+  .turnchip { display: flex; align-items: center; gap: 11px; padding: 8px 16px 8px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--stroke); }
   .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #0a0e1c; font-size: 14px; }
   .turnchip .nm { font-weight: 700; }
   .badge { font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: rgba(122,162,255,.18); color: var(--accent); border: 1px solid rgba(122,162,255,.35); }
@@ -106,7 +101,7 @@
   .rollpips i.live { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
   /* dice stage */
-  .stage { padding: 30px 20px 26px; text-align: center; margin-bottom: 22px; }
+  .stage { padding: 30px 20px 24px; text-align: center; margin-bottom: 22px; }
   .dice { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
   .die {
     --sz: 78px; width: var(--sz); height: var(--sz); border-radius: 18px;
@@ -129,40 +124,49 @@
     60% { transform: translateY(-6px) rotate(80deg); }
     100% { transform: translateY(0) rotate(0); }
   }
-  .stage .hint { color: var(--muted); font-size: 13px; min-height: 18px; margin: 28px 0 18px; }
+  .stage .hint { color: var(--muted); font-size: 13px; min-height: 18px; margin: 28px 0 16px; }
   .stage .controls { display: flex; gap: 12px; justify-content: center; align-items: center; }
   .thinking { color: var(--accent); font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
   .thinking .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
   @keyframes blink { 0%,100%{opacity:.25} 50%{opacity:1} }
 
-  /* scoreboard */
+  /* suggestions (under the dice) */
+  .suggest { margin-top: 22px; border-top: 1px solid var(--stroke); padding-top: 18px; }
+  .sgmsg { color: var(--muted); font-size: 13px; }
+  .sgtitle { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 12px; }
+  .sgwrap { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .sg { display: inline-flex; align-items: center; gap: 9px; padding: 9px 15px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--stroke); font-weight: 700; transition: .12s; }
+  .sg:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .sg .sgl { color: var(--text); }
+  .sg .sgv { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .sg.forfeit { background: transparent; border-style: dashed; }
+  .sg.forfeit:hover { border-color: var(--danger); }
+  .sg.forfeit .sgv { color: var(--muted); }
+  .sg.forfeit.must { border-color: var(--danger); color: var(--danger); animation: pulse 1.3s infinite; }
+  .sg.forfeit.must .sgv { color: var(--danger); }
+  @keyframes pulse { 0%,100%{ box-shadow: 0 0 0 0 rgba(255,122,138,0) } 50%{ box-shadow: 0 0 0 4px rgba(255,122,138,.18) } }
+
+  /* full scoreboard */
+  .board-head { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); text-align: center; margin-bottom: 16px; }
   .board-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 560px) { .board-cols { grid-template-columns: 1fr; } }
   .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 2px 4px 10px; }
-  .cat {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px;
-    border: 1px solid transparent; margin-bottom: 6px; transition: .12s; min-height: 46px;
-  }
+  .cat { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; border: 1px solid transparent; margin-bottom: 6px; transition: .12s; min-height: 44px; }
   .cat .clabel { font-weight: 700; flex: 1; }
   .cat .cval { font-variant-numeric: tabular-nums; color: var(--faint); font-weight: 700; }
   .cat.filled { background: rgba(255,255,255,.03); }
   .cat.filled .cval { color: var(--text); }
   .cat.filled.zeroed .cval { color: var(--muted); }
-  .cat.suggest { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-  .cat.sacrifice { opacity: .8; }
-  .chip {
-    font: inherit; font-weight: 800; font-variant-numeric: tabular-nums;
-    padding: 6px 11px; border-radius: 10px; background: var(--surface-2);
-    border: 1px solid var(--stroke); transition: .12s;
-  }
-  .cat.suggest .chip { background: var(--accent); color: #0a0e1c; border-color: transparent; }
+  .cat.suggest-row { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 42%, transparent); }
+  .chip { font: inherit; font-weight: 800; font-variant-numeric: tabular-nums; padding: 6px 11px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--stroke); transition: .12s; }
+  .cat.suggest-row .chip { background: var(--accent); color: #0a0e1c; border-color: transparent; }
   .chip:hover { transform: translateY(-1px); filter: brightness(1.07); }
   .chip.zero { background: transparent; color: var(--muted); border-style: dashed; }
+  .chip.zero:hover { color: var(--danger); border-color: var(--danger); }
   .totbar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 14px 16px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--stroke); }
   .totbar b { font-size: 20px; }
 
   /* sidebar */
-  .side .section-title { margin-left: 2px; }
   .plist { display: flex; flex-direction: column; gap: 9px; }
   .pcard { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 11px 12px; border-radius: 13px; border: 1px solid var(--stroke); background: var(--surface); transition: .14s; }
   .pcard:hover { border-color: var(--stroke-strong); }
@@ -172,7 +176,7 @@
   .pcard .mini { font-size: 10px; font-weight: 800; color: var(--accent); }
   .side .note { font-size: 12px; color: var(--muted); margin-top: 12px; }
 
-  /* modal */
+  /* modals + transition */
   .overlay { position: fixed; inset: 0; background: rgba(5,7,14,.72); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 20px; z-index: 30; }
   .modal { max-width: 440px; width: 100%; max-height: 88vh; overflow: auto; padding: 22px; }
   .modal .x { float: right; width: 34px; height: 34px; border-radius: 9px; color: var(--muted); font-size: 18px; }
@@ -187,6 +191,20 @@
   .peekrow:nth-child(odd) { background: rgba(255,255,255,.03); }
   .peekrow .pv { font-variant-numeric: tabular-nums; font-weight: 700; }
   .peekrow.empty .pv { color: var(--faint); }
+  .ffhint { color: var(--muted); font-size: 13px; margin: 4px 0 14px; }
+  .ffrow { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 11px 14px; border-radius: 11px; background: var(--surface); border: 1px solid var(--stroke); margin-bottom: 7px; }
+  .ffrow:hover { border-color: var(--danger); }
+  .ffrow .ffv { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  .turn-overlay { position: fixed; inset: 0; display: grid; place-items: center; z-index: 40; background: rgba(5,7,14,.55); backdrop-filter: blur(6px); }
+  .turn-overlay .tcard { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 34px 50px; border-radius: 24px; background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--stroke); box-shadow: var(--shadow); }
+  .turn-overlay .big-avatar { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; font-size: 32px; font-weight: 800; color: #0a0e1c; box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .turn-overlay .tname { font-size: 24px; font-weight: 800; }
+  .turn-overlay .tsub { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .14em; }
+  .turn-overlay.play { animation: ovfade 1.15s ease forwards; }
+  .turn-overlay.play .tcard { animation: tcin 1.15s cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes ovfade { 0%{opacity:0} 12%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
+  @keyframes tcin { 0%{transform:translateY(18px) scale(.9); opacity:0} 16%{transform:none; opacity:1} 82%{transform:none; opacity:1} 100%{transform:scale(1.03); opacity:0} }
 </style>
 </head>
 <body>
@@ -224,9 +242,11 @@
           <button id="rollBtn" class="btn primary">🎲 Хвърли</button>
           <span id="thinking" class="thinking hidden"><span class="dot"></span>AI мисли…</span>
         </div>
+        <div id="suggest" class="suggest"></div>
       </div>
 
       <div class="card" style="padding:18px">
+        <div class="board-head">Пълна таблица</div>
         <div class="board-cols">
           <div>
             <div class="section-title">Горна секция</div>
@@ -251,7 +271,17 @@
   </section>
 </div>
 
-<!-- peek modal -->
+<!-- forfeit selector -->
+<div id="forfeitModal" class="overlay hidden">
+  <div class="card modal">
+    <button class="x" id="forfeitClose">✕</button>
+    <h2>Откажи се от категория</h2>
+    <p class="ffhint">Запиши 0 в избрана незаета категория и приключи хода.</p>
+    <div id="forfeitBody"></div>
+  </div>
+</div>
+
+<!-- peek -->
 <div id="peekModal" class="overlay hidden">
   <div class="card modal">
     <button class="x" id="peekClose">✕</button>
@@ -261,13 +291,22 @@
   </div>
 </div>
 
-<!-- game over modal -->
+<!-- game over -->
 <div id="overModal" class="overlay hidden">
   <div class="card modal">
     <h2>🏆 Край на играта</h2>
     <div id="winner" class="winner"></div>
     <div id="ranks"></div>
     <div class="setup-actions"><button id="playAgain" class="btn primary">↻ Нова игра</button></div>
+  </div>
+</div>
+
+<!-- turn switch animation -->
+<div id="turnOverlay" class="turn-overlay hidden">
+  <div class="tcard">
+    <div id="turnAvatar" class="big-avatar"></div>
+    <div id="turnName" class="tname"></div>
+    <div id="turnSub" class="tsub"></div>
   </div>
 </div>
 
@@ -281,6 +320,8 @@
   var PIPS = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
   var PRESET_COLORS = ['#7aa2ff', '#4bd6a0', '#ff9d5c', '#ec6aa6', '#b98bff', '#f2cb55', '#5fd0e0', '#ff7a8a'];
   var AI_DELAY = 700;
+  var END_DELAY = 480;     // pause after a pick before the turn switches
+  var TRANSITION = 1150;   // length of the turn-switch animation
 
   function initials(name) {
     var parts = name.trim().split(/\s+/);
@@ -329,7 +370,6 @@
       toggle.innerHTML = '<span class="switch"></span><span>AI</span>';
       toggle.onclick = function () {
         p.isAI = !p.isAI;
-        // give the player a name fitting its new kind
         p.name = p.isAI ? aiNames() : humanNames();
         renderSetup();
       };
@@ -366,20 +406,22 @@
   var dice = [];
   var holds = [false, false, false, false, false];
   var rollsUsed = 0;
-  var aiBusy = false;
+  var aiBusy = false;     // an AI is taking its turn
+  var locked = false;     // turn is ending / transitioning — block input
 
   function startGame(players) {
     game = G.createGame(players);
     $('setup').classList.add('hidden');
     $('game').classList.remove('hidden');
     $('overModal').classList.add('hidden');
-    beginTurn();
+    beginTurn();          // first player starts without a transition
   }
 
   function beginTurn() {
     dice = [];
     holds = [false, false, false, false, false];
     rollsUsed = 0;
+    locked = false;
     var p = G.currentPlayer(game);
     document.documentElement.style.setProperty('--accent', p.color);
     renderAll();
@@ -397,7 +439,7 @@
   }
 
   $('rollBtn').onclick = function () {
-    if (aiBusy || rollsLeft() <= 0) return;
+    if (aiBusy || locked || rollsLeft() <= 0) return;
     doRoll();
   };
 
@@ -408,13 +450,40 @@
   }
 
   function toggleHold(i) {
-    if (aiBusy || !rolling() || rollsLeft() <= 0) return;
+    if (aiBusy || locked || !rolling() || rollsLeft() <= 0) return;
     holds[i] = !holds[i];
     renderDice();
   }
 
+  // ---- scoring actions (human) ----
+  function canAct(key) {
+    var p = G.currentPlayer(game);
+    return !(aiBusy || locked || p.isAI || !rolling() || G.isCategoryFilled(p, key));
+  }
+  function chooseScore(key, value) {
+    if (!canAct(key)) return;
+    G.assignScore(G.currentPlayer(game), key, dice, value);
+    afterRecord();
+  }
+  function chooseForfeit(key) {
+    if (!canAct(key)) return;
+    G.forfeitScore(G.currentPlayer(game), key);
+    afterRecord();
+  }
+  function afterRecord() {
+    locked = true;
+    renderAll();                 // show the value just written
+    $('rollBtn').disabled = true;
+    setTimeout(endTurn, END_DELAY);
+  }
+  function endTurn() {
+    if (G.isGameOver(game)) { showGameOver(); return; }
+    G.nextTurn(game);
+    playTransition(G.currentPlayer(game), beginTurn);
+  }
+
   // ---- rendering ----
-  function renderAll() { renderTop(); renderDice(); renderBoard(); renderSide(); }
+  function renderAll() { renderTop(); renderDice(); renderSuggest(); renderBoard(); renderSide(); }
 
   function renderTop() {
     var p = G.currentPlayer(game);
@@ -429,15 +498,15 @@
     $('rollPips').innerHTML = pips;
 
     var btn = $('rollBtn');
-    btn.disabled = aiBusy || rollsLeft() <= 0;
+    btn.disabled = aiBusy || locked || rollsLeft() <= 0;
     btn.textContent = rollsUsed === 0 ? '🎲 Хвърли' : '🎲 Хвърли отново (' + rollsLeft() + ')';
     btn.classList.toggle('hidden', p.isAI);
     $('thinking').classList.toggle('hidden', !p.isAI || !aiBusy);
 
     $('hint').textContent = p.isAI ? ''
       : !rolling() ? 'Натиснете „Хвърли“, за да започнете хода си.'
-      : rollsLeft() > 0 ? 'Натиснете зар, за да го задържите. Изберете предложение от дъската, за да точкувате.'
-      : 'Няма повече хвърляния — изберете категория за точкуване.';
+      : rollsLeft() > 0 ? 'Натиснете зар, за да го задържите, или изберете точкуване по-долу.'
+      : 'Няма повече хвърляния — изберете точкуване.';
   }
 
   function dieEl(value, held, idx, interactive) {
@@ -459,15 +528,53 @@
   function renderDice() {
     var box = $('dice'); box.innerHTML = '';
     var p = G.currentPlayer(game);
-    var interactive = !p.isAI && rolling() && rollsLeft() > 0;
+    var interactive = !p.isAI && !locked && rolling() && rollsLeft() > 0;
     for (var i = 0; i < G.DICE_COUNT; i++) {
       box.appendChild(dieEl(rolling() ? dice[i] : null, holds[i], i, interactive));
     }
   }
 
+  // suggestion panel under the dice
+  function renderSuggest() {
+    var panel = $('suggest'); panel.innerHTML = '';
+    var p = G.currentPlayer(game);
+    if (p.isAI) { panel.innerHTML = '<div class="sgmsg">AI избира своя ход…</div>'; return; }
+    if (!rolling()) { panel.innerHTML = '<div class="sgmsg">Хвърлете заровете, за да видите възможните точкувания.</div>'; return; }
+
+    var entries = [];
+    G.CATEGORIES.forEach(function (c) {
+      if (G.isCategoryFilled(p, c.key)) return;
+      var cands = G.candidates(c.key, dice);
+      if (Math.max.apply(null, cands) > 0) {
+        cands.forEach(function (v) { entries.push({ key: c.key, label: c.label, value: v }); });
+      }
+    });
+    entries.sort(function (a, b) { return b.value - a.value; });
+
+    var title = document.createElement('div');
+    title.className = 'sgtitle';
+    title.textContent = entries.length ? 'Възможни точкувания' : 'Няма комбинации — задължителен отказ';
+    panel.appendChild(title);
+
+    var wrap = document.createElement('div'); wrap.className = 'sgwrap';
+    entries.forEach(function (e) {
+      var b = document.createElement('button'); b.className = 'sg';
+      b.innerHTML = '<span class="sgl">' + e.label + '</span><span class="sgv">' + e.value + '</span>';
+      b.onclick = function () { chooseScore(e.key, e.value); };
+      wrap.appendChild(b);
+    });
+    var f = document.createElement('button');
+    f.className = 'sg forfeit' + (entries.length ? '' : ' must');
+    f.innerHTML = '<span class="sgl">Откажи се</span><span class="sgv">0</span>';
+    f.onclick = openForfeit;
+    wrap.appendChild(f);
+    panel.appendChild(wrap);
+  }
+
+  // full scoreboard (scroll down)
   function renderBoard() {
     var p = G.currentPlayer(game);
-    var canScore = !p.isAI && rolling();
+    var canScore = !p.isAI && !locked && rolling();
     fillBoard('boardUpper', 'upper', p, canScore);
     fillBoard('boardLower', 'lower', p, canScore);
     $('curTotal').textContent = G.playerTotal(p);
@@ -492,25 +599,19 @@
         row.appendChild(val);
       } else if (canScore) {
         var cands = G.candidates(c.key, dice);
-        var best = Math.max.apply(null, cands);
-        if (best > 0) {
-          row.className += ' suggest';
+        if (Math.max.apply(null, cands) > 0) {
+          row.className += ' suggest-row';
           cands.forEach(function (v) {
             var chip = document.createElement('button');
             chip.className = 'chip'; chip.textContent = v;
-            chip.onclick = function () { fillCategory(c.key, v); };
+            chip.onclick = function () { chooseScore(c.key, v); };
             row.appendChild(chip);
           });
         } else {
-          row.className += ' sacrifice';
           var z = document.createElement('button');
           z.className = 'chip zero'; z.textContent = '0';
-          z.title = 'Запиши 0 (изразходва категорията)';
-          z.onclick = function () {
-            if (confirm('Да запиша ли 0 в „' + c.label + '“? Това изразходва категорията.')) {
-              fillCategory(c.key, 0);
-            }
-          };
+          z.title = 'Откажи се (запиши 0)';
+          z.onclick = function () { chooseForfeit(c.key); };
           row.appendChild(z);
         }
       } else {
@@ -520,19 +621,6 @@
       }
       host.appendChild(row);
     });
-  }
-
-  function fillCategory(key, value) {
-    var p = G.currentPlayer(game);
-    if (aiBusy || p.isAI || !rolling() || G.isCategoryFilled(p, key)) return;
-    G.assignScore(p, key, dice, value);
-    advance();
-  }
-
-  function advance() {
-    if (G.isGameOver(game)) { showGameOver(); return; }
-    G.nextTurn(game);
-    beginTurn();
   }
 
   function renderSide() {
@@ -547,6 +635,27 @@
       box.appendChild(b);
     });
   }
+
+  // ---- forfeit selector ----
+  function openForfeit() {
+    if (aiBusy || locked) return;
+    var p = G.currentPlayer(game);
+    var body = $('forfeitBody'); body.innerHTML = '';
+    G.CATEGORIES.forEach(function (c) {
+      if (G.isCategoryFilled(p, c.key)) return;
+      var v = G.scoreFor(c.key, dice);
+      var b = document.createElement('button'); b.className = 'ffrow';
+      b.innerHTML = '<span>' + c.label + '</span><span class="ffv">' + (v > 0 ? 'жертваш ' + v : '0') + '</span>';
+      b.onclick = function () {
+        $('forfeitModal').classList.add('hidden');
+        chooseForfeit(c.key);
+      };
+      body.appendChild(b);
+    });
+    $('forfeitModal').classList.remove('hidden');
+  }
+  $('forfeitClose').onclick = function () { $('forfeitModal').classList.add('hidden'); };
+  $('forfeitModal').onclick = function (e) { if (e.target === $('forfeitModal')) $('forfeitModal').classList.add('hidden'); };
 
   // ---- peek ----
   function openPeek(i) {
@@ -565,6 +674,20 @@
   }
   $('peekClose').onclick = function () { $('peekModal').classList.add('hidden'); };
   $('peekModal').onclick = function (e) { if (e.target === $('peekModal')) $('peekModal').classList.add('hidden'); };
+
+  // ---- turn switch animation ----
+  function playTransition(player, done) {
+    document.documentElement.style.setProperty('--accent', player.color);
+    $('turnAvatar').style.background = player.color;
+    $('turnAvatar').textContent = initials(player.name);
+    $('turnName').textContent = player.name;
+    $('turnSub').textContent = player.isAI ? 'AI — на ход' : 'на ход';
+    var ov = $('turnOverlay');
+    ov.classList.remove('hidden', 'play');
+    void ov.offsetWidth;
+    ov.classList.add('play');
+    setTimeout(function () { ov.classList.add('hidden'); done(); }, TRANSITION);
+  }
 
   // ---- game over ----
   function showGameOver() {
@@ -587,14 +710,13 @@
   // ---- AI autoplay ----
   function runAiTurn() {
     aiBusy = true;
-    renderTop();
+    renderTop(); renderSuggest();
     setTimeout(aiStep, AI_DELAY);
   }
   function aiStep() {
     if (rollsLeft() > 0) {
       if (rollsUsed > 0) holds = G.aiChooseHolds(dice);
       doRoll();
-      // decide whether to keep rolling: keep going while rolls remain
       if (rollsLeft() > 0) {
         holds = G.aiChooseHolds(dice);
         renderDice();
@@ -607,9 +729,10 @@
   function aiFinish() {
     var p = G.currentPlayer(game);
     var choice = G.aiChooseCategory(p, dice);
-    G.assignScore(p, choice.category, dice, choice.value);
     aiBusy = false;
-    advance();
+    if (choice.value > 0) G.assignScore(p, choice.category, dice, choice.value);
+    else G.forfeitScore(p, choice.category);
+    afterRecord();
   }
 })();
 </script>

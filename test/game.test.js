@@ -162,6 +162,14 @@ test('a category can be sacrificed for 0', function () {
   assert.strictEqual(G.isCategoryFilled(p, 'general'), true);
 });
 
+test('forfeitScore zeroes any unfilled category, even a scoring one', function () {
+  var p = G.createPlayer('A', '#000');
+  // chance would score 15 here, but a deliberate forfeit writes 0
+  assert.strictEqual(G.forfeitScore(p, 'chance'), 0);
+  assert.strictEqual(p.scores.chance, 0);
+  assert.throws(function () { G.forfeitScore(p, 'chance'); }); // already filled
+});
+
 test('playerTotal sums recorded scores', function () {
   var p = G.createPlayer('A', '#000');
   p.scores.chance = 17;
