@@ -29,17 +29,21 @@ edition): camouflage field, classification banner, brass medals and stencil type
 - **Any number of players** with custom names, colours and AI toggles; a
   separate scoreboard each, with the current player's shown and the rest
   reachable from the player pills (tap to peek).
-- **AI players & personas.** Flip a seat to AI and pick a persona — a calibrated
-  difficulty from a fixed ladder: **Комар** (~6%, near-random), **Малък калпазан**
-  (~32%, risk-seeking), **Леля ти** (~50%), **Кварталния любител** (~75%) and
-  **Господ бог** (100%, optimal). Each is the EV engine's softmax policy at a
+- **AI players & personas.** AI seats keep a generated metallic name (_Сержант
+  Нано Динамо_); the **persona is the playstyle** — a calibrated difficulty from a
+  fixed ladder: **Мушица** (~6%, harmless), **Комар** (~32%, a _комарджия_/gambler
+  — risk-seeking), **Леля ти** (~50%), **Кварталния любител** (~75%) and **Господ
+  бог** (100%, optimal). Each maps to the EV engine's softmax/risk policy at a
   calibrated temperature (see `tools/calibrate-bots.js`).
-- **Optimal-play hints.** Toggle **СЪВЕТ** for a live "best hold / best category"
-  recommendation straight from the engine (off for serious play).
-- **Post-game report (luck vs skill).** Every game is decomposed via the engine's
-  value function into `final = par + luck + skill`: how many points the dice gave
-  or took (mean-zero luck) and how many you left on the table (decision cost),
-  with **decision accuracy**, your **biggest blunder** and **sharpest play**.
+- **Optimal-play hints.** Toggle **СЪВЕТ** for a live order from HQ — _"Щабът
+  нарежда да стреляш по 1, 2, 3. Търсиш малка кента."_ — naming which dice to
+  re-roll and the combo to chase, from the engine (off for serious play).
+- **Per-game report (luck vs skill).** Each game is decomposed via the engine's
+  value function into `final = par + luck + skill`: points the dice gave or took
+  (mean-zero luck) vs points left on the table (decision cost), with **decision
+  accuracy**, **biggest blunder**, **sharpest play**, where you leak most (keeps
+  vs category choice), the генерал result and scratched categories. (Per-game
+  only — no cross-game storage, since it's served statically from GitHub Pages.)
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet

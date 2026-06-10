@@ -137,7 +137,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 @keyframes sh{ 0%{ transform:translateY(0) rotate(0); } 25%{ transform:translateY(-10px) rotate(-13deg); } 55%{ transform:translateY(-3px) rotate(11deg); } 100%{ transform:translateY(0) rotate(0); } }
 
 /* comic-book roast speech bubble (shown on a disappointing commit) */
-.roast{ position:absolute; left:50%; bottom:172px; transform:translateX(-50%); z-index:6; width:max-content; max-width:84%; text-align:center; pointer-events:none; }
+.roast{ position:absolute; left:50%; bottom:var(--roast-bottom,172px); transform:translateX(-50%); z-index:6; width:max-content; max-width:84%; text-align:center; pointer-events:none; transition:bottom .15s ease; }
 .roast .bubble{ display:inline-block; position:relative; padding:11px 16px; border-radius:16px;
   background:#f7f3e3; color:#15160d; border:3px solid #15160d; box-shadow:0 7px 0 rgba(0,0,0,.35);
   font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.3px; line-height:1.25; }
@@ -209,6 +209,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   color:var(--gen-label); background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:var(--gen-r-pill); padding:4px 8px; }
 .minibtn.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
 .personas{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+.pcap{ font-family:var(--gen-font-display); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gen-muted); }
 .persona{ display:flex; align-items:center; gap:8px; text-align:left; padding:8px 10px; border-radius:8px;
   background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); color:var(--gen-text); }
 .persona.sel{ border-color:var(--gen-brass); box-shadow:inset 0 0 0 1px var(--gen-brass); }
@@ -429,8 +430,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       toggle.innerHTML = '<span class="switch"></span><span>AI</span>';
       toggle.onclick = function () {
         p.isAI = !p.isAI;
-        if (p.isAI) { var d = G.personaById('lelia'); p.personaId = d.id; p.name = d.name; p.personaOpen = true; }
-        else { p.personaId = null; p.name = humanNames(); }
+        // persona is the PLAYSTYLE; the AI keeps a generated metallic/electric name
+        if (p.isAI) { p.personaId = p.personaId || 'lelia'; p.name = aiNames(); p.personaOpen = true; }
+        else { p.name = humanNames(); }
         renderSetup();
       };
       row.appendChild(color); row.appendChild(toggle);
@@ -444,6 +446,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       // persona list (only for AI seats) — collapses to the chosen line
       if (p.isAI) {
         var box = document.createElement('div'); box.className = 'personas';
+        var cap = document.createElement('div'); cap.className = 'pcap'; cap.textContent = 'Стил на игра';
+        box.appendChild(cap);
         var shown = p.personaOpen ? G.PERSONAS : G.PERSONAS.filter(function (x) { return x.id === p.personaId; });
         shown.forEach(function (per) {
           var b = document.createElement('button');
@@ -451,7 +455,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
           b.innerHTML = '<span class="pn2">' + per.name + '</span><span class="pf">' + per.flavor + '</span>'
             + '<span class="pstr">' + Math.round(per.strength * 100) + '%</span>';
           b.onclick = function () {
-            if (p.personaOpen) { p.personaId = per.id; p.name = per.name; p.personaOpen = false; }
+            // selecting a persona sets the playstyle only — the AI's name is unchanged
+            if (p.personaOpen) { p.personaId = per.id; p.personaOpen = false; }
             else { p.personaOpen = true; }
             renderSetup();
           };
@@ -542,15 +547,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function renderHint() {
     var line = $('hintLine');
     var p = G.currentPlayer(game);
-    if (!hintsOn || !evReady || p.isAI || locked) { line.classList.add('hidden'); return; }
+    var show = hintsOn && evReady && !p.isAI && !locked;
+    // raise the speech bubble when the hint line lifts the dice (avoids overlap)
+    document.documentElement.style.setProperty('--roast-bottom', show ? '218px' : '172px');
+    if (!show) { line.classList.add('hidden'); return; }
     var ev = EV.evaluate(p.scores, dice, throwsLeft);
     var txt;
     if (throwsLeft > 0) {
-      var keepFaces = dice.filter(function (v, i) { return ev.best_keep[i]; });
-      txt = 'Щабът съветва: дръж ' + (keepFaces.length ? keepFaces.join('-') : 'нищо')
-        + ' · цел ' + (CAT_LABEL[ev.best_category.key] || ev.best_category.key);
+      var discard = dice.filter(function (v, i) { return !ev.best_keep[i]; });
+      if (discard.length === 0) {
+        txt = 'Щабът нарежда да спреш. Отчети ' + (G.ORDER_NAMES[ev.best_category.key] || ev.best_category.key) + '.';
+      } else {
+        var target = EV.bestTarget(p.scores, dice, ev.best_keep);
+        txt = 'Щабът нарежда да стреляш по ' + discard.join(', ') + '. Търсиш ' + (G.ORDER_NAMES[target] || target) + '.';
+      }
     } else {
-      txt = 'Щабът съветва: играй ' + (CAT_LABEL[ev.best_category.key] || ev.best_category.key);
+      txt = 'Щабът нарежда да отчетеш ' + (G.ORDER_NAMES[ev.best_category.key] || ev.best_category.key) + '.';
     }
     line.textContent = txt; line.classList.remove('hidden');
   }
@@ -879,6 +891,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var panel = '';
     if (fa) {
       var perfRank = G.rankForAccuracy(fa.accuracy);
+      // §4 leak by decision type (this game)
+      var keepCost = 0, catCost = 0, keepN = 0, catN = 0;
+      fa.decisions.forEach(function (d) {
+        if (d.type === 'keep') { keepCost += d.cost; keepN++; } else { catCost += d.cost; catN++; }
+      });
+      var leakWord = keepCost <= catCost ? 'задържанията' : 'избора на категория';
+      // §4 wasted (scratched-to-0) categories this game
+      var zeros = G.CATEGORIES.filter(function (c) { return fp.scores[c.key] === 0; });
+      var genVal = fp.scores.general;
+
       panel += '<div class="evpanel">';
       panel += '<div class="evhead">📋 Рапорт за ' + esc(fp.name) + '</div>';
       panel += '<div class="evline"><b>' + Math.round(fa.par) + '</b> норма '
@@ -889,9 +911,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       if (fa.sharpest) panel += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
       if (fa.blunder && fa.blunder.cost < -0.5) panel += '<div class="evpick blunder">✗ Най-скъпа грешка: ' + decisionLabel(fa.blunder)
         + ' <span class="gap">(−' + (-fa.blunder.cost).toFixed(1) + ' т.)</span></div>';
-      // §4 per-game slice
-      var genVal = fp.scores.general;
-      panel += '<div class="evsub">генерал: ' + (typeof genVal === 'number' && genVal > 0 ? 'хвърлен (' + genVal + ')' : 'не') + '</div>';
+      panel += '<div class="evsub">Изтичане: задържания ' + keepCost.toFixed(0) + ' · категории ' + catCost.toFixed(0)
+        + ' — повече губиш в <b>' + leakWord + '</b></div>';
+      panel += '<div class="evsub">генерал: ' + (typeof genVal === 'number' && genVal > 0 ? 'хвърлен (' + genVal + ')' : 'не')
+        + ' · изхабени категории: ' + zeros.length + (zeros.length ? ' (' + zeros.map(function (c) { return c.label; }).join(', ') + ')' : '') + '</div>';
       panel += '</div>';
     }
     $('evPanel').innerHTML = panel;
@@ -899,8 +922,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
     others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
     $('betMsgs').innerHTML = msgs;
-
-    if (fa) recordCareer(fa, fp === winner);
     $('overModal').classList.remove('hidden');
   }
 
@@ -910,18 +931,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + (d.chosenKey !== d.optimalKey ? ' (по-добре ' + (CAT_LABEL[d.optimalKey] || d.optimalKey) + ')' : '');
     }
     return 'задържане на заровете';
-  }
-
-  // §4 minimal persistent career stats (local, hotseat-aggregate)
-  function recordCareer(a, won) {
-    try {
-      var c = JSON.parse(localStorage.getItem('general_career') || '{}');
-      c.games = (c.games || 0) + 1;
-      c.wins = (c.wins || 0) + (won ? 1 : 0);
-      c.accSum = (c.accSum || 0) + a.accuracy;
-      c.luckSum = (c.luckSum || 0) + a.luck;
-      localStorage.setItem('general_career', JSON.stringify(c));
-    } catch (e) { /* storage unavailable — ignore */ }
   }
 
   $('playAgain').onclick = function () {

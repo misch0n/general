@@ -181,11 +181,26 @@ test('softmax with τ=0 is argmax; bots return legal actions', function () {
 
 // ---- §3.4 personas + §6 ranks (game.js) ----
 
-test('personas bind names to fixed strengths; Господ бог is optimal', function () {
+test('personas bind names to fixed strengths; Господ бог optimal, Комар gambler', function () {
   var g = General.personaById('gospod');
   assert.strictEqual(g.name, 'Господ бог');
   assert.strictEqual(g.policy.type, 'optimal');
-  assert.strictEqual(General.personaById('komar').strength < General.personaById('lyubitel').strength, true);
+  // Комар is the гамблер (комарджия) -> risk-seeking, not the weakling
+  assert.strictEqual(General.personaById('komar').name, 'Комар');
+  assert.strictEqual(General.personaById('komar').policy.type, 'risk');
+  // Мушица is the harmless near-random weakling
+  assert.strictEqual(General.personaById('mushica').strength < General.personaById('lyubitel').strength, true);
+});
+
+test('bestTarget names the combo a keep chases, never Chance unless forced', function () {
+  // keep three 6s, reroll the rest -> steering toward sixes or general, not chance
+  var target = EV.bestTarget({}, [6, 6, 6, 1, 2], [true, true, true, false, false]);
+  assert.notStrictEqual(target, 'chance');
+  assert.ok(['sixes', 'general', 'threeKind', 'fourKind'].indexOf(target) >= 0, 'unexpected target ' + target);
+  // only chance left open -> must return chance
+  var scores = {};
+  General.CATEGORIES.forEach(function (c) { if (c.key !== 'chance') scores[c.key] = 0; });
+  assert.strictEqual(EV.bestTarget(scores, [2, 3, 4, 5, 6], [false, false, false, false, false]), 'chance');
 });
 
 test('rank ladder: winner is Генерал, last is Редник', function () {

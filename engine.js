@@ -255,6 +255,24 @@
     return out;
   }
 
+  // The open category a keep is steering toward = the one with the highest
+  // expected immediate score after re-rolling the non-kept dice. Chance is a
+  // dumping ground, not a "target", so it's only chosen if nothing else is open.
+  function bestTarget(scores, dice, keep) {
+    var counts = [0, 0, 0, 0, 0, 0, 0];
+    for (var i = 0; i < dice.length; i++) if (keep[i]) counts[dice[i]]++;
+    var entry = keepResult(counts);
+    var mask = maskOfScores(scores), best = null, bestE = -1;
+    for (var c = 0; c < NCAT; c++) {
+      if (mask & (1 << c)) continue;
+      if (CATS[c].key === 'chance') continue;
+      var e = 0;
+      for (var j = 0; j < entry.idx.length; j++) e += entry.prob[j] * scoreFor(CATS[c].key, MULTISETS[entry.idx[j]]);
+      if (e > bestE) { bestE = e; best = CATS[c].key; }
+    }
+    return best === null ? 'chance' : best;
+  }
+
   // value of a within-turn node (realised dice, rolls-left), excluding banked score
   function nodeValue(mask, dice, rollsLeft) {
     return arraysFor(mask)[rollsLeft][idxOfDice(dice)];
@@ -381,7 +399,7 @@
     setTable: setTable, hasTable: hasTable, par: par, vstar: vstar,
     maskOfScores: maskOfScores, evaluate: evaluate, evaluateMask: evaluateMask, catBit: catBit,
     nodeValue: nodeValue, keepValue: keepValue, keepPositions: keepPositions,
-    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame,
+    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame, bestTarget: bestTarget,
     softmaxPick: softmaxPick, botCategory: botCategory, botKeep: botKeep,
   };
 });
