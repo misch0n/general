@@ -313,9 +313,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* drag-to-reorder setup cards */
 .pcardtop{ display:flex; align-items:center; gap:8px; }
-.grip{ flex:none; width:26px; height:38px; display:grid; place-items:center; cursor:grab; color:var(--gen-muted); font-size:18px;
-  background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; }
-.grip:active{ cursor:grabbing; }
+.grip{ flex:none; width:34px; height:40px; display:grid; place-items:center; cursor:grab; color:var(--gen-brass); font-size:20px; line-height:1;
+  background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; -webkit-user-select:none; }
+.grip:active{ cursor:grabbing; background:var(--gen-brass); color:var(--gen-ink); }
 .pcard.dragging{ opacity:.85; box-shadow:0 10px 26px rgba(0,0,0,.5); outline:2px solid var(--gen-brass); }
 
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
@@ -585,11 +585,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
 
-  // drag-to-reorder player cards (pointer events; works on touch)
-  function dragAfter(list, y, dragging) {
+  // drag-to-reorder player cards: touch/drag the grip and swipe up/down; cards
+  // shuffle live as you cross their midpoints. Document-level pointer listeners
+  // (more robust than pointer-capture across touch browsers); no hold needed.
+  var drag = null;
+  function dragAfter(list, y, card) {
     var result = null, closest = -Infinity;
     [].forEach.call(list.children, function (c) {
-      if (c === dragging) return;
+      if (c === card) return;
       var box = c.getBoundingClientRect();
       var offset = y - box.top - box.height / 2;
       if (offset < 0 && offset > closest) { closest = offset; result = c; }
@@ -599,25 +602,30 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function startCardDrag(card, e) {
     if (e.button != null && e.button > 0) return;
     e.preventDefault();
-    var list = $('playerList');
+    drag = { card: card, list: $('playerList') };
     card.classList.add('dragging');
-    try { card.setPointerCapture(e.pointerId); } catch (_) {}
-    function move(ev) {
-      var after = dragAfter(list, ev.clientY, card);
-      if (after == null) list.appendChild(card);
-      else if (after !== card) list.insertBefore(card, after);
-    }
-    function up() {
-      card.classList.remove('dragging');
-      card.removeEventListener('pointermove', move);
-      card.removeEventListener('pointerup', up);
-      card.removeEventListener('pointercancel', up);
-      setupPlayers = [].map.call(list.children, function (c) { return c.__player; });
-      renderSetup();
-    }
-    card.addEventListener('pointermove', move);
-    card.addEventListener('pointerup', up);
-    card.addEventListener('pointercancel', up);
+    document.body.style.userSelect = 'none';
+    document.addEventListener('pointermove', onDragMove, { passive: false });
+    document.addEventListener('pointerup', endCardDrag);
+    document.addEventListener('pointercancel', endCardDrag);
+  }
+  function onDragMove(e) {
+    if (!drag) return;
+    e.preventDefault();
+    var after = dragAfter(drag.list, e.clientY, drag.card);
+    if (after == null) drag.list.appendChild(drag.card);
+    else if (after !== drag.card) drag.list.insertBefore(drag.card, after);
+  }
+  function endCardDrag() {
+    if (!drag) return;
+    drag.card.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.removeEventListener('pointermove', onDragMove);
+    document.removeEventListener('pointerup', endCardDrag);
+    document.removeEventListener('pointercancel', endCardDrag);
+    setupPlayers = [].map.call(drag.list.children, function (c) { return c.__player; });
+    drag = null;
+    renderSetup();
   }
   function buildPlayers() {
     return setupPlayers.map(function (p) {
@@ -903,15 +911,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     } else {
       sel.innerHTML = '<b>' + label + '</b> · удари заровете, които я направиха · <b class="livescore">' + manualScore() + '</b> т.';
       diceBox.innerHTML = '';
-      var total = manualCounts.reduce(function (a, b) { return a + b; }, 0);
       for (var f = 1; f <= 6; f++) (function (face) {
         var b = document.createElement('button');
         b.className = 'die mdie' + (manualCounts[face] ? ' counted' : '');
         b.innerHTML = pipFace(face) + (manualCounts[face] ? '<span class="mcount">' + manualCounts[face] + '</span>' : '');
-        var held = false, timer = null;
-        b.onpointerdown = function () { held = false; timer = setTimeout(function () { held = true; manualCounts[face] = 0; renderManualDock(); }, 420); };
-        b.onpointerup = function () { clearTimeout(timer); if (!held) tapManualDie(face); };
-        b.onpointercancel = function () { clearTimeout(timer); };
+        b.onclick = function () { tapManualDie(face); };  // tap to count; re-select the combo to reset
         diceBox.appendChild(b);
       })(f);
     }
