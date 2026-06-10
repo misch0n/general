@@ -50,9 +50,9 @@ edition): camouflage field, classification banner, brass medals and stencil type
 - **Полеви отчет (manual mode).** A second start option runs the board as a
   manual scorekeeper for a real table game — no number pad: **pick a category,
   then tap the dice that made it** (each tap counts; re-pick the combo to reset)
-  and hit **Запиши!**. The two straights are fixed (15 / 20). An **ОПА** button (in the
-  hint slot) undoes action-by-action across the whole game. Roasts and HQ orders
-  still fire; luck/skill is omitted (dice are unknown).
+  and hit **Запиши!**. The two straights are fixed (15 / 20). An **ОПА** button in
+  the bottom action row undoes action-by-action across the whole game. Roasts and
+  HQ orders still fire; luck/skill is omitted (dice are unknown).
 - **Table setup.** **Drag the grip** (⠿) to reorder seats to match how people sit
   around the real table.
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,

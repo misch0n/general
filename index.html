@@ -308,8 +308,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .manualbtns{ display:flex; gap:10px; justify-content:center; align-items:center; }
 .manualbtns .fire{ padding:0 26px; }
 .ghostbtn{ background:transparent; color:var(--gen-alert); border:1px solid var(--gen-alert-line); }
-.undotop.undotop{ color:var(--gen-ink); background:var(--gen-alert); border-color:var(--gen-alert); }
-.undotop:disabled{ opacity:.4; }
+/* ОПА — sits under the tooltip / between submit & forfeit; subtler than the tooltip */
+.opabtn{ flex:none; background:transparent; color:var(--gen-alert); border:1px solid var(--gen-alert-line); opacity:.85; }
+.opabtn:hover:not(:disabled){ opacity:1; border-color:var(--gen-alert); }
+.opabtn:disabled{ opacity:.35; }
 
 /* drag-to-reorder setup cards */
 .pcardtop{ display:flex; align-items:center; gap:8px; }
@@ -363,7 +365,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="pstrip">
     <span id="pillWrap" style="display:contents"></span>
     <button id="hintBtn" class="minibtn" title="Покажи съвет от щаба (оптимален ход)">СЪВЕТ</button>
-    <button id="undoTop" class="minibtn undotop hidden" title="Отмени последното" disabled>↩ ОПА</button>
   </div>
 
   <div class="sheet">
@@ -393,6 +394,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="manualDice" class="dice"></div>
     <div class="manualbtns">
       <button id="forfeitBtn" class="btn ghostbtn hidden">Отказ (0)</button>
+      <button id="undoBottom" class="btn opabtn" title="Отмени последното" disabled>↩ ОПА!</button>
       <button id="recordBtn" class="fire hidden">✍ Запиши!</button>
     </div>
   </div>
@@ -673,7 +675,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.toggle('hidden', !evReady || manualMode);
-    $('undoTop').classList.toggle('hidden', !manualMode);
     document.querySelector('.dock').classList.toggle('hidden', manualMode);
     $('manualDock').classList.toggle('hidden', !manualMode);
     beginTurn();
@@ -741,7 +742,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ---------- render ----------
   function renderAll() {
     renderHeader(); renderPills(); renderBoard();
-    if (manualMode) { renderManualDock(); $('undoTop').disabled = undoStack.length === 0; return; }
+    if (manualMode) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; return; }
     renderDice(); renderFire(); renderHint();
   }
 
@@ -960,7 +961,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     clearRoast();
     renderAll();
   }
-  $('undoTop').onclick = popUndo;
+  $('undoBottom').onclick = popUndo;
   $('overUndo').onclick = popUndo;
 
   function renderDice() {
