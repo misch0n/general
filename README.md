@@ -11,10 +11,11 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
 - **Full-screen board.** Fills the viewport with a thin margin: scoreboard up
   top, a **medal divider**, and the **dice console** anchored at the bottom.
-- **Select-to-reroll.** Dice default to **kept**. Tap the ones you want to
-  re-roll (a ✛ reticle marks them) and hit **ОГЪН**; selection clears after every
-  throw. Up to **3 throws** per turn (one automatic roll + two rerolls). Thrown
-  dice are always **sorted by face** for easy scanning.
+- **Select-to-reroll.** The turn opens on the general's order with the dice
+  **unrolled** (`?`); **tap the dice to make your first throw** (anticipation).
+  Then dice default to **kept** — tap the ones to re-roll (a ✛ reticle marks
+  them) and hit **ОГЪН**; selection clears each throw. 3 throws per turn. Thrown
+  dice are always **sorted by face**.
 - **Suggestions live inside the scoreboard.** After each throw every open
   category shows the points the dice would score as a tappable brass chip; combos
   fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
@@ -47,11 +48,13 @@ edition): camouflage field, classification banner, brass medals and stencil type
   quality) — and the report is **selectable per player** (any seat, incl. AI).
   Per-game only (no cross-game storage; it's served statically).
 - **Полеви отчет (manual mode).** A second start option runs the board as a
-  manual scorekeeper for a real table game — no dice, tap a category and enter the
-  points; turn ends on entry. An **ОПА** button undoes action-by-action across the
-  whole game. Roasts and HQ orders still fire; luck/skill is omitted (dice are
-  unknown).
-- **Table setup.** Reorder seats with ▲▼ to match how people sit around the table.
+  manual scorekeeper for a real table game — no number pad: **pick a category,
+  then tap the dice that made it** (each tap counts; hold to reset a die) and hit
+  **Запиши!**. The two straights are fixed (15 / 20). An **ОПА** button (in the
+  hint slot) undoes action-by-action across the whole game. Roasts and HQ orders
+  still fire; luck/skill is omitted (dice are unknown).
+- **Table setup.** **Drag the grip** (⠿) to reorder seats to match how people sit
+  around the real table.
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet

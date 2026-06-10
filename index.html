@@ -292,7 +292,33 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .mtile .mval{ font-family:var(--gen-font-display); font-weight:700; font-size:13px; font-variant-numeric:tabular-nums; }
 .mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
 
-@media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble{ animation:none; } }
+/* unrolled placeholder dice (tap to make the first throw) */
+.die.ghost{ background:linear-gradient(155deg,#e9e4cf,#c9c2a0); cursor:pointer; animation:ghostpulse 1.4s ease-in-out infinite; }
+.die.ghost .ghostq{ width:100%; height:100%; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:700; font-size:30px; color:#8a8463; }
+@keyframes ghostpulse{ 0%,100%{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 3px 0 rgba(0,0,0,.4); } 50%{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 3px 0 rgba(0,0,0,.4),0 0 14px rgba(200,166,75,.6); } }
+
+/* manual console: tap-the-dice entry */
+.manualsel{ text-align:center; font-family:var(--gen-font-display); font-size:13px; letter-spacing:.3px; color:var(--gen-label); }
+.manualsel b{ color:var(--gen-text); } .manualsel .livescore{ color:var(--gen-brass-bright); font-size:16px; }
+.die.mdie{ position:relative; cursor:pointer; touch-action:none; }
+.die.mdie.counted{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),0 3px 0 rgba(0,0,0,.4); }
+.mcount{ position:absolute; top:-8px; right:-8px; min-width:22px; height:22px; padding:0 4px; display:grid; place-items:center;
+  background:var(--gen-brass); color:var(--gen-ink); border:1.5px solid var(--gen-ink-line); border-radius:11px;
+  font-family:var(--gen-font-display); font-weight:700; font-size:12px; }
+.manualbtns{ display:flex; gap:10px; justify-content:center; align-items:center; }
+.manualbtns .fire{ padding:0 26px; }
+.ghostbtn{ background:transparent; color:var(--gen-alert); border:1px solid var(--gen-alert-line); }
+.undotop.undotop{ color:var(--gen-ink); background:var(--gen-alert); border-color:var(--gen-alert); }
+.undotop:disabled{ opacity:.4; }
+
+/* drag-to-reorder setup cards */
+.pcardtop{ display:flex; align-items:center; gap:8px; }
+.grip{ flex:none; width:26px; height:38px; display:grid; place-items:center; cursor:grab; color:var(--gen-muted); font-size:18px;
+  background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; }
+.grip:active{ cursor:grabbing; }
+.pcard.dragging{ opacity:.85; box-shadow:0 10px 26px rgba(0,0,0,.5); outline:2px solid var(--gen-brass); }
+
+@media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 </style>
 </head>
 <body>
@@ -335,6 +361,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="pstrip">
     <span id="pillWrap" style="display:contents"></span>
     <button id="hintBtn" class="minibtn" title="Покажи съвет от щаба (оптимален ход)">СЪВЕТ</button>
+    <button id="undoTop" class="minibtn undotop hidden" title="Отмени последното" disabled>↩ ОПА</button>
   </div>
 
   <div class="sheet">
@@ -358,10 +385,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
   </div>
 
-  <!-- manual-entry console (ОТЧЕТ mode, no dice) -->
+  <!-- manual-entry console (ОТЧЕТ mode): pick a combo, tap the dice that made it -->
   <div id="manualDock" class="dock manual hidden">
-    <div class="manualhint">Натисни категория и въведи точки. Веднъж записан, ходът приключва.</div>
-    <button id="undoBtn" class="undo" disabled>↩ ОПА</button>
+    <div id="manualSel" class="manualsel">Избери категория ↑</div>
+    <div id="manualDice" class="dice"></div>
+    <div class="manualbtns">
+      <button id="forfeitBtn" class="btn ghostbtn hidden">Отказ (0)</button>
+      <button id="recordBtn" class="fire hidden">✍ Запиши!</button>
+    </div>
   </div>
 </div>
 
@@ -375,19 +406,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   </div>
 </div>
 
-<!-- manual score entry -->
-<div id="entryModal" class="overlay hidden">
-  <div class="modal">
-    <h2 id="entryTitle"></h2>
-    <p class="sub">Въведи реалните точки за тази категория.</p>
-    <input id="entryInput" type="number" inputmode="numeric" min="0" class="entryinput" />
-    <div id="entryQuick" class="entryquick"></div>
-    <div class="setup-actions">
-      <button id="entryCancel" class="btn">Отказ</button>
-      <button id="entryOk" class="btn primary">Запиши</button>
-    </div>
-  </div>
-</div>
 
 <!-- tie-break -->
 <div id="tieModal" class="overlay hidden">
@@ -501,20 +519,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var list = $('playerList'); list.innerHTML = '';
     setupPlayers.forEach(function (p, i) {
       var card = document.createElement('div'); card.className = 'pcard';
+      card.__player = p;
+
+      var top = document.createElement('div'); top.className = 'pcardtop';
+      if (setupPlayers.length > 1) {
+        var grip = document.createElement('div'); grip.className = 'grip'; grip.title = 'Влачи, за да подредиш'; grip.textContent = '⠿';
+        grip.onpointerdown = function (e) { startCardDrag(card, e); };
+        top.appendChild(grip);
+      }
       var name = document.createElement('input');
       name.type = 'text'; name.className = 'name'; name.value = p.name; name.placeholder = 'Име на боеца';
       name.oninput = function () { p.name = name.value; };
-      card.appendChild(name);
+      top.appendChild(name);
+      card.appendChild(top);
 
       var row = document.createElement('div'); row.className = 'prow2';
-      if (setupPlayers.length > 1) {
-        var reo = document.createElement('div'); reo.className = 'reorder';
-        var up = document.createElement('button'); up.textContent = '▲'; up.title = 'Нагоре'; up.disabled = i === 0;
-        up.onclick = function () { swapSetup(i, i - 1); };
-        var dn = document.createElement('button'); dn.textContent = '▼'; dn.title = 'Надолу'; dn.disabled = i === setupPlayers.length - 1;
-        dn.onclick = function () { swapSetup(i, i + 1); };
-        reo.appendChild(up); reo.appendChild(dn); row.appendChild(reo);
-      }
       var color = document.createElement('input'); color.type = 'color'; color.value = p.color;
       color.oninput = function () { p.color = color.value; };
       var toggle = document.createElement('button');
@@ -565,7 +584,41 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     });
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
-  function swapSetup(a, b) { var t = setupPlayers[a]; setupPlayers[a] = setupPlayers[b]; setupPlayers[b] = t; renderSetup(); }
+
+  // drag-to-reorder player cards (pointer events; works on touch)
+  function dragAfter(list, y, dragging) {
+    var result = null, closest = -Infinity;
+    [].forEach.call(list.children, function (c) {
+      if (c === dragging) return;
+      var box = c.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest) { closest = offset; result = c; }
+    });
+    return result;
+  }
+  function startCardDrag(card, e) {
+    if (e.button != null && e.button > 0) return;
+    e.preventDefault();
+    var list = $('playerList');
+    card.classList.add('dragging');
+    try { card.setPointerCapture(e.pointerId); } catch (_) {}
+    function move(ev) {
+      var after = dragAfter(list, ev.clientY, card);
+      if (after == null) list.appendChild(card);
+      else if (after !== card) list.insertBefore(card, after);
+    }
+    function up() {
+      card.classList.remove('dragging');
+      card.removeEventListener('pointermove', move);
+      card.removeEventListener('pointerup', up);
+      card.removeEventListener('pointercancel', up);
+      setupPlayers = [].map.call(list.children, function (c) { return c.__player; });
+      renderSetup();
+    }
+    card.addEventListener('pointermove', move);
+    card.addEventListener('pointerup', up);
+    card.addEventListener('pointercancel', up);
+  }
   function buildPlayers() {
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet;
@@ -594,6 +647,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no dice
   var undoStack = [];      // manual-mode action log for ОПА
   var summary = null;      // end-game summary state (tab, selected player)
+  var manualCat = null;    // manual: the category currently being entered
+  var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face
+  var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
 
   function startGame(players, manual) {
     game = G.createGame(players);
@@ -606,6 +662,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.toggle('hidden', !evReady || manualMode);
+    $('undoTop').classList.toggle('hidden', !manualMode);
     document.querySelector('.dock').classList.toggle('hidden', manualMode);
     $('manualDock').classList.toggle('hidden', !manualMode);
     beginTurn();
@@ -618,20 +675,43 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var p = G.currentPlayer(game);
     document.documentElement.style.setProperty('--pc', p.color);
     if (manualMode) {
+      manualCat = null; manualCounts = [0,0,0,0,0,0,0];
       dice = []; throwsLeft = 0; curLog = null;
       renderAll();
       showOrder(p);
       return;
     }
     selected = [false,false,false,false,false];
-    throwsLeft = ROLLS - 1;            // one automatic roll happened; rerolls remain
+    if (p.isAI) {
+      // AI rolls immediately
+      awaitingRoll = false;
+      throwsLeft = ROLLS - 1;
+      dice = G.rollAll(); sortDice();
+      curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+      renderAll(); shakeDice(); showOrder(p);
+      runAiTurn();
+    } else {
+      // human: the first roll waits for a tap of the dice — adds anticipation
+      // after the general's order
+      awaitingRoll = true;
+      throwsLeft = ROLLS - 1;
+      dice = [];
+      curLog = null;
+      renderAll();
+      showOrder(p);
+    }
+  }
+
+  // the human's first throw of the turn, triggered by tapping the dice tray
+  function firstRoll() {
+    if (!awaitingRoll || locked) return;
+    var p = G.currentPlayer(game);
+    awaitingRoll = false;
     dice = G.rollAll(); sortDice();
-    // open a move-log entry for this turn (mask = scorecard before the turn)
     curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+    clearRoast();
     renderAll();
     shakeDice();
-    showOrder(p);
-    if (p.isAI) runAiTurn();
   }
 
   // ---------- previews ----------
@@ -648,7 +728,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   // ---------- render ----------
-  function renderAll() { renderHeader(); renderPills(); renderBoard(); renderDice(); renderFire(); renderHint(); }
+  function renderAll() {
+    renderHeader(); renderPills(); renderBoard();
+    if (manualMode) { renderManualDock(); $('undoTop').disabled = undoStack.length === 0; return; }
+    renderDice(); renderFire(); renderHint();
+  }
 
   // §1 live "best move" hint (toggle; off for serious play)
   $('hintBtn').onclick = function () {
@@ -658,7 +742,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function renderHint() {
     var line = $('hintLine');
     var p = G.currentPlayer(game);
-    var show = hintsOn && evReady && !p.isAI && !locked;
+    var show = hintsOn && evReady && !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
     // raise the speech bubble when the hint line lifts the dice (avoids overlap)
     document.documentElement.style.setProperty('--roast-bottom', show ? '218px' : '172px');
     if (!show) { line.classList.add('hidden'); return; }
@@ -713,7 +797,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (manualMode) { renderManualBoard(); return; }
     var p = G.currentPlayer(game);
     var pv = computePreviews(p);
-    var canScore = !p.isAI && !locked;
+    var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
 
     $('boardUpper').innerHTML = '';
     G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
@@ -760,19 +844,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     });
   }
 
-  // ---------- manual mode (ОТЧЕТ) ----------
+  // ---------- manual mode (ОТЧЕТ): pick a combo, tap the dice that made it ----------
+  var FIXED = { smallStraight: 15, largeStraight: 20 };
+
   function renderManualBoard() {
     var p = G.currentPlayer(game);
     function tile(c, up) {
       var done = G.isCategoryFilled(p, c.key);
       var v = p.scores[c.key];
       var isVoid = done && v === 0;
+      var sel = manualCat === c.key;
       var el = document.createElement(up ? 'button' : 'div');
-      el.className = (up ? 'tile up' : 'tile low') + (done ? ' done' : '') + (isVoid ? ' void' : '');
+      el.className = (up ? 'tile up' : 'tile low') + (done ? ' done' : '') + (isVoid ? ' void' : '') + (sel ? ' best' : '');
       el.innerHTML = up
-        ? '<span class="face-n">' + c.label + '</span><span class="pts">' + (done ? v : '+') + '</span>'
-        : '<span class="cname">' + c.label + '</span><span class="lval">' + (done ? v : '+') + '</span>';
-      if (!done && !locked) { el.style.cursor = 'pointer'; el.onclick = function () { openEntry(c.key, c.label); }; }
+        ? '<span class="face-n">' + c.label + '</span><span class="pts">' + (done ? v : '·') + '</span>'
+        : '<span class="cname">' + c.label + '</span><span class="lval">' + (done ? v : '·') + '</span>';
+      if (!done && !locked) { el.style.cursor = 'pointer'; el.onclick = function () { selectManualCat(c.key); }; }
       else if (up) el.disabled = true;
       return el;
     }
@@ -783,39 +870,65 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('curTotal').textContent = G.playerTotal(p);
   }
 
-  var pendingKey = null;
-  function quickValues(key) {
-    var f = { ones: 1, twos: 2, threes: 3, fours: 4, fives: 5, sixes: 6 }[key];
-    if (f) return [0, f, f * 2, f * 3, f * 4, f * 5];
-    if (key === 'smallStraight') return [0, 15];
-    if (key === 'largeStraight') return [0, 20];
-    if (key === 'general') return [0, 55, 60, 65, 70, 75, 80];
-    return [0];
-  }
-  function openEntry(key, label) {
+  function selectManualCat(key) {
     if (locked) return;
-    pendingKey = key;
-    $('entryTitle').textContent = label;
-    $('entryInput').value = '';
-    $('entryQuick').innerHTML = quickValues(key).map(function (v) { return '<button>' + v + '</button>'; }).join('');
-    $('entryQuick').querySelectorAll('button').forEach(function (b) { b.onclick = function () { $('entryInput').value = b.textContent; }; });
-    $('entryModal').classList.remove('hidden');
-    setTimeout(function () { $('entryInput').focus(); }, 40);
+    manualCat = key;
+    manualCounts = [0, 0, 0, 0, 0, 0, 0];
+    renderAll();
   }
-  $('entryCancel').onclick = function () { $('entryModal').classList.add('hidden'); };
-  $('entryOk').onclick = function () {
-    var v = parseInt($('entryInput').value, 10);
-    if (isNaN(v) || v < 0) { $('entryInput').focus(); return; }
-    manualCommit(pendingKey, v);
-  };
-  $('entryInput').onkeydown = function (e) { if (e.key === 'Enter') $('entryOk').onclick(); };
 
-  function manualCommit(key, value) {
-    var p = G.currentPlayer(game);
+  function manualDiceArray() {
+    var d = [];
+    for (var f = 1; f <= 6; f++) for (var k = 0; k < manualCounts[f]; k++) d.push(f);
+    return d;
+  }
+  function manualScore() {
+    if (!manualCat) return 0;
+    if (FIXED[manualCat] != null) return FIXED[manualCat];
+    return G.scoreFor(manualCat, manualDiceArray());
+  }
+
+  function renderManualDock() {
+    var sel = $('manualSel'), diceBox = $('manualDice'), rec = $('recordBtn'), forf = $('forfeitBtn');
+    if (!manualCat) {
+      sel.textContent = 'Избери категория ↑';
+      diceBox.innerHTML = ''; rec.classList.add('hidden'); forf.classList.add('hidden');
+      return;
+    }
+    var label = CAT_LABEL[manualCat];
+    rec.classList.remove('hidden'); forf.classList.remove('hidden');
+    if (FIXED[manualCat] != null) {
+      sel.innerHTML = '<b>' + label + '</b> — ' + FIXED[manualCat] + ' т. (ако е направена)';
+      diceBox.innerHTML = '';
+    } else {
+      sel.innerHTML = '<b>' + label + '</b> · удари заровете, които я направиха · <b class="livescore">' + manualScore() + '</b> т.';
+      diceBox.innerHTML = '';
+      var total = manualCounts.reduce(function (a, b) { return a + b; }, 0);
+      for (var f = 1; f <= 6; f++) (function (face) {
+        var b = document.createElement('button');
+        b.className = 'die mdie' + (manualCounts[face] ? ' counted' : '');
+        b.innerHTML = pipFace(face) + (manualCounts[face] ? '<span class="mcount">' + manualCounts[face] + '</span>' : '');
+        var held = false, timer = null;
+        b.onpointerdown = function () { held = false; timer = setTimeout(function () { held = true; manualCounts[face] = 0; renderManualDock(); }, 420); };
+        b.onpointerup = function () { clearTimeout(timer); if (!held) tapManualDie(face); };
+        b.onpointercancel = function () { clearTimeout(timer); };
+        diceBox.appendChild(b);
+      })(f);
+    }
+  }
+  function tapManualDie(face) {
+    var total = manualCounts.reduce(function (a, b) { return a + b; }, 0);
+    if (total >= G.DICE_COUNT) return; // a roll is 5 dice
+    manualCounts[face]++;
+    renderManualDock();
+  }
+
+  function manualRecord(value) {
+    if (locked || !manualCat) return;
+    var key = manualCat, p = G.currentPlayer(game);
     undoStack.push({ playerIdx: game.current, key: key, prevRound: game.round });
     p.scores[key] = value;
-    $('entryModal').classList.add('hidden');
-    $('undoBtn').disabled = false;
+    manualCat = null; manualCounts = [0, 0, 0, 0, 0, 0, 0];
     locked = true;
     renderAll();
     flashTile(key);
@@ -825,6 +938,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       G.nextTurn(game); beginTurn();
     }, value <= 3 ? ROAST_MS + 250 : 700);
   }
+  $('recordBtn').onclick = function () { manualRecord(manualScore()); };
+  $('forfeitBtn').onclick = function () { manualRecord(0); };
 
   function popUndo() {
     if (!undoStack.length) return;
@@ -833,19 +948,31 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     delete game.players[a.playerIdx].scores[a.key];
     game.current = a.playerIdx;
     game.round = a.prevRound;
+    manualCat = null; manualCounts = [0, 0, 0, 0, 0, 0, 0];
     locked = false;
     clearRoast();
-    $('undoBtn').disabled = undoStack.length === 0;
     renderAll();
   }
-  $('undoBtn').onclick = popUndo;
+  $('undoTop').onclick = popUndo;
   $('overUndo').onclick = popUndo;
 
   function renderDice() {
     if (manualMode) return;
     var p = G.currentPlayer(game);
+    var box = $('dice'); box.innerHTML = '';
+    if (awaitingRoll) {
+      for (var k = 0; k < G.DICE_COUNT; k++) {
+        var g = document.createElement('button');
+        g.className = 'die ghost'; g.setAttribute('aria-label', 'Хвърли заровете');
+        g.innerHTML = '<span class="ghostq">?</span>';
+        g.onclick = firstRoll;
+        box.appendChild(g);
+      }
+      var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>';
+      $('throws').innerHTML = td;
+      return;
+    }
     var interactive = !p.isAI && !locked && throwsLeft > 0;
-    $('dice').innerHTML = '';
     dice.forEach(function (v, i) {
       var b = document.createElement('button');
       b.className = 'die' + (selected[i] ? ' sel' : '');
@@ -861,6 +988,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function renderFire() {
     if (manualMode) return;
+    if (awaitingRoll) { $('fire').classList.add('hidden'); $('aiThinking').classList.add('hidden'); return; }
     var p = G.currentPlayer(game);
     var fire = $('fire'), think = $('aiThinking');
     if (p.isAI) { fire.classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
