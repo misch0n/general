@@ -439,30 +439,32 @@ test('neuter names resolve to a neuter noun + agreeing adjective', function () {
   }
 });
 
-test('bonusForPct maps rarity to a starting bonus', function () {
+test('bonusForPct awards points by the final name-percentage bracket', function () {
+  // 0-1→5, 1-2→4, 2-3→3, 3-4→2, 4-5→1, 5-10→0 (smile), 10+→0
   assert.strictEqual(G.bonusForPct(null), 0);
-  assert.strictEqual(G.bonusForPct(9), 0);   // sub-10 but >5: bubble only
-  assert.strictEqual(G.bonusForPct(5), 1);
-  assert.strictEqual(G.bonusForPct(3), 3);
-  assert.strictEqual(G.bonusForPct(1), 5);
+  assert.strictEqual(G.bonusForPct(0.5), 5);
+  assert.strictEqual(G.bonusForPct(1.5), 4);
+  assert.strictEqual(G.bonusForPct(2.5), 3);
+  assert.strictEqual(G.bonusForPct(3.5), 2);
+  assert.strictEqual(G.bonusForPct(4.5), 1);
+  assert.strictEqual(G.bonusForPct(7), 0);   // 5–10%: smile only, no points
+  assert.strictEqual(G.bonusForPct(40), 0);  // common
 });
 
-test('rarityTier buckets the percent brackets; rarityLine exclaims per tier', function () {
+test('rarityTier buckets the name % (5–10 is the smile tier); rarityLine per tier', function () {
   assert.strictEqual(G.rarityTier(null), 0);
   assert.strictEqual(G.rarityTier(0.5), 1);
-  assert.strictEqual(G.rarityTier(1), 1);
-  assert.strictEqual(G.rarityTier(2), 2);
-  assert.strictEqual(G.rarityTier(3), 3);
-  assert.strictEqual(G.rarityTier(4), 4);
-  assert.strictEqual(G.rarityTier(5), 5);
-  assert.strictEqual(G.rarityTier(7), 10);   // the 5–10% (blue) bracket
-  // the line opens with the tier's exclamation and quotes the percent
+  assert.strictEqual(G.rarityTier(1.5), 2);
+  assert.strictEqual(G.rarityTier(2.5), 3);
+  assert.strictEqual(G.rarityTier(3.5), 4);
+  assert.strictEqual(G.rarityTier(4.5), 5);
+  assert.strictEqual(G.rarityTier(7), 10);   // 5–10% smile tier
+  assert.strictEqual(G.rarityTier(40), 0);   // common, no notification
+  // exclamations for the bonus tiers, a smile for 5–10, bonus suffix when earned
   assert.ok(/^ГОСПОДИ! 0\.5% шанс/.test(G.rarityLine(0.5, 5)));
-  assert.ok(/^Ебаси, 2% шанс/.test(G.rarityLine(2, 4)));
-  assert.ok(/^ЕХЕ! 5% шанс/.test(G.rarityLine(5, 1)));
-  assert.ok(/^Брей, 7% шанс/.test(G.rarityLine(7, 0)));
-  // the bonus suffix only appears when there is one
-  assert.ok(G.rarityLine(1, 5).indexOf('+5 т.') > 0);
+  assert.ok(/^Ебаси, 1\.5% шанс/.test(G.rarityLine(1.5, 4)));
+  assert.ok(/^🙂 7% шанс/.test(G.rarityLine(7, 0)));   // smile, no bonus text
+  assert.ok(G.rarityLine(0.5, 5).indexOf('+5 т.') > 0);
   assert.strictEqual(G.rarityLine(7, 0).indexOf('аванс'), -1);
 });
 
@@ -499,23 +501,27 @@ test('matchSeed auto-detects a name gender that differs from the hint', function
   assert.strictEqual(m.bonus, r.bonus);
 });
 
-test('dumpPools exposes pools with rarity percentiles', function () {
+test('dumpPools exposes every entry with its hardcoded bracket + fraction', function () {
   var d = G.dumpPools();
   ['titles', 'adjs', 'nouns', 'aiAdjs', 'aiNouns'].forEach(function (k) {
     assert.ok(Array.isArray(d[k]) && d[k].length);
-    assert.ok(d[k].some(function (e) { return e.pct != null; }), k + ' has rare entries');
+    d[k].forEach(function (e) {
+      assert.ok(G.BRACKETS.indexOf(e.b) >= 0, k + ' bad bracket: ' + e.b);
+      assert.ok(typeof e.frac === 'number' && e.frac > 0 && e.frac <= 1);
+    });
+    assert.ok(d[k].some(function (e) { return e.b !== '10+'; }), k + ' has some bracketed (rare) entries');
   });
 });
 
-test('§7 rarity guarantees one entry at each of the 1..5 percentiles per pool', function () {
-  var d = G.dumpPools();
-  ['titles', 'adjs', 'nouns', 'aiAdjs', 'aiNouns'].forEach(function (k) {
-    [1, 2, 3, 4, 5].forEach(function (tier) {
-      assert.ok(d[k].some(function (e) { return e.pct === tier; }), k + ' missing a ' + tier + '% entry');
-    });
-    // the rest are common (null) or in the 5–10% band — nothing below 0 or above 10
-    d[k].forEach(function (e) { if (e.pct != null) assert.ok(e.pct > 0 && e.pct < 10, k + ' pct out of range: ' + e.pct); });
-  });
+test('name % is the PRODUCT of component fractions (two rares ⇒ far rarer)', function () {
+  // craft parts directly: a common title, a 2-3% adj and a 2-3% noun
+  function part(e, b) { return { e: e, b: b, frac: b === '10+' ? 0.95 : { '0-1': 0.005, '1-2': 0.015, '2-3': 0.025, '3-4': 0.035, '4-5': 0.045, '5-10': 0.075 }[b] }; }
+  var oneRare = { title: part('Генерал', '10+'), adj: part({ base: 'мазен' }, '2-3'), noun: part({ w: 'Петел', g: 'm' }, '10+') };
+  var twoRare = { title: part('Генерал', '10+'), adj: part({ base: 'мазен' }, '2-3'), noun: part({ w: 'Петел', g: 'm' }, '2-3') };
+  var p1 = G.recohereName('human', oneRare, 'm').pct;       // ≈ 0.025*0.95*0.95*100 = 2.26%
+  var p2 = G.recohereName('human', twoRare, 'm').pct;       // ≈ 0.025*0.025*0.95*100 = 0.059%
+  assert.ok(p1 > 2 && p1 < 3, 'one rare ≈ its own bracket: ' + p1);
+  assert.ok(p2 < p1 / 10, 'two rares multiply much rarer: ' + p2);
 });
 
 test('§1 recohereName keeps a name\'s rarity across every gender switch', function () {
@@ -532,8 +538,9 @@ test('§1 recohereName keeps a name\'s rarity across every gender switch', funct
 
 test('§1 a noun with gender variants morphs in place (no re-roll)', function () {
   // Петел(m) carries gv {f:Кокошка, n:Пиле}; recohering keeps the same entry
-  var parts = { title: { e: 'Генерал', pct: null }, adj: { e: { base: 'смотан' }, pct: null },
-                noun: { e: { w: 'Петел', g: 'm', gv: { f: 'Кокошка', n: 'Пиле' } }, pct: 3 } };
+  function part(e, b) { return { e: e, b: b || '10+', frac: 0.95 }; }
+  var parts = { title: part('Генерал'), adj: part({ base: 'смотан' }),
+                noun: part({ w: 'Петел', g: 'm', gv: { f: 'Кокошка', n: 'Пиле' } }) };
   assert.strictEqual(G.recohereName('human', parts, 'm').name, 'Генерал Смотан Петел');
   assert.strictEqual(G.recohereName('human', parts, 'f').name, 'Генерал Смотана Кокошка');
   assert.strictEqual(G.recohereName('human', parts, 'n').name, 'Генерал Смотано Пиле');
@@ -557,13 +564,19 @@ test('§6 censor removes NSFW words from generated names and seed matching', fun
   assert.strictEqual(G.matchSeed('Генерал Смотана Курва', 'f').matched, true);
 });
 
-test('dumpSource round-trips through rebuildFromSource', function () {
+test('dumpSource round-trips through rebuildFromSource (brackets preserved)', function () {
   var src = G.dumpSource();
   assert.ok(src.titles.length && src.nouns.length);
   assert.ok(src.nouns.some(function (o) { return o.nsfw; }), 'some nouns flagged NSFW');
   assert.ok(src.titles.every(function (o) { return o.m; }), 'titles use the m field');
+  assert.ok(src.titles.every(function (o) { return G.BRACKETS.indexOf(o.b) >= 0; }), 'every entry carries a bracket');
+  assert.ok(src.nouns.some(function (o) { return o.b !== '10+'; }), 'some nouns are bracketed rare');
+  // an edited bracket survives the round-trip into the live pool
+  var idx = src.titles.findIndex(function (o) { return o.b === '10+'; });
+  src.titles[idx].b = '0-1';
   G.rebuildFromSource(src);                 // must not throw; pools stay valid
   var d = G.dumpPools();
+  assert.strictEqual(d.titles[idx].b, '0-1', 'edited bracket applied');
   assert.ok(d.nouns.length && d.titles.length);
   var name = G.randomNameRarity('human', 'f').name;
   assert.strictEqual(name.split(/\s+/).length, 3);

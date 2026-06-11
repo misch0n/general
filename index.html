@@ -417,6 +417,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* dev word-list editor */
 .devnote{ font-size:11px; color:var(--gen-muted); line-height:1.4; margin-bottom:10px; }
 .devedrow{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+/* hardcoded percentile bracket selector (colour cues the rarity tier) */
+.devbk{ align-self:flex-end; margin-bottom:3px; font-family:var(--gen-font-body); font-size:11px; font-weight:700; color:var(--gen-ink);
+  background:var(--gen-canvas); border:1px solid var(--gen-ink-line); border-radius:5px; padding:3px 2px; }
+.devbk.r0{ background:#8a5fc0; color:#fff; } .devbk.r1{ background:#e8c356; } .devbk.r2{ background:#e8843a; }
+.devbk.r3{ background:#e8d04a; } .devbk.r4{ background:#7ab85a; } .devbk.r5{ background:#6fa8e8; }
+.devbk.r6{ background:rgba(205,198,160,.25); color:var(--gen-label); }
 .devf{ display:flex; flex-direction:column; gap:1px; font-size:8px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
 .devin{ width:74px; font-family:var(--gen-font-body); font-size:11.5px; color:var(--gen-text); background:rgba(0,0,0,.3);
   border:1px solid var(--gen-pill-line); border-radius:5px; padding:4px 5px; }
@@ -701,7 +707,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // build the rare-name brag bubble for a player (or null)
   function rarityBubbleEl(p) {
-    if (p.pct == null || p.pct > 9 || p.bubbleDismissed) return null;
+    if (p.pct == null || p.pct >= 10 || p.bubbleDismissed) return null; // notify on the sub-10% bracket
     var eff = settings.noBonus ? 0 : p.bonus;
     var bub = document.createElement('div');
     bub.className = 'rarebubble rt' + G.rarityTier(p.pct); // colour = rarity tier
@@ -1646,8 +1652,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var i = document.createElement('input'); i.className = 'devin'; i.type = 'text';
     i.value = val || ''; i.placeholder = ph; i.oninput = function () { on(i.value.trim()); }; return i;
   }
+  function bracketRank(b) { var i = G.BRACKETS.indexOf(b || '10+'); return i < 0 ? G.BRACKETS.length : i; }
   function devRow(kind, entry, onDel) {
     var row = document.createElement('div'); row.className = 'devedrow';
+    // percentile bracket selector (hardcoded rarity — rarest first)
+    var bsel = document.createElement('select'); bsel.className = 'devbk r' + bracketRank(entry.b);
+    G.BRACKETS.forEach(function (b) {
+      var o = document.createElement('option'); o.value = b; o.textContent = b; if ((entry.b || '10+') === b) o.selected = true; bsel.appendChild(o);
+    });
+    bsel.onchange = function () { entry.b = bsel.value; bsel.className = 'devbk r' + bracketRank(entry.b); };
+    row.appendChild(bsel);
     DEV_FIELDS[kind].forEach(function (f) {
       var wrap = document.createElement('label'); wrap.className = 'devf';
       wrap.appendChild(document.createTextNode(f[1]));
@@ -1669,30 +1683,39 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return row;
   }
   function devPoolSection(key, label) {
-    var list = devModel[key];
     var sec = document.createElement('details'); sec.className = 'devsec';
-    var sum = document.createElement('summary'); sum.textContent = label + ' (' + list.length + ')'; sec.appendChild(sum);
+    var sum = document.createElement('summary'); sec.appendChild(sum);
     var body = document.createElement('div'); body.className = 'devlist'; sec.appendChild(body);
     function redraw() {
-      body.innerHTML = ''; sum.textContent = label + ' (' + list.length + ')';
-      list.forEach(function (entry, i) {
-        body.appendChild(devRow(key, entry, function () { list.splice(i, 1); redraw(); }));
+      // rank by rarity (rarest bracket first) for easy scanning
+      devModel[key].sort(function (a, b) { return bracketRank(a.b) - bracketRank(b.b); });
+      var list = devModel[key];
+      sum.textContent = label + ' (' + list.length + ')';
+      body.innerHTML = '';
+      list.forEach(function (entry) {
+        body.appendChild(devRow(key, entry, function () { var i = list.indexOf(entry); if (i >= 0) list.splice(i, 1); redraw(); }));
       });
       var add = document.createElement('button'); add.className = 'devadd'; add.textContent = '+ добави';
-      add.onclick = function () { list.push({}); redraw(); sec.open = true; };
+      add.onclick = function () { list.push({ b: '10+' }); redraw(); sec.open = true; };
       body.appendChild(add);
     }
     redraw();
     return sec;
   }
-  function pctStr(p) { return p == null ? '—' : (p < 1 ? p.toFixed(1) : p) + '%'; }
   function msgSec(t, arr) {
     return '<details class="devsec"><summary>' + esc(t) + ' (' + arr.length + ')</summary><div class="devlist">'
       + arr.map(function (m) { return '<div class="devmsg">' + esc(m) + '</div>'; }).join('') + '</div></details>';
   }
   function serializeDev() {
-    // emit only non-empty fields; unchanged entries come out as their originals
-    function ent(o) { var r = {}; ['m', 'n', 'f'].forEach(function (k) { if (o[k]) r[k] = o[k]; }); if (o.inv) r.inv = true; if (o.nsfw) r.nsfw = true; return r; }
+    // emit only non-empty fields + the bracket (omit the '10+' default)
+    function ent(o) {
+      var r = {};
+      ['m', 'n', 'f'].forEach(function (k) { if (o[k]) r[k] = o[k]; });
+      if (o.inv) r.inv = true;
+      if (o.nsfw) r.nsfw = true;
+      if (o.b && o.b !== '10+') r.b = o.b;
+      return r;
+    }
     var out = {};
     DEV_POOLS.forEach(function (p) { out[p[0]] = devModel[p[0]].filter(function (o) { return o.m || o.n || o.f; }).map(ent); });
     return JSON.stringify(out, null, 2);

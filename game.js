@@ -565,14 +565,19 @@
   // Titles span every Bulgarian age — modern army ranks, medieval/imperial
   // dignities and the revival-era resistance (hajduks, komiti, opълченци). All
   // genderless (used verbatim before the name). SFW.
+  // `b` (optional) pins a hardcoded rarity bracket; unbracketed entries are '10+'
+  // (common). These initial brackets are ARBITRARY — meant to be fine-tuned by
+  // hand via the dev panel (rarer dignities/titles seeded as the scarcer ones).
   var TITLES = [
-    // modern military ranks
+    // modern military ranks (the everyday common ones)
     'Генерал', 'Майор', 'Полковник', 'Капитан', 'Адмирал', 'Сержант', 'Ефрейтор', 'Лейтенант',
     'Старшина', 'Подполковник', 'Поручик', 'Подпоручик', 'Прапорщик', 'Гвардеец', 'Командир', 'Знаменосец',
-    // First/Second Bulgarian Empire dignities
-    'Цар', 'Княз', 'Хан', 'Кан', 'Боляр', 'Кавхан', 'Багатур', 'Таркан', 'Деспот', 'Севастократор', 'Протостратор',
+    // First/Second Bulgarian Empire dignities (seeded rarer)
+    'Цар', 'Княз', { m: 'Хан', b: '4-5' }, { m: 'Кан', b: '3-4' }, 'Боляр', { m: 'Кавхан', b: '0-1' },
+    { m: 'Багатур', b: '1-2' }, { m: 'Таркан', b: '2-3' }, 'Деспот', { m: 'Севастократор', b: '1-2' }, { m: 'Протостратор', b: '2-3' },
     // revival-era resistance / liberation
-    'Войвода', 'Хайдутин', 'Байрактар', 'Комита', 'Четник', 'Апостол', 'Опълченец', 'Партизанин', 'Юнак',
+    'Войвода', 'Хайдутин', { m: 'Байрактар', b: '5-10' }, { m: 'Комита', b: '4-5' }, 'Четник', { m: 'Апостол', b: '0-1' },
+    { m: 'Опълченец', b: '3-4' }, 'Партизанин', 'Юнак',
   ];
 
   // Adjectives. Strings inflect regularly (masc base; f = +а, n = +о). Objects
@@ -580,15 +585,15 @@
   var ADJS = [
     'смотан', 'сополив', 'космат', 'тлъст', 'тромав', 'кьорав', 'проклет', 'опърпан',
     'дебел', 'рунтав', 'скапан', 'луд', 'крив', 'вмирисан', 'вкиснал', 'мек', 'подлудял',
-    'чевръст', 'смазан', 'гръмнал', 'направен', 'лош', 'пиян', 'дрислив', 'парцалив',
-    'оплескан', 'прецакан', 'проскубан', 'опикан', 'оакан', 'недодялан', 'сбъркан',
-    'вонящ', 'изтормозен', 'олигавен', 'оплешивял', 'занемарен',
-    { base: 'срамен', f: 'срамна', n: 'срамно' },
+    { base: 'чевръст', b: '1-2' }, 'смазан', { base: 'гръмнал', b: '2-3' }, 'направен', 'лош', 'пиян', 'дрислив', 'парцалив',
+    'оплескан', { base: 'прецакан', b: '4-5' }, 'проскубан', 'опикан', 'оакан', { base: 'недодялан', b: '3-4' }, 'сбъркан',
+    'вонящ', 'изтормозен', 'олигавен', { base: 'оплешивял', b: '5-10' }, 'занемарен',
+    { base: 'срамен', f: 'срамна', n: 'срамно', b: '0-1' },
     { base: 'добър', f: 'добра', n: 'добро' },
     { base: 'гаден', f: 'гадна', n: 'гадно' },
-    { base: 'мазен', f: 'мазна', n: 'мазно' },
+    { base: 'мазен', f: 'мазна', n: 'мазно', b: '2-3' },
     { base: 'гнусен', f: 'гнусна', n: 'гнусно' },
-    { base: 'грозен', f: 'грозна', n: 'грозно' },
+    { base: 'грозен', f: 'грозна', n: 'грозно', b: '1-2' },
   ];
   var AI_ADJS = [
     { base: 'ръждив' }, { base: 'цинков' }, { base: 'хромиран' }, { base: 'искрящ' },
@@ -605,15 +610,15 @@
   // player switching gender keeps the entry (and its rarity) and just morphs the
   // word instead of re-rolling. `nsfw` flags adult-only entries (censorable).
   var NOUNS = [
-    { w: 'Пишка', g: 'f' }, { w: 'Петел', g: 'm', gv: { f: 'Кокошка', n: 'Пиле' } }, { w: 'Краставица', g: 'f' },
+    { w: 'Пишка', g: 'f' }, { w: 'Петел', g: 'm', gv: { f: 'Кокошка', n: 'Пиле' }, b: '2-3' }, { w: 'Краставица', g: 'f' },
     { w: 'Тиква', g: 'f' }, { w: 'Мотика', g: 'f' }, { w: 'Чорап', g: 'm' },
-    { w: 'Баклава', g: 'f' }, { w: 'Магаре', g: 'n', gv: { m: 'Катър', f: 'Магарица' } }, { w: 'Кашкавал', g: 'm' },
-    { w: 'Лопата', g: 'f' }, { w: 'Бухал', g: 'm', gv: { f: 'Кукумявка', n: 'Совище' } }, { w: 'Геврек', g: 'm' },
+    { w: 'Баклава', g: 'f' }, { w: 'Магаре', g: 'n', gv: { m: 'Катър', f: 'Магарица' }, b: '3-4' }, { w: 'Кашкавал', g: 'm' },
+    { w: 'Лопата', g: 'f' }, { w: 'Бухал', g: 'm', gv: { f: 'Кукумявка', n: 'Совище' }, b: '4-5' }, { w: 'Геврек', g: 'm' },
     { w: 'Таралеж', g: 'm' }, { w: 'Дюшек', g: 'm' },
     { w: 'Метла', g: 'f' }, { w: 'Патка', g: 'f' },
-    { w: 'Маймуна', g: 'f', gv: { m: 'Маймун', n: 'Маймунче' } }, { w: 'Кранта', g: 'f' }, { w: 'Пън', g: 'm' }, { w: 'Чук', g: 'm' },
+    { w: 'Маймуна', g: 'f', gv: { m: 'Маймун', n: 'Маймунче' }, b: '1-2' }, { w: 'Кранта', g: 'f' }, { w: 'Пън', g: 'm' }, { w: 'Чук', g: 'm' },
     // crude additions (adult party game) — flagged NSFW so they can be censored
-    { w: 'Жребец', g: 'm', nsfw: true }, { w: 'Хуй', g: 'm', nsfw: true }, { w: 'Кур', g: 'm', nsfw: true }, { w: 'Изклесяк', g: 'm', nsfw: true },
+    { w: 'Жребец', g: 'm', nsfw: true }, { w: 'Хуй', g: 'm', nsfw: true, b: '0-1' }, { w: 'Кур', g: 'm', nsfw: true }, { w: 'Изклесяк', g: 'm', nsfw: true },
     { w: 'Пийняк', g: 'm', nsfw: true }, { w: 'Брънзел', g: 'm', nsfw: true }, { w: 'Гъз', g: 'm', nsfw: true }, { w: 'Пръч', g: 'm', nsfw: true },
     { w: 'Дръвник', g: 'm', nsfw: true }, { w: 'Тъпак', g: 'm', gv: { f: 'Тъпачка', n: 'Тъпаче' }, nsfw: true }, { w: 'Льохман', g: 'm', nsfw: true }, { w: 'Серсем', g: 'm', nsfw: true },
     { w: 'Простак', g: 'm', gv: { f: 'Простачка' }, nsfw: true }, { w: 'Балък', g: 'm', nsfw: true }, { w: 'Дебелак', g: 'm', gv: { f: 'Дебелана', n: 'Дебеланче' }, nsfw: true },
@@ -628,8 +633,8 @@
     { w: 'Камила', g: 'f' }, { w: 'Тенеке', g: 'n' }, { w: 'Робот', g: 'm' },
     { w: 'Чайник', g: 'm' }, { w: 'Трансформатор', g: 'm' }, { w: 'Болт', g: 'm' },
     { w: 'Тостер', g: 'm' }, { w: 'Прахосмукачка', g: 'f' }, { w: 'Ютия', g: 'f' },
-    { w: 'Котлон', g: 'm' }, { w: 'Бойлер', g: 'm' }, { w: 'Динамо', g: 'n' },
-    { w: 'Реотан', g: 'm' }, { w: 'Ключ', g: 'm' },
+    { w: 'Котлон', g: 'm' }, { w: 'Бойлер', g: 'm' }, { w: 'Динамо', g: 'n', b: '2-3' },
+    { w: 'Реотан', g: 'm', b: '4-5' }, { w: 'Ключ', g: 'm' },
     { w: 'Турбина', g: 'f' }, { w: 'Платка', g: 'f' }, { w: 'Антена', g: 'f' },
     { w: 'Жица', g: 'f' }, { w: 'Батерия', g: 'f' }, { w: 'Кабел', g: 'm' }, { w: 'Винт', g: 'm' },
     { w: 'Бормашина', g: 'f' }, { w: 'Дискета', g: 'f' }, { w: 'Клавиатура', g: 'f' }, { w: 'Камера', g: 'f' },
@@ -656,9 +661,8 @@
     var pool = gender ? nouns.filter(function (n) { return n.g === gender; }) : nouns;
     if (!pool.length) pool = nouns;
     var noun = pick(pool, rng);
-    var raw = pick(adjs, rng);
-    var adj = typeof raw === 'string' ? { base: raw } : raw;
-    return pick(TITLES, rng) + ' ' + capitalize(inflectAdj(adj, noun.g)) + ' ' + noun.w;
+    var adj = entryAdj(pick(adjs, rng));
+    return entryWord(pick(TITLES, rng)) + ' ' + capitalize(inflectAdj(adj, noun.g)) + ' ' + noun.w;
   }
   function randomHumanName(rng, gender) { return randomName(ADJS, NOUNS, rng, gender); }
   function randomAiName(rng, gender) { return randomName(AI_ADJS, AI_NOUNS, rng, gender); }
@@ -671,20 +675,19 @@
   // changes every page load. A name's rarity = its rarest component; sub-10% earns
   // a brag bubble, sub-5% a starting bonus (5%→1 … 1%→5; sub-1% → 5).
 
-  // extra "epic" words mixed into the pools as ordinary candidates
-  var EPIC_TITLES = ['Маршал', 'Воевода', 'Хан', 'Фелдмаршал'];
-  var EPIC_ADJS = ['величав', { base: 'легендарен', f: 'легендарна', n: 'легендарно' },
-    { base: 'безсмъртен', f: 'безсмъртна', n: 'безсмъртно' }, { base: 'митичен', f: 'митична', n: 'митично' }];
-  var EPIC_NOUNS = [{ w: 'Великан', g: 'm' }, { w: 'Дракон', g: 'm' }, { w: 'Феникс', g: 'm' },
-    { w: 'Кралица', g: 'f' }, { w: 'Сирена', g: 'f' }, { w: 'Богиня', g: 'f' }, { w: 'Валкирия', g: 'f' },
-    { w: 'Светило', g: 'n' }, { w: 'Привидение', g: 'n' }, { w: 'Божество', g: 'n' }];
-  var EPIC_AI_ADJS = [{ base: 'квантов' }, { base: 'плазмен' }, { base: 'термоядрен' }];
-  var EPIC_AI_NOUNS = [{ w: 'Суперкомпютър', g: 'm' }, { w: 'Реактор', g: 'm' }, { w: 'Андроид', g: 'm' },
-    { w: 'Матрица', g: 'f' }, { w: 'Совалка', g: 'f' }, { w: 'Сингулярност', g: 'f' }, { w: 'Ядро', g: 'n' }];
+  // extra "epic" words mixed into the pools — seeded into the rarer brackets
+  var EPIC_TITLES = ['Маршал', { m: 'Воевода', b: '3-4' }, { m: 'Фелдмаршал', b: '1-2' }];
+  var EPIC_ADJS = ['величав', { base: 'легендарен', f: 'легендарна', n: 'легендарно', b: '0-1' },
+    { base: 'безсмъртен', f: 'безсмъртна', n: 'безсмъртно', b: '1-2' }, { base: 'митичен', f: 'митична', n: 'митично', b: '2-3' }];
+  var EPIC_NOUNS = [{ w: 'Великан', g: 'm', b: '3-4' }, { w: 'Дракон', g: 'm', b: '1-2' }, { w: 'Феникс', g: 'm', b: '0-1' },
+    { w: 'Кралица', g: 'f', b: '2-3' }, { w: 'Сирена', g: 'f', b: '4-5' }, { w: 'Богиня', g: 'f', b: '1-2' }, { w: 'Валкирия', g: 'f', b: '0-1' },
+    { w: 'Светило', g: 'n', b: '3-4' }, { w: 'Привидение', g: 'n', b: '2-3' }, { w: 'Божество', g: 'n', b: '0-1' }];
+  var EPIC_AI_ADJS = [{ base: 'квантов', b: '2-3' }, { base: 'плазмен', b: '1-2' }, { base: 'термоядрен', b: '0-1' }];
+  var EPIC_AI_NOUNS = [{ w: 'Суперкомпютър', g: 'm', b: '1-2' }, { w: 'Реактор', g: 'm', b: '2-3' }, { w: 'Андроид', g: 'm', b: '3-4' },
+    { w: 'Матрица', g: 'f', b: '1-2' }, { w: 'Совалка', g: 'f', b: '4-5' }, { w: 'Сингулярност', g: 'f', b: '0-1' }, { w: 'Ядро', g: 'n', b: '2-3' }];
 
   function entryWord(e) { return typeof e === 'string' ? e : (e.w || e.base || e.m); }
   function entryAdj(e) { return typeof e === 'string' ? { base: e } : e; }
-  function shuffleInPlace(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   // A noun entry can render gender g if g is its base gender or it carries a `gv`
   // variant for g. The surface word for g is the base `w` (when g matches) or the
@@ -692,17 +695,27 @@
   function nounCanRender(e, g) { return e.g === g || (e.gv && e.gv[g] != null); }
   function nounWordFor(e, g) { return e.g === g ? e.w : (e.gv && e.gv[g]) || e.w; }
 
-  // §7 rarity algorithm. Guarantee one entry at EACH of the 1/2/3/4/5 percentiles
-  // (so a draw can land any bonus tier), sprinkle a small random handful into the
-  // 5–10% band, and leave the rest common (null = the high-probability bulk).
-  function assignRarity(pool) {
-    var idx = shuffleInPlace(pool.map(function (_, i) { return i; })), k = 0;
-    [1, 2, 3, 4, 5].forEach(function (p) { if (k < pool.length) pool[idx[k++]].pct = p; });
-    var extra = 1 + Math.floor(Math.random() * 2); // 1–2 entries in the 5–10% band
-    for (var e = 0; e < extra && k < pool.length; e++) pool[idx[k++]].pct = 5 + Math.random() * 5;
-    return pool;
+  // ---- HARDCODED percentile brackets (per component, fine-tuned by hand) ----
+  //
+  // Each name component (title/adj/noun) sits in a FIXED rarity bracket carried
+  // on the source entry as `b`. Unbracketed entries fall into '10+' (common). The
+  // bracket maps to a representative probability fraction; a component is DRAWN
+  // with that probability (commons share the rest), and the NAME's percentage is
+  // the PRODUCT of its three components' fractions — so two rare components
+  // multiply into something far rarer. Nothing is randomised per load (the only
+  // randomness is the draw itself), which keeps rarities consistent across loads.
+  var BRACKETS = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-10', '10+'];
+  var BRACKET_FRAC = { '0-1': 0.005, '1-2': 0.015, '2-3': 0.025, '3-4': 0.035, '4-5': 0.045, '5-10': 0.075 };
+  // Representative probability of the '10+' (common) bracket. Kept near 1 so a
+  // single rare component lands the NAME in ≈ that component's bracket, while two
+  // or three rare components still multiply into something far rarer.
+  var COMMON_FRAC = 0.95;
+  function bracketOf(e) { var b = (e && typeof e === 'object') ? e.b : null; return (BRACKET_FRAC[b] != null || b === '10+') ? b : '10+'; }
+  function fracOf(e) { var b = bracketOf(e); return b === '10+' ? COMMON_FRAC : BRACKET_FRAC[b]; }
+
+  function buildPool(list) {
+    return list.map(function (e) { var b = bracketOf(e); return { e: e, b: b, frac: fracOf(e), rare: b !== '10+' }; });
   }
-  function buildPool(list) { return assignRarity(list.map(function (e) { return { e: e, pct: null }; })); }
 
   var censorNSFW = false; // when true (the menu "censor" toggle) NSFW entries are excluded
   function setCensor(on) { censorNSFW = !!on; }
@@ -716,11 +729,12 @@
     aiAdjPool  = buildPool(AI_ADJS.concat(EPIC_AI_ADJS));
     aiNounPool = buildPool(AI_NOUNS.concat(EPIC_AI_NOUNS));
   }
-  rollPools(); // assign rarity once, per page load
+  rollPools();
 
-  // Pick a pool entry. `gender` (nouns only, via isNoun) filters to entries that
-  // can render it; NSFW entries drop out while censoring. Rare entries are drawn
-  // with probability = their assigned percent; otherwise a common entry.
+  // Pick a pool entry honoring its bracket. `gender` (nouns only) filters to
+  // entries that can render it; NSFW entries drop out while censoring. A rare
+  // (bracketed) entry is drawn with probability ≈ its fraction; otherwise a
+  // common one. Returns the chosen part { e, b, frac }.
   function pickFromPool(pool, gender, rng, isNoun) {
     var cand = pool.filter(function (p) {
       if (isCensored(p.e)) return false;
@@ -728,36 +742,38 @@
     });
     if (!cand.length) cand = pool.filter(function (p) { return !isCensored(p.e); });
     if (!cand.length) cand = pool;
-    var rare = cand.filter(function (p) { return p.pct != null; });
-    var common = cand.filter(function (p) { return p.pct == null; });
-    var sum = 0; for (var i = 0; i < rare.length; i++) sum += rare[i].pct;
-    var r = (rng || Math.random)() * 100;
+    var rare = cand.filter(function (p) { return p.rare; });
+    var common = cand.filter(function (p) { return !p.rare; });
+    var sum = 0; for (var i = 0; i < rare.length; i++) sum += rare[i].frac;
+    var r = (rng || Math.random)();
     if (rare.length && r < sum) {
-      var acc = 0; for (var j = 0; j < rare.length; j++) { acc += rare[j].pct; if (r <= acc) return { e: rare[j].e, pct: rare[j].pct }; }
+      var acc = 0; for (var j = 0; j < rare.length; j++) { acc += rare[j].frac; if (r <= acc) return rare[j]; }
     }
     var c = common.length ? common : cand;
-    return { e: c[Math.floor((rng || Math.random)() * c.length)].e, pct: null };
+    return c[Math.floor((rng || Math.random)() * c.length)];
   }
-  // a same-rarity noun that can render `gender` — used when a gender switch can't
-  // morph the current noun in place, so the player's rarity stays consistent.
-  function pickNounSamePct(pool, gender, pct, rng) {
-    var cand = pool.filter(function (p) {
-      return p.pct === pct && !isCensored(p.e) && nounCanRender(p.e, gender);
-    });
-    if (!cand.length && pct != null) cand = pool.filter(function (p) {  // any rare of a similar tier
-      return p.pct != null && !isCensored(p.e) && nounCanRender(p.e, gender);
-    });
+  // a same-bracket noun that can render `gender` — used when a gender switch
+  // can't morph the current noun in place, so the player's rarity stays exact.
+  function pickNounSameBracket(pool, gender, b, rng) {
+    var cand = pool.filter(function (p) { return p.b === b && !isCensored(p.e) && nounCanRender(p.e, gender); });
+    if (!cand.length && b !== '10+') cand = pool.filter(function (p) { return p.rare && !isCensored(p.e) && nounCanRender(p.e, gender); });
     if (!cand.length) cand = pool.filter(function (p) { return !isCensored(p.e) && nounCanRender(p.e, gender); });
     if (!cand.length) return null;
     return cand[Math.floor((rng || Math.random)() * cand.length)];
   }
 
+  // §pts Name point award by the FINAL (combined) name percentage: <1→5, <2→4,
+  // <3→3, <4→2, <5→1, 5–10→0 (a smile, no points), 10+→0.
   function bonusForPct(pct) {
     if (pct == null) return 0;
-    if (pct <= 1) return 5; if (pct <= 2) return 4; if (pct <= 3) return 3;
-    if (pct <= 4) return 2; if (pct <= 5) return 1;
+    if (pct < 1) return 5; if (pct < 2) return 4; if (pct < 3) return 3;
+    if (pct < 4) return 2; if (pct < 5) return 1;
     return 0;
   }
+
+  // The combined name percentage = product of the three component fractions
+  // (×100). Lower = rarer. Used for the bubble, the bonus and the notification.
+  function comboPct(parts) { return parts.title.frac * parts.adj.frac * parts.noun.frac * 100; }
 
   // Assemble a name (+ rarity) from chosen pool parts for a given gender. The
   // adjective agrees with the gender; the noun shows its form for that gender.
@@ -765,8 +781,7 @@
     var name = entryWord(parts.title.e) + ' '
       + capitalize(inflectAdj(entryAdj(parts.adj.e), gender)) + ' '
       + nounWordFor(parts.noun.e, gender);
-    var pcts = [parts.title.pct, parts.adj.pct, parts.noun.pct].filter(function (p) { return p != null; });
-    var pct = pcts.length ? Math.min.apply(null, pcts) : null;
+    var pct = comboPct(parts);
     return { name: name, pct: pct, bonus: bonusForPct(pct), parts: parts };
   }
 
@@ -785,21 +800,16 @@
 
   // §1 re-cohere a name for a new gender WITHOUT changing its rarity. Title and
   // adjective are kept (the adjective just re-agrees); the noun morphs in place
-  // when it has the new gender's form, else it's swapped for a same-rarity noun.
+  // when it has the new gender's form, else it's swapped for a same-BRACKET noun
+  // (so the product — and thus the rarity — is unchanged).
   function recohereName(kind, parts, gender) {
     var np = kind === 'ai' ? aiNounPool : nounPool;
-    var origPcts = [parts.title.pct, parts.adj.pct, parts.noun.pct].filter(function (p) { return p != null; });
-    var origPct = origPcts.length ? Math.min.apply(null, origPcts) : null;
     var noun = parts.noun;
     if (!nounCanRender(noun.e, gender)) {
-      var repl = pickNounSamePct(np, gender, noun.pct);
+      var repl = pickNounSameBracket(np, gender, noun.b);
       if (repl) noun = repl;
     }
-    var res = buildFromParts({ title: parts.title, adj: parts.adj, noun: noun }, gender);
-    // §1: a gender switch never changes the player's rarity — pin it even in the
-    // rare case where no same-tier noun could render the new gender.
-    res.pct = origPct; res.bonus = bonusForPct(origPct);
-    return res;
+    return buildFromParts({ title: parts.title, adj: parts.adj, noun: noun }, gender);
   }
 
   // Check a hand-typed "Title Adj Noun" against the human seed; if it lands an
@@ -824,41 +834,49 @@
       if (!ne) continue;
       for (i = 0; i < adjPool.length; i++) if (!isCensored(adjPool[i].e) && capitalize(inflectAdj(entryAdj(adjPool[i].e), g)) === adjForm) { ae = adjPool[i]; break; }
       if (!ae) continue;
-      var pcts = [te.pct, ae.pct, ne.pct].filter(function (p) { return p != null; });
-      var pct = pcts.length ? Math.min.apply(null, pcts) : null;
-      return { matched: true, pct: pct, bonus: bonusForPct(pct), gender: g, parts: { title: te, adj: ae, noun: ne } };
+      var parts = { title: te, adj: ae, noun: ne };
+      var pct = comboPct(parts);
+      return { matched: true, pct: pct, bonus: bonusForPct(pct), gender: g, parts: parts };
     }
     return { matched: false, pct: null, bonus: 0 };
   }
 
-  // Rarity tier (drives the bubble colour + the exclamation): 1..5 = that
-  // percent bracket, 10 = the 5–10% bracket. null pct = common, no tier.
+  // Rarity tier of a FINAL name percentage (bubble colour + exclamation): 1..5
+  // for the 0–5% brackets, 10 for 5–10% (a smile, no bonus), 0 = common (10+).
   function rarityTier(pct) {
     if (pct == null) return 0;
-    if (pct <= 1) return 1; if (pct <= 2) return 2; if (pct <= 3) return 3;
-    if (pct <= 4) return 4; if (pct <= 5) return 5;
-    return 10;
+    if (pct < 1) return 1; if (pct < 2) return 2; if (pct < 3) return 3;
+    if (pct < 4) return 4; if (pct < 5) return 5;
+    if (pct < 10) return 10;
+    return 0;
   }
-  var RARITY_EXCL = { 1: 'ГОСПОДИ!', 2: 'Ебаси,', 3: 'Лееееле, майко!', 4: 'Татенце!', 5: 'ЕХЕ!', 10: 'Брей,' };
+  var RARITY_EXCL = { 1: 'ГОСПОДИ!', 2: 'Ебаси,', 3: 'Лееееле, майко!', 4: 'Татенце!', 5: 'ЕХЕ!' };
 
+  function fmtPct(p) {
+    if (p >= 10) return String(Math.round(p));
+    if (p >= 0.1) return p.toFixed(1).replace(/\.0$/, ''); // 7 → "7", 1.5 → "1.5"
+    return Number(p.toPrecision(2)).toString();            // tiny products: 2 sig-figs
+  }
   function rarityLine(pct, bonus) {
-    var pctStr = pct < 1 ? pct.toFixed(1) : String(Math.round(pct));
-    var excl = RARITY_EXCL[rarityTier(pct)] || 'Брей,';
+    var tier = rarityTier(pct);
+    var pctStr = fmtPct(pct);
+    if (tier === 10) return '🙂 ' + pctStr + '% шанс за такова име!'; // 5–10%: just a smile
+    var excl = RARITY_EXCL[tier] || 'Брей,';
     var b = bonus > 0 ? ' Щабът ти отпуска +' + bonus + ' т. начален аванс!' : '';
     return excl + ' ' + pctStr + '% шанс за такова име!' + b;
   }
 
-  // dev-mode dump of the current (per-load) pools, with assigned rarity.
+  // dev-mode dump of the live pools, with each entry's hardcoded bracket.
   function dumpPools() {
-    function fmt(pool) { return pool.map(function (p) { return { w: entryWord(p.e), pct: p.pct, g: p.e.g || null, nsfw: !!(p.e && p.e.nsfw) }; }); }
+    function fmt(pool) { return pool.map(function (p) { return { w: entryWord(p.e), b: p.b, frac: p.frac, g: p.e.g || null, nsfw: !!(p.e && p.e.nsfw) }; }); }
     return { titles: fmt(titlePool), adjs: fmt(adjPool), nouns: fmt(nounPool), aiAdjs: fmt(aiAdjPool), aiNouns: fmt(aiNounPool) };
   }
 
   // ---- dev-mode editor: normalize the SOURCE word lists to a uniform editable
-  // shape { m, n, f, inv?, nsfw? } and back, for fine-tuning + КОПИРАЙ export.
-  function srcTitle(t) { var o = { m: entryWord(t) }; if (t && t.nsfw) o.nsfw = true; return o; }
-  function srcAdj(a) { a = entryAdj(a); var o = { m: a.base || a.m }; if (a.n) o.n = a.n; if (a.f) o.f = a.f; if (a.inv) o.inv = true; if (a.nsfw) o.nsfw = true; return o; }
-  function srcNoun(e) { var o = {}; o[e.g] = e.w; if (e.gv) { for (var k in e.gv) o[k] = e.gv[k]; } if (e.nsfw) o.nsfw = true; return o; }
+  // shape { m, n, f, inv?, nsfw?, b? } and back, for fine-tuning + КОПИРАЙ export.
+  function srcTitle(t) { var o = { m: entryWord(t) }; if (t && t.nsfw) o.nsfw = true; o.b = bracketOf(t); return o; }
+  function srcAdj(a) { a = entryAdj(a); var o = { m: a.base || a.m }; if (a.n) o.n = a.n; if (a.f) o.f = a.f; if (a.inv) o.inv = true; if (a.nsfw) o.nsfw = true; o.b = bracketOf(a); return o; }
+  function srcNoun(e) { var o = {}; o[e.g] = e.w; if (e.gv) { for (var k in e.gv) o[k] = e.gv[k]; } if (e.nsfw) o.nsfw = true; o.b = bracketOf(e); return o; }
   function dumpSource() {
     return {
       titles: TITLES.concat(EPIC_TITLES).map(srcTitle),
@@ -868,17 +886,15 @@
       aiNouns: AI_NOUNS.concat(EPIC_AI_NOUNS).map(srcNoun),
     };
   }
-  // Rebuild the live pools from an edited source object (for the dev "apply"
-  // preview). Each kind converts back to its internal entry shape, then rarity
-  // is reassigned per §7.
-  function toTitleEntry(o) { return o.nsfw ? { m: o.m, nsfw: true } : o.m; }
-  function toAdjEntry(o) { var a = { base: o.m }; if (o.n) a.n = o.n; if (o.f) a.f = o.f; if (o.inv) a.inv = true; if (o.nsfw) a.nsfw = true; return a; }
+  function withBracket(o, b) { if (b && b !== '10+' && BRACKET_FRAC[b] != null) o.b = b; return o; }
+  function toTitleEntry(o) { var e = (o.nsfw || (o.b && o.b !== '10+')) ? { m: o.m } : o.m; if (typeof e === 'object') { if (o.nsfw) e.nsfw = true; withBracket(e, o.b); } return e; }
+  function toAdjEntry(o) { var a = { base: o.m }; if (o.n) a.n = o.n; if (o.f) a.f = o.f; if (o.inv) a.inv = true; if (o.nsfw) a.nsfw = true; return withBracket(a, o.b); }
   function toNounEntry(o) {
     var g = o.m ? 'm' : o.f ? 'f' : 'n', e = { w: o[g], g: g }, gv = {};
     ['m', 'f', 'n'].forEach(function (x) { if (x !== g && o[x]) gv[x] = o[x]; });
     if (Object.keys(gv).length) e.gv = gv;
     if (o.nsfw) e.nsfw = true;
-    return e;
+    return withBracket(e, o.b);
   }
   function rebuildFromSource(src) {
     function clean(arr, f) { return (arr || []).filter(function (o) { return o && (o.m || o.f || o.n); }).map(f); }
@@ -1027,6 +1043,7 @@
     matchSeed: matchSeed,
     recohereName: recohereName,
     setCensor: setCensor,
+    BRACKETS: BRACKETS,
     dumpPools: dumpPools,
     dumpSource: dumpSource,
     rebuildFromSource: rebuildFromSource,
