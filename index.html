@@ -348,7 +348,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .combotip{ position:fixed; z-index:50; max-width:280px; background:#f3ead0; color:#2a230c; border:2px solid var(--gen-ink-line);
   border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.55); font-size:12.5px; line-height:1.4; }
 .combotip .shame{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); margin-bottom:5px; }
+.combotip .cdesc{ color:#2a230c; }
 .combotip .cfine{ margin-top:6px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); font-size:11px; letter-spacing:.3px; }
+/* YOU LOSE prank overlay */
+.youlose{ position:absolute; inset:0; z-index:40; display:grid; place-items:center; background:rgba(8,10,5,.78); }
+.youlose span{ font-family:var(--gen-font-display); font-weight:700; font-size:46px; letter-spacing:3px; color:var(--gen-alert);
+  text-shadow:0 4px 0 #000, 0 0 22px rgba(178,58,46,.7); transform:rotate(-7deg); }
 /* how-to content */
 .ht{ font-size:12.5px; color:var(--gen-label); line-height:1.5; margin:0 0 10px; }
 .ht b{ color:var(--gen-text); }
@@ -449,6 +454,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   </div>
 
   <div id="comboTip" class="combotip hidden"></div>
+  <div id="youLose" class="youlose hidden"><span>ГУБИШ!</span></div>
 </div>
 
 <!-- peek -->
@@ -800,7 +806,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var manualCat = null;    // manual: the category currently being entered
   var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face
   var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
-  var pointsPenalty = 0;   // temporary (gag) deduction shown on the total
+  var fx = {};             // active combo-reminder penalty (non-permanent overrides)
   var tipBusy = false;     // a combo-reminder gag is running
 
   function startGame(players, manual) {
@@ -924,13 +930,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   function renderHeader() {
-    var p = G.currentPlayer(game);
+    // a 'pretend next turn' penalty briefly shows the next player in the header
+    var p = fx.pretendNext ? game.players[(game.current + 1) % game.players.length] : G.currentPlayer(game);
     $('curRank').textContent = initials(p.name);
     $('curName').innerHTML = esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
     else per.classList.add('hidden');
-    $('curTotal').textContent = total(p) - pointsPenalty;
+    $('curTotal').textContent = total(p) - (fx.points || 0);
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
@@ -951,55 +958,67 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     nameEl.onclick = function (e) { e.stopPropagation(); comboReminder(key, nameEl); };
   }
 
+  function boardKeys(group) {
+    if (fx.order && fx.order[group]) return fx.order[group];
+    return G.CATEGORIES.filter(function (c) { return c.group === group; }).map(function (c) { return c.key; });
+  }
   function renderBoard() {
     if (manualMode) { renderManualBoard(); return; }
     var p = G.currentPlayer(game);
     var pv = computePreviews(p);
-    var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT && !fx.lock;
+    var hidden = fx.hide || [], blanked = fx.blank || [];
 
     $('boardUpper').innerHTML = '';
-    G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
-      var done = G.isCategoryFilled(p, c.key);
-      var val = done ? p.scores[c.key] : pv.prev[c.key];
-      var isVoid = done && p.scores[c.key] === 0;
-      var cls = 'tile up' + (done ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === c.key ? ' best' : '');
+    boardKeys('upper').forEach(function (key) {
+      if (hidden.indexOf(key) >= 0) return; // penalty: combo removed
+      var c = CAT_BY_KEY[key];
+      var done = G.isCategoryFilled(p, key);
+      var val = done ? p.scores[key] : pv.prev[key];
+      var forf = fx.forfeit === key;
+      var isVoid = (done && p.scores[key] === 0) || forf;
+      var cls = 'tile up' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === key ? ' best' : '');
       var el = document.createElement('button');
       el.className = cls;
-      var pts = done ? p.scores[c.key] : (val > 0 ? val : '·');
+      var pts = forf ? '·' : (done ? (blanked.indexOf(key) >= 0 ? '·' : p.scores[key]) : (val > 0 ? val : '·'));
       el.innerHTML = '<span class="face-n">' + c.label + '</span>'
         + '<span class="pts' + (canScore && !done ? ' upchip' : '') + '">' + pts + '</span>';
-      if (canScore && !done) el.onclick = function () { val > 0 ? commitScore(c.key, val) : commitForfeit(c.key); };
-      attachTip(el.querySelector('.face-n'), c.key, p.isAI); // tap the number for the rule reminder
+      if (canScore && !done) el.onclick = function () { val > 0 ? commitScore(key, val) : commitForfeit(key); };
+      attachTip(el.querySelector('.face-n'), key, p.isAI);
       $('boardUpper').appendChild(el);
     });
 
     $('boardLower').innerHTML = '';
-    G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).forEach(function (c) {
-      var done = G.isCategoryFilled(p, c.key);
-      var isVoid = done && p.scores[c.key] === 0;
+    boardKeys('lower').forEach(function (key) {
+      if (hidden.indexOf(key) >= 0) return;
+      var c = CAT_BY_KEY[key];
+      var done = G.isCategoryFilled(p, key);
+      var forf = fx.forfeit === key;
+      var isVoid = (done && p.scores[key] === 0) || forf;
       var row = document.createElement('div');
-      row.className = 'tile low' + (done ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === c.key ? ' best' : '');
+      row.className = 'tile low' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === key ? ' best' : '');
       var html = '<span class="cname">' + c.label + '</span>';
-      if (done) {
-        html += '<span class="lval">' + p.scores[c.key] + '</span>';
-        row.innerHTML = html;
+      if (forf) {
+        row.innerHTML = html + '<span class="lval">·</span>';
+      } else if (done) {
+        row.innerHTML = html + '<span class="lval">' + (blanked.indexOf(key) >= 0 ? '·' : p.scores[key]) + '</span>';
       } else {
         row.innerHTML = html + '<span class="acts"></span>';
         var acts = row.querySelector('.acts');
         if (canScore) {
-          pv.cand[c.key].forEach(function (v) {
+          pv.cand[key].forEach(function (v) {
             if (v > 0) {
               var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v;
-              chip.onclick = function () { commitScore(c.key, v); };
+              chip.onclick = function () { commitScore(key, v); };
               acts.appendChild(chip);
             }
           });
           var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се');
-          x.onclick = function () { commitForfeit(c.key); };
+          x.onclick = function () { commitForfeit(key); };
           acts.appendChild(x);
         }
       }
-      attachTip(row.querySelector('.cname'), c.key, p.isAI); // tap the name for the rule reminder
+      attachTip(row.querySelector('.cname'), key, p.isAI);
       $('boardLower').appendChild(row);
     });
   }
@@ -1131,14 +1150,18 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       $('throws').innerHTML = td;
       return;
     }
-    var interactive = !p.isAI && !locked && throwsLeft > 0;
-    dice.forEach(function (v, i) {
+    var interactive = !p.isAI && !locked && throwsLeft > 0 && !fx.lock;
+    // penalty overrides: swap the dice, or hide some (centred remainder)
+    var shown = fx.dice ? fx.dice : dice;
+    if (fx.diceKeep != null) shown = shown.slice(0, fx.diceKeep);
+    shown.forEach(function (v, i) {
       var b = document.createElement('button');
-      b.className = 'die' + (selected[i] ? ' sel' : '');
+      var sel = !fx.dice && fx.diceKeep == null && selected[i];
+      b.className = 'die' + (sel ? ' sel' : '');
       b.disabled = !interactive;
-      b.setAttribute('aria-label', 'Зар ' + v + (selected[i] ? ', маркиран за огън' : ''));
-      b.innerHTML = pipFace(v) + (selected[i] ? '<span class="reticle">✛</span>' : '');
-      if (interactive) b.onclick = function () { toggleSelect(i); };
+      b.setAttribute('aria-label', 'Зар ' + v + (sel ? ', маркиран за огън' : ''));
+      b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">✛</span>' : '');
+      if (interactive && !fx.type) b.onclick = function () { toggleSelect(i); };
       $('dice').appendChild(b);
     });
     var t = ''; for (var k = 0; k < ROLLS - 1; k++) t += '<span class="tdot' + (k < throwsLeft ? ' on' : '') + '"></span>';
@@ -1305,36 +1328,61 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function clearRoast() { var b = $('roast'); b.className = 'roast'; b.innerHTML = ''; clearTimeout(roastTimer); }
 
-  // ---------- combo reminder tooltip (with a fake point "fine") ----------
-  var shameIx = 0;
+  // ---------- combo reminder tooltip + a random (non-permanent) penalty ----------
+  var shameIx = 0, TIP_MS = 5000, PEN_EXTRA = 3000;
+  function shuffled(arr) { arr = arr.slice(); for (var i = arr.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; }
+
   function comboReminder(key, anchor) {
     if (tipBusy || locked || settings.noAdvice) return;
     tipBusy = true;
     var shame = G.SHAME_LINES[shameIx % G.SHAME_LINES.length]; shameIx++;
-    // random comical fine: usually a few points, sometimes a ridiculous 9999999
-    var fine = Math.random() < 0.18 ? 9999999 : 2 + Math.floor(Math.random() * 40);
     var tip = $('comboTip');
     tip.innerHTML = '<div class="shame">' + esc(shame) + '</div>'
       + '<div class="cdesc">' + esc(G.COMBO_DESC[key] || '') + '</div>'
-      + '<div class="cfine">Глоба за подсещане: −' + fine + ' т.</div>';
+      + '<div class="cfine">И сега — наказание за подсещането!</div>';
     tip.classList.remove('hidden');
-    // position the tooltip just below the tapped name
     var r = anchor.getBoundingClientRect();
-    var tw = tip.offsetWidth;
-    var left = Math.min(Math.max(8, r.left + r.width / 2 - tw / 2), window.innerWidth - tw - 8);
-    tip.style.left = left + 'px';
+    tip.style.left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8) + 'px';
     tip.style.top = (r.bottom + 8) + 'px';
 
-    pointsPenalty = fine; renderHeader();
-    setTimeout(function () {
-      pointsPenalty = 0; renderHeader();
-      tip.classList.add('hidden');
-      var pb = $('pointsBubble');
-      pb.textContent = 'Ебавам се, ей ти ги пак.';
-      pb.classList.remove('hidden');
-      setTimeout(function () { pb.classList.add('hidden'); }, 2600);
-      tipBusy = false;
-    }, 5000);
+    applyPenalty(key);
+    setTimeout(function () { tip.classList.add('hidden'); }, TIP_MS);
+    setTimeout(clearPenalty, TIP_MS + PEN_EXTRA); // penalty lasts 3s past the reminder
+  }
+
+  function applyPenalty(reqKey) {
+    var p = G.currentPlayer(game);
+    var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(p, c.key); }).map(function (c) { return c.key; });
+    var filled = G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).map(function (c) { return c.key; });
+    var diceMode = !manualMode && dice.length === G.DICE_COUNT && !awaitingRoll;
+    var pool = ['points', 'hideReq', 'hideRand', 'shuffle', 'pretend', 'youlose'];
+    if (filled.length) pool.push('blank');
+    if (open.length) pool.push('forfeit');
+    if (diceMode) pool.push('changeDice', 'removeDice');
+    var t = pool[Math.floor(Math.random() * pool.length)];
+    fx = { type: t, lock: true };
+    if (t === 'points') fx.points = Math.random() < 0.18 ? 9999999 : 3 + Math.floor(Math.random() * 45);
+    else if (t === 'hideReq') fx.hide = [reqKey];
+    else if (t === 'hideRand') fx.hide = [G.CATEGORIES[Math.floor(Math.random() * G.CATEGORIES.length)].key];
+    else if (t === 'blank') fx.blank = [filled[Math.floor(Math.random() * filled.length)]];
+    else if (t === 'forfeit') fx.forfeit = open[Math.floor(Math.random() * open.length)];
+    else if (t === 'shuffle') fx.order = { upper: shuffled(boardKeys('upper')), lower: shuffled(boardKeys('lower')) };
+    else if (t === 'changeDice') fx.dice = [1, 1, 1, 1, 2];
+    else if (t === 'removeDice') fx.diceKeep = Math.floor(Math.random() * 5); // keep 0..4 (centred)
+    else if (t === 'youlose') $('youLose').classList.remove('hidden');
+    // 'pretend' just needs fx.pretendNext for the header
+    if (t === 'pretend') fx.pretendNext = true;
+    renderAll();
+  }
+  function clearPenalty() {
+    fx = {};
+    $('youLose').classList.add('hidden');
+    renderAll();
+    var pb = $('pointsBubble');
+    pb.textContent = 'Ебавам се, ей ти ги пак.';
+    pb.classList.remove('hidden');
+    setTimeout(function () { pb.classList.add('hidden'); }, 2600);
+    tipBusy = false;
   }
 
   // ---------- how to play + in-game menu ----------
@@ -1453,8 +1501,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     }
   };
 
-  var CAT_LABEL = {};
-  G.CATEGORIES.forEach(function (c) { CAT_LABEL[c.key] = c.label; });
+  var CAT_LABEL = {}, CAT_BY_KEY = {};
+  G.CATEGORIES.forEach(function (c) { CAT_LABEL[c.key] = c.label; CAT_BY_KEY[c.key] = c; });
 
   function showGameOver(winner) {
     var others = game.players.filter(function (p) { return p !== winner; })
