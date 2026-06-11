@@ -46,20 +46,25 @@ function riskPolicy() {
   };
 }
 
+function policyOf(p) {
+  return {
+    keep: function (s, d, rl) { return EV.botKeep(s, d, rl, p, Math.random); },
+    cat: function (s, d) { return EV.botCategory(s, d, p, Math.random); },
+  };
+}
+
 var Srandom = meanOf(randomPolicy, N);
 var par = EV.par();
 console.log('par =', par.toFixed(2), ' S_random =', Srandom.toFixed(2));
 function strength(S) { return (S - Srandom) / (par - Srandom); }
+function report(label, p) {
+  var S = meanOf(policyOf(p), N);
+  console.log(label + '\tmean=' + S.toFixed(1) + '\tstrength=' + (100 * strength(S)).toFixed(0) + '%');
+}
 
-[0.5, 1, 2, 3, 5, 8, 15, 30, 60].forEach(function (tau) {
-  var S = meanOf(softmaxPolicy(tau), N);
-  console.log('softmax τ=' + tau + '\tmean=' + S.toFixed(1) + '\tstrength=' + (100 * strength(S)).toFixed(0) + '%');
-});
-[[2, 1.4], [5, 2.5], [8, 2.5], [10, 3]].forEach(function (rp) {
-  var pol = { keep: function (s, d, rl) { return EV.botKeep(s, d, rl, { type: 'risk', tau: rp[0], lambda: rp[1] }); },
-              cat: function (s, d) { return EV.botCategory(s, d, { type: 'risk', tau: rp[0], lambda: rp[1] }); } };
-  var Sr = meanOf(pol, N);
-  console.log('risk(τ=' + rp[0] + ',λ=' + rp[1] + ')\tmean=' + Sr.toFixed(1) + '\tstrength=' + (100 * strength(Sr)).toFixed(0) + '%');
-});
-var So = meanOf(softmaxPolicy(0), N);
-console.log('optimal τ=0\tmean=' + So.toFixed(1) + '\tstrength=' + (100 * strength(So)).toFixed(0) + '%');
+// the five-tier persona ladder (random / greedy / epsilon / softmax / optimal)
+report('random (Мушица)', { type: 'random' });
+report('greedy (Комар)', { type: 'greedy' });
+[0.4, 0.3, 0.2, 0.1].forEach(function (e) { report('epsilon ε=' + e, { type: 'epsilon', epsilon: e }); });
+[3, 2, 1.3, 0.8].forEach(function (tau) { report('softmax τ=' + tau, { type: 'softmax', tau: tau }); });
+report('optimal (Господ бог)', { type: 'optimal', tau: 0 });

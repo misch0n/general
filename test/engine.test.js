@@ -147,6 +147,63 @@ test('analyzeGame reports accuracy, blunder and sharpest', function () {
   assert.strictEqual(a.nDecisions, a.decisions.length);
 });
 
+test('analyzeGame deep metrics: stages, luck split, zero-outs, severity, aggression', function () {
+  var seed = 4242;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  var game = simulateLoggedGame(rng);
+  var a = EV.analyzeGame(game.turns);
+  // turn-by-turn details cover every turn, and per-turn luck+skill re-sums
+  assert.strictEqual(a.turns.length, game.turns.length);
+  var l = 0, s = 0;
+  a.turns.forEach(function (td) { l += td.luck; s += td.skill; });
+  approx(l, a.luck, 1e-6); approx(s, a.skill, 1e-6);
+  // luck splits into first-throw + reroll components
+  approx(a.luckFirst + a.luckRerolls, a.luck, 1e-6);
+  // stage turn counts: 5 early, 5 mid, 4 late
+  assert.strictEqual(a.stages.early.n, 5);
+  assert.strictEqual(a.stages.mid.n, 5);
+  assert.strictEqual(a.stages.late.n, 4);
+  // severity counts equal the number of non-optimal decisions
+  var mist = a.decisions.filter(function (d) { return d.cost < -0.05; }).length;
+  assert.strictEqual(a.severity.minor + a.severity.major + a.severity.fatal, mist);
+  assert.strictEqual(a.mistakes.keep + a.mistakes.category, mist);
+  // zero-outs are consistent
+  assert.strictEqual(a.zeroOuts.forced + a.zeroOuts.unforced, a.zeroOuts.total);
+  assert.ok(typeof a.aggression === 'number');
+  assert.ok(typeof a.avgLostPerTurn === 'number' && a.avgLostPerTurn >= 0);
+  // the playstyle fingerprint classifies any analysis
+  var st = General.playstyleFor(a);
+  assert.ok(st && st.name && /^#/.test(st.color));
+});
+
+test('analyzeManualGame: optimal picks score 100%, a bad pick is charged', function () {
+  // category-only analysis (manual mode logs just final dice + the pick)
+  var seed = 31337;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  function roll5() { var d = []; for (var i = 0; i < 5; i++) d.push(1 + Math.floor(rng() * 6)); return d.sort(function (a, b) { return a - b; }); }
+  var scores = {}, turns = [];
+  for (var t = 0; t < EV.NCAT; t++) {
+    var mask = EV.maskOfScores(scores), dice = roll5();
+    var best = EV.evaluateMask(mask, dice, 0).category_ranked[0].key;
+    turns.push({ mask: mask, dice: dice, category: best });
+    scores[best] = General.scoreFor(best, dice);
+  }
+  var a = EV.analyzeManualGame(turns);
+  assert.strictEqual(a.manual, true);
+  assert.strictEqual(a.accuracy, 1);
+  approx(a.skill, 0, 1e-9);
+  assert.strictEqual(a.turns.length, EV.NCAT);
+  // sabotage one pick: charge the EV gap
+  var e0 = EV.evaluateMask(turns[0].mask, turns[0].dice, 0);
+  var worst = e0.category_ranked[e0.category_ranked.length - 1];
+  if (worst.ev < e0.category_ranked[0].ev - 0.05) {
+    var bad = turns.slice(); bad[0] = { mask: turns[0].mask, dice: turns[0].dice, category: worst.key };
+    var ab = EV.analyzeManualGame(bad);
+    assert.ok(ab.accuracy < 1);
+    assert.ok(ab.skill < -0.05);
+  }
+});
+
 test('an optimal player leaves ~0 skill on the table', function () {
   var seed = 7;
   var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
@@ -181,15 +238,49 @@ test('softmax with τ=0 is argmax; bots return legal actions', function () {
 
 // ---- §3.4 personas + §6 ranks (game.js) ----
 
-test('personas bind names to fixed strengths; Господ бог optimal, Комар gambler', function () {
-  var g = General.personaById('gospod');
-  assert.strictEqual(g.name, 'Господ бог');
-  assert.strictEqual(g.policy.type, 'optimal');
-  // Комар is the гамблер (комарджия) -> risk-seeking, not the weakling
-  assert.strictEqual(General.personaById('komar').name, 'Комар');
-  assert.strictEqual(General.personaById('komar').policy.type, 'risk');
-  // Мушица is the harmless near-random weakling
-  assert.strictEqual(General.personaById('mushica').strength < General.personaById('lyubitel').strength, true);
+test('persona ladder: random < greedy < epsilon < softmax < optimal', function () {
+  // the five-tier split: Мушица random, Комар greedy (no lookup), Леля ти
+  // epsilon-greedy, Кварталния softmax, Господ бог optimal
+  assert.strictEqual(General.personaById('mushica').policy.type, 'random');
+  assert.strictEqual(General.personaById('komar').policy.type, 'greedy');
+  assert.strictEqual(General.personaById('lelia').policy.type, 'epsilon');
+  assert.strictEqual(General.personaById('lyubitel').policy.type, 'softmax');
+  assert.strictEqual(General.personaById('gospod').policy.type, 'optimal');
+  // strengths strictly increase up the ladder
+  var s = General.PERSONAS.map(function (p) { return p.strength; });
+  for (var i = 1; i < s.length; i++) assert.ok(s[i] > s[i - 1], 'ladder must be increasing at ' + i);
+});
+
+test('greedy bot mirrors the heuristic AI; never forfeits a scoring hand', function () {
+  var dice = [6, 6, 6, 1, 2];
+  assert.deepStrictEqual(EV.botKeep({}, dice, 2, { type: 'greedy' }), General.aiChooseHolds(dice));
+  var cat = EV.botCategory({}, dice, { type: 'greedy' });
+  assert.strictEqual(cat, General.aiChooseCategory({ scores: {} }, dice).category);
+  assert.ok(General.scoreFor(cat, dice) > 0);
+});
+
+test('random bot: 1st reroll always rethrows all, 2nd is a coin flip; greedy placement', function () {
+  var all = EV.botKeep({}, [1, 2, 3, 4, 6], 2, { type: 'random' }, function () { return 0.9; });
+  assert.deepStrictEqual(all, [false, false, false, false, false]); // always rethrows everything first
+  var stop = EV.botKeep({}, [1, 2, 3, 4, 6], 1, { type: 'random' }, function () { return 0.1; });
+  assert.deepStrictEqual(stop, [true, true, true, true, true]);     // coin says stop
+  var go = EV.botKeep({}, [1, 2, 3, 4, 6], 1, { type: 'random' }, function () { return 0.9; });
+  assert.deepStrictEqual(go, [false, false, false, false, false]);  // coin says rethrow again
+  // placement is best-immediate, no random forfeits
+  var cat = EV.botCategory({}, [5, 5, 5, 2, 2], { type: 'random' }, Math.random);
+  assert.ok(General.scoreFor(cat, [5, 5, 5, 2, 2]) > 0);
+});
+
+test('epsilon-greedy: ε=0 is optimal, ε=1 explores but never forfeits a scorer', function () {
+  var dice = [6, 6, 6, 1, 2];
+  var best = EV.evaluate({}, dice, 0).category_ranked[0].key;
+  assert.strictEqual(EV.botCategory({}, dice, { type: 'epsilon', epsilon: 0 }, Math.random), best);
+  for (var i = 0; i < 30; i++) {
+    var cat = EV.botCategory({}, dice, { type: 'epsilon', epsilon: 1 }, Math.random);
+    assert.ok(General.scoreFor(cat, dice) > 0, 'ε-greedy must not random-forfeit (' + cat + ')');
+  }
+  var keep = EV.botKeep({}, dice, 2, { type: 'epsilon', epsilon: 1 }, Math.random);
+  assert.strictEqual(keep.length, 5);
 });
 
 test('bestTarget names the combo a keep chases, never Chance unless forced', function () {

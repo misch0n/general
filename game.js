@@ -761,10 +761,21 @@
     return { matched: false, pct: null, bonus: 0 };
   }
 
+  // Rarity tier (drives the bubble colour + the exclamation): 1..5 = that
+  // percent bracket, 10 = the 5–10% bracket. null pct = common, no tier.
+  function rarityTier(pct) {
+    if (pct == null) return 0;
+    if (pct <= 1) return 1; if (pct <= 2) return 2; if (pct <= 3) return 3;
+    if (pct <= 4) return 4; if (pct <= 5) return 5;
+    return 10;
+  }
+  var RARITY_EXCL = { 1: 'ГОСПОДИ!', 2: 'Ебаси,', 3: 'Лееееле, майко!', 4: 'Татенце!', 5: 'ЕХЕ!', 10: 'Брей,' };
+
   function rarityLine(pct, bonus) {
     var pctStr = pct < 1 ? pct.toFixed(1) : String(Math.round(pct));
+    var excl = RARITY_EXCL[rarityTier(pct)] || 'Брей,';
     var b = bonus > 0 ? ' Щабът ти отпуска +' + bonus + ' т. начален аванс!' : '';
-    return 'Рядка порода — само ' + pctStr + '% шанс за такова име!' + b;
+    return excl + ' ' + pctStr + '% шанс за такова име!' + b;
   }
 
   // dev-mode dump of the current (per-load) pools, with assigned rarity.
@@ -777,19 +788,49 @@
 
   // Persona = PLAYSTYLE preset feeding the EV engine's bot policy (NOT the bot's
   // name — AI players keep their generated Title+Adjective+Noun name). Name→
-  // strength is a FIXED binding. τ values are from tools/calibrate-bots.js.
-  // Комар = комарджия (a gambler) → the risk-seeking exception; Мушица is the
-  // harmless near-random weakling.
+  // strength is a FIXED binding; strengths from tools/calibrate-bots.js.
+  // The five-tier ladder:
+  //   Мушица   = RANDOM  — rethrows blindly 1–2 times, then banks the best it can
+  //   Комар    = EASY    — no lookup; always grabs the biggest immediate score
+  //   Леля ти  = MEDIUM  — epsilon-greedy over the optimal table
+  //   Кварталния = HARD  — softmax over the optimal table
+  //   Господ бог = GOD   — always the optimal move
+  // None of them ever forfeits at random — only when nothing scores.
   var PERSONAS = [
-    { id: 'mushica',  name: 'Мушица',             flavor: 'Дребна и безобидна.',           policy: { type: 'softmax', tau: 40 },           strength: 0.20 },
-    { id: 'komar',    name: 'Комар',              flavor: 'Комарджия — залага и на дъжда.', policy: { type: 'risk', tau: 8, lambda: 2.5 },  strength: 0.32 },
-    { id: 'lelia',    name: 'Леля ти',            flavor: 'Играе на семейни вечери.',      policy: { type: 'softmax', tau: 3 },             strength: 0.53 },
-    { id: 'lyubitel', name: 'Кварталния любител', flavor: 'Бива го, бутка кокала.',        policy: { type: 'softmax', tau: 1.3 },          strength: 0.75 },
-    { id: 'gospod',   name: 'Господ бог',         flavor: 'Вижда всичко. Не прощава.',     policy: { type: 'optimal', tau: 0 },             strength: 1.0 },
+    { id: 'mushica',  name: 'Мушица',             flavor: 'Хвърля наслуки и се надява.',     policy: { type: 'random' },                  strength: 0.25 },
+    { id: 'komar',    name: 'Комар',              flavor: 'Комарджия — граби каквото е на масата.', policy: { type: 'greedy' },           strength: 0.64 },
+    { id: 'lelia',    name: 'Леля ти',            flavor: 'Играе на семейни вечери.',        policy: { type: 'epsilon', epsilon: 0.2 },   strength: 0.77 },
+    { id: 'lyubitel', name: 'Кварталния любител', flavor: 'Бива го, бутка кокала.',          policy: { type: 'softmax', tau: 0.8 },       strength: 0.85 },
+    { id: 'gospod',   name: 'Господ бог',         flavor: 'Вижда всичко. Не прощава.',       policy: { type: 'optimal', tau: 0 },         strength: 1.0 },
   ];
   function personaById(id) {
     for (var i = 0; i < PERSONAS.length; i++) if (PERSONAS[i].id === id) return PERSONAS[i];
     return PERSONAS[2]; // sensible mid default
+  }
+
+  // Playstyle fingerprint: archetype + a distinctive colour, classified from the
+  // post-game analysis (accuracy / aggression / blunder severity / luck). The
+  // checks are ordered most-specific first.
+  var PLAYSTYLES = {
+    surgeon:  { name: 'Хирургът',     color: '#e8c356', desc: 'Точен, хладнокръвен, без излишни рискове.' },
+    recruit:  { name: 'Новобранецът', color: '#b39ddb', desc: 'Още учи кой зар за какво е.' },
+    gambler:  { name: 'Комарджията',  color: '#e05545', desc: 'Гони големите комбинации на всяка цена.' },
+    clerk:    { name: 'Чиновникът',   color: '#6fa8e8', desc: 'Прибира сигурното и спи спокойно.' },
+    stuntman: { name: 'Каскадьорът',  color: '#e8843a', desc: 'Грешките му са зрелищни.' },
+    lucky:    { name: 'Късметлията',  color: '#9bd17e', desc: 'Заровете го обичат повече, отколкото заслужава.' },
+    soldier:  { name: 'Боецът',       color: '#cdc9a8', desc: 'Стабилен среден кадър.' },
+  };
+  function playstyleFor(a) {
+    if (!a) return null;
+    var acc = a.accuracy || 0, sev = a.severity || { minor: 0, major: 0, fatal: 0 };
+    var aggr = a.aggression || 0, luck = a.luck || 0;
+    if (acc >= 0.92 && sev.fatal === 0) return PLAYSTYLES.surgeon;
+    if (acc < 0.55) return PLAYSTYLES.recruit;
+    if (aggr >= 0.7) return PLAYSTYLES.gambler;
+    if (aggr <= -0.7) return PLAYSTYLES.clerk;
+    if (sev.fatal >= 2) return PLAYSTYLES.stuntman;
+    if (luck >= 25 && acc < 0.85) return PLAYSTYLES.lucky;
+    return PLAYSTYLES.soldier;
   }
 
   // Bulgarian military ladder, low → high. Top = Генерал (the game's namesake).
@@ -877,6 +918,7 @@
     randomNameRarity: randomNameRarity,
     bonusForPct: bonusForPct,
     rarityLine: rarityLine,
+    rarityTier: rarityTier,
     matchSeed: matchSeed,
     dumpPools: dumpPools,
     COMBO_DESC: COMBO_DESC,
@@ -884,6 +926,8 @@
     nameGenerator: nameGenerator,
     PERSONAS: PERSONAS,
     personaById: personaById,
+    PLAYSTYLES: PLAYSTYLES,
+    playstyleFor: playstyleFor,
     RANKS: RANKS,
     rankForPlacement: rankForPlacement,
     rankForAccuracy: rankForAccuracy,

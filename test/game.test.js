@@ -447,6 +447,25 @@ test('bonusForPct maps rarity to a starting bonus', function () {
   assert.strictEqual(G.bonusForPct(1), 5);
 });
 
+test('rarityTier buckets the percent brackets; rarityLine exclaims per tier', function () {
+  assert.strictEqual(G.rarityTier(null), 0);
+  assert.strictEqual(G.rarityTier(0.5), 1);
+  assert.strictEqual(G.rarityTier(1), 1);
+  assert.strictEqual(G.rarityTier(2), 2);
+  assert.strictEqual(G.rarityTier(3), 3);
+  assert.strictEqual(G.rarityTier(4), 4);
+  assert.strictEqual(G.rarityTier(5), 5);
+  assert.strictEqual(G.rarityTier(7), 10);   // the 5–10% (blue) bracket
+  // the line opens with the tier's exclamation and quotes the percent
+  assert.ok(/^ГОСПОДИ! 0\.5% шанс/.test(G.rarityLine(0.5, 5)));
+  assert.ok(/^Ебаси, 2% шанс/.test(G.rarityLine(2, 4)));
+  assert.ok(/^ЕХЕ! 5% шанс/.test(G.rarityLine(5, 1)));
+  assert.ok(/^Брей, 7% шанс/.test(G.rarityLine(7, 0)));
+  // the bonus suffix only appears when there is one
+  assert.ok(G.rarityLine(1, 5).indexOf('+5 т.') > 0);
+  assert.strictEqual(G.rarityLine(7, 0).indexOf('аванс'), -1);
+});
+
 test('randomNameRarity returns a coherent name + rarity/bonus', function () {
   for (var i = 0; i < 200; i++) {
     var r = G.randomNameRarity('human', 'f', undefined);

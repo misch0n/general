@@ -58,8 +58,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ribbons{ display:grid; grid-template-columns:repeat(3,12px); grid-auto-rows:6px; gap:2px; width:max-content; }
 .ribbons i{ display:block; height:6px; border:1px solid rgba(0,0,0,.45); box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
 .totalbox{ display:flex; flex-direction:column; align-items:center; flex:none; position:relative; }
-.pbubble{ position:absolute; top:100%; right:0; margin-top:5px; white-space:nowrap; background:var(--gen-brass-bright); color:var(--gen-ink);
-  font-family:var(--gen-font-display); font-weight:700; font-size:10px; letter-spacing:.3px; padding:4px 8px; border-radius:7px; box-shadow:0 5px 14px rgba(0,0,0,.5); z-index:5; }
 .ptotal{ font-family:var(--gen-font-display); font-weight:700; font-size:26px; color:var(--gen-brass); line-height:1; font-variant-numeric:tabular-nums; }
 .tcap{ font-size:8px; letter-spacing:2px; color:var(--gen-muted); margin-top:2px; }
 .badge-ai{ font-family:var(--gen-font-display); font-size:9px; font-weight:700; letter-spacing:1px; color:var(--gen-ink);
@@ -145,7 +143,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .roast{ position:absolute; left:50%; bottom:var(--roast-bottom,172px); transform:translateX(-50%); z-index:6; width:max-content; max-width:84%; text-align:center; pointer-events:none; transition:bottom .15s ease; }
 .roast .bubble{ display:inline-block; position:relative; padding:11px 16px; border-radius:16px;
   background:#f7f3e3; color:#15160d; border:3px solid #15160d; box-shadow:0 7px 0 rgba(0,0,0,.35);
-  font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.3px; line-height:1.25; }
+  font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.3px; line-height:1.25;
+  pointer-events:auto; cursor:pointer; } /* tap any bubble to dismiss it */
 .roast .bubble::after{ content:''; position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); border:9px solid transparent; border-top-color:#15160d; }
 .roast .bubble::before{ content:''; position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); border:7px solid transparent; border-top-color:#f7f3e3; z-index:1; }
 .roast.show .bubble{ animation:roastpop .3s cubic-bezier(.2,1.4,.4,1); }
@@ -253,6 +252,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .evpick.sharp{ background:rgba(75,140,60,.16); color:#9bd17e; }
 .evpick.blunder{ background:rgba(178,58,46,.16); color:#e88; }
 .evpick .gap{ font-weight:700; }
+/* playstyle fingerprint chip (colour = the archetype) */
+.stylechip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  font-size:11px; color:var(--gen-ink); border-radius:5px; padding:2px 7px; margin-right:4px; }
+/* turn-by-turn breakdown (collapsed by default) */
+.evturns{ margin-top:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.18); }
+.evturns summary{ cursor:pointer; padding:7px 10px; font-family:var(--gen-font-display); font-weight:700; font-size:12px;
+  letter-spacing:.5px; color:var(--gen-brass); list-style:none; }
+.evturns summary::-webkit-details-marker{ display:none; }
+.evturns summary::before{ content:'▸ '; }
+.evturns[open] summary::before{ content:'▾ '; }
+.evtrow{ display:flex; align-items:center; gap:8px; padding:4px 10px; font-size:11px; color:var(--gen-label);
+  border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; }
+.evtrow .tn{ width:22px; color:var(--gen-muted); flex:none; }
+.evtrow .tc{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); flex:1; min-width:0; }
+.evtrow .tv{ flex:none; color:var(--gen-brass); font-weight:700; }
+.evtrow .tl{ flex:none; } .evtrow .tl.plus{ color:#9bd17e; } .evtrow .tl.minus{ color:#e88; }
 
 /* AI persona subtitle in the header */
 .ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); margin-top:-2px; }
@@ -345,9 +360,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .cname.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); }
 .face-n.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); padding-bottom:1px; }
 .tile.up .pts.upchip{ background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; padding:0 6px; font-weight:800; }
-/* combo reminder tooltip */
+/* combo reminder tooltip (tap anywhere on it to dismiss) */
 .combotip{ position:fixed; z-index:50; max-width:280px; background:#f3ead0; color:#2a230c; border:2px solid var(--gen-ink-line);
-  border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.55); font-size:12.5px; line-height:1.4; }
+  border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.55); font-size:12.5px; line-height:1.4; cursor:pointer; }
+/* penalty-expiry bubble, floated next to the area the penalty hit */
+.fxbubble{ position:fixed; z-index:50; max-width:240px; background:var(--gen-brass-bright); color:var(--gen-ink);
+  border:2px solid var(--gen-brass-stroke); border-radius:9px; padding:6px 10px; box-shadow:0 6px 18px rgba(0,0,0,.5);
+  font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.3px; cursor:pointer; }
 .combotip .shame{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); margin-bottom:5px; }
 .combotip .cdesc{ color:#2a230c; }
 .combotip .cfine{ margin-top:6px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); font-size:11px; letter-spacing:.3px; }
@@ -362,10 +381,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .htlist{ margin:0 0 8px; padding-left:18px; }
 .htlist li{ font-size:12px; color:var(--gen-text); margin-bottom:5px; line-height:1.4; }
 
-/* rare-name brag bubble (setup) */
+/* rare-name brag bubble (setup) — colour-coded by rarity tier */
 .rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
   border:2px solid var(--gen-brass-stroke); border-radius:10px; padding:8px 10px; font-size:12px; font-weight:600; line-height:1.35; }
-.rarebubble .rbx{ flex:none; margin-left:auto; color:var(--gen-ink); font-size:13px; background:transparent; line-height:1; }
+.rarebubble .rbx{ flex:none; margin-left:auto; color:inherit; font-size:13px; background:transparent; line-height:1; }
+.rarebubble.rt1{ background:#8a5fc0; border-color:#4a2f6e; color:#fff; box-shadow:0 0 14px rgba(138,95,192,.55); } /* ≤1% purple */
+.rarebubble.rt2{ background:var(--gen-brass-bright); border-color:var(--gen-brass-stroke); color:var(--gen-ink); } /* ≤2% gold */
+.rarebubble.rt3{ background:#e8843a; border-color:#8a4a1a; color:#241303; }                                       /* ≤3% orange */
+.rarebubble.rt4{ background:#e8d04a; border-color:#8a7a1a; color:#262203; }                                       /* ≤4% yellow */
+.rarebubble.rt5{ background:#7ab85a; border-color:#3a6e2a; color:#0f1f08; }                                       /* ≤5% green */
+.rarebubble.rt10{ background:#6fa8e8; border-color:#2f4a6b; color:#0a1320; }                                      /* 5–10% blue */
 /* settings rows */
 .setrow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0; color:var(--gen-text); font-size:13px;
   border-bottom:1px solid var(--gen-pill-line); cursor:pointer; }
@@ -428,7 +453,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <span class="totalbox">
       <span id="curTotal" class="ptotal">0</span>
       <span class="tcap">ТОЧКИ</span>
-      <span id="pointsBubble" class="pbubble hidden"></span>
     </span>
   </div>
 
@@ -454,23 +478,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="throws" class="throws"></div>
     <div id="dice" class="dice"></div>
     <div id="hintLine" class="hintline hidden"></div>
-    <button id="fire" class="fire">ОГИН</button>
+    <button id="fire" class="fire">ОГИН!</button>
     <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
   </div>
 
-  <!-- manual-entry console (ОТЧЕТ mode): pick a combo, tap the dice that made it -->
+  <!-- manual-entry console (ОТЧЕТ mode): tap in all five table dice, then pick
+       a combo from the board exactly like in regular play -->
   <div id="manualDock" class="dock manual hidden">
-    <div id="manualSel" class="manualsel">Избери категория ↑</div>
+    <div id="manualSel" class="manualsel">Въведи заровете от масата ↓</div>
     <div id="manualDice" class="dice"></div>
     <div class="manualbtns">
-      <button id="forfeitBtn" class="btn ghostbtn hidden">Отказ (0)</button>
       <button id="undoBottom" class="btn opabtn" title="Отмени последното" disabled>ОПА!</button>
-      <button id="recordBtn" class="fire hidden">✍ Запиши!</button>
     </div>
   </div>
 
   <div id="comboTip" class="combotip hidden"></div>
+  <div id="fxBubble" class="fxbubble hidden"></div>
   <div id="youLose" class="youlose hidden"><span>ГУБИШ!</span></div>
 </div>
 
@@ -644,7 +668,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function rarityBubbleEl(p) {
     if (p.pct == null || p.pct > 9 || p.bubbleDismissed) return null;
     var eff = settings.noBonus ? 0 : p.bonus;
-    var bub = document.createElement('div'); bub.className = 'rarebubble';
+    var bub = document.createElement('div');
+    bub.className = 'rarebubble rt' + G.rarityTier(p.pct); // colour = rarity tier
     var intro = p.typed ? '🎯 Позна! ' : '🏅 ';
     bub.innerHTML = '<span>' + intro + esc(G.rarityLine(p.pct, eff)) + '</span><button class="rbx" title="Скрий">✕</button>';
     bub.querySelector('.rbx').onclick = function () { p.bubbleDismissed = true; bub.remove(); };
@@ -840,11 +865,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var moveLog = [];   // per player index: array of completed turn logs
   var curLog = null;  // the in-progress turn log
   var hintsOn = false;
-  var manualMode = false;  // ОТЧЕТ mode: manual point entry, no dice
-  var undoStack = [];      // manual-mode action log for ОПА
+  var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
+  var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
-  var manualCat = null;    // manual: the category currently being entered
-  var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face
+  var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face (the 5-dice entry)
   var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
   var fx = {};             // combo-reminder penalties folded into one override (see rebuildFx)
 
@@ -872,7 +896,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var p = G.currentPlayer(game);
     document.documentElement.style.setProperty('--pc', p.color);
     if (manualMode) {
-      manualCat = null; manualCounts = [0,0,0,0,0,0,0];
+      manualCounts = [0,0,0,0,0,0,0];
       dice = []; throwsLeft = 0; curLog = null;
       renderAll();
       showOrder(p);
@@ -1003,10 +1027,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return G.CATEGORIES.filter(function (c) { return c.group === group; }).map(function (c) { return c.key; });
   }
   function renderBoard() {
-    if (manualMode) { renderManualBoard(); return; }
     var p = G.currentPlayer(game);
-    var pv = computePreviews(p);
-    var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT && !fx.lock;
+    // manual mode reuses the regular board: once all 5 table dice are tapped in,
+    // every open category shows its suggestion chip exactly like in normal play
+    var pv = dice.length === G.DICE_COUNT ? computePreviews(p) : { prev: {}, cand: {}, best: null };
+    var canScore = !locked && dice.length === G.DICE_COUNT && !fx.lock
+      && (manualMode || (!p.isAI && !awaitingRoll));
     var hidden = fx.hide || [], blanked = fx.blank || [];
 
     $('boardUpper').innerHTML = '';
@@ -1024,7 +1050,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       el.innerHTML = '<span class="face-n">' + c.label + '</span>'
         + '<span class="pts' + (canScore && !done ? ' upchip' : '') + '">' + pts + '</span>';
       if (canScore && !done) el.onclick = function () { val > 0 ? commitScore(key, val) : commitForfeit(key); };
-      attachTip(el.querySelector('.face-n'), key, p.isAI);
+      attachTip(el.querySelector('.face-n'), key, p.isAI && !manualMode);
       $('boardUpper').appendChild(el);
     });
 
@@ -1058,120 +1084,63 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
           acts.appendChild(x);
         }
       }
-      attachTip(row.querySelector('.cname'), key, p.isAI);
+      attachTip(row.querySelector('.cname'), key, p.isAI && !manualMode);
       $('boardLower').appendChild(row);
     });
   }
 
-  // ---------- manual mode (ОТЧЕТ): pick a combo, tap the dice that made it ----------
-  var FIXED = { smallStraight: 15, largeStraight: 20 };
-
-  function renderManualBoard() {
-    var p = G.currentPlayer(game);
-    var hidden = fx.hide || [], blanked = fx.blank || [];
-    function tile(key, up) {
-      var c = CAT_BY_KEY[key];
-      var done = G.isCategoryFilled(p, key);
-      var forf = (fx.forfeit || []).indexOf(key) >= 0;
-      var v = blanked.indexOf(key) >= 0 ? '·' : p.scores[key];
-      var isVoid = (done && p.scores[key] === 0) || forf;
-      var sel = manualCat === key;
-      var el = document.createElement(up ? 'button' : 'div');
-      el.className = (up ? 'tile up' : 'tile low') + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (sel ? ' best' : '');
-      var shown = forf ? '·' : (done ? v : '·');
-      el.innerHTML = up
-        ? '<span class="face-n">' + c.label + '</span><span class="pts">' + shown + '</span>'
-        : '<span class="cname">' + c.label + '</span><span class="lval">' + shown + '</span>';
-      if (!done && !forf && !locked && !fx.lock) { el.style.cursor = 'pointer'; el.onclick = function () { selectManualCat(key); }; }
-      else if (up) el.disabled = true;
-      attachTip(el.querySelector(up ? '.face-n' : '.cname'), key, p.isAI);
-      return el;
-    }
-    var hu = $('boardUpper'); hu.innerHTML = '';
-    boardKeys('upper').forEach(function (key) { if (hidden.indexOf(key) < 0) hu.appendChild(tile(key, true)); });
-    var hl = $('boardLower'); hl.innerHTML = '';
-    boardKeys('lower').forEach(function (key) { if (hidden.indexOf(key) < 0) hl.appendChild(tile(key, false)); });
-    // (#curTotal is set by renderHeader, which also handles fx.points/pretend)
-  }
-
-  function selectManualCat(key) {
-    if (locked) return;
-    manualCat = key;
-    manualCounts = [0, 0, 0, 0, 0, 0, 0];
-    renderAll();
-  }
+  // ---------- manual mode (ОТЧЕТ): tap in all 5 table dice, then pick a combo ----------
+  // Requiring the full hand lets the board suggest every fillable category (so
+  // nothing is missed mentally) AND enables category-decision analytics.
 
   function manualDiceArray() {
     var d = [];
     for (var f = 1; f <= 6; f++) for (var k = 0; k < manualCounts[f]; k++) d.push(f);
     return d;
   }
-  function manualScore() {
-    if (!manualCat) return 0;
-    if (FIXED[manualCat] != null) return FIXED[manualCat];
-    return G.scoreFor(manualCat, manualDiceArray());
-  }
 
   function renderManualDock() {
-    var sel = $('manualSel'), diceBox = $('manualDice'), rec = $('recordBtn'), forf = $('forfeitBtn'), opa = $('undoBottom');
-    if (!manualCat) {
-      // before picking a combo: only ОПА (under the tooltip)
-      sel.textContent = 'Избери категория ↑';
-      diceBox.innerHTML = ''; rec.classList.add('hidden'); forf.classList.add('hidden');
-      opa.classList.remove('hidden');
-      return;
-    }
-    var label = CAT_LABEL[manualCat];
-    // during point selection: only Отказ / Запиши! (no ОПА — avoids 3 buttons)
-    rec.classList.remove('hidden'); forf.classList.remove('hidden'); opa.classList.add('hidden');
-    if (FIXED[manualCat] != null) {
-      sel.innerHTML = '<b>' + label + '</b> — ' + FIXED[manualCat] + ' т. (ако е направена)';
-      diceBox.innerHTML = '';
-    } else {
-      sel.innerHTML = '<b>' + label + '</b> · удари заровете, които я направиха · <b class="livescore">' + manualScore() + '</b> т.';
-      diceBox.innerHTML = '';
-      for (var f = 1; f <= 6; f++) (function (face) {
-        var b = document.createElement('button');
-        b.className = 'die mdie' + (manualCounts[face] ? ' counted' : '');
-        b.innerHTML = pipFace(face) + (manualCounts[face] ? '<span class="mcount">' + manualCounts[face] + '</span>' : '');
-        b.onclick = function () { tapManualDie(face); };  // tap to count; re-select the combo to reset
-        diceBox.appendChild(b);
-      })(f);
-    }
+    var sel = $('manualSel'), diceBox = $('manualDice');
+    var n = dice.length;
+    sel.innerHTML = n < G.DICE_COUNT
+      ? 'Удари заровете от масата · <b class="livescore">' + n + '/' + G.DICE_COUNT + '</b>'
+      : 'Избери категория от таблото ↑';
+    diceBox.innerHTML = '';
+    for (var f = 1; f <= 6; f++) (function (face) {
+      var b = document.createElement('button');
+      b.className = 'die mdie' + (manualCounts[face] ? ' counted' : '');
+      b.innerHTML = pipFace(face) + (manualCounts[face] ? '<span class="mcount">' + manualCounts[face] + '</span>' : '');
+      b.onclick = function () { tapManualDie(face); };  // tap to count; ОПА removes the last tap
+      diceBox.appendChild(b);
+    })(f);
   }
   function tapManualDie(face) {
-    var total = manualCounts.reduce(function (a, b) { return a + b; }, 0);
-    if (total >= G.DICE_COUNT) return; // a roll is 5 dice
+    if (locked) return;
+    if (dice.length >= G.DICE_COUNT) return; // a roll is 5 dice
     manualCounts[face]++;
-    renderManualDock();
-  }
-
-  function manualRecord(value) {
-    if (locked || !manualCat) return;
-    var key = manualCat, p = G.currentPlayer(game);
-    undoStack.push({ playerIdx: game.current, key: key, prevRound: game.round });
-    p.scores[key] = value;
-    manualCat = null; manualCounts = [0, 0, 0, 0, 0, 0, 0];
-    locked = true;
+    dice = manualDiceArray();
+    undoStack.push({ t: 'tap', face: face });
     renderAll();
-    flashTile(key);
-    if (G.isDisappointing(value, false)) showRoast();
-    setTimeout(function () {
-      if (G.isGameOver(game)) { endGame(); return; }
-      G.nextTurn(game); beginTurn();
-    }, value <= 3 ? ROAST_MS + 250 : 700);
   }
-  $('recordBtn').onclick = function () { manualRecord(manualScore()); };
-  $('forfeitBtn').onclick = function () { manualRecord(0); };
 
+  // ОПА — undoes action by action across the whole game: dice taps first, then
+  // the commit before them (restoring that player's entered hand), and so on.
   function popUndo() {
     if (!undoStack.length) return;
+    clearTimeout(turnTimer);                    // undoing mid-handover must not double-advance
     $('overModal').classList.add('hidden');     // in case we're undoing the final entry
     var a = undoStack.pop();
-    delete game.players[a.playerIdx].scores[a.key];
-    game.current = a.playerIdx;
-    game.round = a.prevRound;
-    manualCat = null; manualCounts = [0, 0, 0, 0, 0, 0, 0];
+    if (a.t === 'tap') {
+      if (manualCounts[a.face] > 0) manualCounts[a.face]--;
+      dice = manualDiceArray();
+    } else { // commit
+      delete game.players[a.playerIdx].scores[a.key];
+      game.current = a.playerIdx;
+      game.round = a.prevRound;
+      if (moveLog[a.playerIdx] && moveLog[a.playerIdx].length) moveLog[a.playerIdx].pop();
+      manualCounts = a.counts.slice();
+      dice = manualDiceArray();
+    }
     locked = false;
     clearRoast();
     renderAll();
@@ -1229,7 +1198,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (locked) { fire.textContent = '…'; fire.disabled = true; }
     else if (throwsLeft <= 0) { fire.textContent = 'ОТЧЕТИ!'; fire.disabled = true; }
     else if (!someSel) { fire.textContent = 'ИЗБЕРИ ЦЕЛИ'; fire.disabled = true; }
-    else { fire.textContent = 'ОГИН · ' + throwsLeft; fire.disabled = false; }
+    else { fire.textContent = 'ОГИН! · ' + throwsLeft; fire.disabled = false; }
   }
 
   // ---------- dice interaction (select-to-reroll) ----------
@@ -1263,28 +1232,35 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ---------- commit / turn flow ----------
   function commitScore(key, value) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || p.isAI || G.isCategoryFilled(p, key)) return;
+    if (aiBusy || locked || (!manualMode && p.isAI) || G.isCategoryFilled(p, key)) return;
     G.assignScore(p, key, dice, value);
     afterCommit(key, value);
   }
   function commitForfeit(key) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || p.isAI || G.isCategoryFilled(p, key)) return;
+    if (aiBusy || locked || (!manualMode && p.isAI) || G.isCategoryFilled(p, key)) return;
     G.forfeitScore(p, key);
     afterCommit(key, 0);
   }
   function afterCommit(key, value) {
     var p = G.currentPlayer(game);  // still the player who just committed
     if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
+    if (manualMode) {
+      // ОПА can rewind this commit (restoring the entered hand), and the turn is
+      // logged for the category-only analytics (mask = the board BEFORE this pick)
+      undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
+      if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: dice.slice(), category: key });
+    }
     locked = true;
     renderAll();
     flashTile(key);
     $('fire').disabled = true;
     // after an AI turn, hold the board a beat so players can read it
-    var delay = p.isAI ? AI_VIEW_DELAY : END_DELAY;
-    if (!p.isAI && G.isDisappointing(value, rerolledAll)) { showRoast(); delay = ROAST_MS + 250; }
-    setTimeout(endTurn, delay);
+    var delay = !manualMode && p.isAI ? AI_VIEW_DELAY : END_DELAY;
+    if ((manualMode || !p.isAI) && G.isDisappointing(value, rerolledAll)) { showRoast(); delay = ROAST_MS + 250; }
+    turnTimer = setTimeout(endTurn, delay);
   }
+  var turnTimer = null;
   function flashTile(key) {
     // tiles aren't id-keyed; locate the committed tile by its position in its section
     var cat = G.CATEGORIES.filter(function (c) { return c.key === key; })[0];
@@ -1358,6 +1334,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var box = $('roast');
     box.className = 'roast show order';
     box.innerHTML = '<span class="bubble">🎖 ' + esc(G.orderText(addressee, cat.key)) + '</span>';
+    box.querySelector('.bubble').onclick = clearRoast; // tap to dismiss
     clearTimeout(roastTimer);
     roastTimer = setTimeout(clearRoast, ORDER_MS);
   }
@@ -1368,6 +1345,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var box = $('roast');
     box.className = 'roast show';
     box.innerHTML = '<span class="bubble">' + esc(line) + '</span>';
+    box.querySelector('.bubble').onclick = clearRoast; // tap to dismiss
     clearTimeout(roastTimer);
     roastTimer = setTimeout(clearRoast, ROAST_MS);
   }
@@ -1384,6 +1362,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function comboReminder(key, anchor) {
     if (locked || settings.noAdvice) return;
+    // measure the anchor BEFORE the penalty re-renders the board (which would
+    // detach it and zero its rect, dumping the tooltip in the top-left corner)
+    var r = anchor.getBoundingClientRect();
     var pen = applyPenalty(key);                 // pick + register a fresh penalty
     var shame = G.SHAME_LINES[shameIx % G.SHAME_LINES.length]; shameIx++;
     var tip = $('comboTip');
@@ -1391,12 +1372,40 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<div class="cdesc">' + esc(G.COMBO_DESC[key] || '') + '</div>'
       + '<div class="cfine">⚠ ' + esc(pen.desc) + '</div>';   // in-game: reveal the penalty
     tip.classList.remove('hidden');
-    var r = anchor.getBoundingClientRect();
     tip.style.left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8) + 'px';
     tip.style.top = (r.bottom + 8) + 'px';
     // a newer reminder replaces this tooltip; the penalty itself stays on its own clock
     clearTimeout(tipHideTimer);
     tipHideTimer = setTimeout(function () { tip.classList.add('hidden'); }, TIP_MS);
+  }
+  // any bubble can be tapped away (no lingering screen obstruction)
+  $('comboTip').onclick = function () { $('comboTip').classList.add('hidden'); clearTimeout(tipHideTimer); };
+  $('fxBubble').onclick = function () { $('fxBubble').classList.add('hidden'); clearTimeout(refundTimer); };
+
+  // where on screen a penalty lives — used to float its expiry bubble there
+  function penAnchor(pen) {
+    if (pen.type === 'points') return $('curTotal');
+    if (pen.type === 'changeDice' || pen.type === 'removeDice') return $('dice');
+    if (pen.type === 'pretend') return $('curName');
+    if (pen.key) {                                 // combo penalties → the tile itself
+      var cat = CAT_BY_KEY[pen.key];
+      var host = cat.group === 'upper' ? $('boardUpper') : $('boardLower');
+      var keys = boardKeys(cat.group).filter(function (k) { return (fx.hide || []).indexOf(k) < 0; });
+      var i = keys.indexOf(pen.key);
+      if (i >= 0 && host.children[i]) return host.children[i];
+    }
+    return $('medals');                            // shuffle / youlose → the board middle
+  }
+  function showFxBubble(text, anchor) {
+    var b = $('fxBubble');
+    b.textContent = text;
+    b.classList.remove('hidden');
+    var r = (anchor || $('medals')).getBoundingClientRect();
+    b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
+    var above = r.top - b.offsetHeight - 8;        // prefer above the target, flip below if cramped
+    b.style.top = (above >= 8 ? above : r.bottom + 8) + 'px';
+    clearTimeout(refundTimer);
+    refundTimer = setTimeout(function () { b.classList.add('hidden'); }, 2600);
   }
 
   function applyPenalty(reqKey) {
@@ -1454,11 +1463,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var i = penalties.indexOf(pen); if (i < 0) return;
     penalties.splice(i, 1);
     syncPenalties();
-    var pb = $('pointsBubble');
-    pb.textContent = 'Ебавам се, ей ти ги пак.';
-    pb.classList.remove('hidden');
-    clearTimeout(refundTimer);
-    refundTimer = setTimeout(function () { pb.classList.add('hidden'); }, 2600);
+    // the "just kidding" bubble floats next to the area the penalty hit
+    showFxBubble('Ебавам се, ей ти ги пак.', penAnchor(pen));
   }
 
   function clearAllPenalties() {           // hard reset (e.g. on restart)
@@ -1466,6 +1472,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     penalties = [];
     fx = {};
     $('youLose').classList.add('hidden');
+    $('comboTip').classList.add('hidden');
+    $('fxBubble').classList.add('hidden');
   }
 
   function rebuildFx() {                    // fold the live penalties into one override
@@ -1509,12 +1517,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return '<h2>📖 Бойна задача</h2>'
       + '<p class="ht">Печели бойният, който събере най-много точки — и грабва чин <b>Генерал</b>. Последният получава <b>Редник</b>.</p>'
       + '<h3 class="hth">Ходът</h3>'
-      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай тези за прехвърляне (✛) и стреляй с <b>ОГИН</b> — или спри по-рано. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
+      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай тези за прехвърляне (✛) и стреляй с <b>ОГИН!</b> — или спри по-рано. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
       + '<h3 class="hth">Категориите и какво искат</h3>'
       + '<ul class="htlist">' + combos + '</ul>'
       + '<p class="ht">Забрави ли коя категория какво иска? Докосни името ѝ в игра и щабът ще ти го припомни.</p>'
       + '<h3 class="hth">Полеви отчет</h3>'
-      + '<p class="ht">Режим без зарове за игра на маса: избираш категория, удряш заровете, които я направиха, и натискаш <b>Запиши</b>. <b>ОПА!</b> връща назад при грешка.</p>'
+      + '<p class="ht">Режим за игра на маса с истински зарове: удряш долу <b>петте зара</b> от хвърлянето си и таблото само ти предлага всички възможни категории — избираш една, точно както в нормална игра. Така не пропускаш комбинация и щабът пак ти прави рапорт накрая. <b>ОПА!</b> връща назад действие по действие.</p>'
       + '<h3 class="hth">Как се чете рапортът</h3>'
       + '<p class="ht">След битката щабът разбива резултата ти:</p>'
       + '<ul class="htlist">'
@@ -1524,6 +1532,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<li><b>норма + късмет + решения = крайният ти резултат.</b></li>'
       + '<li><b>Точност</b> — какъв процент от ходовете са били оптималните; чинът ти отразява това.</li>'
       + '<li><b>Най-добър ход / Най-скъпа грешка</b> — върховият ти момент и най-скъпата издънка.</li>'
+      + '<li><b>Стил</b> — щабът ти лепва досие: Хирург, Комарджия, Чиновник, Късметлия…</li>'
+      + '<li><b>Ход по ход</b> — разгъни го за пълния разбор на всяка отчетена категория.</li>'
       + '<li>Разделът <b>По умение</b> подрежда по качество на решенията, не по късмет.</li>'
       + '</ul>';
   }
@@ -1674,13 +1684,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var ordered = [winner].concat(others);                // standings: by points only
     var analysisByPlayer = {};
     game.players.forEach(function (p, idx) {
-      analysisByPlayer[idx] = (!manualMode && evReady && moveLog[idx] && moveLog[idx].length) ? EV.analyzeGame(moveLog[idx]) : null;
+      // manual games are analysed too — category decisions only (dice rolls unseen)
+      analysisByPlayer[idx] = (evReady && moveLog[idx] && moveLog[idx].length)
+        ? (manualMode ? EV.analyzeManualGame(moveLog[idx]) : EV.analyzeGame(moveLog[idx]))
+        : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
     summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: game.players.indexOf(winner) };
 
     $('tabSkill').classList.toggle('hidden', !anyAnalysis);
-    $('tabStand').classList.toggle('hidden', !anyAnalysis); // hide tabs entirely in manual mode
+    $('tabStand').classList.toggle('hidden', !anyAnalysis);
     $('overUndo').classList.toggle('hidden', !manualMode || !undoStack.length);
 
     // bets (stakes) — unchanged in both modes
@@ -1732,32 +1745,100 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       r.onclick = function () { summary.sel = +r.getAttribute('data-pi'); renderSummary(); };
     });
 
-    // §1/§2/§4 report for the selected player (any player, incl AI) — none in manual mode
+    // report for the selected player (any seat, incl AI; manual = category-only)
     $('evPanel').innerHTML = summary.ana[summary.sel] ? renderReport(summary.sel) : '';
   }
+
+  function signed(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 0 : d); }
 
   function renderReport(pi) {
     var fp = game.players[pi], fa = summary.ana[pi];
     var perfRank = G.rankForAccuracy(fa.accuracy);
-    var keepCost = 0, catCost = 0;
-    fa.decisions.forEach(function (d) { if (d.type === 'keep') keepCost += d.cost; else catCost += d.cost; });
-    var leakWord = keepCost <= catCost ? 'задържанията' : 'избора на категория';
-    var zeros = G.CATEGORIES.filter(function (c) { return fp.scores[c.key] === 0; });
     var genVal = fp.scores.general;
     var html = '<div class="evpanel">';
     html += '<div class="evhead">📋 Рапорт за ' + esc(fp.name) + (fp.isAI && fp.persona ? ' · ' + esc(fp.persona.name) : '') + '</div>';
-    html += '<div class="evline"><b>' + Math.round(fa.par) + '</b> норма '
-      + '<span class="luck">' + (fa.luck >= 0 ? '+' : '') + fa.luck.toFixed(0) + ' късмет</span> '
-      + '<span class="skill">' + fa.skill.toFixed(0) + ' решения</span> → <b>' + G.playerTotal(fp) + '</b></div>';
+
+    // §identity (dice mode only — manual games have no luck term)
+    if (!fa.manual) {
+      html += '<div class="evline"><b>' + Math.round(fa.par) + '</b> норма '
+        + '<span class="luck">' + signed(fa.luck) + ' късмет</span> '
+        + '<span class="skill">' + fa.skill.toFixed(0) + ' решения</span> → <b>' + G.playerTotal(fp) + '</b></div>';
+    }
     html += '<div class="evsub">Игра като <b>' + esc(perfRank) + '</b> — точност ' + Math.round(fa.accuracy * 100) + '%'
-      + ' (средно −' + fa.avgLostPerDecision.toFixed(1) + ' т./решение)</div>';
+      + ' · средна загуба <b>−' + fa.avgLostPerTurn.toFixed(1) + ' т. EV/ход</b></div>';
+
+    // playstyle fingerprint (colour-coded archetype)
+    var st = G.playstyleFor(fa);
+    if (st) html += '<div class="evsub"><span class="stylechip" style="background:' + st.color + '">' + esc(st.name) + '</span> ' + esc(st.desc) + '</div>';
+
+    // outstanding moves / costliest mistake
     if (fa.sharpest) html += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
     if (fa.blunder && fa.blunder.cost < -0.5) html += '<div class="evpick blunder">✗ Най-скъпа грешка: ' + decisionLabel(fa.blunder)
       + ' <span class="gap">(−' + (-fa.blunder.cost).toFixed(1) + ' т.)</span></div>';
-    html += '<div class="evsub">Изтичане: задържания ' + keepCost.toFixed(0) + ' · категории ' + catCost.toFixed(0)
-      + ' — повече губиш в <b>' + leakWord + '</b></div>';
-    html += '<div class="evsub">генерал: ' + (typeof genVal === 'number' && genVal > 0 ? 'хвърлен (' + genVal + ')' : 'не')
-      + ' · изхабени категории: ' + zeros.length + (zeros.length ? ' (' + zeros.map(function (c) { return c.label; }).join(', ') + ')' : '') + '</div>';
+
+    // hold/category efficiency + mistake counts
+    if (!fa.manual) {
+      var leakWord = fa.leak.keep <= fa.leak.category ? 'задържанията' : 'избора на категория';
+      html += '<div class="evsub">Изтичане: задържания ' + fa.leak.keep.toFixed(0) + ' т. (' + fa.mistakes.keep + '/' + fa.leakCounts.keep + ' грешни)'
+        + ' · категории ' + fa.leak.category.toFixed(0) + ' т. (' + fa.mistakes.category + '/' + fa.leakCounts.category + ')'
+        + ' — повече губиш в <b>' + leakWord + '</b></div>';
+    } else {
+      html += '<div class="evsub">Избор на категория: ' + fa.mistakes.category + ' от ' + fa.leakCounts.category + ' неоптимални'
+        + ' (' + (-fa.leak.category).toFixed(0) + ' т. изпуснати)</div>';
+    }
+
+    // blunder categorisation by severity
+    var sevTotal = fa.severity.minor + fa.severity.major + fa.severity.fatal;
+    html += sevTotal
+      ? '<div class="evsub">Издънки: ' + fa.severity.minor + ' дребни · ' + fa.severity.major + ' сериозни · <b>' + fa.severity.fatal + ' фатални</b></div>'
+      : '<div class="evsub">Издънки: нито една. Чисто досие.</div>';
+
+    // deep luck deconstruction + tilt + bailout (need the roll sequence)
+    if (!fa.manual) {
+      html += '<div class="evsub">Късмет под лупа: първо хвърляне ' + signed(fa.luckFirst) + ' · прехвърляния ' + signed(fa.luckRerolls)
+        + ' · в края, когато боли (clutch) <b>' + signed(fa.clutch) + '</b></div>';
+      if (fa.tilt) {
+        html += '<div class="evsub">Тилт: ' + (fa.tilt.delta > 1.5
+          ? 'след гадно хвърляне губиш с <b>' + signed(fa.tilt.delta, 1) + ' т./ход</b> повече — дишай дълбоко'
+          : 'хладнокръвен — лошият късмет не те разклаща') + '</div>';
+      }
+      if (fa.bailout) {
+        var pivots = fa.bailout.avgCost <= fa.bailout.baseline + 0.5;
+        html += '<div class="evsub">Спасения: при счупен план (' + fa.bailout.n + ' хода) губиш средно '
+          + fa.bailout.avgCost.toFixed(1) + ' т./ход — ' + (pivots ? '<b>превключваш добре</b>' : 'инатиш се на стария план') + '</div>';
+      }
+    }
+
+    // zero-out avoidance
+    if (fa.zeroOuts.total) {
+      html += '<div class="evsub">Нули: ' + fa.zeroOuts.total + ' — математически принудени ' + fa.zeroOuts.forced
+        + ', от собствената ти игра ' + fa.zeroOuts.unforced + '</div>';
+    }
+
+    // upper-section efficiency (vs the "three of each" yardstick = 63)
+    var upTot = 0;
+    G.CATEGORIES.forEach(function (c) { if (c.group === 'upper' && typeof fp.scores[c.key] === 'number') upTot += fp.scores[c.key]; });
+    html += '<div class="evsub">Горна секция: ' + upTot + ' т. — ' + Math.round(100 * upTot / 63) + '% от целта „по три от всяко“ (63)</div>';
+
+    // game-section ratings (the late game forgives nothing)
+    function stageLoss(s) { return s.n ? (-s.skill / s.n).toFixed(1) : '0.0'; }
+    html += '<div class="evsub">По етапи (загуба т./ход): начало −' + stageLoss(fa.stages.early)
+      + ' · среда −' + stageLoss(fa.stages.mid) + ' · край −' + stageLoss(fa.stages.late) + ' — краят прощава най-малко</div>';
+
+    html += '<div class="evsub">генерал: ' + (typeof genVal === 'number' && genVal > 0 ? 'хвърлен (' + genVal + ')' : 'не') + '</div>';
+
+    // turn-by-turn breakdown — collapsed by default
+    html += '<details class="evturns"><summary>Ход по ход</summary>';
+    fa.turns.forEach(function (td) {
+      var luckCell = fa.manual ? '' : '<span class="tl ' + (td.luck >= 0 ? 'plus' : 'minus') + '">' + signed(td.luck, 1) + '</span>';
+      var skillCell = '<span class="tl' + (td.skill < -0.05 ? ' minus' : ' plus') + '">'
+        + (td.skill < -0.05 ? '−' + (-td.skill).toFixed(1) : '✓') + '</span>';
+      html += '<div class="evtrow"><span class="tn">' + (td.turn + 1) + '</span>'
+        + '<span class="tc">' + esc(CAT_LABEL[td.category] || td.category) + '</span>'
+        + '<span class="tv">' + td.score + ' т.</span>' + luckCell + skillCell + '</div>';
+    });
+    html += '</details>';
+
     html += '</div>';
     return html;
   }

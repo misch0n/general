@@ -298,8 +298,10 @@
   function analyzeTurn(mask, rolls, keeps, category) {
     var luck = 0, skill = 0, decisions = [];
     var R = rolls.length;
-    // first roll: chance delta vs the about-to-roll value V*(mask)
-    luck += nodeValue(mask, rolls[0], 2) - vstar(mask);
+    // first roll: chance delta vs the about-to-roll value V*(mask) — the "net
+    // dice variance" of the throw (how far the dice landed from expectation)
+    var firstLuck = nodeValue(mask, rolls[0], 2) - vstar(mask);
+    luck += firstLuck;
     for (var i = 0; i < keeps.length; i++) {
       var rl = 2 - i;
       var node = nodeValue(mask, rolls[i], rl);
@@ -307,7 +309,8 @@
       var e = evaluateMask(mask, rolls[i], rl);
       var second = e.keep_ranked.length > 1 ? e.keep_ranked[1].ev : node;
       skill += chosenEV - node;
-      decisions.push({ type: 'keep', cost: chosenEV - node, chosenEV: chosenEV, optimalEV: node, margin: node - second, optimal: e.best_keep });
+      decisions.push({ type: 'keep', cost: chosenEV - node, chosenEV: chosenEV, optimalEV: node, margin: node - second,
+                       chosen: keeps[i], optimal: e.best_keep });
       luck += nodeValue(mask, rolls[i + 1], rl - 1) - chosenEV; // reroll chance delta
     }
     // category decision at the dice the player stopped on
@@ -320,19 +323,22 @@
     skill += chosen.ev - nodeVal;
     decisions.push({ type: 'category', cost: chosen.ev - nodeVal, chosenEV: chosen.ev, optimalEV: nodeVal,
                      margin: eStop.category_ranked[0].ev - secondCat, chosenKey: category, optimalKey: eStop.category_ranked[0].key });
-    return { luck: luck, skill: skill, decisions: decisions };
+    // was a zero mathematically forced (nothing scores), or self-inflicted?
+    var anyPositive = eStop.category_ranked.some(function (c) { return c.immediate > 0; });
+    return { luck: luck, skill: skill, decisions: decisions,
+             firstLuck: firstLuck, rerollLuck: luck - firstLuck,
+             score: chosen.immediate, forcedZero: !anyPositive, finalDice: last };
   }
 
-  // Aggregate a whole game's turns (in play order) into the §2 identity:
-  // final_score = par + Σ luck + Σ skill.
-  function analyzeGame(turns) {
-    var luck = 0, skill = 0, decisions = [];
-    turns.forEach(function (t) {
-      var a = analyzeTurn(t.mask, t.rolls, t.keeps, t.category);
-      luck += a.luck; skill += a.skill;
-      a.decisions.forEach(function (d) { d.turnCategory = t.category; decisions.push(d); });
-    });
-    var EPS = 0.05;
+  var EPS = 0.05;                                  // "optimal" tolerance (points)
+  var SEV = { major: 3, fatal: 8 };                // blunder severity thresholds
+
+  function severityOf(cost) { var c = -cost; return c >= SEV.fatal ? 'fatal' : c >= SEV.major ? 'major' : 'minor'; }
+  function stageOf(ti) { return ti < 5 ? 'early' : ti < 10 ? 'mid' : 'late'; }
+  function avg(arr) { if (!arr.length) return 0; var s = 0; arr.forEach(function (x) { s += x; }); return s / arr.length; }
+
+  // Aggregates shared by the full and the manual analysis.
+  function aggregate(decisions, turnDetails) {
     var optimalCount = decisions.filter(function (d) { return d.cost > -EPS; }).length;
     var blunder = null, sharpest = null;
     decisions.forEach(function (d) {
@@ -340,13 +346,108 @@
       // sharpest = an optimal (cost≈0) decision that mattered most (largest margin)
       if (d.cost > -EPS && (!sharpest || d.margin > sharpest.margin)) sharpest = d;
     });
+    // blunder categorisation: counts by severity + by decision type
+    var sev = { minor: 0, major: 0, fatal: 0 }, mistakes = { keep: 0, category: 0 };
+    var costs = { keep: 0, category: 0 }, counts = { keep: 0, category: 0 };
+    decisions.forEach(function (d) {
+      counts[d.type]++; costs[d.type] += d.cost;
+      if (d.cost < -EPS) { sev[severityOf(d.cost)]++; mistakes[d.type]++; }
+    });
+    // outstanding moves: the optimal calls with the biggest margins
+    var topMoves = decisions.filter(function (d) { return d.cost > -EPS && d.margin > 0.5; })
+      .sort(function (a, b) { return b.margin - a.margin; }).slice(0, 3);
+    // game-section ratings: avg EV loss per turn by stage (late game is tightest)
+    var stages = { early: { skill: 0, luck: 0, n: 0 }, mid: { skill: 0, luck: 0, n: 0 }, late: { skill: 0, luck: 0, n: 0 } };
+    turnDetails.forEach(function (td) {
+      var s = stages[stageOf(td.turn)];
+      s.skill += td.skill; s.luck += (td.luck || 0); s.n++;
+    });
+    // zero-out avoidance: forced (nothing scored) vs self-inflicted
+    var zeroOuts = { total: 0, forced: 0, unforced: 0 };
+    turnDetails.forEach(function (td) {
+      if (td.score === 0) { zeroOuts.total++; td.forcedZero ? zeroOuts.forced++ : zeroOuts.unforced++; }
+    });
     return {
-      par: PAR, luck: luck, skill: skill, projectedFinal: PAR + luck + skill,
-      decisions: decisions, nDecisions: decisions.length,
+      decisions: decisions, nDecisions: decisions.length, turns: turnDetails,
       accuracy: decisions.length ? optimalCount / decisions.length : 1,
-      avgLostPerDecision: decisions.length ? -skill / decisions.length : 0,
-      blunder: blunder, sharpest: sharpest,
+      blunder: blunder, sharpest: sharpest, topMoves: topMoves,
+      severity: sev, mistakes: mistakes, leak: costs, leakCounts: counts,
+      stages: stages, zeroOuts: zeroOuts,
     };
+  }
+
+  // Aggregate a whole game's turns (in play order) into the §2 identity:
+  // final_score = par + Σ luck + Σ skill — plus the deep-dive metrics.
+  function analyzeGame(turns) {
+    var luck = 0, skill = 0, decisions = [], turnDetails = [];
+    turns.forEach(function (t, ti) {
+      var a = analyzeTurn(t.mask, t.rolls, t.keeps, t.category);
+      luck += a.luck; skill += a.skill;
+      a.decisions.forEach(function (d) { d.turnCategory = t.category; d.turn = ti; decisions.push(d); });
+      turnDetails.push({ turn: ti, category: t.category, score: a.score, luck: a.luck, skill: a.skill,
+                         firstLuck: a.firstLuck, rerollLuck: a.rerollLuck, forcedZero: a.forcedZero,
+                         finalDice: a.finalDice, nRolls: t.rolls.length, decisions: a.decisions });
+    });
+    var out = aggregate(decisions, turnDetails);
+    out.par = PAR; out.luck = luck; out.skill = skill; out.projectedFinal = PAR + luck + skill;
+    out.avgLostPerDecision = decisions.length ? -skill / decisions.length : 0;
+    out.avgLostPerTurn = turns.length ? -skill / turns.length : 0;
+
+    // deep luck deconstruction: net dice variance split first-throw vs rerolls,
+    // and the clutch factor — late-game luck weighs differently (fewer outs)
+    out.luckFirst = avg(turnDetails.map(function (td) { return td.firstLuck; })) * turnDetails.length;
+    out.luckRerolls = out.luck - out.luckFirst;
+    out.clutch = out.stages.late.luck;
+
+    // tilt: does EV loss spike on the turn after a terrible roll?
+    var afterBad = [], baselineT = [];
+    turnDetails.forEach(function (td, i) {
+      (i > 0 && turnDetails[i - 1].luck < -6 ? afterBad : baselineT).push(-td.skill);
+    });
+    out.tilt = afterBad.length ? { n: afterBad.length, afterBad: avg(afterBad), baseline: avg(baselineT), delta: avg(afterBad) - avg(baselineT) } : null;
+
+    // bailout rating: decision quality in turns whose FIRST throw broke the plan
+    // (−2.5 ≈ the worst ~20% of opening throws; the spread is tight because two
+    // rerolls still remain, so most bad starts are partially recoverable)
+    var badStart = turnDetails.filter(function (td) { return td.firstLuck < -2.5; });
+    out.bailout = badStart.length
+      ? { n: badStart.length, avgCost: avg(badStart.map(function (td) { return -td.skill; })), baseline: out.avgLostPerTurn }
+      : null;
+
+    // aggression: extra dice rerolled vs the optimal keep (chasing > 0 > settling)
+    var keepDeltas = decisions.filter(function (d) { return d.type === 'keep'; }).map(function (d) {
+      var cr = 0, or = 0;
+      for (var i = 0; i < d.chosen.length; i++) { if (!d.chosen[i]) cr++; if (!d.optimal[i]) or++; }
+      return cr - or;
+    });
+    out.aggression = avg(keepDeltas);
+    return out;
+  }
+
+  // Manual-mode analysis: only the FINAL dice and the category pick are known
+  // (the table rolled real dice we never saw), so only the category decision is
+  // judged — against the same optimal table at rolls_left = 0. No luck terms.
+  function analyzeManualGame(turns) {
+    var decisions = [], turnDetails = [], skill = 0;
+    turns.forEach(function (t, ti) {
+      var e = evaluateMask(t.mask, t.dice, 0);
+      var chosen = e.category_ranked.filter(function (c) { return c.key === t.category; })[0];
+      var secondCat = e.category_ranked.length > 1 ? e.category_ranked[1].ev : e.category_ranked[0].ev;
+      var cost = chosen.ev - e.category_ranked[0].ev;
+      skill += cost;
+      decisions.push({ type: 'category', turn: ti, cost: cost, chosenEV: chosen.ev, optimalEV: e.category_ranked[0].ev,
+                       margin: e.category_ranked[0].ev - secondCat, chosenKey: t.category, optimalKey: e.category_ranked[0].key,
+                       turnCategory: t.category });
+      var anyPositive = e.category_ranked.some(function (c) { return c.immediate > 0; });
+      turnDetails.push({ turn: ti, category: t.category, score: chosen.immediate, skill: cost,
+                         forcedZero: !anyPositive, finalDice: t.dice, decisions: [decisions[decisions.length - 1]] });
+    });
+    var out = aggregate(decisions, turnDetails);
+    out.manual = true;
+    out.skill = skill;
+    out.avgLostPerDecision = decisions.length ? -skill / decisions.length : 0;
+    out.avgLostPerTurn = turns.length ? -skill / turns.length : 0;
+    return out;
   }
 
   // ============================================================ §3 bot policy
@@ -367,15 +468,28 @@
     return actions[actions.length - 1];
   }
 
-  // policy: { type:'optimal'|'softmax'|'risk', tau, lambda }
-  // Non-optimal personas play WEAK DICE but still bank points: they only scratch
-  // a category for 0 when nothing scores (no random/repeated forfeits). The
-  // weakness lives in their keeps and in suboptimal-but-positive placement.
+  // policy: { type:'optimal'|'softmax'|'epsilon'|'greedy'|'random'|'risk', tau, epsilon, lambda }
+  // The persona ladder: GOD = optimal table lookup; HARD = softmax over the
+  // table; MEDIUM = epsilon-greedy over the table; EASY = no lookup at all,
+  // pure immediate-gain heuristics; RANDOM = blind rethrows (1–2), then the
+  // best immediate placement. Non-optimal personas only scratch a category
+  // for 0 when nothing scores (no random/repeated forfeits). 'risk' is the
+  // legacy gambler policy, kept for experiments/calibration.
   function botCategory(scores, dice, policy, rng) {
+    // EASY/RANDOM: no table lookup — best immediate score via the game's own
+    // greedy heuristic (sacrifices in its fixed order only when forced).
+    if (policy.type === 'greedy' || policy.type === 'random') {
+      return General.aiChooseCategory({ scores: scores }, dice).category;
+    }
     var ranked = evaluate(scores, dice, 0).category_ranked;
     if (policy.type === 'optimal') return ranked[0].key; // may strategically scratch
     var positive = ranked.filter(function (r) { return r.immediate > 0; });
     var pool = positive.length ? positive : ranked; // forfeit only when forced
+    if (policy.type === 'epsilon') {
+      var eps = policy.epsilon == null ? 0.25 : policy.epsilon;
+      if ((rng || Math.random)() < eps) return pool[Math.floor((rng || Math.random)() * pool.length)].key;
+      return pool[0].key;
+    }
     if (policy.type === 'risk') {
       var lambda = policy.lambda == null ? 1.4 : policy.lambda;
       return softmaxPick(pool, function (a) { return a.ev + lambda * (CEIL[a.key] || 0); }, policy.tau || 2, rng).key;
@@ -383,7 +497,21 @@
     return softmaxPick(pool, function (a) { return a.ev; }, policy.tau, rng).key;
   }
   function botKeep(scores, dice, rollsLeft, policy, rng) {
+    rng = rng || Math.random;
+    // EASY: greedy heuristic holds (largest matching group / high dice).
+    if (policy.type === 'greedy') return General.aiChooseHolds(dice);
+    // RANDOM: always rethrows the whole hand once, then a second time half the
+    // time — i.e. 1–2 blind rethrows, no keep intelligence at all.
+    if (policy.type === 'random') {
+      var all = rollsLeft === 2 ? false : rng() < 0.5;
+      return dice.map(function () { return all; }); // all-true = stop, all-false = rethrow everything
+    }
     var ranked = evaluate(scores, dice, rollsLeft).keep_ranked;
+    if (policy.type === 'epsilon') {
+      var eps = policy.epsilon == null ? 0.25 : policy.epsilon;
+      if (rng() < eps) return ranked[Math.floor(rng() * ranked.length)].keep;
+      return ranked[0].keep;
+    }
     if (policy.type === 'risk') {
       // bias toward holding the biggest matching group (chase General / straights)
       var lambda = policy.lambda == null ? 1.4 : policy.lambda;
@@ -405,7 +533,7 @@
     setTable: setTable, hasTable: hasTable, par: par, vstar: vstar,
     maskOfScores: maskOfScores, evaluate: evaluate, evaluateMask: evaluateMask, catBit: catBit,
     nodeValue: nodeValue, keepValue: keepValue, keepPositions: keepPositions,
-    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame, bestTarget: bestTarget,
+    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame, analyzeManualGame: analyzeManualGame, bestTarget: bestTarget,
     softmaxPick: softmaxPick, botCategory: botCategory, botKeep: botKeep,
   };
 });
