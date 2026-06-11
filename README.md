@@ -121,17 +121,19 @@ edition): camouflage field, classification banner, brass medals and stencil type
   is **off by default** (this is an adult party game). Flip it **on** to drop all
   NSFW-flagged words and generate from the SFW set only; names already on the
   muster screen are re-cohered so nothing crude slips through.
-- **Settings + a secret dev word-editor.** Settings also toggle the rare-name
-  bonuses and the in-game advice. Each row hides a tiny clickable box on its right
-  edge; tap them **in order with rising counts** (1st row once, 2nd row twice, …)
-  to unlock a **developer mode** — a full **word-list editor**. Every title /
+- **Settings + a secret dev editor.** Settings also toggle the rare-name bonuses
+  and the in-game advice. Each row hides a tiny clickable box on its right edge;
+  a **rolling tap-sequence matcher** unlocks **developer mode** when the recent
+  taps hit the key (box 0 once, box 1 twice, … the 1-2-3-x escalating pattern) —
+  a mistap just means re-tapping. Dev mode is a full **editor**: every title /
   adjective / noun (and the AI pools) is editable across its **м / ср / ж** forms,
   with a **percentile-bracket selector** (colour-cued) and an **NSFW** flag; rows
-  are **ranked by rarity** for quick scanning. You can **add** entries, hit
-  **↻ Приложи** to re-roll the live pools and preview, and **📋 КОПИРАЙ** to export
-  the whole edited set as JSON (brackets included; unchanged entries verbatim) to
-  hand back for baking into the source. The roast / shame / combo message banks
-  are shown read-only.
+  are **ranked by rarity**. The roast / shame / combo **message banks are editable
+  too** — add, edit and delete across all of them. Every field is a **multiline
+  box that grows to show the whole entry**, with the controls on the line below
+  (no sideways scrolling). Hit **↻ Приложи** to load the edits live for preview,
+  and **📋 КОПИРАЙ** to export the whole set as JSON (words + brackets + messages;
+  unchanged entries verbatim) to hand back for baking into the source.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).

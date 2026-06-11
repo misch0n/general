@@ -416,18 +416,24 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .devmsg{ font-size:11.5px; color:var(--gen-label); padding:4px 0; border-bottom:1px solid rgba(255,255,255,.05); line-height:1.35; }
 /* dev word-list editor */
 .devnote{ font-size:11px; color:var(--gen-muted); line-height:1.4; margin-bottom:10px; }
-.devedrow{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+/* editor row: fields on top, controls on the line below (no sideways scroll) */
+.devedrow{ display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+.devfields{ display:flex; flex-wrap:wrap; gap:6px; }
+.devctrls{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.devctrls .devdel{ margin-left:auto; }
+/* multiline auto-growing text box — shows every line of an entry */
+.devta{ width:100%; min-width:90px; font-family:var(--gen-font-body); font-size:11.5px; color:var(--gen-text); background:rgba(0,0,0,.3);
+  border:1px solid var(--gen-pill-line); border-radius:5px; padding:5px 6px; line-height:1.35; resize:vertical; overflow:hidden; box-sizing:border-box; }
+.devta:focus{ outline:none; border-color:var(--gen-brass); }
+.devmlab{ width:100%; font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--gen-brass); }
 /* hardcoded percentile bracket selector (colour cues the rarity tier) */
-.devbk{ align-self:flex-end; margin-bottom:3px; font-family:var(--gen-font-body); font-size:11px; font-weight:700; color:var(--gen-ink);
+.devbk{ font-family:var(--gen-font-body); font-size:11px; font-weight:700; color:var(--gen-ink);
   background:var(--gen-canvas); border:1px solid var(--gen-ink-line); border-radius:5px; padding:3px 2px; }
 .devbk.r0{ background:#8a5fc0; color:#fff; } .devbk.r1{ background:#e8c356; } .devbk.r2{ background:#e8843a; }
 .devbk.r3{ background:#e8d04a; } .devbk.r4{ background:#7ab85a; } .devbk.r5{ background:#6fa8e8; }
 .devbk.r6{ background:rgba(205,198,160,.25); color:var(--gen-label); }
-.devf{ display:flex; flex-direction:column; gap:1px; font-size:8px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
-.devin{ width:74px; font-family:var(--gen-font-body); font-size:11.5px; color:var(--gen-text); background:rgba(0,0,0,.3);
-  border:1px solid var(--gen-pill-line); border-radius:5px; padding:4px 5px; }
-.devin:focus{ outline:none; border-color:var(--gen-brass); }
-.devchk{ display:flex; align-items:center; gap:3px; font-size:9px; letter-spacing:.3px; color:var(--gen-muted); align-self:flex-end; padding-bottom:4px; }
+.devf{ flex:1 1 90px; min-width:90px; display:flex; flex-direction:column; gap:1px; font-size:8px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
+.devchk{ display:flex; align-items:center; gap:3px; font-size:9px; letter-spacing:.3px; color:var(--gen-muted); }
 .devchk.nsfw{ color:var(--gen-alert); font-weight:700; }
 .devchk input{ accent-color:var(--gen-brass); }
 .devdel{ margin-left:auto; align-self:flex-end; width:24px; height:24px; border-radius:5px; color:var(--gen-alert);
@@ -1609,7 +1615,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
   ];
-  var devProgress = 0, devClicks = 0;
+  var devTaps = [];
   function buildSettingsRows() {
     var host = $('settingsRows'); host.innerHTML = '';
     SETTINGS_ROWS.forEach(function (row, idx) {
@@ -1623,14 +1629,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       host.appendChild(div);
     });
   }
-  // unlock: tap box 0 once, box 1 twice, … box i (i+1) times, in order
+  // the unlock KEY, flattened: box 0 once, box 1 twice, box i (i+1)× — i.e. the
+  // 1-2-3-…-x escalating pattern. We keep a ROLLING buffer of recent taps and
+  // unlock whenever its tail matches the key, so a mistap just needs re-tapping.
+  function devKey() {
+    var k = []; for (var i = 0; i < SETTINGS_ROWS.length; i++) for (var j = 0; j <= i; j++) k.push(i); return k;
+  }
   function devBoxClick(idx) {
     if (settings.dev) return;
-    if (idx === devProgress) {
-      devClicks++;
-      if (devClicks === devProgress + 1) { devProgress++; devClicks = 0; if (devProgress >= SETTINGS_ROWS.length) activateDev(); }
-    } else if (idx === 0) { devProgress = 0; devClicks = 1; }
-    else { devProgress = 0; devClicks = 0; }
+    var key = devKey();
+    devTaps.push(idx);
+    if (devTaps.length > key.length) devTaps = devTaps.slice(-key.length);
+    if (devTaps.length === key.length && devTaps.every(function (v, i) { return v === key[i]; })) {
+      devTaps = [];
+      activateDev();
+    }
   }
   function activateDev() { settings.dev = true; devModel = null; renderDevPanel(); $('devPanel').classList.remove('hidden'); }
 
@@ -1648,39 +1661,77 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   };
   var DEV_POOLS = [['titles', 'Титли'], ['adjs', 'Прилагателни'], ['nouns', 'Съществителни'],
     ['aiAdjs', 'AI прилагателни'], ['aiNouns', 'AI съществителни']];
-  function devInput(val, ph, on) {
-    var i = document.createElement('input'); i.className = 'devin'; i.type = 'text';
-    i.value = val || ''; i.placeholder = ph; i.oninput = function () { on(i.value.trim()); }; return i;
+  // a text box that grows to show ALL of its content (no sideways scroll)
+  function devArea(val, ph, on) {
+    var t = document.createElement('textarea'); t.className = 'devta'; t.rows = 1;
+    t.value = val || ''; t.placeholder = ph;
+    function grow() { t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight, 26) + 'px'; }
+    t.oninput = function () { on(t.value.trim()); grow(); };
+    setTimeout(grow, 0); // size once attached (scrollHeight needs layout)
+    return t;
   }
   function bracketRank(b) { var i = G.BRACKETS.indexOf(b || '10+'); return i < 0 ? G.BRACKETS.length : i; }
+  function delBtn(onDel) { var d = document.createElement('button'); d.className = 'devdel'; d.textContent = '✕'; d.title = 'Изтрий'; d.onclick = onDel; return d; }
+
+  // a word-pool row: the (multiline) м/ср/ж fields on top, controls BELOW
   function devRow(kind, entry, onDel) {
     var row = document.createElement('div'); row.className = 'devedrow';
-    // percentile bracket selector (hardcoded rarity — rarest first)
+    var fields = document.createElement('div'); fields.className = 'devfields';
+    DEV_FIELDS[kind].forEach(function (f) {
+      var wrap = document.createElement('label'); wrap.className = 'devf';
+      wrap.appendChild(document.createTextNode(f[1]));
+      wrap.appendChild(devArea(entry[f[0]], f[1], function (v) { if (v) entry[f[0]] = v; else delete entry[f[0]]; }));
+      fields.appendChild(wrap);
+    });
+    row.appendChild(fields);
+
+    var ctrls = document.createElement('div'); ctrls.className = 'devctrls';
     var bsel = document.createElement('select'); bsel.className = 'devbk r' + bracketRank(entry.b);
     G.BRACKETS.forEach(function (b) {
       var o = document.createElement('option'); o.value = b; o.textContent = b; if ((entry.b || '10+') === b) o.selected = true; bsel.appendChild(o);
     });
     bsel.onchange = function () { entry.b = bsel.value; bsel.className = 'devbk r' + bracketRank(entry.b); };
-    row.appendChild(bsel);
-    DEV_FIELDS[kind].forEach(function (f) {
-      var wrap = document.createElement('label'); wrap.className = 'devf';
-      wrap.appendChild(document.createTextNode(f[1]));
-      wrap.appendChild(devInput(entry[f[0]], f[1], function (v) { if (v) entry[f[0]] = v; else delete entry[f[0]]; }));
-      row.appendChild(wrap);
-    });
+    ctrls.appendChild(bsel);
     if (kind === 'adjs' || kind === 'aiAdjs') {
       var invL = document.createElement('label'); invL.className = 'devchk';
       var inv = document.createElement('input'); inv.type = 'checkbox'; inv.checked = !!entry.inv;
       inv.onchange = function () { if (inv.checked) entry.inv = true; else delete entry.inv; };
-      invL.appendChild(inv); invL.appendChild(document.createTextNode('неизм.')); row.appendChild(invL);
+      invL.appendChild(inv); invL.appendChild(document.createTextNode('неизм.')); ctrls.appendChild(invL);
     }
     var nsL = document.createElement('label'); nsL.className = 'devchk nsfw';
     var ns = document.createElement('input'); ns.type = 'checkbox'; ns.checked = !!entry.nsfw;
     ns.onchange = function () { if (ns.checked) entry.nsfw = true; else delete entry.nsfw; };
-    nsL.appendChild(ns); nsL.appendChild(document.createTextNode('NSFW')); row.appendChild(nsL);
-    var del = document.createElement('button'); del.className = 'devdel'; del.textContent = '✕'; del.title = 'Изтрий'; del.onclick = onDel;
-    row.appendChild(del);
+    nsL.appendChild(ns); nsL.appendChild(document.createTextNode('NSFW')); ctrls.appendChild(nsL);
+    ctrls.appendChild(delBtn(onDel));
+    row.appendChild(ctrls);
     return row;
+  }
+
+  // a message row: a full-width multiline box on top, control(s) BELOW
+  function devMsgRow(entry, onDel) {
+    var row = document.createElement('div'); row.className = 'devedrow';
+    var fields = document.createElement('div'); fields.className = 'devfields';
+    if (entry.label) { var lab = document.createElement('div'); lab.className = 'devmlab'; lab.textContent = entry.label; fields.appendChild(lab); }
+    fields.appendChild(devArea(entry.t, 'текст…', function (v) { entry.t = v; }));
+    row.appendChild(fields);
+    if (onDel) { var ctrls = document.createElement('div'); ctrls.className = 'devctrls'; ctrls.appendChild(delBtn(onDel)); row.appendChild(ctrls); }
+    return row;
+  }
+  function devMsgSection(label, arr, addable) {
+    var sec = document.createElement('details'); sec.className = 'devsec';
+    var sum = document.createElement('summary'); sec.appendChild(sum);
+    var body = document.createElement('div'); body.className = 'devlist'; sec.appendChild(body);
+    function redraw() {
+      sum.textContent = label + ' (' + arr.length + ')';
+      body.innerHTML = '';
+      arr.forEach(function (entry) {
+        body.appendChild(devMsgRow(entry, addable ? function () { var i = arr.indexOf(entry); if (i >= 0) arr.splice(i, 1); redraw(); } : null));
+      });
+      if (addable) { var add = document.createElement('button'); add.className = 'devadd'; add.textContent = '+ добави';
+        add.onclick = function () { arr.push({ t: '' }); redraw(); sec.open = true; }; body.appendChild(add); }
+    }
+    redraw();
+    return sec;
   }
   function devPoolSection(key, label) {
     var sec = document.createElement('details'); sec.className = 'devsec';
@@ -1702,9 +1753,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     redraw();
     return sec;
   }
-  function msgSec(t, arr) {
-    return '<details class="devsec"><summary>' + esc(t) + ' (' + arr.length + ')</summary><div class="devlist">'
-      + arr.map(function (m) { return '<div class="devmsg">' + esc(m) + '</div>'; }).join('') + '</div></details>';
+  var DEV_MSGS = [['flop', 'Подигравки (флоп)'], ['risk', 'Подигравки (риск)'], ['fail', 'Подигравки (провал)'], ['shames', 'Засрамвания']];
+  function seedDevModel() {
+    devModel = JSON.parse(JSON.stringify(G.dumpSource())); // deep copy of the word source
+    function wrap(a) { return a.map(function (t) { return { t: t }; }); }
+    devModel.msgs = {
+      flop: wrap(G.ROASTS.flop), risk: wrap(G.ROASTS.risk), fail: wrap(G.ROASTS.fail),
+      shames: wrap(G.SHAME_LINES),
+      combos: G.CATEGORIES.map(function (c) { return { key: c.key, label: c.label, t: G.COMBO_DESC[c.key] || '' }; }),
+    };
   }
   function serializeDev() {
     // emit only non-empty fields + the bracket (omit the '10+' default)
@@ -1716,30 +1773,41 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       if (o.b && o.b !== '10+') r.b = o.b;
       return r;
     }
+    function texts(a) { return a.map(function (o) { return o.t; }).filter(function (s) { return s && s.trim(); }); }
     var out = {};
     DEV_POOLS.forEach(function (p) { out[p[0]] = devModel[p[0]].filter(function (o) { return o.m || o.n || o.f; }).map(ent); });
+    var m = devModel.msgs, combos = {};
+    m.combos.forEach(function (o) { if (o.t && o.t.trim()) combos[o.key] = o.t; });
+    out.roasts = { flop: texts(m.flop), risk: texts(m.risk), fail: texts(m.fail) };
+    out.shames = texts(m.shames);
+    out.combos = combos;
     return JSON.stringify(out, null, 2);
   }
+  // live-apply edited messages by mutating the exported banks in place
+  function applyDevMsgs() {
+    function set(target, arr) { target.length = 0; arr.forEach(function (o) { if (o.t && o.t.trim()) target.push(o.t); }); }
+    set(G.ROASTS.flop, devModel.msgs.flop); set(G.ROASTS.risk, devModel.msgs.risk); set(G.ROASTS.fail, devModel.msgs.fail);
+    set(G.SHAME_LINES, devModel.msgs.shames);
+    devModel.msgs.combos.forEach(function (o) { if (o.t && o.t.trim()) G.COMBO_DESC[o.key] = o.t; });
+  }
   function renderDevPanel() {
-    if (!devModel) devModel = JSON.parse(JSON.stringify(G.dumpSource())); // deep copy of the source
+    if (!devModel) seedDevModel();
     var host = $('devPanel'); host.innerHTML = '';
-    var hdr = document.createElement('div'); hdr.className = 'devhdr'; hdr.textContent = '🔧 РЕЖИМ РАЗРАБОТЧИК — редактор на думи';
+    var hdr = document.createElement('div'); hdr.className = 'devhdr'; hdr.textContent = '🔧 РЕЖИМ РАЗРАБОТЧИК — редактор';
     host.appendChild(hdr);
     var note = document.createElement('div'); note.className = 'devnote';
-    note.textContent = 'Редактирай формите за м/ср/ж, маркирай NSFW, добавяй записи. „Приложи“ презарежда имената за преглед; „Копирай“ дава JSON за подаване обратно.';
+    note.textContent = 'Редактирай думи (м/ср/ж + бракет + NSFW) и съобщения; добавяй записи навсякъде. „Приложи“ зарежда промените за преглед; „Копирай“ дава JSON за подаване обратно.';
     host.appendChild(note);
     DEV_POOLS.forEach(function (p) { host.appendChild(devPoolSection(p[0], p[1])); });
-    // read-only message banks (with rarity glance) stay informational
-    var combos = G.CATEGORIES.map(function (c) { return G.COMBO_DESC[c.key]; });
-    var msgs = document.createElement('div');
-    msgs.innerHTML = msgSec('Подигравки (флоп)', G.ROASTS.flop) + msgSec('Подигравки (риск)', G.ROASTS.risk)
-      + msgSec('Подигравки (провал)', G.ROASTS.fail) + msgSec('Засрамвания', G.SHAME_LINES) + msgSec('Описания на комбо', combos);
-    host.appendChild(msgs);
+    // editable message banks (add / edit / delete) + the per-category combo texts
+    DEV_MSGS.forEach(function (m) { host.appendChild(devMsgSection(m[1], devModel.msgs[m[0]], true)); });
+    host.appendChild(devMsgSection('Описания на комбо', devModel.msgs.combos, false));
     // action bar: apply (preview) + copy (export)
     var bar = document.createElement('div'); bar.className = 'devbar';
     var apply = document.createElement('button'); apply.className = 'btn'; apply.textContent = '↻ Приложи';
     apply.onclick = function () {
       G.rebuildFromSource(devModel);
+      applyDevMsgs();
       if (!$('setup').classList.contains('hidden')) { setupPlayers.forEach(regenName); renderSetup(); }
       apply.textContent = '↻ Приложено!'; setTimeout(function () { apply.textContent = '↻ Приложи'; }, 1400);
     };
@@ -1759,7 +1827,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     host.appendChild(bar); host.appendChild(out);
   }
   function openSettings() {
-    if (!settings.dev) { devProgress = 0; devClicks = 0; }
+    if (!settings.dev) { devTaps = []; }
     buildSettingsRows();
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
