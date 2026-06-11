@@ -9,6 +9,12 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
 ## Features
 
+- **РЕЖИМ КАЗАРМА (barracks mode).** A master switch on the start screen that
+  **hides every goofy feature** for a dead-serious game: no roasts, no marching
+  orders, no shaming combo tooltips or penalties, no rare-name bonuses or brag
+  bubbles, and no stupid bets (or end-screen stakes). The competitive core — dice,
+  scoring and the full analytics report — stays untouched. Off by default;
+  persists across sessions.
 - **Full-screen board.** Fills the viewport with a thin margin: scoreboard up
   top, a **medal divider**, and the **dice console** anchored at the bottom.
 - **Select-to-reroll.** The turn opens on the general's order with the dice
