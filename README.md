@@ -94,14 +94,13 @@ edition): camouflage field, classification banner, brass medals and stencil type
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
 - **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f), random
-  initially. Switching gender **keeps the same name and its rarity** — it only
-  re-coheres grammatically: the adjective re-agrees and the noun **morphs in
-  place** when it carries a sibling-gender form (_Маймун → Маймуна → Маймунче_),
-  otherwise it's swapped for a same-rarity sibling. Callouts and roasts agree too
-  (incl. neuter), via the agreement engine.
-- **How to play + menu.** A **📖 Как се играе** briefing on setup, and a
-  pronounced in-game **☰ menu** (how-to · settings · restart) explain the turn and
-  every combo's requirement. **Restart** returns to the muster screen with the
+  initially. Switching gender **morphs the same name in place** when the noun
+  carries a sibling-gender form (_Маймун → Маймуна → Маймунче_) — rarity unchanged;
+  if the noun has no form for the new gender, it **rolls a fresh name with
+  refreshed rarity** instead. Callouts and roasts agree too (incl. neuter).
+- **How to play + menu.** A **📖 Как се играе** briefing on setup, and an in-game
+  **☰ menu** (the hamburger sits in the header where the player badge used to be)
+  explain the turn and every combo's requirement. **Restart** returns to the muster screen with the
   **same roster** (player & AI counts intact) so the lineup can be tweaked before
   the next battle.
 - **Shaming combo tooltips.** Touch a category name in-game and HQ explains the
@@ -128,11 +127,13 @@ edition): camouflage field, classification banner, brass medals and stencil type
   exactly** — open a game from the archive and you get the same standings, tabs
   and per-player report. As many games as storage allows are kept (oldest dropped
   on overflow); games can be deleted inline or the whole archive **cleared from
-  settings (with a confirmation)**. Each game also has a **🎬 replay**: a
-  scrubbable, auto-playing turn-by-turn / roll-by-roll viewer with a **speed
-  selector** (🐢→⚡), **play/pause**, step buttons and an **action slider** that
+  settings (with a confirmation)**. Each game also has a **replay** — _Бойна
+  хроника_: a scrubbable, auto-playing turn-by-turn / roll-by-roll viewer with
+  CSS-drawn transport controls (play/pause, step, restart), a military **tempo
+  selector** (_Походно · Боен ход · Щурмово · Блиц_) and an **action slider** that
   jumps to any individual roll or commit — the board fills and the dice (kept ones
-  marked) update as it plays. The archive opens to an **owner overview**:
+  marked) update as it plays, narrated in the comic register (_Открива огън —
+  залп 2/3!_). The archive opens to an **owner overview**:
   multi-game trends for the owner — battles, wins, win-rate, average decision
   accuracy (→ a rank), personal best, average luck, generals, your **favourite
   blunder**, and recent form. If no analysable owner games exist yet, a goofy
@@ -146,15 +147,18 @@ edition): camouflage field, classification banner, brass medals and stencil type
   and the in-game advice. Each row hides a tiny clickable box on its right edge;
   a **rolling tap-sequence matcher** unlocks **developer mode** when the recent
   taps hit the key (box 0 once, box 1 twice, … the 1-2-3-x escalating pattern) —
-  a mistap just means re-tapping. Dev mode is a full **editor**: every title /
-  adjective / noun (and the AI pools) is editable across its **м / ср / ж** forms,
-  with a **percentile-bracket selector** (colour-cued) and an **NSFW** flag; rows
-  are **ranked by rarity**. The roast / shame / combo **message banks are editable
-  too** — add, edit and delete across all of them. Every field is a **multiline
-  box that grows to show the whole entry**, with the controls on the line below
-  (no sideways scrolling). Hit **↻ Приложи** to load the edits live for preview,
-  and **📋 КОПИРАЙ** to export the whole set as JSON (words + brackets + messages;
-  unchanged entries verbatim) to hand back for baking into the source.
+  a mistap just means re-tapping. Dev mode is a full **editor over every game
+  string** — word pools (titles / adjectives / nouns + AI), all roast / shame
+  banks, bets, ranks, combo descriptions, HQ orders, rarity exclamations, AI
+  persona names + flavour, and playstyle names + descriptions. **Touching an
+  entry opens an edit panel** (so the list stays clean) with **Приложи / Отказ**,
+  a **Възстанови** for modified ones, and **Премахни**; words also get the
+  **м / ср / ж** forms, a **percentile-bracket selector** and an **NSFW** flag.
+  Add entries anywhere. **↻ Приложи всичко** loads the applyable edits live for
+  preview, and **📋 Копирай промените** exports a compact **diff** — only the
+  changes, each with an executable identifier and an action marker
+  (`~ nouns[21]: {…}`, `+ roasts.flop: "…"`, `- adjs[4]`) — to hand back for
+  baking into the source.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).

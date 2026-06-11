@@ -828,10 +828,10 @@
     return buildFromParts(parts, gender, kind);
   }
 
-  // §1 re-cohere a name for a new gender WITHOUT changing its rarity. Title and
-  // adjective are kept (the adjective just re-agrees); the noun morphs in place
-  // when it has the new gender's form, else it's swapped for a same-BRACKET noun
-  // (so the product — and thus the rarity — is unchanged).
+  // §1 re-cohere a name for a new gender, morphing the noun IN PLACE (keeps the
+  // exact rarity). Only valid when the noun has a form for the new gender — the
+  // caller checks nounRenders() first; otherwise the UI rolls a fresh name.
+  function nounRenders(parts, gender) { return !!nounCanRender(parts.noun.e, gender); }
   function recohereName(kind, parts, gender) {
     var np = kind === 'ai' ? aiNounPool : nounPool;
     var noun = parts.noun;
@@ -877,16 +877,17 @@
     var n = Math.max(1, Math.round(100 / pct));
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
-  // The brag line talks in FREQUENCY (1 на N · топ X%), not the tiny raw chance.
-  function rarityLine(pct, bonus, tier) {
+  // The brag headline talks in FREQUENCY (1 на N · топ X%), not the tiny raw
+  // chance. The award message is a SEPARATE line (rarityAward).
+  function rarityLine(pct, tier) {
     if (tier == null) tier = rarityTier(pct);
     if (!tier) return '';
     var odds = '1 на ' + odds1inN(pct) + ' имена';
     if (tier === 10) return '🙂 Рядко име — ' + odds + '.';
     var excl = RARITY_EXCL[tier] || 'Брей,';
-    var b = bonus > 0 ? ' Щабът ти отпуска +' + bonus + ' т. начален аванс!' : '';
-    return excl + ' ' + odds + ' — топ ' + tier + '% рядкост!' + b;
+    return excl + ' ' + odds + ' — топ ' + tier + '%.';
   }
+  function rarityAward(bonus) { return bonus > 0 ? 'Щабът ти отпуска +' + bonus + ' т. начален аванс!' : ''; }
 
   // dev-mode dump of the live pools, with each entry's hardcoded bracket.
   function dumpPools() {
@@ -1063,11 +1064,15 @@
     bonusForPct: bonusForPct,
     bonusForTier: bonusForTier,
     rarityLine: rarityLine,
+    rarityAward: rarityAward,
     rarityTier: rarityTier,
     matchSeed: matchSeed,
     recohereName: recohereName,
+    nounRenders: nounRenders,
     setCensor: setCensor,
     BRACKETS: BRACKETS,
+    BETS: BETS,
+    RARITY_EXCL: RARITY_EXCL,
     dumpPools: dumpPools,
     dumpSource: dumpSource,
     rebuildFromSource: rebuildFromSource,

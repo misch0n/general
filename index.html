@@ -380,11 +380,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .pcard.dragging{ opacity:.85; box-shadow:0 10px 26px rgba(0,0,0,.5); outline:2px solid var(--gen-brass); }
 
 /* hamburger menu, how-to button */
-.menubtn{ position:absolute; right:30px; top:50%; transform:translateY(-50%); z-index:3; width:34px; height:20px; padding:0;
-  display:grid; place-items:center; color:var(--gen-ink); background:var(--gen-brass); font-size:15px; line-height:1;
-  border:1.5px solid var(--gen-brass-stroke); border-radius:5px; }
-.menubtn:hover{ background:var(--gen-brass-bright); }
-.menubtn:active{ filter:brightness(.92); }
+/* hamburger sits in the header where the rank box was (replaces the initials) */
+.rank.menubtn{ padding:0; cursor:pointer; gap:0; }
+.rank.menubtn .burger{ position:relative; width:18px; height:2px; background:var(--gen-brass); border-radius:2px; box-shadow:0 -5px 0 var(--gen-brass), 0 5px 0 var(--gen-brass); }
+.rank.menubtn:hover{ border-color:var(--gen-brass); }
+.rank.menubtn:hover .burger,.rank.menubtn:hover .burger{ background:var(--gen-brass-bright); box-shadow:0 -5px 0 var(--gen-brass-bright), 0 5px 0 var(--gen-brass-bright); }
+.rank.menubtn:active{ transform:translateY(1px); }
 .howtobtn{ width:100%; margin-top:10px; }
 /* tappable combo names + upper commit chip */
 .face-n.tappable,.cname.tappable{ cursor:help; }
@@ -452,7 +453,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
-.histgame .hg-play{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-brass); border:1px solid var(--gen-pill-line); background:transparent; font-size:11px; }
+.histgame .hg-play{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; display:grid; place-items:center; }
+.histgame .hg-play .gl{ position:relative; width:10px; height:10px; display:block; }
+.histgame .hg-play .gl::before{ content:''; position:absolute; inset:0; background:var(--gen-brass); clip-path:polygon(0 0,0 100%,100% 50%); }
 .histgame .hg-play:hover{ border-color:var(--gen-brass); }
 /* replay viewer */
 .rpinfo{ display:flex; align-items:center; justify-content:space-between; font-family:var(--gen-font-display); font-weight:700;
@@ -470,10 +473,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .rplabel b{ color:var(--gen-brass-bright); }
 .rpslider{ width:100%; margin:4px 0 12px; accent-color:var(--gen-brass); }
 .rpctrls{ display:flex; align-items:center; justify-content:center; gap:8px; }
-.rpbtn{ width:40px; height:36px; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); font-size:14px; }
-.rpbtn.play{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); width:50px; }
+/* equal-size control buttons; glyphs drawn in CSS (no emoji), centred */
+.rpbtn{ width:40px; height:38px; flex:none; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line);
+  position:relative; display:grid; place-items:center; }
+.rpbtn.play{ background:var(--gen-brass); border-color:var(--gen-brass); }
 .rpbtn:active{ transform:translateY(1px); }
-.rpspeed{ height:36px; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); font-family:var(--gen-font-body); font-size:11px; padding:0 4px; }
+.rpbtn .gl{ position:relative; width:14px; height:14px; display:block; }
+.rpbtn .gl::before,.rpbtn .gl::after{ content:''; position:absolute; background:var(--gen-text); }
+.rpbtn.play .gl::before,.rpbtn.play .gl::after{ background:var(--gen-ink); }
+.rpbtn .gl::after{ display:none; }
+.ic-prev .gl::before{ inset:0; clip-path:polygon(100% 0,100% 100%,0 50%); }        /* ◀ */
+.ic-next .gl::before{ inset:0; clip-path:polygon(0 0,0 100%,100% 50%); }           /* ▶ */
+.ic-play .gl::before{ inset:0; clip-path:polygon(0 0,0 100%,100% 50%); }           /* ▶ */
+/* ⏸ — two bars when playing */
+.ic-play.playing .gl::before{ clip-path:none; inset:0 auto 0 1px; width:4px; }
+.ic-play.playing .gl::after{ display:block; inset:0 1px 0 auto; width:4px; }
+/* ⏮ restart — leading bar + left triangle */
+.ic-restart .gl::before{ inset:0; clip-path:polygon(100% 0,100% 100%,22% 50%); }
+.ic-restart .gl::after{ display:block; left:0; top:0; bottom:0; width:3px; }
+.rpspeed{ height:38px; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); font-family:var(--gen-font-display); font-size:11px; letter-spacing:.4px; padding:0 6px; text-transform:uppercase; }
 
 /* rare-name brag bubble (setup) — colour-coded by rarity tier */
 .rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
@@ -531,10 +549,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   border:1px solid var(--gen-alert-line); background:transparent; font-size:12px; }
 .devadd{ margin-top:6px; width:100%; padding:6px; border-radius:6px; color:var(--gen-brass); background:var(--gen-pill);
   border:1px dashed var(--gen-pill-line); font-family:var(--gen-font-display); font-size:11px; letter-spacing:1px; }
-.devbar{ display:flex; gap:8px; margin-top:12px; }
-.devbar .btn{ padding:10px; font-size:12px; }
+.devbar{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.devbar .btn{ padding:10px; font-size:12px; flex:1 1 auto; }
+.devbar .devrem{ color:var(--gen-alert); border-color:var(--gen-alert-line); }
 .devout{ width:100%; height:120px; margin-top:8px; font-family:var(--gen-font-body); font-size:10px; color:var(--gen-text);
   background:rgba(0,0,0,.4); border:1px solid var(--gen-brass-stroke); border-radius:6px; padding:6px; resize:vertical; }
+/* clickable list item (touch to edit) + status badges */
+.devitem{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; padding:7px 9px; border-radius:7px;
+  background:rgba(255,255,255,.03); border:1px solid var(--gen-pill-line); color:var(--gen-text); margin-bottom:5px; font-size:11.5px; }
+.devitem:hover{ border-color:var(--gen-brass); }
+.devitem .diword{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.devitem.st-removed .diword{ text-decoration:line-through; color:var(--gen-muted); }
+.devitem.st-modified{ border-color:#e0b85a; } .devitem.st-added{ border-color:#7ab85a; } .devitem.st-removed{ border-color:var(--gen-alert-line); }
+.dinsfw{ flex:none; font-size:8px; font-weight:700; color:var(--gen-alert); border:1px solid var(--gen-alert-line); border-radius:3px; padding:0 3px; }
+.devbadge{ flex:none; font-size:8.5px; font-weight:700; letter-spacing:.3px; border-radius:4px; padding:1px 5px; }
+.devbadge.add{ background:rgba(75,140,60,.25); color:#9bd17e; } .devbadge.mod{ background:rgba(200,166,75,.22); color:var(--gen-brass-bright); } .devbadge.rem{ background:rgba(178,58,46,.22); color:#e88; }
+.deveditbox{ padding:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.2); }
+.deveditbox .devfields{ margin-bottom:8px; }
+
+@media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 </style>
@@ -566,10 +599,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 <!-- ============ GAME ============ -->
 <div id="game" class="board hidden">
-  <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО<button id="menuBtn" class="menubtn" title="Меню" aria-label="Меню">☰</button></div>
+  <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО</div>
 
   <div class="hd">
-    <span id="curRank" class="rank"></span>
+    <button id="menuBtn" class="rank menubtn" title="Меню" aria-label="Меню"><span class="burger"></span></button>
     <span class="pinfo">
       <span id="curName" class="pn"></span>
       <span id="curPersona" class="ppersona hidden"></span>
@@ -721,22 +754,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 <div id="replayModal" class="overlay hidden">
   <div class="modal replaymodal">
     <button class="x-close" id="replayClose">✕</button>
-    <h2>🎬 Реплей</h2>
+    <h2>Бойна хроника</h2>
     <div id="replayInfo" class="rpinfo"></div>
     <div id="replayBoard" class="rpboard"></div>
     <div id="replayDice" class="rpdice"></div>
     <div id="rpLabel" class="rplabel"></div>
     <input id="rpSlider" class="rpslider" type="range" min="0" max="0" value="0" />
     <div class="rpctrls">
-      <button id="rpRestart" class="rpbtn" title="Отначало">⏮</button>
-      <button id="rpStepB" class="rpbtn" title="Назад">◀</button>
-      <button id="rpPlay" class="rpbtn play" title="Пусни / пауза">▶</button>
-      <button id="rpStepF" class="rpbtn" title="Напред">▶❘</button>
-      <select id="rpSpeed" class="rpspeed" title="Скорост">
-        <option value="1300">🐢 Бавно</option>
-        <option value="750" selected>Нормално</option>
-        <option value="380">🐇 Бързо</option>
-        <option value="160">⚡ Светкавица</option>
+      <button id="rpRestart" class="rpbtn ic-restart" title="Отначало"><span class="gl"></span></button>
+      <button id="rpStepB" class="rpbtn ic-prev" title="Назад"><span class="gl"></span></button>
+      <button id="rpPlay" class="rpbtn play ic-play" title="Пусни / пауза"><span class="gl"></span></button>
+      <button id="rpStepF" class="rpbtn ic-next" title="Напред"><span class="gl"></span></button>
+      <select id="rpSpeed" class="rpspeed" title="Темпо">
+        <option value="1300">Походно</option>
+        <option value="750" selected>Боен ход</option>
+        <option value="380">Щурмово</option>
+        <option value="160">Блиц</option>
       </select>
     </div>
   </div>
@@ -892,13 +925,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // (the noun morphs in place when it can, else swaps for a same-rarity sibling).
   function setGender(p, g) {
     p.gender = g;
-    if (p.parts) {
-      // rarity is fixed at name creation and stays immutable across gender
-      // switches — only the NAME string re-coheres (p.pct / p.bonus untouched).
+    // morph the SAME name in place only when the noun has a form for the new
+    // gender (rarity unchanged); otherwise roll a fresh name + refreshed rarity.
+    if (p.parts && G.nounRenders(p.parts, g)) {
       var r = G.recohereName(p.isAI ? 'ai' : 'human', p.parts, g);
-      p.name = r.name; p.parts = r.parts;
+      p.name = r.name; p.parts = r.parts; // p.pct / p.tier / p.bonus untouched
     } else {
-      regenName(p); // a hand-typed name has no parts to re-cohere — start fresh
+      regenName(p);
     }
   }
   // build the rare-name brag bubble for a player (or null)
@@ -908,7 +941,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var bub = document.createElement('div');
     bub.className = 'rarebubble rt' + p.tier;                // colour = frequency tier
     var intro = p.typed ? '🎯 Позна! ' : '🏅 ';
-    bub.innerHTML = '<span>' + intro + esc(G.rarityLine(p.pct, eff, p.tier)) + '</span><button class="rbx" title="Скрий">✕</button>';
+    // two lines: «exclamation, 1 на X — топ Y%» then the award on its own line
+    var award = G.rarityAward(eff);
+    bub.innerHTML = '<span>' + intro + esc(G.rarityLine(p.pct, p.tier))
+      + (award ? '<br>' + esc(award) : '') + '</span><button class="rbx" title="Скрий">✕</button>';
     bub.querySelector('.rbx').onclick = function () { p.bubbleDismissed = true; bub.remove(); };
     return bub;
   }
@@ -1243,7 +1279,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // a 'pretend next turn' penalty briefly shows the next player in the header
     var idx = fx.pretendNext ? (game.current + 1) % game.players.length : game.current;
     var p = game.players[idx];
-    $('curRank').textContent = initials(p.name);
     $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
@@ -1845,186 +1880,180 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       activateDev();
     }
   }
-  function activateDev() { settings.dev = true; devModel = null; renderDevPanel(); $('devPanel').classList.remove('hidden'); }
+  function activateDev() { settings.dev = true; devCats = null; renderDevPanel(); $('devPanel').classList.remove('hidden'); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
-  // ---- dev-mode word-list editor (fine-tune + КОПИРАЙ export) ----
-  // The model is a deep copy of the live source; edits mutate it by reference so
-  // typing never re-renders. КОПИРАЙ serialises it for pasting back to me.
-  var devModel = null;
-  // which gendered fields each kind exposes (titles are genderless → one field)
-  var DEV_FIELDS = {
-    titles:  [['m', 'дума']],
-    adjs:    [['m', 'м (база)'], ['n', 'ср'], ['f', 'ж']],
-    nouns:   [['m', 'м'], ['n', 'ср'], ['f', 'ж']],
-    aiAdjs:  [['m', 'м (база)'], ['n', 'ср'], ['f', 'ж']],
-    aiNouns: [['m', 'м'], ['n', 'ср'], ['f', 'ж']],
-  };
-  var DEV_POOLS = [['titles', 'Титли'], ['adjs', 'Прилагателни'], ['nouns', 'Съществителни'],
-    ['aiAdjs', 'AI прилагателни'], ['aiNouns', 'AI съществителни']];
+  // ---- dev-mode editor: ALL game strings, edit-on-touch, diff-only copy ----
+  // Every item tracks its original, so „Копирай“ emits only the CHANGES (modified
+  // / added / removed) with an executable identifier. Touching an item opens an
+  // edit panel with Приложи / Отказ / Възстанови.
+  var devCats = null, devEditing = null;
+  function bracketRank(b) { var i = G.BRACKETS.indexOf(b || '10+'); return i < 0 ? G.BRACKETS.length : i; }
+  function cloneVal(v) { return v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v; }
   // a text box that grows to show ALL of its content (no sideways scroll)
   function devArea(val, ph, on) {
     var t = document.createElement('textarea'); t.className = 'devta'; t.rows = 1;
     t.value = val || ''; t.placeholder = ph;
     function grow() { t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight, 26) + 'px'; }
     t.oninput = function () { on(t.value.trim()); grow(); };
-    setTimeout(grow, 0); // size once attached (scrollHeight needs layout)
+    setTimeout(grow, 0);
     return t;
   }
-  function bracketRank(b) { var i = G.BRACKETS.indexOf(b || '10+'); return i < 0 ? G.BRACKETS.length : i; }
-  function delBtn(onDel) { var d = document.createElement('button'); d.className = 'devdel'; d.textContent = '✕'; d.title = 'Изтрий'; d.onclick = onDel; return d; }
 
-  // a word-pool row: the (multiline) м/ср/ж fields on top, controls BELOW
-  function devRow(kind, entry, onDel) {
-    var row = document.createElement('div'); row.className = 'devedrow';
-    var fields = document.createElement('div'); fields.className = 'devfields';
-    DEV_FIELDS[kind].forEach(function (f) {
-      var wrap = document.createElement('label'); wrap.className = 'devf';
-      wrap.appendChild(document.createTextNode(f[1]));
-      wrap.appendChild(devArea(entry[f[0]], f[1], function (v) { if (v) entry[f[0]] = v; else delete entry[f[0]]; }));
-      fields.appendChild(wrap);
-    });
-    row.appendChild(fields);
-
-    var ctrls = document.createElement('div'); ctrls.className = 'devctrls';
-    var bsel = document.createElement('select'); bsel.className = 'devbk r' + bracketRank(entry.b);
-    G.BRACKETS.forEach(function (b) {
-      var o = document.createElement('option'); o.value = b; o.textContent = b; if ((entry.b || '10+') === b) o.selected = true; bsel.appendChild(o);
-    });
-    bsel.onchange = function () { entry.b = bsel.value; bsel.className = 'devbk r' + bracketRank(entry.b); };
-    ctrls.appendChild(bsel);
-    if (kind === 'adjs' || kind === 'aiAdjs') {
-      var invL = document.createElement('label'); invL.className = 'devchk';
-      var inv = document.createElement('input'); inv.type = 'checkbox'; inv.checked = !!entry.inv;
-      inv.onchange = function () { if (inv.checked) entry.inv = true; else delete entry.inv; };
-      invL.appendChild(inv); invL.appendChild(document.createTextNode('неизм.')); ctrls.appendChild(invL);
-    }
-    var nsL = document.createElement('label'); nsL.className = 'devchk nsfw';
-    var ns = document.createElement('input'); ns.type = 'checkbox'; ns.checked = !!entry.nsfw;
-    ns.onchange = function () { if (ns.checked) entry.nsfw = true; else delete entry.nsfw; };
-    nsL.appendChild(ns); nsL.appendChild(document.createTextNode('NSFW')); ctrls.appendChild(nsL);
-    ctrls.appendChild(delBtn(onDel));
-    row.appendChild(ctrls);
-    return row;
+  function buildDevCats() {
+    var src = G.dumpSource();
+    function words(arr) { return arr.map(function (o, i) { return { id: i, orig: cloneVal(o), val: cloneVal(o), status: 'unchanged' }; }); }
+    function texts(arr) { return arr.map(function (s, i) { return { id: i, orig: s, val: s, status: 'unchanged' }; }); }
+    function keyed(pairs) { return pairs.map(function (p) { return { id: p[0], orig: p[1], val: p[1], status: 'unchanged' }; }); }
+    var personas = [], playstyles = [];
+    G.PERSONAS.forEach(function (p) { personas.push([p.id + '.name', p.name], [p.id + '.flavor', p.flavor]); });
+    Object.keys(G.PLAYSTYLES).forEach(function (k) { var s = G.PLAYSTYLES[k]; playstyles.push([k + '.name', s.name], [k + '.desc', s.desc]); });
+    devCats = [
+      { key: 'titles', label: 'Титли', kind: 'word', items: words(src.titles) },
+      { key: 'adjs', label: 'Прилагателни', kind: 'word', adj: true, items: words(src.adjs) },
+      { key: 'nouns', label: 'Съществителни', kind: 'word', items: words(src.nouns) },
+      { key: 'aiAdjs', label: 'AI прилагателни', kind: 'word', adj: true, items: words(src.aiAdjs) },
+      { key: 'aiNouns', label: 'AI съществителни', kind: 'word', items: words(src.aiNouns) },
+      { key: 'roasts.flop', label: 'Подигравки (флоп)', kind: 'text', items: texts(G.ROASTS.flop) },
+      { key: 'roasts.risk', label: 'Подигравки (риск)', kind: 'text', items: texts(G.ROASTS.risk) },
+      { key: 'roasts.fail', label: 'Подигравки (провал)', kind: 'text', items: texts(G.ROASTS.fail) },
+      { key: 'shames', label: 'Засрамвания', kind: 'text', items: texts(G.SHAME_LINES) },
+      { key: 'bets', label: 'Облози', kind: 'text', items: texts(G.BETS) },
+      { key: 'ranks', label: 'Чинове', kind: 'text', items: texts(G.RANKS) },
+      { key: 'combos', label: 'Описания на комбо', kind: 'keyed', items: keyed(G.CATEGORIES.map(function (c) { return [c.key, G.COMBO_DESC[c.key] || '']; })) },
+      { key: 'orders', label: 'Заповеди (имена)', kind: 'keyed', items: keyed(Object.keys(G.ORDER_NAMES).map(function (k) { return [k, G.ORDER_NAMES[k]]; })) },
+      { key: 'excl', label: 'Възклицания за рядкост', kind: 'keyed', items: keyed(Object.keys(G.RARITY_EXCL).map(function (k) { return [k, G.RARITY_EXCL[k]]; })) },
+      { key: 'personas', label: 'AI стилове', kind: 'keyed', items: keyed(personas) },
+      { key: 'playstyles', label: 'Почерци', kind: 'keyed', items: keyed(playstyles) },
+    ];
   }
-
-  // a message row: a full-width multiline box on top, control(s) BELOW
-  function devMsgRow(entry, onDel) {
-    var row = document.createElement('div'); row.className = 'devedrow';
-    var fields = document.createElement('div'); fields.className = 'devfields';
-    if (entry.label) { var lab = document.createElement('div'); lab.className = 'devmlab'; lab.textContent = entry.label; fields.appendChild(lab); }
-    fields.appendChild(devArea(entry.t, 'текст…', function (v) { entry.t = v; }));
-    row.appendChild(fields);
-    if (onDel) { var ctrls = document.createElement('div'); ctrls.className = 'devctrls'; ctrls.appendChild(delBtn(onDel)); row.appendChild(ctrls); }
-    return row;
+  function devItemText(cat, it) {
+    if (cat.kind === 'word') { var v = it.val; return [v.m, v.n, v.f].filter(Boolean).join(' / ') || '∅'; }
+    return it.val || '∅';
   }
-  function devMsgSection(label, arr, addable) {
-    var sec = document.createElement('details'); sec.className = 'devsec';
-    var sum = document.createElement('summary'); sec.appendChild(sum);
-    var body = document.createElement('div'); body.className = 'devlist'; sec.appendChild(body);
-    function redraw() {
-      sum.textContent = label + ' (' + arr.length + ')';
-      body.innerHTML = '';
-      arr.forEach(function (entry) {
-        body.appendChild(devMsgRow(entry, addable ? function () { var i = arr.indexOf(entry); if (i >= 0) arr.splice(i, 1); redraw(); } : null));
-      });
-      if (addable) { var add = document.createElement('button'); add.className = 'devadd'; add.textContent = '+ добави';
-        add.onclick = function () { arr.push({ t: '' }); redraw(); sec.open = true; }; body.appendChild(add); }
-    }
-    redraw();
-    return sec;
-  }
-  function devPoolSection(key, label) {
-    var sec = document.createElement('details'); sec.className = 'devsec';
-    var sum = document.createElement('summary'); sec.appendChild(sum);
-    var body = document.createElement('div'); body.className = 'devlist'; sec.appendChild(body);
-    function redraw() {
-      // rank by rarity (rarest bracket first) for easy scanning
-      devModel[key].sort(function (a, b) { return bracketRank(a.b) - bracketRank(b.b); });
-      var list = devModel[key];
-      sum.textContent = label + ' (' + list.length + ')';
-      body.innerHTML = '';
-      list.forEach(function (entry) {
-        body.appendChild(devRow(key, entry, function () { var i = list.indexOf(entry); if (i >= 0) list.splice(i, 1); redraw(); }));
-      });
-      var add = document.createElement('button'); add.className = 'devadd'; add.textContent = '+ добави';
-      add.onclick = function () { list.push({ b: '10+' }); redraw(); sec.open = true; };
-      body.appendChild(add);
-    }
-    redraw();
-    return sec;
-  }
-  var DEV_MSGS = [['flop', 'Подигравки (флоп)'], ['risk', 'Подигравки (риск)'], ['fail', 'Подигравки (провал)'], ['shames', 'Засрамвания']];
-  function seedDevModel() {
-    devModel = JSON.parse(JSON.stringify(G.dumpSource())); // deep copy of the word source
-    function wrap(a) { return a.map(function (t) { return { t: t }; }); }
-    devModel.msgs = {
-      flop: wrap(G.ROASTS.flop), risk: wrap(G.ROASTS.risk), fail: wrap(G.ROASTS.fail),
-      shames: wrap(G.SHAME_LINES),
-      combos: G.CATEGORIES.map(function (c) { return { key: c.key, label: c.label, t: G.COMBO_DESC[c.key] || '' }; }),
-    };
-  }
-  function serializeDev() {
-    // emit only non-empty fields + the bracket (omit the '10+' default)
-    function ent(o) {
-      var r = {};
-      ['m', 'n', 'f'].forEach(function (k) { if (o[k]) r[k] = o[k]; });
-      if (o.inv) r.inv = true;
-      if (o.nsfw) r.nsfw = true;
-      if (o.b && o.b !== '10+') r.b = o.b;
-      return r;
-    }
-    function texts(a) { return a.map(function (o) { return o.t; }).filter(function (s) { return s && s.trim(); }); }
-    var out = {};
-    DEV_POOLS.forEach(function (p) { out[p[0]] = devModel[p[0]].filter(function (o) { return o.m || o.n || o.f; }).map(ent); });
-    var m = devModel.msgs, combos = {};
-    m.combos.forEach(function (o) { if (o.t && o.t.trim()) combos[o.key] = o.t; });
-    out.roasts = { flop: texts(m.flop), risk: texts(m.risk), fail: texts(m.fail) };
-    out.shames = texts(m.shames);
-    out.combos = combos;
-    return JSON.stringify(out, null, 2);
-  }
-  // live-apply edited messages by mutating the exported banks in place
-  function applyDevMsgs() {
-    function set(target, arr) { target.length = 0; arr.forEach(function (o) { if (o.t && o.t.trim()) target.push(o.t); }); }
-    set(G.ROASTS.flop, devModel.msgs.flop); set(G.ROASTS.risk, devModel.msgs.risk); set(G.ROASTS.fail, devModel.msgs.fail);
-    set(G.SHAME_LINES, devModel.msgs.shames);
-    devModel.msgs.combos.forEach(function (o) { if (o.t && o.t.trim()) G.COMBO_DESC[o.key] = o.t; });
+  function devBadge(st) {
+    if (st === 'added') return '<span class="devbadge add">+ ново</span>';
+    if (st === 'modified') return '<span class="devbadge mod">~ променено</span>';
+    if (st === 'removed') return '<span class="devbadge rem">− премахнато</span>';
+    return '';
   }
   function renderDevPanel() {
-    if (!devModel) seedDevModel();
+    devEditing = null;
+    if (!devCats) buildDevCats();
     var host = $('devPanel'); host.innerHTML = '';
-    var hdr = document.createElement('div'); hdr.className = 'devhdr'; hdr.textContent = '🔧 РЕЖИМ РАЗРАБОТЧИК — редактор';
-    host.appendChild(hdr);
-    var note = document.createElement('div'); note.className = 'devnote';
-    note.textContent = 'Редактирай думи (м/ср/ж + бракет + NSFW) и съобщения; добавяй записи навсякъде. „Приложи“ зарежда промените за преглед; „Копирай“ дава JSON за подаване обратно.';
-    host.appendChild(note);
-    DEV_POOLS.forEach(function (p) { host.appendChild(devPoolSection(p[0], p[1])); });
-    // editable message banks (add / edit / delete) + the per-category combo texts
-    DEV_MSGS.forEach(function (m) { host.appendChild(devMsgSection(m[1], devModel.msgs[m[0]], true)); });
-    host.appendChild(devMsgSection('Описания на комбо', devModel.msgs.combos, false));
-    // action bar: apply (preview) + copy (export)
+    host.appendChild(el('div', 'devhdr', '🔧 РЕЖИМ РАЗРАБОТЧИК — редактор'));
+    host.appendChild(el('div', 'devnote', 'Докосни запис, за да го редактираш (Приложи / Отказ / Възстанови). „Копирай“ дава само промените за подаване обратно. „Приложи всичко“ зарежда наличните за преглед.'));
+    devCats.forEach(function (cat) {
+      var changed = cat.items.filter(function (i) { return i.status !== 'unchanged'; }).length;
+      var sec = document.createElement('details'); sec.className = 'devsec';
+      var sum = document.createElement('summary');
+      sum.innerHTML = esc(cat.label) + ' (' + cat.items.length + ')' + (changed ? ' <span class="devbadge mod">' + changed + ' промени</span>' : '');
+      sec.appendChild(sum);
+      var body = document.createElement('div'); body.className = 'devlist'; sec.appendChild(body);
+      var items = cat.kind === 'word' ? cat.items.slice().sort(function (a, b) { return bracketRank(a.val.b) - bracketRank(b.val.b); }) : cat.items;
+      items.forEach(function (it) {
+        var row = document.createElement('button'); row.className = 'devitem st-' + it.status;
+        row.innerHTML = '<span class="diword">' + esc(devItemText(cat, it)) + '</span>'
+          + (cat.kind === 'word' && it.val.b && it.val.b !== '10+' ? '<span class="devbk r' + bracketRank(it.val.b) + '" style="pointer-events:none">' + it.val.b + '</span>' : '')
+          + (cat.kind === 'word' && it.val.nsfw ? '<span class="dinsfw">NSFW</span>' : '')
+          + devBadge(it.status);
+        row.onclick = function () { openDevEdit(cat, it, false); };
+        body.appendChild(row);
+      });
+      var add = el('button', 'devadd', '+ добави'); add.onclick = function () { addDevItem(cat); }; body.appendChild(add);
+      host.appendChild(sec);
+    });
     var bar = document.createElement('div'); bar.className = 'devbar';
-    var apply = document.createElement('button'); apply.className = 'btn'; apply.textContent = '↻ Приложи';
-    apply.onclick = function () {
-      G.rebuildFromSource(devModel);
-      applyDevMsgs();
-      if (!$('setup').classList.contains('hidden')) { setupPlayers.forEach(regenName); renderSetup(); }
-      apply.textContent = '↻ Приложено!'; setTimeout(function () { apply.textContent = '↻ Приложи'; }, 1400);
-    };
-    var copy = document.createElement('button'); copy.className = 'btn primary'; copy.textContent = '📋 КОПИРАЙ';
+    var apply = el('button', 'btn', '↻ Приложи всичко');
+    apply.onclick = function () { devApplyAll(); apply.textContent = '↻ Приложено!'; setTimeout(function () { apply.textContent = '↻ Приложи всичко'; }, 1400); };
+    var copy = el('button', 'btn primary', '📋 Копирай промените');
     var out = document.createElement('textarea'); out.className = 'devout hidden'; out.readOnly = true;
     copy.onclick = function () {
-      var json = serializeDev();
-      out.value = json; out.classList.remove('hidden');
-      out.focus(); out.select();
-      var ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-      if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(json); ok = true; } catch (e) {} }
-      copy.textContent = ok ? '📋 Копирано!' : '📋 Маркирай и копирай ⬇';
-      setTimeout(function () { copy.textContent = '📋 КОПИРАЙ'; }, 1600);
+      var txt = serializeDevDiff(); out.value = txt; out.classList.remove('hidden'); out.focus(); out.select();
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(txt); ok = true; } catch (e) {} }
+      copy.textContent = ok ? '📋 Копирано!' : '📋 Маркирай и копирай ⬇'; setTimeout(function () { copy.textContent = '📋 Копирай промените'; }, 1600);
     };
     bar.appendChild(apply); bar.appendChild(copy);
     host.appendChild(bar); host.appendChild(out);
+  }
+  function addDevItem(cat) {
+    var it = { id: 'new', orig: null, val: cat.kind === 'word' ? { b: '10+' } : '', status: 'added' };
+    cat.items.push(it); openDevEdit(cat, it, true);
+  }
+  // ----- the edit panel (replaces the list while editing) -----
+  function openDevEdit(cat, it, isNew) {
+    devEditing = { cat: cat, item: it, isNew: isNew, draft: cloneVal(it.val) };
+    var host = $('devPanel'); host.innerHTML = '';
+    host.appendChild(el('div', 'devhdr', '✎ ' + cat.label + (cat.kind === 'keyed' ? ' · ' + it.id : '')));
+    var box = document.createElement('div'); box.className = 'deveditbox';
+    var d = devEditing.draft;
+    if (cat.kind === 'word') {
+      var fields = document.createElement('div'); fields.className = 'devfields';
+      [['m', 'м (база)'], ['n', 'ср'], ['f', 'ж']].forEach(function (f) {
+        var w = document.createElement('label'); w.className = 'devf'; w.appendChild(document.createTextNode(f[1]));
+        w.appendChild(devArea(d[f[0]], f[1], function (v) { if (v) d[f[0]] = v; else delete d[f[0]]; }));
+        fields.appendChild(w);
+      });
+      box.appendChild(fields);
+      var ctr = document.createElement('div'); ctr.className = 'devctrls';
+      var bsel = document.createElement('select'); bsel.className = 'devbk r' + bracketRank(d.b);
+      G.BRACKETS.forEach(function (b) { var o = document.createElement('option'); o.value = b; o.textContent = b; if ((d.b || '10+') === b) o.selected = true; bsel.appendChild(o); });
+      bsel.onchange = function () { d.b = bsel.value; bsel.className = 'devbk r' + bracketRank(d.b); };
+      ctr.appendChild(bsel);
+      if (cat.adj) { var iL = document.createElement('label'); iL.className = 'devchk'; var ic = document.createElement('input'); ic.type = 'checkbox'; ic.checked = !!d.inv; ic.onchange = function () { if (ic.checked) d.inv = true; else delete d.inv; }; iL.appendChild(ic); iL.appendChild(document.createTextNode('неизм.')); ctr.appendChild(iL); }
+      var nL = document.createElement('label'); nL.className = 'devchk nsfw'; var nc = document.createElement('input'); nc.type = 'checkbox'; nc.checked = !!d.nsfw; nc.onchange = function () { if (nc.checked) d.nsfw = true; else delete d.nsfw; }; nL.appendChild(nc); nL.appendChild(document.createTextNode('NSFW')); ctr.appendChild(nL);
+      box.appendChild(ctr);
+    } else {
+      box.appendChild(devArea(d, 'текст…', function (v) { devEditing.draft = v; }));
+    }
+    host.appendChild(box);
+    var bar = document.createElement('div'); bar.className = 'devbar';
+    var apply = el('button', 'btn primary', '✓ Приложи'); apply.onclick = devApplyEdit;
+    var cancel = el('button', 'btn', '✕ Отказ'); cancel.onclick = devCancelEdit;
+    bar.appendChild(apply); bar.appendChild(cancel);
+    if (!isNew && it.status === 'modified') { var rest = el('button', 'btn', '↺ Възстанови'); rest.onclick = devRestoreEdit; bar.appendChild(rest); }
+    if (!isNew) { var rem = el('button', 'btn devrem', '🗑 Премахни'); rem.onclick = devRemoveEdit; bar.appendChild(rem); }
+    host.appendChild(bar);
+  }
+  function valEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function devApplyEdit() {
+    var it = devEditing.item; it.val = devEditing.draft;
+    it.status = devEditing.isNew ? 'added' : (valEqual(it.val, it.orig) ? 'unchanged' : 'modified');
+    renderDevPanel();
+  }
+  function devCancelEdit() {
+    if (devEditing.isNew) { var its = devEditing.cat.items, i = its.indexOf(devEditing.item); if (i >= 0) its.splice(i, 1); }
+    renderDevPanel();
+  }
+  function devRestoreEdit() { devEditing.item.val = cloneVal(devEditing.item.orig); devEditing.item.status = 'unchanged'; renderDevPanel(); }
+  function devRemoveEdit() { devEditing.item.status = 'removed'; renderDevPanel(); }
+  // ----- copy: only the changes, with an executable identifier -----
+  function wordJSON(v) { var r = {}; ['m', 'n', 'f'].forEach(function (k) { if (v[k]) r[k] = v[k]; }); if (v.inv) r.inv = true; if (v.nsfw) r.nsfw = true; if (v.b && v.b !== '10+') r.b = v.b; return JSON.stringify(r); }
+  function diffVal(cat, v) { return cat.kind === 'word' ? wordJSON(v) : JSON.stringify(v); }
+  function serializeDevDiff() {
+    var lines = [];
+    devCats.forEach(function (cat) {
+      cat.items.forEach(function (it) {
+        if (it.status === 'unchanged') return;
+        var ref = cat.kind === 'keyed' ? cat.key + '.' + it.id : cat.key + '[' + it.id + ']';
+        if (it.status === 'removed') lines.push('- ' + ref);
+        else if (it.status === 'added') lines.push('+ ' + cat.key + ': ' + diffVal(cat, it.val));
+        else lines.push('~ ' + ref + ': ' + diffVal(cat, it.val));
+      });
+    });
+    return lines.length ? lines.join('\n') : '(няма промени)';
+  }
+  // ----- live preview of the applyable subset (word pools + roast/shame/combos/bets) -----
+  function devApplyAll() {
+    function cat(key) { return devCats.filter(function (c) { return c.key === key; })[0]; }
+    function liveWords(key) { return cat(key).items.filter(function (i) { return i.status !== 'removed'; }).map(function (i) { return i.val; }); }
+    G.rebuildFromSource({ titles: liveWords('titles'), adjs: liveWords('adjs'), nouns: liveWords('nouns'), aiAdjs: liveWords('aiAdjs'), aiNouns: liveWords('aiNouns') });
+    function liveTexts(key, target) { target.length = 0; cat(key).items.forEach(function (i) { if (i.status !== 'removed' && i.val && i.val.trim()) target.push(i.val); }); }
+    liveTexts('roasts.flop', G.ROASTS.flop); liveTexts('roasts.risk', G.ROASTS.risk); liveTexts('roasts.fail', G.ROASTS.fail);
+    liveTexts('shames', G.SHAME_LINES); liveTexts('bets', G.BETS);
+    cat('combos').items.forEach(function (i) { if (i.status !== 'removed' && i.val) G.COMBO_DESC[i.id] = i.val; });
+    if (!$('setup').classList.contains('hidden')) { setupPlayers.forEach(regenName); renderSetup(); }
   }
   function openSettings() {
     if (!settings.dev) { devTaps = []; }
@@ -2345,7 +2374,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function fmtWhen(ts) {
     var d = new Date(ts), p = function (x) { return (x < 10 ? '0' : '') + x; };
-    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
   // reconstruct a saved game into the live state and show its end-game summary
@@ -2420,13 +2449,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('replayInfo').innerHTML = '<span>' + (pl.owner ? ownerTokenHTML(true) : '') + esc(pl.name) + '</span><span class="rpround">рунд ' + (a.r + 1) + '/' + G.CATEGORIES.length + ' · ' + (run + (pl.bonus || 0)) + ' т.</span>';
     $('replayBoard').innerHTML = replayBoardHTML(sc[a.p], a.type === 'commit' ? a.category : null);
     $('replayDice').innerHTML = (a.dice || []).map(function (v, i) { return '<div class="rpdie' + (a.kept && a.kept[i] ? ' kept' : '') + '">' + pipFace(v) + '</div>'; }).join('');
-    $('rpLabel').innerHTML = a.type === 'roll'
-      ? 'Хвърляне <b>' + a.rollNo + '/' + a.rolls + '</b>' + (a.kept ? ' · задържа маркираните' : '')
-      : 'Записва <b>' + esc(CAT_LABEL[a.category] || a.category) + '</b> = <b>' + a.score + '</b> т.';
+    // military-comic narration
+    if (a.type === 'roll') {
+      $('rpLabel').innerHTML = a.rollNo === 1
+        ? 'Открива огън — <b>залп ' + a.rollNo + '/' + a.rolls + '</b>!'
+        : 'Презарежда и стреля — <b>залп ' + a.rollNo + '/' + a.rolls + '</b>' + (a.kept ? ' (държи маркираните)' : '');
+    } else {
+      $('rpLabel').innerHTML = a.score > 0
+        ? 'Вписва <b>' + esc(CAT_LABEL[a.category] || a.category) + '</b> в дневника — <b>' + a.score + '</b> т.!'
+        : 'Жертва <b>' + esc(CAT_LABEL[a.category] || a.category) + '</b> — нула, ама с чест.';
+    }
     $('rpSlider').value = String(replay.idx);
   }
   function rpLast() { return replay.actions.length - 1; }
-  function rpPause() { replay.playing = false; $('rpPlay').textContent = '▶'; clearTimeout(replay.timer); }
+  function rpPause() { replay.playing = false; $('rpPlay').classList.remove('playing'); clearTimeout(replay.timer); }
   function rpSchedule() {
     clearTimeout(replay.timer);
     replay.timer = setTimeout(function () {
@@ -2436,7 +2472,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function rpPlay() {
     if (replay.idx >= rpLast()) replay.idx = 0;
-    replay.playing = true; $('rpPlay').textContent = '⏸'; renderReplay(); rpSchedule();
+    replay.playing = true; $('rpPlay').classList.add('playing'); renderReplay(); rpSchedule();
   }
   function openReplay(rec) {
     var actions = buildReplayActions(rec);
@@ -2523,7 +2559,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + (winR ? '' : ' · 🏆 ' + esc(winnerName)) + '</span>'
         + '<span class="hg-sub">' + fmtWhen(rec.ts) + ' · ' + rec.players.length + ' бойци' + (rec.manualMode ? ' · отчет' : '') + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
-        + '<button class="hg-play" title="Реплей">🎬</button>'
+        + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
     });
     $('historyList').innerHTML = html;

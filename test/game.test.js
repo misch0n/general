@@ -464,12 +464,14 @@ test('rarityTier is frequency-ranked; rarer chance ⇒ rarer tier; rarityLine ta
   assert.strictEqual(G.rarityTier(null), 0);
   assert.strictEqual(G.rarityTier(0.0001, 'human'), 1); // far below the 1% threshold
   assert.strictEqual(G.rarityTier(90, 'human'), 0);     // a common name
-  // the brag line is in frequency terms (1 на N · топ X%), no raw tiny %
-  var line = G.rarityLine(0.001, 5, 1);
-  assert.ok(/^ГОСПОДИ! 1 на [\d ]+ имена — топ 1% рядкост!/.test(line), line);
-  assert.ok(line.indexOf('+5 т.') > 0);
-  assert.ok(/^🙂 Рядко име — 1 на /.test(G.rarityLine(0.05, 0, 10)));
-  assert.strictEqual(G.rarityLine(90, 0, 0), ''); // common → no line
+  // headline is frequency-only (1 на N · топ X%) with the award on a SEPARATE line
+  var line = G.rarityLine(0.001, 1);
+  assert.ok(/^ГОСПОДИ! 1 на [\d ]+ имена — топ 1%\.$/.test(line), line);
+  assert.strictEqual(line.indexOf('аванс'), -1, 'no award in the headline');
+  assert.strictEqual(G.rarityAward(5), 'Щабът ти отпуска +5 т. начален аванс!');
+  assert.strictEqual(G.rarityAward(0), '');
+  assert.ok(/^🙂 Рядко име — 1 на /.test(G.rarityLine(0.05, 10)));
+  assert.strictEqual(G.rarityLine(90, 0), ''); // common → no line
 });
 
 test('randomNameRarity returns a coherent name + rarity/bonus', function () {
@@ -548,6 +550,16 @@ test('§1 a noun with gender variants morphs in place (no re-roll)', function ()
   assert.strictEqual(G.recohereName('human', parts, 'm').name, 'Генерал Смотан Петел');
   assert.strictEqual(G.recohereName('human', parts, 'f').name, 'Генерал Смотана Кокошка');
   assert.strictEqual(G.recohereName('human', parts, 'n').name, 'Генерал Смотано Пиле');
+});
+
+test('nounRenders reports whether a noun can morph to a gender (the UI gate)', function () {
+  function part(e) { return { e: e, b: '10+', frac: 0.95 }; }
+  var withGv = { noun: part({ w: 'Петел', g: 'm', gv: { f: 'Кокошка', n: 'Пиле' } }) };
+  var noGv = { noun: part({ w: 'Хуй', g: 'm' }) };
+  assert.strictEqual(G.nounRenders(withGv, 'm'), true);
+  assert.strictEqual(G.nounRenders(withGv, 'f'), true);
+  assert.strictEqual(G.nounRenders(noGv, 'm'), true);
+  assert.strictEqual(G.nounRenders(noGv, 'f'), false); // no feminine form → UI rolls a fresh name
 });
 
 test('§6 censor removes NSFW words from generated names and seed matching', function () {
