@@ -57,9 +57,15 @@ edition): camouflage field, classification banner, brass medals and stencil type
   around the real table.
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
-- **Gender switch.** Each seat has a male/female toggle (restroom pictograms,
-  blue/pink). It's assigned at random and re-generates a **gender-matching name**;
-  callouts agree too (the agreement engine handles the grammar).
+- **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f). It's
+  random initially and re-generates a **gender-matching name**; callouts agree too
+  — the agreement engine inflects names and roasts (incl. neuter) coherently.
+- **How to play + menu.** A **📖 Как се играе** briefing on setup, and an in-game
+  **☰ menu** (how-to + restart) explain the turn and every combo's requirement.
+- **Shaming combo tooltips.** Touch a category name in-game and HQ explains the
+  combo — then "fines" you a random (sometimes absurd, −9999999) number of points
+  for needing a refresher, refunding them after 5s with _"Ебавам се, ей ти ги
+  пак."_
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).

@@ -415,11 +415,33 @@ test('randomGender returns m or f', function () {
   assert.strictEqual(G.randomGender(function () { return 0.7; }), 'f');
 });
 
-test('genderFill inflects {adj} tokens by player gender', function () {
+test('genderFill inflects {adj} tokens by player gender (incl. neuter)', function () {
   assert.strictEqual(G.genderFill('по-{костелив} от това', 'm'), 'по-костелив от това');
   assert.strictEqual(G.genderFill('по-{костелив} от това', 'f'), 'по-костелива от това');
+  assert.strictEqual(G.genderFill('по-{костелив} от това', 'n'), 'по-костеливо от това');
   assert.strictEqual(G.genderFill('{Роден} си за провал', 'f'), 'Родена си за провал');
   assert.strictEqual(G.genderFill('без токени', 'f'), 'без токени');
+});
+
+test('inflectAdj handles neuter and irregular (explicit) forms', function () {
+  assert.strictEqual(G.inflectAdj({ base: 'смотан' }, 'n'), 'смотано'); // regular +о
+  var irr = { base: 'добър', f: 'добра', n: 'добро' };
+  assert.strictEqual(G.inflectAdj(irr, 'm'), 'добър');
+  assert.strictEqual(G.inflectAdj(irr, 'f'), 'добра');
+  assert.strictEqual(G.inflectAdj(irr, 'n'), 'добро');
+});
+
+test('neuter names resolve to a neuter noun + agreeing adjective', function () {
+  // many neuter names must read coherently (3 words, neuter noun)
+  for (var i = 0; i < 30; i++) {
+    var parts = G.randomHumanName(undefined, 'n').split(' ');
+    assert.strictEqual(parts.length, 3, 'Title+Adj+Noun: ' + parts.join(' '));
+  }
+});
+
+test('every category has a combo description; shame lines exist', function () {
+  G.CATEGORIES.forEach(function (c) { assert.ok(G.COMBO_DESC[c.key], 'missing desc for ' + c.key); });
+  assert.ok(G.SHAME_LINES.length > 0);
 });
 
 test('gendered names pick a matching-gender noun + agreeing adjective', function () {

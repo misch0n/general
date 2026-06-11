@@ -411,11 +411,14 @@
   // Inflect a regular Bulgarian adjective for a gender. Our curated adjectives
   // follow the regular pattern (masc base + 'а' for f, + 'о' for n). Adjectives
   // flagged `inv` (indeclinable foreign prefixes like "електро") never change.
+  // Inflect an adjective for a gender. Regular adjectives are a masculine base
+  // (f = +а, n = +о). Irregular ones (fleeting vowel) carry explicit m/f/n forms;
+  // indeclinable ones carry `inv`.
   function inflectAdj(adj, gender) {
     if (adj.inv) return adj.base;
-    if (gender === 'f') return adj.base + 'а';
-    if (gender === 'n') return adj.base + 'о';
-    return adj.base; // masculine
+    if (gender === 'f') return adj.f != null ? adj.f : adj.base + 'а';
+    if (gender === 'n') return adj.n != null ? adj.n : adj.base + 'о';
+    return adj.m != null ? adj.m : adj.base; // masculine
   }
 
   // Possessive "your" (2nd person singular), agreeing with gender.
@@ -484,13 +487,46 @@
     '{Роден} си за поражения, личи си.',
   ];
 
-  // Fill a roast's {adj} tokens for the player's gender (m as written, f = +а).
+  // Fill a roast's {adj} tokens for the player's gender (m as written, f = +а,
+  // n = +о).
   function genderFill(template, gender) {
     return template.replace(/\{([^}]+)\}/g, function (_, w) {
-      return gender === 'f' ? w + 'а' : w;
+      if (gender === 'f') return w + 'а';
+      if (gender === 'n') return w + 'о';
+      return w;
     });
   }
   function randomGender(rng) { return (rng || Math.random)() < 0.5 ? 'm' : 'f'; }
+
+  // Short rule reminders per category (shown in the shaming combo tooltip).
+  var COMBO_DESC = {
+    ones:   '1 — сборът от всички зарове със страна 1.',
+    twos:   '2 — сборът от всички зарове със страна 2.',
+    threes: '3 — сборът от всички зарове със страна 3.',
+    fours:  '4 — сборът от всички зарове със страна 4.',
+    fives:  '5 — сборът от всички зарове със страна 5.',
+    sixes:  '6 — сборът от всички зарове със страна 6.',
+    twoKind:   '2x — нужни са поне два еднакви зара; точки = сборът на двата.',
+    threeKind: '3x — нужни са поне три еднакви; точки = сборът на трите.',
+    fourKind:  '4x — нужни са поне четири еднакви; точки = сборът на четирите.',
+    fullHouse: 'фул хаус — три еднакви + два еднакви (различни); точки = сборът на всички зарове.',
+    smallStraight: 'малка кента — точно 1-2-3-4-5; фиксирани 15 точки.',
+    largeStraight: 'голяма кента — точно 2-3-4-5-6; фиксирани 20 точки.',
+    general: 'генерал — пет еднакви зара; 50 + сборът (между 55 и 80).',
+    chance:  'шанс — сборът от всичките пет зара, каквото и да се падне.',
+  };
+
+  // Shaming intros for the combo reminder tooltip.
+  var SHAME_LINES = [
+    'Пак забрави, а? Гинкобилобата е в шкафа.',
+    'Сериозно? Това го учат в казармата първия ден.',
+    'Виж го ти — забрави устава.',
+    'Маразъм ли те хвана? Чети внимателно.',
+    'Ето ти подсказка, новобранец.',
+    'Главата ти само за каска ли става?',
+    'Стига си се правил на ударен. Запомни го.',
+    'Дъртофелнико, пак ли не помниш?',
+  ];
 
   // Was a commit genuinely disappointing (worth a roast)? Either the player
   // ended up with (next to) nothing, or they re-rolled everything and still
@@ -528,13 +564,27 @@
 
   var TITLES = ['Генерал', 'Майор', 'Полковник', 'Капитан', 'Адмирал', 'Сержант', 'Ефрейтор', 'Лейтенант'];
 
-  // Adjectives that inflect regularly (masc base; f = +а, n = +о).
-  var ADJS = ['смотан', 'сополив', 'космат', 'тлъст', 'тромав', 'кьорав', 'проклет', 'опърпан', 'дебел', 'рунтав', 'скапан', 'луд', 'крив', 'вмирисан'];
+  // Adjectives. Strings inflect regularly (masc base; f = +а, n = +о). Objects
+  // with explicit f/n are irregular (fleeting vowel); `inv` = indeclinable.
+  var ADJS = [
+    'смотан', 'сополив', 'космат', 'тлъст', 'тромав', 'кьорав', 'проклет', 'опърпан',
+    'дебел', 'рунтав', 'скапан', 'луд', 'крив', 'вмирисан', 'вкиснал', 'мек', 'подлудял',
+    'чевръст', 'смазан', 'гръмнал', 'направен', 'лош', 'пиян', 'дрислив', 'парцалив',
+    'оплескан', 'прецакан', 'проскубан', 'опикан', 'оакан', 'недодялан', 'сбъркан',
+    'вонящ', 'изтормозен', 'олигавен', 'оплешивял', 'занемарен',
+    { base: 'срамен', f: 'срамна', n: 'срамно' },
+    { base: 'добър', f: 'добра', n: 'добро' },
+    { base: 'гаден', f: 'гадна', n: 'гадно' },
+    { base: 'мазен', f: 'мазна', n: 'мазно' },
+    { base: 'гнусен', f: 'гнусна', n: 'гнусно' },
+    { base: 'грозен', f: 'грозна', n: 'грозно' },
+  ];
   var AI_ADJS = [
     { base: 'ръждив' }, { base: 'цинков' }, { base: 'хромиран' }, { base: 'искрящ' },
-    { base: 'продупчен' }, { base: 'стоманен' }, { base: 'наелектризиран' },
+    { base: 'продупчен' }, { base: 'стоманен' }, { base: 'наелектризиран' }, { base: 'заваден' },
+    { base: 'изгорял' }, { base: 'претоварен' }, { base: 'пренавит' }, { base: 'окъсян' },
     { base: 'електро', inv: true }, { base: 'турбо', inv: true }, { base: 'кибер', inv: true },
-    { base: 'нано', inv: true }, { base: 'мега', inv: true },
+    { base: 'нано', inv: true }, { base: 'мега', inv: true }, { base: 'демоде', inv: true },
   ];
 
   // Nouns carry their grammatical gender (display form, capitalized). New ones
@@ -548,6 +598,17 @@
     { w: 'Таралеж', g: 'm' }, { w: 'Дюшек', g: 'm' },
     { w: 'Метла', g: 'f' }, { w: 'Кокошка', g: 'f' }, { w: 'Патка', g: 'f' },
     { w: 'Маймуна', g: 'f' }, { w: 'Кранта', g: 'f' }, { w: 'Пън', g: 'm' }, { w: 'Чук', g: 'm' },
+    // crude additions (adult party game)
+    { w: 'Жребец', g: 'm' }, { w: 'Хуй', g: 'm' }, { w: 'Кур', g: 'm' }, { w: 'Изклесяк', g: 'm' },
+    { w: 'Пийняк', g: 'm' }, { w: 'Брънзел', g: 'm' }, { w: 'Гъз', g: 'm' }, { w: 'Пръч', g: 'm' },
+    { w: 'Дръвник', g: 'm' }, { w: 'Тъпак', g: 'm' }, { w: 'Льохман', g: 'm' }, { w: 'Серсем', g: 'm' },
+    { w: 'Простак', g: 'm' }, { w: 'Балък', g: 'm' }, { w: 'Дебелак', g: 'm' },
+    { w: 'Путка', g: 'f' }, { w: 'Буба', g: 'f' }, { w: 'Дуда', g: 'f' }, { w: 'Вулва', g: 'f' },
+    { w: 'Вагина', g: 'f' }, { w: 'Цепка', g: 'f' }, { w: 'Курва', g: 'f' }, { w: 'Дроля', g: 'f' },
+    { w: 'Гнида', g: 'f' }, { w: 'Въшка', g: 'f' }, { w: 'Крава', g: 'f' }, { w: 'Свиня', g: 'f' },
+    { w: 'Циция', g: 'f' }, { w: 'Пачавра', g: 'f' }, { w: 'Тъпачка', g: 'f' },
+    { w: 'Влагалище', g: 'n' }, { w: 'Прасе', g: 'n' }, { w: 'Говедо', g: 'n' }, { w: 'Леке', g: 'n' },
+    { w: 'Лайно', g: 'n' }, { w: 'Чудовище', g: 'n' }, { w: 'Изчадие', g: 'n' }, { w: 'Добиче', g: 'n' },
   ];
   var AI_NOUNS = [
     { w: 'Камила', g: 'f' }, { w: 'Тенеке', g: 'n' }, { w: 'Робот', g: 'm' },
@@ -557,6 +618,10 @@
     { w: 'Реотан', g: 'm' }, { w: 'Ключ', g: 'm' },
     { w: 'Турбина', g: 'f' }, { w: 'Платка', g: 'f' }, { w: 'Антена', g: 'f' },
     { w: 'Жица', g: 'f' }, { w: 'Батерия', g: 'f' }, { w: 'Кабел', g: 'm' }, { w: 'Винт', g: 'm' },
+    { w: 'Бормашина', g: 'f' }, { w: 'Дискета', g: 'f' }, { w: 'Клавиатура', g: 'f' }, { w: 'Камера', g: 'f' },
+    { w: 'Сонда', g: 'f' }, { w: 'Помпа', g: 'f' }, { w: 'Спирала', g: 'f' }, { w: 'Решетка', g: 'f' },
+    { w: 'Крушка', g: 'f' }, { w: 'Гайка', g: 'f' }, { w: 'Печка', g: 'f' }, { w: 'Тенджера', g: 'f' },
+    { w: 'Реле', g: 'n' }, { w: 'Табло', g: 'n' }, { w: 'Радио', g: 'n' },
   ];
 
   // Self-contained (already grammatical) wagers for the "Залага X" line.
@@ -686,6 +751,8 @@
     randomBet: randomBet,
     randomGender: randomGender,
     genderFill: genderFill,
+    COMBO_DESC: COMBO_DESC,
+    SHAME_LINES: SHAME_LINES,
     nameGenerator: nameGenerator,
     PERSONAS: PERSONAS,
     personaById: personaById,

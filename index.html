@@ -57,7 +57,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,.6); }
 .ribbons{ display:grid; grid-template-columns:repeat(3,12px); grid-auto-rows:6px; gap:2px; width:max-content; }
 .ribbons i{ display:block; height:6px; border:1px solid rgba(0,0,0,.45); box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
-.totalbox{ display:flex; flex-direction:column; align-items:center; flex:none; }
+.totalbox{ display:flex; flex-direction:column; align-items:center; flex:none; position:relative; }
+.pbubble{ position:absolute; top:100%; right:0; margin-top:5px; white-space:nowrap; background:var(--gen-brass-bright); color:var(--gen-ink);
+  font-family:var(--gen-font-display); font-weight:700; font-size:10px; letter-spacing:.3px; padding:4px 8px; border-radius:7px; box-shadow:0 5px 14px rgba(0,0,0,.5); z-index:5; }
 .ptotal{ font-family:var(--gen-font-display); font-weight:700; font-size:26px; color:var(--gen-brass); line-height:1; font-variant-numeric:tabular-nums; }
 .tcap{ font-size:8px; letter-spacing:2px; color:var(--gen-muted); margin-top:2px; }
 .badge-ai{ font-family:var(--gen-font-display); font-size:9px; font-weight:700; letter-spacing:1px; color:var(--gen-ink);
@@ -165,10 +167,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .prow2 input[type=color]::-webkit-color-swatch{ border:none; border-radius:6px; }
 .prow2 input[type=color]::-webkit-color-swatch-wrapper{ padding:3px; }
 .gender{ display:inline-flex; gap:2px; padding:2px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; }
-.gicon{ width:26px; height:30px; display:grid; place-items:center; border-radius:6px; background:transparent; color:var(--gen-disabled); }
-.gicon svg{ width:14px; height:18px; fill:currentColor; }
-.gicon.male.on{ color:#fff; background:#3f78c0; }
-.gicon.female.on{ color:#fff; background:#cf5a85; }
+.glabel{ padding:5px 9px; border-radius:6px; background:transparent; color:var(--gen-disabled);
+  font-family:var(--gen-font-display); font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.glabel.on{ font-weight:700; background:rgba(255,255,255,.06); }
+.glabel.on.g-m{ color:#6fa8e8; }
+.glabel.on.g-f{ color:#e88bb0; }
+.glabel.on.g-n{ color:var(--gen-brass-bright); }
 .toggle{ display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-family:var(--gen-font-display); font-size:11px; letter-spacing:1px; color:var(--gen-muted); }
 .switch{ width:40px; height:22px; border-radius:999px; background:rgba(255,255,255,.1); position:relative; transition:.18s; border:1px solid var(--gen-ink-line); }
 .switch::after{ content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#d8cfa8; transition:.18s; }
@@ -332,6 +336,26 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .grip:active{ cursor:grabbing; background:var(--gen-brass); color:var(--gen-ink); }
 .pcard.dragging{ opacity:.85; box-shadow:0 10px 26px rgba(0,0,0,.5); outline:2px solid var(--gen-brass); }
 
+/* hamburger menu, how-to button */
+.menubtn{ position:absolute; right:34px; top:50%; transform:translateY(-50%); z-index:2; width:24px; height:18px; padding:0;
+  color:var(--gen-brass); background:transparent; font-size:14px; line-height:1; }
+.howtobtn{ width:100%; margin-top:10px; }
+/* tappable combo names + upper commit chip */
+.face-n.tappable,.cname.tappable{ cursor:help; }
+.cname.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); }
+.tile.up .pts.upchip{ background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; padding:0 6px; font-weight:800; }
+/* combo reminder tooltip */
+.combotip{ position:fixed; z-index:50; max-width:280px; background:#f3ead0; color:#2a230c; border:2px solid var(--gen-ink-line);
+  border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.55); font-size:12.5px; line-height:1.4; }
+.combotip .shame{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); margin-bottom:5px; }
+.combotip .cfine{ margin-top:6px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); font-size:11px; letter-spacing:.3px; }
+/* how-to content */
+.ht{ font-size:12.5px; color:var(--gen-label); line-height:1.5; margin:0 0 10px; }
+.ht b{ color:var(--gen-text); }
+.hth{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:13px; margin:14px 0 6px; }
+.htlist{ margin:0 0 8px; padding-left:18px; }
+.htlist li{ font-size:12px; color:var(--gen-text); margin-bottom:5px; line-height:1.4; }
+
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 </style>
 </head>
@@ -352,12 +376,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="startManual" class="btn">✍ Полеви отчет</button>
     </div>
     <p class="modehint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
+    <button id="howtoBtn" class="btn howtobtn">📖 Как се играе</button>
   </div>
 </div>
 
 <!-- ============ GAME ============ -->
 <div id="game" class="board hidden">
-  <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО</div>
+  <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО<button id="menuBtn" class="menubtn" title="Меню" aria-label="Меню">☰</button></div>
 
   <div class="hd">
     <span id="curRank" class="rank"></span>
@@ -369,6 +394,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <span class="totalbox">
       <span id="curTotal" class="ptotal">0</span>
       <span class="tcap">ТОЧКИ</span>
+      <span id="pointsBubble" class="pbubble hidden"></span>
     </span>
   </div>
 
@@ -394,7 +420,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="throws" class="throws"></div>
     <div id="dice" class="dice"></div>
     <div id="hintLine" class="hintline hidden"></div>
-    <button id="fire" class="fire">ОГЪН</button>
+    <button id="fire" class="fire">ОГИН</button>
     <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
   </div>
@@ -409,6 +435,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="recordBtn" class="fire hidden">✍ Запиши!</button>
     </div>
   </div>
+
+  <div id="comboTip" class="combotip hidden"></div>
 </div>
 
 <!-- peek -->
@@ -450,6 +478,26 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   </div>
 </div>
 
+<!-- in-game menu -->
+<div id="menuModal" class="overlay hidden">
+  <div class="modal" style="max-width:300px">
+    <h2>Щаб</h2>
+    <div class="setup-actions" style="flex-direction:column">
+      <button id="menuHowto" class="btn">📖 Как се играе</button>
+      <button id="menuRestart" class="btn">↺ Нов набор</button>
+      <button id="menuClose" class="btn primary">Назад</button>
+    </div>
+  </div>
+</div>
+
+<!-- how to play -->
+<div id="howtoModal" class="overlay hidden">
+  <div class="modal">
+    <button class="x-close" id="howtoClose">✕</button>
+    <div id="howtoBody"></div>
+  </div>
+</div>
+
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
 <script src="engine.js"></script>
@@ -480,17 +528,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     for (var i = 0; i < QMARK.length; i++) s += '<span class="' + (QMARK[i] ? 'on' : '') + '"></span>';
     return '<span class="ghostq">' + s + '</span>';
   }
-  // restroom-style pictograms for the gender switch (fill via currentColor)
-  var MALE_SVG = '<svg viewBox="0 0 24 30" aria-hidden="true">'
-    + '<circle cx="12" cy="4.5" r="3.4"/>'
-    + '<rect x="8" y="9.5" width="8" height="10.5" rx="2.2"/>'
-    + '<rect x="8.8" y="18.5" width="2.6" height="9.5" rx="1.1"/>'
-    + '<rect x="12.6" y="18.5" width="2.6" height="9.5" rx="1.1"/></svg>';
-  var FEMALE_SVG = '<svg viewBox="0 0 24 30" aria-hidden="true">'
-    + '<circle cx="12" cy="4.5" r="3.4"/>'
-    + '<path d="M12 8.5 L6.4 20 H17.6 Z"/>'
-    + '<rect x="9.4" y="19.5" width="2.3" height="8.5" rx="1.1"/>'
-    + '<rect x="12.3" y="19.5" width="2.3" height="8.5" rx="1.1"/></svg>';
   var PRESET_COLORS = ['#c8a64b', '#b23a2e', '#3f6b3a', '#2f4a6b', '#9a6b2f', '#7a4632', '#5f7a3a', '#a23a6b'];
   var RIBBON_COLORS = ['#b23a2e', '#2f4a6b', '#c8a64b', '#3f6b3a', '#7a4632', '#c8a64b'];
   var AI_DELAY = 680, END_DELAY = 620, AI_VIEW_DELAY = 1500, ROLLS = G.MAX_ROLLS; // 1 auto roll + (ROLLS-1) rerolls
@@ -582,12 +619,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var color = document.createElement('input'); color.type = 'color'; color.value = p.color;
       color.oninput = function () { p.color = color.value; };
 
-      // gender switch (restroom pictograms, blue/pink) — changes the name + callouts
+      // gender switch (мъжко / то / женско) — changes the name + callouts
       var gsw = document.createElement('div'); gsw.className = 'gender';
-      [['m', 'Мъж', MALE_SVG], ['f', 'Жена', FEMALE_SVG]].forEach(function (g) {
+      [['m', 'мъжко'], ['n', 'то'], ['f', 'женско']].forEach(function (g) {
         var gb = document.createElement('button');
-        gb.className = 'gicon ' + (g[0] === 'm' ? 'male' : 'female') + (p.gender === g[0] ? ' on' : '');
-        gb.title = g[1]; gb.innerHTML = g[2];
+        gb.className = 'glabel g-' + g[0] + (p.gender === g[0] ? ' on' : '');
+        gb.textContent = g[1];
         gb.onclick = function () {
           if (p.gender === g[0]) return;
           p.gender = g[0];
@@ -719,6 +756,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var manualCat = null;    // manual: the category currently being entered
   var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face
   var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
+  var pointsPenalty = 0;   // temporary (gag) deduction shown on the total
+  var tipBusy = false;     // a combo-reminder gag is running
 
   function startGame(players, manual) {
     game = G.createGame(players);
@@ -847,7 +886,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
     else per.classList.add('hidden');
-    $('curTotal').textContent = G.playerTotal(p);
+    $('curTotal').textContent = G.playerTotal(p) - pointsPenalty;
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
@@ -859,6 +898,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) {
       b.onclick = function () { openPeek(+b.getAttribute('data-i')); };
     });
+  }
+
+  // make a category name tappable for the shaming reminder tooltip (human only)
+  function attachTip(nameEl, key, isAI) {
+    if (isAI) return;
+    nameEl.classList.add('tappable');
+    nameEl.onclick = function (e) { e.stopPropagation(); comboReminder(key, nameEl); };
   }
 
   function renderBoard() {
@@ -875,10 +921,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var cls = 'tile up' + (done ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === c.key ? ' best' : '');
       var el = document.createElement('button');
       el.className = cls;
+      var pts = done ? p.scores[c.key] : (val > 0 ? val : '·');
       el.innerHTML = '<span class="face-n">' + c.label + '</span>'
-        + '<span class="pts">' + (done ? p.scores[c.key] : (val > 0 ? val : '·')) + '</span>';
+        + '<span class="pts' + (canScore && !done ? ' upchip' : '') + '">' + pts + '</span>';
       if (canScore && !done) el.onclick = function () { val > 0 ? commitScore(c.key, val) : commitForfeit(c.key); };
-      else el.disabled = true;
+      attachTip(el.querySelector('.face-n'), c.key, p.isAI); // tap the number for the rule reminder
       $('boardUpper').appendChild(el);
     });
 
@@ -908,6 +955,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
           acts.appendChild(x);
         }
       }
+      attachTip(row.querySelector('.cname'), c.key, p.isAI); // tap the name for the rule reminder
       $('boardLower').appendChild(row);
     });
   }
@@ -1069,7 +1117,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (locked) { fire.textContent = '…'; fire.disabled = true; }
     else if (throwsLeft <= 0) { fire.textContent = 'ОТЧЕТИ!'; fire.disabled = true; }
     else if (!someSel) { fire.textContent = 'ИЗБЕРИ ЦЕЛИ'; fire.disabled = true; }
-    else { fire.textContent = 'ОГЪН · ' + throwsLeft; fire.disabled = false; }
+    else { fire.textContent = 'ОГИН · ' + throwsLeft; fire.disabled = false; }
   }
 
   // ---------- dice interaction (select-to-reroll) ----------
@@ -1212,6 +1260,66 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     roastTimer = setTimeout(clearRoast, ROAST_MS);
   }
   function clearRoast() { var b = $('roast'); b.className = 'roast'; b.innerHTML = ''; clearTimeout(roastTimer); }
+
+  // ---------- combo reminder tooltip (with a fake point "fine") ----------
+  var shameIx = 0;
+  function comboReminder(key, anchor) {
+    if (tipBusy || locked) return;
+    tipBusy = true;
+    var shame = G.SHAME_LINES[shameIx % G.SHAME_LINES.length]; shameIx++;
+    // random comical fine: usually a few points, sometimes a ridiculous 9999999
+    var fine = Math.random() < 0.18 ? 9999999 : 2 + Math.floor(Math.random() * 40);
+    var tip = $('comboTip');
+    tip.innerHTML = '<div class="shame">' + esc(shame) + '</div>'
+      + '<div class="cdesc">' + esc(G.COMBO_DESC[key] || '') + '</div>'
+      + '<div class="cfine">Глоба за подсещане: −' + fine + ' т.</div>';
+    tip.classList.remove('hidden');
+    // position the tooltip just below the tapped name
+    var r = anchor.getBoundingClientRect();
+    var tw = tip.offsetWidth;
+    var left = Math.min(Math.max(8, r.left + r.width / 2 - tw / 2), window.innerWidth - tw - 8);
+    tip.style.left = left + 'px';
+    tip.style.top = (r.bottom + 8) + 'px';
+
+    pointsPenalty = fine; renderHeader();
+    setTimeout(function () {
+      pointsPenalty = 0; renderHeader();
+      tip.classList.add('hidden');
+      var pb = $('pointsBubble');
+      pb.textContent = 'Ебавам се, ей ти ги пак.';
+      pb.classList.remove('hidden');
+      setTimeout(function () { pb.classList.add('hidden'); }, 2600);
+      tipBusy = false;
+    }, 5000);
+  }
+
+  // ---------- how to play + in-game menu ----------
+  function buildHowTo() {
+    var combos = G.CATEGORIES.map(function (c) { return '<li>' + esc(G.COMBO_DESC[c.key]) + '</li>'; }).join('');
+    return '<h2>📖 Бойна задача</h2>'
+      + '<p class="ht">Печели бойният, който събере най-много точки — и грабва чин <b>Генерал</b>. Последният получава <b>Редник</b>.</p>'
+      + '<h3 class="hth">Ходът</h3>'
+      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай тези за прехвърляне (✛) и стреляй с <b>ОГИН</b> — или спри по-рано. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
+      + '<h3 class="hth">Категориите и какво искат</h3>'
+      + '<ul class="htlist">' + combos + '</ul>'
+      + '<h3 class="hth">Полеви отчет</h3>'
+      + '<p class="ht">Режим без зарове за игра на маса: избираш категория, удряш заровете, които я направиха, и натискаш <b>Запиши</b>. <b>ОПА!</b> връща назад при грешка.</p>'
+      + '<p class="ht">Съвет: ако докоснеш име на категория в игра, щабът ти обяснява — но те <b>глобява</b> за подсещането.</p>';
+  }
+  function openHowto() { $('howtoBody').innerHTML = buildHowTo(); $('howtoModal').classList.remove('hidden'); }
+  $('howtoBtn').onclick = openHowto;
+  $('howtoClose').onclick = function () { $('howtoModal').classList.add('hidden'); };
+  $('howtoModal').onclick = function (e) { if (e.target === $('howtoModal')) $('howtoModal').classList.add('hidden'); };
+
+  $('menuBtn').onclick = function () { $('menuModal').classList.remove('hidden'); };
+  $('menuClose').onclick = function () { $('menuModal').classList.add('hidden'); };
+  $('menuModal').onclick = function (e) { if (e.target === $('menuModal')) $('menuModal').classList.add('hidden'); };
+  $('menuHowto').onclick = function () { $('menuModal').classList.add('hidden'); openHowto(); };
+  $('menuRestart').onclick = function () {
+    $('menuModal').classList.add('hidden');
+    $('overModal').classList.add('hidden');
+    $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
+  };
 
   // ---------- peek (mini scoreboard, like the in-game one) ----------
   function miniBoard(p) {
