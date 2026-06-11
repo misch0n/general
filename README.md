@@ -76,25 +76,31 @@ edition): camouflage field, classification banner, brass medals and stencil type
 - **Table setup.** **Drag the grip** (⠿) to reorder seats to match how people sit
   around the real table.
 - **Rare names & starting bonuses.** Word pools are re-rolled **on every page
-  load** — a slice of titles, adjectives and nouns is dealt a rarity percentile
-  (down to sub-1%), so each session has its own rare breeds. Draw (or **type**) a
-  rare _Title + Adjective + Noun_ and a brag bubble exclaims the odds tier-style —
-  _ГОСПОДИ! 0.5% шанс за такова име!_, _Ебаси, 2%…_, _ЕХЕ! 5%…_ — plus an HQ
-  **starting bonus** (rarer ⇒ bigger). The bubble is **colour-coded by tier**:
-  ≤1% purple, ≤2% gold, ≤3% orange, ≤4% yellow, ≤5% green, 5–10% blue. Typing a
-  name checks it live (debounced) against the seed — _🎯 Позна!_ — and adopts the
-  name's own gender; landing a rare combo still earns the bonus. Switching gender
-  re-rolls the name, so the bonus doesn't carry over (nor across a restart — see
-  below). The whole feature works in manual mode too.
+  load** by an algorithm that **guarantees one entry at each of the 1/2/3/4/5%
+  percentiles**, sprinkles a small random handful into the 5–10% band, and leaves
+  the bulk common (high-probability) — so every tier is always reachable. Titles
+  span **every Bulgarian age** (modern ranks, imperial dignities — _Хан, Боляр,
+  Кавхан_ — and revival-era resistance — _Войвода, Хайдутин, Комита, Опълченец_).
+  Draw (or **type**) a rare _Title + Adjective + Noun_ and a brag bubble exclaims
+  the odds tier-style — _ГОСПОДИ! 0.5% шанс…_, _Ебаси, 2%…_, _ЕХЕ! 5%…_ — plus an
+  HQ **starting bonus** (rarer ⇒ bigger), **colour-coded by tier**: ≤1% purple,
+  ≤2% gold, ≤3% orange, ≤4% yellow, ≤5% green, 5–10% blue. Typing a name checks it
+  live (debounced) against the seed — _🎯 Позна!_ — and adopts the name's own
+  gender; landing a rare combo still earns the bonus. The whole feature works in
+  manual mode too.
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
-- **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f). It's
-  random initially and re-generates a **gender-matching name**; callouts agree too
-  — the agreement engine inflects names and roasts (incl. neuter) coherently.
-- **How to play + menu.** A **📖 Как се играе** briefing on setup, and an in-game
-  **☰ menu** (how-to + restart) explain the turn and every combo's requirement.
-  **Restart** deals a fresh game with the **same seats and AI count but brand-new
-  names**, so nobody smuggles a rare-name bonus into the next round.
+- **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f), random
+  initially. Switching gender **keeps the same name and its rarity** — it only
+  re-coheres grammatically: the adjective re-agrees and the noun **morphs in
+  place** when it carries a sibling-gender form (_Маймун → Маймуна → Маймунче_),
+  otherwise it's swapped for a same-rarity sibling. Callouts and roasts agree too
+  (incl. neuter), via the agreement engine.
+- **How to play + menu.** A **📖 Как се играе** briefing on setup, and a
+  pronounced in-game **☰ menu** (how-to · settings · restart) explain the turn and
+  every combo's requirement. **Restart** returns to the muster screen with the
+  **same roster** (player & AI counts intact) so the lineup can be tweaked before
+  the next battle.
 - **Shaming combo tooltips.** Touch a category name in-game and HQ explains the
   combo — the tooltip pops **right next to it** and then ambushes you with a
   random **penalty** (the tooltip names it): a points fine (sometimes an absurd
@@ -108,12 +114,19 @@ edition): camouflage field, classification banner, brass medals and stencil type
   game can be tapped away** — tooltips, refunds, roasts and orders alike. (The
   how-to deliberately keeps quiet about the fine — the ambush is the joke. Dice
   penalties don't apply in manual mode; everything else does.)
-- **Settings + a secret dev mode.** A **⚙ settings** panel toggles the rare-name
+- **Censor toggle.** A **⚙ settings** switch — _Цензура, само прилични имена_ —
+  is **off by default** (this is an adult party game). Flip it **on** to drop all
+  NSFW-flagged words and generate from the SFW set only; names already on the
+  muster screen are re-cohered so nothing crude slips through.
+- **Settings + a secret dev word-editor.** Settings also toggle the rare-name
   bonuses and the in-game advice. Each row hides a tiny clickable box on its right
   edge; tap them **in order with rising counts** (1st row once, 2nd row twice, …)
-  to unlock a **developer panel** that lists every title / adjective / noun (and
-  the AI pools) with their dealt percentiles, plus all the roast / shame / combo
-  message banks — a way to inspect the live seed without reading the source.
+  to unlock a **developer mode** — a full **word-list editor**. Every title /
+  adjective / noun (and the AI pools) is editable across its **м / ср / ж** forms,
+  each with an **NSFW** flag; you can **add** entries, hit **↻ Приложи** to
+  re-roll the live pools and preview, and **📋 КОПИРАЙ** to export the whole edited
+  set as JSON (unchanged entries included verbatim) to hand back for baking into
+  the source. The roast / shame / combo message banks are shown read-only.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).
@@ -156,7 +169,10 @@ coherent. A small morphology engine in [`game.js`](game.js) handles agreement:
 - **Names** are _Title + Adjective + Noun_, and the **adjective agrees with the
   noun's gender** — _Ефрейтор Смотан**а** Пишка_ (f), _Майор Смотан Петел_ (m),
   _Капитан Стоманен**о** Динамо_ (n). Indeclinable prefixes (_Електро_, _Турбо_)
-  stay put. AIs draw from electric / metallic word lists.
+  stay put. AIs draw from electric / metallic word lists. Noun entries can carry
+  optional **sibling-gender forms** (`gv`) so a gender switch morphs the word in
+  place rather than re-rolling; each entry also carries an optional `nsfw` flag
+  for the censor toggle.
 - **Roasts** agree with the staked combo's gender via possessive forms — _Твоят
   генерал си замина_ (m), _Твоята малка кента си замина_ (f), _Твоето каре_ (n).
 

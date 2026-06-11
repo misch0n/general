@@ -507,6 +507,68 @@ test('dumpPools exposes pools with rarity percentiles', function () {
   });
 });
 
+test('§7 rarity guarantees one entry at each of the 1..5 percentiles per pool', function () {
+  var d = G.dumpPools();
+  ['titles', 'adjs', 'nouns', 'aiAdjs', 'aiNouns'].forEach(function (k) {
+    [1, 2, 3, 4, 5].forEach(function (tier) {
+      assert.ok(d[k].some(function (e) { return e.pct === tier; }), k + ' missing a ' + tier + '% entry');
+    });
+    // the rest are common (null) or in the 5–10% band — nothing below 0 or above 10
+    d[k].forEach(function (e) { if (e.pct != null) assert.ok(e.pct > 0 && e.pct < 10, k + ' pct out of range: ' + e.pct); });
+  });
+});
+
+test('§1 recohereName keeps a name\'s rarity across every gender switch', function () {
+  for (var i = 0; i < 200; i++) {
+    var r = G.randomNameRarity('human', 'm');
+    ['f', 'n', 'm'].forEach(function (g) {
+      var rc = G.recohereName('human', r.parts, g);
+      assert.strictEqual(rc.pct, r.pct, 'rarity must not change on gender switch');
+      assert.strictEqual(rc.bonus, r.bonus);
+      assert.strictEqual(rc.name.split(/\s+/).length, 3);
+    });
+  }
+});
+
+test('§1 a noun with gender variants morphs in place (no re-roll)', function () {
+  // Петел(m) carries gv {f:Кокошка, n:Пиле}; recohering keeps the same entry
+  var parts = { title: { e: 'Генерал', pct: null }, adj: { e: { base: 'смотан' }, pct: null },
+                noun: { e: { w: 'Петел', g: 'm', gv: { f: 'Кокошка', n: 'Пиле' } }, pct: 3 } };
+  assert.strictEqual(G.recohereName('human', parts, 'm').name, 'Генерал Смотан Петел');
+  assert.strictEqual(G.recohereName('human', parts, 'f').name, 'Генерал Смотана Кокошка');
+  assert.strictEqual(G.recohereName('human', parts, 'n').name, 'Генерал Смотано Пиле');
+});
+
+test('§6 censor removes NSFW words from generated names and seed matching', function () {
+  G.setCensor(true);
+  try {
+    // an NSFW noun must never appear over many draws while censoring
+    var bad = 0;
+    for (var i = 0; i < 1500; i++) {
+      ['m', 'f', 'n'].forEach(function (g) {
+        if (/Курва|Хуй|Путка|Вагина|Гъз|Прасе/.test(G.randomNameRarity('human', g).name)) bad++;
+      });
+    }
+    assert.strictEqual(bad, 0, 'NSFW leaked while censoring');
+    // a typed NSFW seed name no longer matches while censoring
+    assert.strictEqual(G.matchSeed('Генерал Смотана Курва', 'f').matched, false);
+  } finally { G.setCensor(false); }
+  // uncensored, the same NSFW seed matches again
+  assert.strictEqual(G.matchSeed('Генерал Смотана Курва', 'f').matched, true);
+});
+
+test('dumpSource round-trips through rebuildFromSource', function () {
+  var src = G.dumpSource();
+  assert.ok(src.titles.length && src.nouns.length);
+  assert.ok(src.nouns.some(function (o) { return o.nsfw; }), 'some nouns flagged NSFW');
+  assert.ok(src.titles.every(function (o) { return o.m; }), 'titles use the m field');
+  G.rebuildFromSource(src);                 // must not throw; pools stay valid
+  var d = G.dumpPools();
+  assert.ok(d.nouns.length && d.titles.length);
+  var name = G.randomNameRarity('human', 'f').name;
+  assert.strictEqual(name.split(/\s+/).length, 3);
+});
+
 test('every category has a combo description; shame lines exist', function () {
   G.CATEGORIES.forEach(function (c) { assert.ok(G.COMBO_DESC[c.key], 'missing desc for ' + c.key); });
   assert.ok(G.SHAME_LINES.length > 0);
