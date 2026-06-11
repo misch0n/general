@@ -384,6 +384,47 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .htlist{ margin:0 0 8px; padding-left:18px; }
 .htlist li{ font-size:12px; color:var(--gen-text); margin-bottom:5px; line-height:1.4; }
 
+/* device-owner token (seat #1) */
+.ownertok{ display:inline-grid; place-items:center; width:16px; height:16px; margin-right:5px; vertical-align:middle; flex:none;
+  background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; font-size:10px; font-weight:700; box-shadow:0 0 0 1px var(--gen-brass-stroke); }
+.ownertok.sm{ width:14px; height:14px; font-size:9px; }
+/* owner settings block */
+.ownerbox{ margin:10px 0 4px; padding:11px; border:1px solid var(--gen-pill-line); border-radius:10px; background:rgba(0,0,0,.2); }
+.ownersub{ font-size:11px; color:var(--gen-muted); margin-bottom:8px; line-height:1.35; }
+.ownername{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
+  background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
+.ownername:focus{ outline:none; border-color:var(--gen-brass); }
+.ownertog{ border-bottom:none !important; padding:10px 0 0 !important; }
+.clearconfirm{ margin-top:8px; padding:10px; border:1px solid var(--gen-alert-line); border-radius:8px; background:rgba(178,58,46,.12); }
+.clearconfirm span{ display:block; font-size:12px; color:#e8b0a8; margin-bottom:8px; }
+/* archive (history) */
+.histover{ padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); margin-bottom:12px; }
+.histover .oname{ display:flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px;
+  color:var(--gen-brass); font-size:14px; margin-bottom:8px; }
+.histstats{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:8px; }
+.hstat{ background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); border-radius:8px; padding:7px 6px; text-align:center; }
+.hstat b{ display:block; font-family:var(--gen-font-display); font-weight:700; font-size:18px; color:var(--gen-text); font-variant-numeric:tabular-nums; }
+.hstat span{ font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
+.histline{ font-size:11.5px; color:var(--gen-label); margin:4px 0; line-height:1.4; }
+.histline b{ color:var(--gen-brass-bright); }
+.histform{ display:flex; gap:4px; margin-top:6px; }
+.histform i{ width:18px; height:18px; display:grid; place-items:center; border-radius:4px; font-size:10px; font-weight:700; font-style:normal; }
+.histform i.w{ background:rgba(75,140,60,.3); color:#9bd17e; } .histform i.l{ background:rgba(178,58,46,.25); color:#e88; }
+.noowner{ text-align:center; padding:16px 12px; color:var(--gen-muted); font-size:12.5px; line-height:1.5; }
+.noowner .nohd{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:14px; margin-bottom:6px; }
+.histgame{ display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
+  background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:6px; color:var(--gen-text); }
+.histgame:hover{ border-color:var(--gen-brass); }
+.histgame .hg-res{ width:30px; height:30px; flex:none; display:grid; place-items:center; border-radius:6px; font-family:var(--gen-font-display);
+  font-weight:700; font-size:13px; }
+.histgame .hg-res.win{ background:var(--gen-brass); color:var(--gen-ink); } .histgame .hg-res.loss{ background:var(--gen-pill); color:var(--gen-muted); border:1px solid var(--gen-pill-line); }
+.histgame .hg-main{ flex:1; min-width:0; }
+.histgame .hg-top{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.histgame .hg-sub{ font-size:10px; color:var(--gen-muted); margin-top:2px; }
+.histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
+.histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
+.histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
+
 /* rare-name brag bubble (setup) — colour-coded by rarity tier */
 .rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
   border:2px solid var(--gen-brass-stroke); border-radius:10px; padding:8px 10px; font-size:12px; font-weight:600; line-height:1.35; }
@@ -469,6 +510,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="howtoBtn" class="btn">📖 Как се играе</button>
       <button id="settingsBtn" class="btn">⚙ Настройки</button>
     </div>
+    <button id="archiveBtn" class="btn addbtn">📜 Военен архив</button>
   </div>
 </div>
 
@@ -564,6 +606,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="evPanel"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
+      <button id="overBack" class="btn hidden">← Архив</button>
       <button id="overUndo" class="btn hidden">ОПА!</button>
       <button id="playAgain" class="btn primary">↻ Нов набор</button>
     </div>
@@ -576,6 +619,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <h2>Щаб</h2>
     <div class="setup-actions" style="flex-direction:column">
       <button id="menuHowto" class="btn">📖 Как се играе</button>
+      <button id="menuArchive" class="btn">📜 Военен архив</button>
       <button id="menuSettings" class="btn">⚙ Настройки</button>
       <button id="menuRestart" class="btn">↺ Нов набор</button>
       <button id="menuClose" class="btn primary">Назад</button>
@@ -588,8 +632,38 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="modal" style="max-width:340px">
     <h2>⚙ Настройки</h2>
     <div id="settingsRows"></div>
+    <!-- device owner (seat #1) -->
+    <div class="ownerbox">
+      <div class="ownersub">Стопанин на устройството ★ — винаги боец №1</div>
+      <input id="ownerName" class="ownername" type="text" maxlength="40" placeholder="Бойното ти име, командире…" />
+      <label class="ownertog setrow" style="cursor:pointer">
+        <span>Използвай моето име за боец №1</span>
+        <button id="ownerToggle" class="toggle"><span class="switch"></span></button>
+      </label>
+    </div>
+    <div class="setup-actions" style="margin-top:8px">
+      <button id="historyBtn" class="btn">📜 Военен архив</button>
+      <button id="clearHistory" class="btn">🗑 Изчисти архива</button>
+    </div>
+    <div id="clearConfirm" class="clearconfirm hidden">
+      <span>Сигурен ли си, командире? Архивът изгаря завинаги.</span>
+      <div class="setup-actions">
+        <button id="clearYes" class="btn">🔥 Да, изгори го</button>
+        <button id="clearNo" class="btn primary">Отмяна</button>
+      </div>
+    </div>
     <div id="devPanel" class="devpanel hidden"></div>
     <div class="setup-actions"><button id="settingsClose" class="btn primary">Готово</button></div>
+  </div>
+</div>
+
+<!-- military archive (history) -->
+<div id="historyModal" class="overlay hidden">
+  <div class="modal">
+    <button class="x-close" id="historyClose">✕</button>
+    <h2>📜 Военен архив</h2>
+    <div id="historyOverview"></div>
+    <div id="historyList"></div>
   </div>
 </div>
 
@@ -615,8 +689,45 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
-  var settings = { noBonus: false, noAdvice: false, censor: false };
+  var settings = { noBonus: false, noAdvice: false, censor: false, ownerName: '', useOwnerName: false };
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
+
+  // ---------- persistent settings + game archive (localStorage) ----------
+  var SETTINGS_KEY = 'general:settings:v1', HISTORY_KEY = 'general:history:v1';
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
+
+  function saveSettings() {
+    var s = { noBonus: settings.noBonus, noAdvice: settings.noAdvice, censor: settings.censor,
+              ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
+    lsSet(SETTINGS_KEY, JSON.stringify(s));
+  }
+  function loadSettings() {
+    var raw = lsGet(SETTINGS_KEY); if (!raw) return;
+    try { var s = JSON.parse(raw); ['noBonus', 'noAdvice', 'censor', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; }); } catch (e) {}
+    G.setCensor(settings.censor);
+  }
+
+  function loadHistory() { var raw = lsGet(HISTORY_KEY); if (!raw) return []; try { var a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  // save as many games as storage allows: on a quota error, drop the oldest and retry
+  function persistHistory(arr) {
+    while (arr.length) { if (lsSet(HISTORY_KEY, JSON.stringify(arr))) return true; arr.shift(); }
+    lsDel(HISTORY_KEY); return false;
+  }
+  function archiveGame(rec) { var arr = loadHistory(); arr.push(rec); persistHistory(arr); }
+
+  // The device owner is always seat #1 (index 0), shown with a ★ token.
+  function isOwnerIdx(i) { return i === 0; }
+  function ownerTokenHTML(small) { return '<span class="ownertok' + (small ? ' sm' : '') + '" title="Стопанин на устройството">★</span>'; }
+  // force seat-0's name to the configured owner name when the toggle is on
+  function applyOwnerName() {
+    if (!setupPlayers.length) return;
+    if (settings.useOwnerName && settings.ownerName.trim()) {
+      var p = setupPlayers[0];
+      p.name = settings.ownerName.trim(); p.pct = null; p.bonus = 0; p.parts = null; p.typed = true; p.bubbleDismissed = true;
+    }
+  }
 
   var PIPS = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
   // a blocky "?" drawn from square pip-coloured blocks (6 cols x 6 rows)
@@ -735,10 +846,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     renderSetup();
   }
   function renderSetup() {
+    applyOwnerName(); // seat #1 carries the owner's name when the toggle is on
     var list = $('playerList'); list.innerHTML = '';
     setupPlayers.forEach(function (p, i) {
       var card = document.createElement('div'); card.className = 'pcard';
       card.__player = p;
+      var owner = isOwnerIdx(i);
 
       var top = document.createElement('div'); top.className = 'pcardtop';
       if (setupPlayers.length > 1) {
@@ -747,8 +860,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         grip.onpointerdown = function (e) { startCardDrag(card, e); };
         top.appendChild(grip);
       }
+      if (owner) { var tok = document.createElement('span'); tok.innerHTML = ownerTokenHTML(false); tok.firstChild.title = 'Ти, стопанинът на устройството'; top.appendChild(tok.firstChild); }
       var name = document.createElement('input');
       name.type = 'text'; name.className = 'name'; name.value = p.name; name.placeholder = 'Име на боеца';
+      var nameLocked = owner && settings.useOwnerName && settings.ownerName.trim();
+      if (nameLocked) { name.readOnly = true; name.title = 'Заключено от настройките (твоето име)'; }
       // a hand-typed name is checked against the seed (debounced); a matching
       // (and rare) Title+Adj+Noun still earns the bonus, otherwise it forfeits it
       name.oninput = function () {
@@ -887,6 +1003,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     renderSetup();
   }
   function buildPlayers() {
+    applyOwnerName(); // ensure seat #1 carries the owner's name if the toggle is on
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.bonus = settings.noBonus ? 0 : (p.bonus || 0); // rare-name starting bonus
@@ -903,6 +1020,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('startGame').onclick = function () { startFromSetup(false); };
   $('startManual').onclick = function () { startFromSetup(true); };
 
+  loadSettings();   // restore censor + owner name/toggle before the first muster
   paintCamo($('setup'));
   addSetupPlayer(false); addSetupPlayer(false);
 
@@ -1042,9 +1160,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function renderHeader() {
     // a 'pretend next turn' penalty briefly shows the next player in the header
-    var p = fx.pretendNext ? game.players[(game.current + 1) % game.players.length] : G.currentPlayer(game);
+    var idx = fx.pretendNext ? (game.current + 1) % game.players.length : game.current;
+    var p = game.players[idx];
     $('curRank').textContent = initials(p.name);
-    $('curName').innerHTML = esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
+    $('curName').innerHTML = (isOwnerIdx(idx) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
     else per.classList.add('hidden');
@@ -1622,7 +1741,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var div = document.createElement('div'); div.className = 'setrow';
       var span = document.createElement('span'); span.textContent = row.label;
       var tog = document.createElement('button'); tog.className = 'toggle' + (settings[row.key] ? ' on' : ''); tog.innerHTML = '<span class="switch"></span>';
-      tog.onclick = function () { settings[row.key] = !settings[row.key]; tog.classList.toggle('on', settings[row.key]); if (row.onChange) row.onChange(); };
+      tog.onclick = function () { settings[row.key] = !settings[row.key]; tog.classList.toggle('on', settings[row.key]); if (row.onChange) row.onChange(); saveSettings(); };
       var box = document.createElement('span'); box.className = 'devbox';            // hidden unlock box (right edge)
       box.onclick = function (e) { e.stopPropagation(); devBoxClick(idx); };
       div.appendChild(span); div.appendChild(tog); div.appendChild(box);
@@ -1829,6 +1948,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function openSettings() {
     if (!settings.dev) { devTaps = []; }
     buildSettingsRows();
+    // reflect persisted owner controls
+    $('ownerName').value = settings.ownerName || '';
+    $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
+    $('clearConfirm').classList.add('hidden');
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
     $('settingsModal').classList.remove('hidden');
@@ -1852,7 +1975,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function openPeek(i) {
     var p = game.players[i];
-    $('peekTitle').innerHTML = esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
+    $('peekTitle').innerHTML = (isOwnerIdx(i) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
     $('peekBody').innerHTML = miniBoard(p);
     $('peekTotal').textContent = total(p);
     $('peekModal').classList.remove('hidden');
@@ -1861,7 +1984,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('peekModal').onclick = function (e) { if (e.target === $('peekModal')) $('peekModal').classList.add('hidden'); };
 
   // ---------- end game + tie-break ----------
+  // serialise a finished game so the archive can reproduce its summary exactly
+  function saveCurrentGame() {
+    if (!game || !game.players || !game.players.length) return;
+    archiveGame({
+      id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4),
+      ts: Date.now(),
+      manualMode: manualMode,
+      ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
+      players: game.players.map(function (p) {
+        return { name: p.name, color: p.color, isAI: !!p.isAI, personaId: p.persona ? p.persona.id : null,
+                 gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [] };
+      }),
+      moveLog: moveLog,
+    });
+  }
   function endGame() {
+    if (!viewingHistory) saveCurrentGame();   // archive every real game
     var top = Math.max.apply(null, game.players.map(total)); // ranking includes the bonus
     var tied = game.players.filter(function (p) { return total(p) === top; });
     if (tied.length > 1) startTieBreak(tied, showGameOver); else showGameOver(tied[0]);
@@ -1960,7 +2099,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       return '<div class="rankrow' + (i === 0 ? ' first' : '') + (pi === summary.sel ? ' picked' : '') + '" data-pi="' + pi + '">'
         + '<span class="rkbadge">' + esc(badge) + '</span>'
         + '<span class="pdot" style="width:16px;height:16px;border-radius:50%;background:' + p.color + '"></span>'
-        + '<span class="nm">' + esc(p.name) + sub + '</span>'
+        + '<span class="nm">' + (isOwnerIdx(pi) ? ownerTokenHTML(true) : '') + esc(p.name) + sub + '</span>'
         + '<span class="tt">' + val + '</span></div>';
     }).join('');
     $('ranks').querySelectorAll('.rankrow').forEach(function (r) {
@@ -2073,9 +2212,166 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return 'задържане на заровете';
   }
 
+  // ============================================================ ARCHIVE / HISTORY
+  var viewingHistory = false, histSnapshot = null;
+
+  function recTotal(sp) { var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
+  function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
+  function analyzeRec(rec, i) {
+    var log = rec.moveLog && rec.moveLog[i];
+    if (!evReady || !log || !log.length) return null;
+    try { return rec.manualMode ? EV.analyzeManualGame(log) : EV.analyzeGame(log); } catch (e) { return null; }
+  }
+  function fmtWhen(ts) {
+    var d = new Date(ts), p = function (x) { return (x < 10 ? '0' : '') + x; };
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // reconstruct a saved game into the live state and show its end-game summary
+  function reconstructPlayers(rec) {
+    return rec.players.map(function (sp) {
+      var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
+      pl.gender = sp.gender || 'm'; pl.bet = sp.bet; pl.scores = sp.scores || {}; pl.bonus = sp.bonus || 0; pl.ribbons = sp.ribbons || RIBBON_COLORS;
+      if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
+      return pl;
+    });
+  }
+  function openHistoryGame(rec) {
+    histSnapshot = { game: game, moveLog: moveLog, manualMode: manualMode, summary: summary, undo: undoStack };
+    viewingHistory = true;
+    game = { players: reconstructPlayers(rec), current: 0, round: 1 };
+    moveLog = rec.moveLog || game.players.map(function () { return []; });
+    manualMode = !!rec.manualMode; undoStack = [];
+    var top = Math.max.apply(null, game.players.map(total));
+    var winner = game.players.filter(function (p) { return total(p) === top; })[0];
+    $('historyModal').classList.add('hidden');
+    showGameOver(winner);
+    $('overBack').classList.remove('hidden'); $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
+  }
+  function exitHistoryGame(toArchive) {
+    $('overModal').classList.add('hidden');
+    $('overBack').classList.add('hidden'); $('playAgain').classList.remove('hidden');
+    if (histSnapshot) { game = histSnapshot.game; moveLog = histSnapshot.moveLog; manualMode = histSnapshot.manualMode; summary = histSnapshot.summary; undoStack = histSnapshot.undo; histSnapshot = null; }
+    viewingHistory = false;
+    if (toArchive) openHistory();
+  }
+  $('overBack').onclick = function () { exitHistoryGame(true); };
+
+  // owner trends: aggregate seat-0 (the device owner, when human) across games
+  function ownerOverview(games) {
+    var owned = games.filter(function (r) { return r.players[0] && !r.players[0].isAI; });
+    var data = owned.map(function (r) {
+      var ana = analyzeRec(r, 0);
+      return { rec: r, ana: ana, total: recTotal(r.players[0]), place: recPlacement(r, 0), n: r.players.length,
+               general: (r.players[0].scores.general || 0) > 0, name: r.players[0].name };
+    }).filter(function (d) { return d.ana; }); // need analysis for trends
+    if (!data.length) {
+      return '<div class="histover"><div class="noowner"><div class="nohd">🤷 Няма досие на стопанина</div>'
+        + 'Щабът не намира нито една битка с теб на боец №1. За да следим бойната ти форма, '
+        + '<b title="В настройките включи „Използвай моето име“, или просто играй като боец №1 (★) — без да го пускаш AI.">влез в боя сам</b> '
+        + '(★ боец №1, не AI). Тогава архивът ще почне да трупа графиката на величието ти.</div></div>';
+    }
+    var n = data.length;
+    var wins = data.filter(function (d) { return d.place === 1; }).length;
+    var avgAcc = data.reduce(function (s, d) { return s + d.ana.accuracy; }, 0) / n;
+    var diceData = data.filter(function (d) { return !d.rec.manualMode; });
+    var avgLuck = diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null;
+    var best = data.reduce(function (m, d) { return d.total > m ? d.total : m; }, 0);
+    var avgScore = Math.round(data.reduce(function (s, d) { return s + d.total; }, 0) / n);
+    var generals = data.filter(function (d) { return d.general; }).length;
+    var avgPlace = data.reduce(function (s, d) { return s + d.place; }, 0) / n;
+    // favourite blunder: the category most often fingered as the biggest mistake
+    var bl = {};
+    data.forEach(function (d) { var b = d.ana.blunder; if (b && b.cost < -0.5) { var k = b.chosenKey || b.turnCategory; if (k) bl[k] = (bl[k] || 0) + 1; } });
+    var favBl = null, favN = 0; Object.keys(bl).forEach(function (k) { if (bl[k] > favN) { favN = bl[k]; favBl = k; } });
+    var name = (settings.useOwnerName && settings.ownerName.trim()) || data[data.length - 1].name;
+    var rank = G.rankForAccuracy(avgAcc);
+    var form = data.slice(-7).map(function (d) { return d.place === 1 ? '<i class="w">П</i>' : '<i class="l">' + d.place + '</i>'; }).join('');
+
+    var h = '<div class="histover">';
+    h += '<div class="oname">' + ownerTokenHTML(true) + esc(name) + '</div>';
+    h += '<div class="histstats">'
+      + '<div class="hstat"><b>' + n + '</b><span>битки</span></div>'
+      + '<div class="hstat"><b>' + wins + '</b><span>победи</span></div>'
+      + '<div class="hstat"><b>' + Math.round(avgAcc * 100) + '%</b><span>точност</span></div></div>';
+    h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * wins / n) + '%</b> · средно място <b>' + avgPlace.toFixed(1) + '</b></div>';
+    h += '<div class="histline">Личен рекорд: <b>' + best + '</b> т. · среден резултат <b>' + avgScore + '</b> т.'
+      + (avgLuck != null ? ' · среден късмет <b>' + (avgLuck >= 0 ? '+' : '') + avgLuck.toFixed(0) + '</b>' : '') + '</div>';
+    h += '<div class="histline">Хвърлени генерали: <b>' + generals + '</b> от ' + n + ' битки'
+      + (favBl ? ' · любима издънка: <b>' + esc(CAT_LABEL[favBl] || favBl) + '</b> (×' + favN + ')' : '') + '</div>';
+    h += '<div class="histline">Последна форма:</div><div class="histform">' + (form || '—') + '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  function renderHistory() {
+    var games = loadHistory().slice().reverse(); // newest first
+    $('historyOverview').innerHTML = ownerOverview(loadHistory());
+    if (!games.length) {
+      $('historyList').innerHTML = '<div class="noowner">Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.</div>';
+      return;
+    }
+    var html = '<div class="histhd">Битки (' + games.length + ')</div>';
+    games.forEach(function (rec) {
+      var oTotal = recTotal(rec.players[0]), place = recPlacement(rec, 0), winR = place === 1;
+      var winnerName = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0].name;
+      var res = winR ? 'П' : place + '/' + rec.players.length;
+      html += '<div class="histgame" data-id="' + esc(rec.id) + '">'
+        + '<span class="hg-res ' + (winR ? 'win' : 'loss') + '">' + esc(res) + '</span>'
+        + '<span class="hg-main"><span class="hg-top">' + ownerTokenHTML(true) + esc(rec.players[0].name)
+        + (winR ? '' : ' · 🏆 ' + esc(winnerName)) + '</span>'
+        + '<span class="hg-sub">' + fmtWhen(rec.ts) + ' · ' + rec.players.length + ' бойци' + (rec.manualMode ? ' · отчет' : '') + '</span></span>'
+        + '<span class="hg-pts">' + oTotal + '</span>'
+        + '<button class="hg-del" title="Изтрий">✕</button></div>';
+    });
+    $('historyList').innerHTML = html;
+    $('historyList').querySelectorAll('.histgame').forEach(function (row) {
+      var id = row.getAttribute('data-id');
+      row.onclick = function () { var rec = loadHistory().filter(function (r) { return r.id === id; })[0]; if (rec) openHistoryGame(rec); };
+      row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
+    });
+  }
+  function deleteGame(id) {
+    persistHistory(loadHistory().filter(function (r) { return r.id !== id; }));
+    renderHistory();
+  }
+  function openHistory() {
+    renderHistory();
+    $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
+    $('historyModal').classList.remove('hidden');
+  }
+  $('historyClose').onclick = function () { $('historyModal').classList.add('hidden'); };
+  $('historyModal').onclick = function (e) { if (e.target === $('historyModal')) $('historyModal').classList.add('hidden'); };
+  $('archiveBtn').onclick = openHistory;
+  $('historyBtn').onclick = openHistory;
+  $('menuArchive').onclick = function () { $('menuModal').classList.add('hidden'); openHistory(); };
+
+  // ---------- owner name + clear-archive controls (settings) ----------
+  $('ownerName').oninput = function () {
+    settings.ownerName = $('ownerName').value; saveSettings();
+    if (settings.useOwnerName && !$('setup').classList.contains('hidden')) renderSetup();
+  };
+  $('ownerToggle').onclick = function () {
+    settings.useOwnerName = !settings.useOwnerName;
+    $('ownerToggle').classList.toggle('on', settings.useOwnerName);
+    saveSettings();
+    if (!$('setup').classList.contains('hidden')) {
+      if (!settings.useOwnerName && setupPlayers[0]) regenName(setupPlayers[0]); // give seat-0 a fresh random name
+      renderSetup();
+    }
+  };
+  $('clearHistory').onclick = function () { $('clearConfirm').classList.remove('hidden'); };
+  $('clearNo').onclick = function () { $('clearConfirm').classList.add('hidden'); };
+  $('clearYes').onclick = function () {
+    lsDel(HISTORY_KEY); $('clearConfirm').classList.add('hidden');
+    if (!$('historyModal').classList.contains('hidden')) renderHistory();
+  };
+
   $('playAgain').onclick = function () {
+    if (viewingHistory) { exitHistoryGame(false); }
     $('overModal').classList.add('hidden'); $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
   };
+
 })();
 </script>
 </body>

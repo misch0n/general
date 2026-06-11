@@ -117,6 +117,23 @@ edition): camouflage field, classification banner, brass medals and stencil type
   game can be tapped away** — tooltips, refunds, roasts and orders alike. (The
   how-to deliberately keeps quiet about the fine — the ambush is the joke. Dice
   penalties don't apply in manual mode; everything else does.)
+- **Device owner (seat #1).** The first player is always **you, the device
+  owner**, marked with a brass **★ token** next to the name (in setup, the header,
+  peek and the standings). In **⚙ settings** you can enter your **battle name** and
+  toggle **„Използвай моето име“**: on → seat #1 is always that name; off → seat #1
+  gets a standard random name and is still the owner. The name persists across
+  sessions.
+- **Военен архив (game history).** Every finished battle is saved to the browser
+  (`localStorage`) in a format that **reproduces its end-game summary and analysis
+  exactly** — open a game from the archive and you get the same standings, tabs
+  and per-player report as when it was played. As many games as storage allows
+  are kept; on a quota error the oldest are dropped. A game can be deleted inline,
+  or the whole archive **cleared from settings (with a confirmation)**. The archive
+  opens to an **owner overview**: multi-game trends for seat #1 — battles, wins,
+  win-rate, average decision accuracy (→ a rank), personal best, average luck,
+  generals thrown, your **favourite blunder**, and recent form. If no analysable
+  owner games exist yet, a goofy **„Няма досие на стопанина“** notice (with a
+  tooltip) explains you need to play as seat #1 (★, not an AI) to build trends.
 - **Censor toggle.** A **⚙ settings** switch — _Цензура, само прилични имена_ —
   is **off by default** (this is an adult party game). Flip it **on** to drop all
   NSFW-flagged words and generate from the SFW set only; names already on the
