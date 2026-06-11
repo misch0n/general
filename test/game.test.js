@@ -439,6 +439,23 @@ test('neuter names resolve to a neuter noun + agreeing adjective', function () {
   }
 });
 
+test('bonusForPct maps rarity to a starting bonus', function () {
+  assert.strictEqual(G.bonusForPct(null), 0);
+  assert.strictEqual(G.bonusForPct(9), 0);   // sub-10 but >5: bubble only
+  assert.strictEqual(G.bonusForPct(5), 1);
+  assert.strictEqual(G.bonusForPct(3), 3);
+  assert.strictEqual(G.bonusForPct(1), 5);
+});
+
+test('randomNameRarity returns a coherent name + rarity/bonus', function () {
+  for (var i = 0; i < 200; i++) {
+    var r = G.randomNameRarity('human', 'f', undefined);
+    assert.strictEqual(r.name.split(' ').length, 3);
+    if (r.pct != null) assert.strictEqual(r.bonus, G.bonusForPct(r.pct));
+    else assert.strictEqual(r.bonus, 0);
+  }
+});
+
 test('every category has a combo description; shame lines exist', function () {
   G.CATEGORIES.forEach(function (c) { assert.ok(G.COMBO_DESC[c.key], 'missing desc for ' + c.key); });
   assert.ok(G.SHAME_LINES.length > 0);

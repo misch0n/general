@@ -650,6 +650,81 @@
   function randomAiName(rng, gender) { return randomName(AI_ADJS, AI_NOUNS, rng, gender); }
   function randomBet(rng) { return pick(BETS, rng); }
 
+  // ----------------------------------------------------- rare names & bonuses
+  //
+  // Each pool also has a set of RARE entries with an explicit selection chance
+  // (pct). Common entries share the remaining probability. A name's rarity is
+  // the rarest component it drew; sub-10% earns a bragging bubble and sub-5% a
+  // starting-point bonus (5%→1 … 1%→5).
+
+  // ~12% rare per pool: one bubble-only tier (≈8%) + two bonus tiers (3%, 1%).
+  var TITLES_RARE = [
+    { w: 'Маршал', pct: 8 }, { w: 'Воевода', pct: 3 }, { w: 'Хан', pct: 1 },
+  ];
+  var ADJS_RARE = [
+    { base: 'величав', pct: 8 },
+    { base: 'легендарен', f: 'легендарна', n: 'легендарно', pct: 3 },
+    { base: 'безсмъртен', f: 'безсмъртна', n: 'безсмъртно', pct: 1 },
+  ];
+  var NOUNS_RARE = [
+    { w: 'Великан', g: 'm', pct: 8 }, { w: 'Дракон', g: 'm', pct: 3 }, { w: 'Феникс', g: 'm', pct: 1 },
+    { w: 'Кралица', g: 'f', pct: 8 }, { w: 'Богиня', g: 'f', pct: 3 }, { w: 'Валкирия', g: 'f', pct: 1 },
+    { w: 'Светило', g: 'n', pct: 8 }, { w: 'Божество', g: 'n', pct: 3 }, { w: 'Привидение', g: 'n', pct: 1 },
+  ];
+  var AI_ADJS_RARE = [
+    { base: 'квантов', pct: 8 }, { base: 'плазмен', pct: 3 }, { base: 'термоядрен', pct: 1 },
+  ];
+  var AI_NOUNS_RARE = [
+    { w: 'Суперкомпютър', g: 'm', pct: 8 }, { w: 'Реактор', g: 'm', pct: 3 }, { w: 'Андроид', g: 'm', pct: 1 },
+    { w: 'Матрица', g: 'f', pct: 8 }, { w: 'Совалка', g: 'f', pct: 3 }, { w: 'Сингулярност', g: 'f', pct: 1 },
+    { w: 'Ядро', g: 'n', pct: 8 }, { w: 'Сонда', g: 'n', pct: 3 },
+  ];
+
+  // pick from a common list + rare list (rare entries carry .pct). Returns the
+  // chosen entry and its rarity pct (null when common).
+  function pickRare(common, rare, rng) {
+    var sum = 0; for (var i = 0; i < rare.length; i++) sum += rare[i].pct;
+    var r = (rng || Math.random)() * 100;
+    if (rare.length && r < sum) {
+      var acc = 0;
+      for (var j = 0; j < rare.length; j++) { acc += rare[j].pct; if (r <= acc) return { e: rare[j], pct: rare[j].pct }; }
+    }
+    return { e: common[Math.floor((rng || Math.random)() * common.length)], pct: null };
+  }
+
+  // sub-5% → bonus 1..5 (5%→1 … 1%→5); 6–9% → 0 (bubble only).
+  function bonusForPct(pct) {
+    if (pct == null) return 0;
+    if (pct <= 1) return 5; if (pct <= 2) return 4; if (pct <= 3) return 3;
+    if (pct <= 4) return 2; if (pct <= 5) return 1;
+    return 0;
+  }
+
+  // Generate a name and report its rarity. { name, pct, bonus } (pct null = common).
+  function randomNameRarity(kind, gender, rng) {
+    var adjsC = kind === 'ai' ? AI_ADJS : ADJS, adjsR = kind === 'ai' ? AI_ADJS_RARE : ADJS_RARE;
+    var nounsAll = kind === 'ai' ? AI_NOUNS : NOUNS, nounsRall = kind === 'ai' ? AI_NOUNS_RARE : NOUNS_RARE;
+    var nounsC = gender ? nounsAll.filter(function (n) { return n.g === gender; }) : nounsAll;
+    var nounsR = gender ? nounsRall.filter(function (n) { return n.g === gender; }) : nounsRall;
+    if (!nounsC.length) nounsC = nounsAll;
+    var t = pickRare(TITLES, TITLES_RARE, rng);
+    var a = pickRare(adjsC, adjsR, rng);
+    var n = pickRare(nounsC, nounsR, rng);
+    var title = typeof t.e === 'string' ? t.e : t.e.w;
+    var adj = typeof a.e === 'string' ? { base: a.e } : a.e;
+    var noun = n.e;
+    var name = title + ' ' + capitalize(inflectAdj(adj, noun.g)) + ' ' + noun.w;
+    var pcts = [t.pct, a.pct, n.pct].filter(function (p) { return p != null; });
+    var pct = pcts.length ? Math.min.apply(null, pcts) : null;
+    return { name: name, pct: pct, bonus: bonusForPct(pct) };
+  }
+
+  // Comical brag about a rare name.
+  function rarityLine(pct, bonus) {
+    var b = bonus > 0 ? ' Щабът ти отпуска +' + bonus + ' т. начален аванс!' : '';
+    return 'Рядка порода — само ' + pct + '% шанс за такова име!' + b;
+  }
+
   // ----------------------------------------------------- bot personas & ranks
 
   // Persona = PLAYSTYLE preset feeding the EV engine's bot policy (NOT the bot's
@@ -751,6 +826,9 @@
     randomBet: randomBet,
     randomGender: randomGender,
     genderFill: genderFill,
+    randomNameRarity: randomNameRarity,
+    bonusForPct: bonusForPct,
+    rarityLine: rarityLine,
     COMBO_DESC: COMBO_DESC,
     SHAME_LINES: SHAME_LINES,
     nameGenerator: nameGenerator,

@@ -356,6 +356,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .htlist{ margin:0 0 8px; padding-left:18px; }
 .htlist li{ font-size:12px; color:var(--gen-text); margin-bottom:5px; line-height:1.4; }
 
+/* rare-name brag bubble (setup) */
+.rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
+  border:2px solid var(--gen-brass-stroke); border-radius:10px; padding:8px 10px; font-size:12px; font-weight:600; line-height:1.35; }
+.rarebubble .rbx{ flex:none; margin-left:auto; color:var(--gen-ink); font-size:13px; background:transparent; line-height:1; }
+/* settings rows */
+.setrow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0; color:var(--gen-text); font-size:13px;
+  border-bottom:1px solid var(--gen-pill-line); cursor:pointer; }
+.setrow span{ flex:1; }
+
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 </style>
 </head>
@@ -376,7 +385,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="startManual" class="btn">✍ Полеви отчет</button>
     </div>
     <p class="modehint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
-    <button id="howtoBtn" class="btn howtobtn">📖 Как се играе</button>
+    <div class="setup-actions">
+      <button id="howtoBtn" class="btn">📖 Как се играе</button>
+      <button id="settingsBtn" class="btn">⚙ Настройки</button>
+    </div>
   </div>
 </div>
 
@@ -484,9 +496,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <h2>Щаб</h2>
     <div class="setup-actions" style="flex-direction:column">
       <button id="menuHowto" class="btn">📖 Как се играе</button>
+      <button id="menuSettings" class="btn">⚙ Настройки</button>
       <button id="menuRestart" class="btn">↺ Нов набор</button>
       <button id="menuClose" class="btn primary">Назад</button>
     </div>
+  </div>
+</div>
+
+<!-- settings -->
+<div id="settingsModal" class="overlay hidden">
+  <div class="modal" style="max-width:320px">
+    <h2>⚙ Настройки</h2>
+    <label class="setrow"><span>Изключи бонусите за редки имена</span><button id="setBonus" class="toggle"><span class="switch"></span></button></label>
+    <label class="setrow"><span>Изключи съветите в игра</span><button id="setAdvice" class="toggle"><span class="switch"></span></button></label>
+    <div class="setup-actions"><button id="settingsClose" class="btn primary">Готово</button></div>
   </div>
 </div>
 
@@ -512,6 +535,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
+  var settings = { noBonus: false, noAdvice: false };
+  function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   var PIPS = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
   // a blocky "?" drawn from square pip-coloured blocks (6 cols x 6 rows)
@@ -587,13 +612,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var aiNames = G.nameGenerator('ai');
   var setupPlayers = [];
 
+  // (re)generate a name for a setup player and capture its rarity + bonus
+  function regenName(p) {
+    var r = G.randomNameRarity(p.isAI ? 'ai' : 'human', p.gender);
+    p.name = r.name; p.pct = r.pct; p.bonus = r.bonus; p.bubbleDismissed = false;
+  }
   function addSetupPlayer(isAI) {
     var n = setupPlayers.length;
-    var gender = G.randomGender();   // initial gender is random; new players too
-    setupPlayers.push({
-      name: isAI ? aiNames(null, gender) : humanNames(null, gender),
-      color: PRESET_COLORS[n % PRESET_COLORS.length], isAI: !!isAI, bet: G.randomBet(), gender: gender,
-    });
+    var p = { isAI: !!isAI, gender: G.randomGender(), color: PRESET_COLORS[n % PRESET_COLORS.length], bet: G.randomBet() };
+    regenName(p);
+    setupPlayers.push(p);
     renderSetup();
   }
   function renderSetup() {
@@ -611,7 +639,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       }
       var name = document.createElement('input');
       name.type = 'text'; name.className = 'name'; name.value = p.name; name.placeholder = 'Име на боеца';
-      name.oninput = function () { p.name = name.value; };
+      // editing the name by hand forfeits any rarity bonus + bubble
+      name.oninput = function () {
+        p.name = name.value; p.pct = null; p.bonus = 0;
+        var bb = card.querySelector('.rarebubble'); if (bb) bb.remove();
+      };
       top.appendChild(name);
       card.appendChild(top);
 
@@ -628,7 +660,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         gb.onclick = function () {
           if (p.gender === g[0]) return;
           p.gender = g[0];
-          p.name = (p.isAI ? aiNames : humanNames)(null, p.gender); // regenerate to match
+          regenName(p); // new gender-matching name (with its own rarity)
           renderSetup();
         };
         gsw.appendChild(gb);
@@ -640,8 +672,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       toggle.onclick = function () {
         p.isAI = !p.isAI;
         // persona is the PLAYSTYLE; the AI keeps a generated metallic/electric name
-        if (p.isAI) { p.personaId = p.personaId || 'lelia'; p.name = aiNames(null, p.gender); p.personaOpen = true; }
-        else { p.name = humanNames(null, p.gender); }
+        if (p.isAI) p.personaId = p.personaId || 'lelia';
+        if (p.isAI) p.personaOpen = true;
+        regenName(p);
         renderSetup();
       };
       row.appendChild(color); row.appendChild(gsw); row.appendChild(toggle);
@@ -678,6 +711,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       // the wager is fixed at draw — you're stuck with whatever you got
       bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
       card.appendChild(bet);
+
+      // rare-name brag bubble (dismissable); awards the bonus unless disabled
+      if (p.pct != null && p.pct <= 9 && !p.bubbleDismissed) {
+        var eff = settings.noBonus ? 0 : p.bonus;
+        var bub = document.createElement('div'); bub.className = 'rarebubble';
+        bub.innerHTML = '<span>🏅 ' + esc(G.rarityLine(p.pct, eff)) + '</span>'
+          + '<button class="rbx" title="Скрий">✕</button>';
+        bub.querySelector('.rbx').onclick = function () { p.bubbleDismissed = true; bub.remove(); };
+        card.appendChild(bub);
+      }
       list.appendChild(card);
     });
   }
@@ -728,6 +771,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function buildPlayers() {
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
+      pl.bonus = settings.noBonus ? 0 : (p.bonus || 0); // rare-name starting bonus
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
       return pl;
@@ -769,7 +813,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
-    $('hintBtn').classList.toggle('hidden', !evReady || manualMode);
+    $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice);
     document.querySelector('.dock').classList.toggle('hidden', manualMode);
     $('manualDock').classList.toggle('hidden', !manualMode);
     beginTurn();
@@ -886,14 +930,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
     else per.classList.add('hidden');
-    $('curTotal').textContent = G.playerTotal(p) - pointsPenalty;
+    $('curTotal').textContent = total(p) - pointsPenalty;
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
   function renderPills() {
     $('pillWrap').innerHTML = game.players.map(function (p, i) {
       return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">'
-        + '<span class="pdot" style="background:' + p.color + '"></span>' + initials(p.name) + ' · ' + G.playerTotal(p) + '</button>';
+        + '<span class="pdot" style="background:' + p.color + '"></span>' + initials(p.name) + ' · ' + total(p) + '</button>';
     }).join('');
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) {
       b.onclick = function () { openPeek(+b.getAttribute('data-i')); };
@@ -983,7 +1027,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) { hu.appendChild(tile(c, true)); });
     var hl = $('boardLower'); hl.innerHTML = '';
     G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).forEach(function (c) { hl.appendChild(tile(c, false)); });
-    $('curTotal').textContent = G.playerTotal(p);
+    $('curTotal').textContent = total(p);
   }
 
   function selectManualCat(key) {
@@ -1264,7 +1308,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ---------- combo reminder tooltip (with a fake point "fine") ----------
   var shameIx = 0;
   function comboReminder(key, anchor) {
-    if (tipBusy || locked) return;
+    if (tipBusy || locked || settings.noAdvice) return;
     tipBusy = true;
     var shame = G.SHAME_LINES[shameIx % G.SHAME_LINES.length]; shameIx++;
     // random comical fine: usually a few points, sometimes a ridiculous 9999999
@@ -1331,6 +1375,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
   };
 
+  // ---------- settings ----------
+  function openSettings() {
+    $('setBonus').classList.toggle('on', settings.noBonus);
+    $('setAdvice').classList.toggle('on', settings.noAdvice);
+    $('settingsModal').classList.remove('hidden');
+  }
+  $('settingsBtn').onclick = openSettings;
+  $('menuSettings').onclick = function () { $('menuModal').classList.add('hidden'); openSettings(); };
+  $('settingsClose').onclick = function () { $('settingsModal').classList.add('hidden'); };
+  $('settingsModal').onclick = function (e) { if (e.target === $('settingsModal')) $('settingsModal').classList.add('hidden'); };
+  $('setBonus').onclick = function () {
+    settings.noBonus = !settings.noBonus; $('setBonus').classList.toggle('on', settings.noBonus);
+    if (!$('setup').classList.contains('hidden')) renderSetup(); // refresh bubbles
+  };
+  $('setAdvice').onclick = function () {
+    settings.noAdvice = !settings.noAdvice; $('setAdvice').classList.toggle('on', settings.noAdvice);
+    if (game) { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice); renderAll(); }
+  };
+
   // ---------- peek (mini scoreboard, like the in-game one) ----------
   function miniBoard(p) {
     function tile(c, up) {
@@ -1347,7 +1410,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var p = game.players[i];
     $('peekTitle').innerHTML = esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
     $('peekBody').innerHTML = miniBoard(p);
-    $('peekTotal').textContent = G.playerTotal(p);
+    $('peekTotal').textContent = total(p);
     $('peekModal').classList.remove('hidden');
   }
   $('peekClose').onclick = function () { $('peekModal').classList.add('hidden'); };
@@ -1355,8 +1418,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   // ---------- end game + tie-break ----------
   function endGame() {
-    var top = G.ranking(game)[0].total;
-    var tied = game.players.filter(function (p) { return G.playerTotal(p) === top; });
+    var top = Math.max.apply(null, game.players.map(total)); // ranking includes the bonus
+    var tied = game.players.filter(function (p) { return total(p) === top; });
     if (tied.length > 1) startTieBreak(tied, showGameOver); else showGameOver(tied[0]);
   }
 
@@ -1395,7 +1458,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function showGameOver(winner) {
     var others = game.players.filter(function (p) { return p !== winner; })
-      .sort(function (a, b) { return G.playerTotal(b) - G.playerTotal(a); });
+      .sort(function (a, b) { return total(b) - total(a); });
     var ordered = [winner].concat(others);                // standings: by points only
     var analysisByPlayer = {};
     game.players.forEach(function (p, idx) {
@@ -1439,8 +1502,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var badge, sub = '', val;
       if (summary.tab === 'stand') {
         badge = G.rankForPlacement(summary.ordered.indexOf(p), n);
-        sub = p.isAI && p.persona ? '<div class="persub">⚙ ' + esc(p.persona.name) + '</div>' : '';
-        val = G.playerTotal(p);
+        var bonusTag = p.bonus ? ' · +' + p.bonus + ' аванс' : '';
+        sub = '<div class="persub">' + (p.isAI && p.persona ? '⚙ ' + esc(p.persona.name) : '') + bonusTag + '</div>';
+        val = total(p);
       } else {
         badge = a ? G.rankForAccuracy(a.accuracy) : '—';
         sub = '<div class="persub">' + (a ? 'точност ' + Math.round(a.accuracy * 100) + '% · умение ' + a.skill.toFixed(0) : 'няма данни') + '</div>';
