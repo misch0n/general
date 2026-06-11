@@ -343,6 +343,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* tappable combo names + upper commit chip */
 .face-n.tappable,.cname.tappable{ cursor:help; }
 .cname.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); }
+.face-n.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); padding-bottom:1px; }
 .tile.up .pts.upchip{ background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; padding:0 6px; font-weight:800; }
 /* combo reminder tooltip */
 .combotip{ position:fixed; z-index:50; max-width:280px; background:#f3ead0; color:#2a230c; border:2px solid var(--gen-ink-line);
@@ -369,6 +370,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setrow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0; color:var(--gen-text); font-size:13px;
   border-bottom:1px solid var(--gen-pill-line); cursor:pointer; }
 .setrow span{ flex:1; }
+/* secret developer mode */
+.setrow .devbox{ flex:none; width:22px; height:22px; margin-left:4px; border-radius:4px; background:transparent; cursor:default; }
+.devpanel{ margin-top:14px; border-top:2px dashed var(--gen-brass-stroke); padding-top:12px; max-height:46vh; overflow-y:auto; }
+.devhdr{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.5px; color:var(--gen-brass); font-size:13px; margin-bottom:10px; }
+.devsec{ border:1px solid var(--gen-pill-line); border-radius:8px; margin-bottom:8px; background:rgba(0,0,0,.18); }
+.devsec summary{ cursor:pointer; padding:8px 10px; font-size:12px; font-weight:600; color:var(--gen-text); list-style:none; }
+.devsec summary::-webkit-details-marker{ display:none; }
+.devsec summary::before{ content:'▸ '; color:var(--gen-brass); }
+.devsec[open] summary::before{ content:'▾ '; }
+.devlist{ padding:2px 10px 8px; }
+.devrow{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11.5px; color:var(--gen-label); padding:3px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+.devrow span:first-child{ color:var(--gen-text); }
+.devrow i{ color:var(--gen-brass); font-style:normal; opacity:.7; }
+.devpct{ flex:none; font-variant-numeric:tabular-nums; color:var(--gen-label); }
+.devpct.rare{ color:var(--gen-brass-bright); font-weight:700; }
+.devmsg{ font-size:11.5px; color:var(--gen-label); padding:4px 0; border-bottom:1px solid rgba(255,255,255,.05); line-height:1.35; }
 
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 </style>
@@ -511,10 +528,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 <!-- settings -->
 <div id="settingsModal" class="overlay hidden">
-  <div class="modal" style="max-width:320px">
+  <div class="modal" style="max-width:340px">
     <h2>⚙ Настройки</h2>
-    <label class="setrow"><span>Изключи бонусите за редки имена</span><button id="setBonus" class="toggle"><span class="switch"></span></button></label>
-    <label class="setrow"><span>Изключи съветите в игра</span><button id="setAdvice" class="toggle"><span class="switch"></span></button></label>
+    <div id="settingsRows"></div>
+    <div id="devPanel" class="devpanel hidden"></div>
     <div class="setup-actions"><button id="settingsClose" class="btn primary">Готово</button></div>
   </div>
 </div>
@@ -621,7 +638,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // (re)generate a name for a setup player and capture its rarity + bonus
   function regenName(p) {
     var r = G.randomNameRarity(p.isAI ? 'ai' : 'human', p.gender);
-    p.name = r.name; p.pct = r.pct; p.bonus = r.bonus; p.bubbleDismissed = false;
+    p.name = r.name; p.pct = r.pct; p.bonus = r.bonus; p.bubbleDismissed = false; p.typed = false;
+  }
+  // build the rare-name brag bubble for a player (or null)
+  function rarityBubbleEl(p) {
+    if (p.pct == null || p.pct > 9 || p.bubbleDismissed) return null;
+    var eff = settings.noBonus ? 0 : p.bonus;
+    var bub = document.createElement('div'); bub.className = 'rarebubble';
+    var intro = p.typed ? '🎯 Позна! ' : '🏅 ';
+    bub.innerHTML = '<span>' + intro + esc(G.rarityLine(p.pct, eff)) + '</span><button class="rbx" title="Скрий">✕</button>';
+    bub.querySelector('.rbx').onclick = function () { p.bubbleDismissed = true; bub.remove(); };
+    return bub;
+  }
+  // refresh just the bubble in a card (used by the debounced custom-name check)
+  function updateCardBubble(card, p) {
+    var old = card.querySelector('.rarebubble'); if (old) old.remove();
+    var bub = rarityBubbleEl(p); if (bub) card.appendChild(bub);
   }
   function addSetupPlayer(isAI) {
     var n = setupPlayers.length;
@@ -645,10 +677,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       }
       var name = document.createElement('input');
       name.type = 'text'; name.className = 'name'; name.value = p.name; name.placeholder = 'Име на боеца';
-      // editing the name by hand forfeits any rarity bonus + bubble
+      // a hand-typed name is checked against the seed (debounced); a matching
+      // (and rare) Title+Adj+Noun still earns the bonus, otherwise it forfeits it
       name.oninput = function () {
-        p.name = name.value; p.pct = null; p.bonus = 0;
-        var bb = card.querySelector('.rarebubble'); if (bb) bb.remove();
+        p.name = name.value;
+        clearTimeout(p._seedTimer);
+        p._seedTimer = setTimeout(function () {
+          var m = G.matchSeed(p.name, p.gender);
+          p.pct = m.matched ? m.pct : null;
+          p.bonus = m.matched ? m.bonus : 0;
+          p.typed = true; p.bubbleDismissed = false;
+          // the name fixes its own gender — adopt it so callouts stay coherent
+          if (m.matched && m.gender && m.gender !== p.gender) {
+            p.gender = m.gender;
+            ['m', 'n', 'f'].forEach(function (g) {
+              var gb = card.querySelector('.g-' + g); if (gb) gb.classList.toggle('on', g === p.gender);
+            });
+          }
+          updateCardBubble(card, p);
+        }, 450);
       };
       top.appendChild(name);
       card.appendChild(top);
@@ -719,14 +766,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       card.appendChild(bet);
 
       // rare-name brag bubble (dismissable); awards the bonus unless disabled
-      if (p.pct != null && p.pct <= 9 && !p.bubbleDismissed) {
-        var eff = settings.noBonus ? 0 : p.bonus;
-        var bub = document.createElement('div'); bub.className = 'rarebubble';
-        bub.innerHTML = '<span>🏅 ' + esc(G.rarityLine(p.pct, eff)) + '</span>'
-          + '<button class="rbx" title="Скрий">✕</button>';
-        bub.querySelector('.rbx').onclick = function () { p.bubbleDismissed = true; bub.remove(); };
-        card.appendChild(bub);
-      }
+      var bub0 = rarityBubbleEl(p); if (bub0) card.appendChild(bub0);
       list.appendChild(card);
     });
   }
@@ -806,10 +846,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var manualCat = null;    // manual: the category currently being entered
   var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face
   var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
-  var fx = {};             // active combo-reminder penalty (non-permanent overrides)
-  var tipBusy = false;     // a combo-reminder gag is running
+  var fx = {};             // combo-reminder penalties folded into one override (see rebuildFx)
 
   function startGame(players, manual) {
+    clearAllPenalties();
     game = G.createGame(players);
     manualMode = !!manual;
     undoStack = [];
@@ -975,7 +1015,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var c = CAT_BY_KEY[key];
       var done = G.isCategoryFilled(p, key);
       var val = done ? p.scores[key] : pv.prev[key];
-      var forf = fx.forfeit === key;
+      var forf = (fx.forfeit || []).indexOf(key) >= 0;
       var isVoid = (done && p.scores[key] === 0) || forf;
       var cls = 'tile up' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === key ? ' best' : '');
       var el = document.createElement('button');
@@ -993,7 +1033,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       if (hidden.indexOf(key) >= 0) return;
       var c = CAT_BY_KEY[key];
       var done = G.isCategoryFilled(p, key);
-      var forf = fx.forfeit === key;
+      var forf = (fx.forfeit || []).indexOf(key) >= 0;
       var isVoid = (done && p.scores[key] === 0) || forf;
       var row = document.createElement('div');
       row.className = 'tile low' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === key ? ' best' : '');
@@ -1028,25 +1068,30 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function renderManualBoard() {
     var p = G.currentPlayer(game);
-    function tile(c, up) {
-      var done = G.isCategoryFilled(p, c.key);
-      var v = p.scores[c.key];
-      var isVoid = done && v === 0;
-      var sel = manualCat === c.key;
+    var hidden = fx.hide || [], blanked = fx.blank || [];
+    function tile(key, up) {
+      var c = CAT_BY_KEY[key];
+      var done = G.isCategoryFilled(p, key);
+      var forf = (fx.forfeit || []).indexOf(key) >= 0;
+      var v = blanked.indexOf(key) >= 0 ? '·' : p.scores[key];
+      var isVoid = (done && p.scores[key] === 0) || forf;
+      var sel = manualCat === key;
       var el = document.createElement(up ? 'button' : 'div');
-      el.className = (up ? 'tile up' : 'tile low') + (done ? ' done' : '') + (isVoid ? ' void' : '') + (sel ? ' best' : '');
+      el.className = (up ? 'tile up' : 'tile low') + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (sel ? ' best' : '');
+      var shown = forf ? '·' : (done ? v : '·');
       el.innerHTML = up
-        ? '<span class="face-n">' + c.label + '</span><span class="pts">' + (done ? v : '·') + '</span>'
-        : '<span class="cname">' + c.label + '</span><span class="lval">' + (done ? v : '·') + '</span>';
-      if (!done && !locked) { el.style.cursor = 'pointer'; el.onclick = function () { selectManualCat(c.key); }; }
+        ? '<span class="face-n">' + c.label + '</span><span class="pts">' + shown + '</span>'
+        : '<span class="cname">' + c.label + '</span><span class="lval">' + shown + '</span>';
+      if (!done && !forf && !locked && !fx.lock) { el.style.cursor = 'pointer'; el.onclick = function () { selectManualCat(key); }; }
       else if (up) el.disabled = true;
+      attachTip(el.querySelector(up ? '.face-n' : '.cname'), key, p.isAI);
       return el;
     }
     var hu = $('boardUpper'); hu.innerHTML = '';
-    G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) { hu.appendChild(tile(c, true)); });
+    boardKeys('upper').forEach(function (key) { if (hidden.indexOf(key) < 0) hu.appendChild(tile(key, true)); });
     var hl = $('boardLower'); hl.innerHTML = '';
-    G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).forEach(function (c) { hl.appendChild(tile(c, false)); });
-    $('curTotal').textContent = total(p);
+    boardKeys('lower').forEach(function (key) { if (hidden.indexOf(key) < 0) hl.appendChild(tile(key, false)); });
+    // (#curTotal is set by renderHeader, which also handles fx.points/pretend)
   }
 
   function selectManualCat(key) {
@@ -1161,7 +1206,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       b.disabled = !interactive;
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? ', маркиран за огън' : ''));
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">✛</span>' : '');
-      if (interactive && !fx.type) b.onclick = function () { toggleSelect(i); };
+      if (interactive) b.onclick = function () { toggleSelect(i); };
       $('dice').appendChild(b);
     });
     var t = ''; for (var k = 0; k < ROLLS - 1; k++) t += '<span class="tdot' + (k < throwsLeft ? ' on' : '') + '"></span>';
@@ -1331,58 +1376,131 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ---------- combo reminder tooltip + a random (non-permanent) penalty ----------
   var shameIx = 0, TIP_MS = 5000, PEN_EXTRA = 3000;
   function shuffled(arr) { arr = arr.slice(); for (var i = arr.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; }
+  function catLabel(key) { var c = G.CATEGORIES.filter(function (x) { return x.key === key; })[0]; return c ? c.label : key; }
+
+  // Several penalties can be live at once; each expires on its OWN timer (relative
+  // to when it was triggered) and only ever targets something not already taken.
+  var penalties = [], tipHideTimer = null, refundTimer = null;
 
   function comboReminder(key, anchor) {
-    if (tipBusy || locked || settings.noAdvice) return;
-    tipBusy = true;
+    if (locked || settings.noAdvice) return;
+    var pen = applyPenalty(key);                 // pick + register a fresh penalty
     var shame = G.SHAME_LINES[shameIx % G.SHAME_LINES.length]; shameIx++;
     var tip = $('comboTip');
     tip.innerHTML = '<div class="shame">' + esc(shame) + '</div>'
       + '<div class="cdesc">' + esc(G.COMBO_DESC[key] || '') + '</div>'
-      + '<div class="cfine">И сега — наказание за подсещането!</div>';
+      + '<div class="cfine">⚠ ' + esc(pen.desc) + '</div>';   // in-game: reveal the penalty
     tip.classList.remove('hidden');
     var r = anchor.getBoundingClientRect();
     tip.style.left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8) + 'px';
     tip.style.top = (r.bottom + 8) + 'px';
-
-    applyPenalty(key);
-    setTimeout(function () { tip.classList.add('hidden'); }, TIP_MS);
-    setTimeout(clearPenalty, TIP_MS + PEN_EXTRA); // penalty lasts 3s past the reminder
+    // a newer reminder replaces this tooltip; the penalty itself stays on its own clock
+    clearTimeout(tipHideTimer);
+    tipHideTimer = setTimeout(function () { tip.classList.add('hidden'); }, TIP_MS);
   }
 
   function applyPenalty(reqKey) {
     var p = G.currentPlayer(game);
-    var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(p, c.key); }).map(function (c) { return c.key; });
-    var filled = G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).map(function (c) { return c.key; });
+    // tally what the already-live penalties have claimed, so we never double-target
+    var usedHide = {}, usedBlank = {}, usedForfeit = {}, usedIdx = {}, removed = 0, hasPretend = false, hasLose = false;
+    penalties.forEach(function (q) {
+      if (q.type === 'hideReq' || q.type === 'hideRand') usedHide[q.key] = 1;
+      else if (q.type === 'blank') usedBlank[q.key] = 1;
+      else if (q.type === 'forfeit') usedForfeit[q.key] = 1;
+      else if (q.type === 'changeDice') usedIdx[q.index] = 1;
+      else if (q.type === 'removeDice') removed += q.n;
+      else if (q.type === 'pretend') hasPretend = true;
+      else if (q.type === 'youlose') hasLose = true;
+    });
+    var allKeys = G.CATEGORIES.map(function (c) { return c.key; });
+    var openK = allKeys.filter(function (k) { return !G.isCategoryFilled(p, k) && !usedForfeit[k]; });
+    var filledK = allKeys.filter(function (k) { return G.isCategoryFilled(p, k) && !usedBlank[k]; });
+    var hideK = allKeys.filter(function (k) { return !usedHide[k]; });
+    var remaining = G.DICE_COUNT - removed;
     var diceMode = !manualMode && dice.length === G.DICE_COUNT && !awaitingRoll;
-    var pool = ['points', 'hideReq', 'hideRand', 'shuffle', 'pretend', 'youlose'];
-    if (filled.length) pool.push('blank');
-    if (open.length) pool.push('forfeit');
-    if (diceMode) pool.push('changeDice', 'removeDice');
+    var freeIdx = []; for (var i = 0; i < remaining; i++) if (!usedIdx[i]) freeIdx.push(i);
+
+    var pool = ['points'];                              // a fine always stacks
+    if (!usedHide[reqKey]) pool.push('hideReq');
+    if (hideK.length) pool.push('hideRand');
+    if (filledK.length) pool.push('blank');
+    if (openK.length) pool.push('forfeit');
+    pool.push('shuffle');
+    if (!hasPretend) pool.push('pretend');
+    if (!hasLose) pool.push('youlose');
+    if (diceMode && remaining > 0) pool.push('removeDice');
+    if (diceMode && freeIdx.length) pool.push('changeDice');
+
     var t = pool[Math.floor(Math.random() * pool.length)];
-    fx = { type: t, lock: true };
-    if (t === 'points') fx.points = Math.random() < 0.18 ? 9999999 : 3 + Math.floor(Math.random() * 45);
-    else if (t === 'hideReq') fx.hide = [reqKey];
-    else if (t === 'hideRand') fx.hide = [G.CATEGORIES[Math.floor(Math.random() * G.CATEGORIES.length)].key];
-    else if (t === 'blank') fx.blank = [filled[Math.floor(Math.random() * filled.length)]];
-    else if (t === 'forfeit') fx.forfeit = open[Math.floor(Math.random() * open.length)];
-    else if (t === 'shuffle') fx.order = { upper: shuffled(boardKeys('upper')), lower: shuffled(boardKeys('lower')) };
-    else if (t === 'changeDice') fx.dice = [1, 1, 1, 1, 2];
-    else if (t === 'removeDice') fx.diceKeep = Math.floor(Math.random() * 5); // keep 0..4 (centred)
-    else if (t === 'youlose') $('youLose').classList.remove('hidden');
-    // 'pretend' just needs fx.pretendNext for the header
-    if (t === 'pretend') fx.pretendNext = true;
-    renderAll();
+    var pen = { type: t };
+    if (t === 'points') { pen.points = Math.random() < 0.18 ? 9999999 : 3 + Math.floor(Math.random() * 45); pen.desc = 'Глоба: −' + pen.points + ' точки!'; }
+    else if (t === 'hideReq') { pen.key = reqKey; pen.desc = 'Скрих ти полето „' + catLabel(reqKey) + '“.'; }
+    else if (t === 'hideRand') { pen.key = hideK[Math.floor(Math.random() * hideK.length)]; pen.desc = 'Скрих ти полето „' + catLabel(pen.key) + '“.'; }
+    else if (t === 'blank') { pen.key = filledK[Math.floor(Math.random() * filledK.length)]; pen.desc = 'Изтрих ти точките от „' + catLabel(pen.key) + '“.'; }
+    else if (t === 'forfeit') { pen.key = openK[Math.floor(Math.random() * openK.length)]; pen.desc = 'Жертвам ти „' + catLabel(pen.key) + '“.'; }
+    else if (t === 'shuffle') { pen.order = { upper: shuffled(boardKeys('upper')), lower: shuffled(boardKeys('lower')) }; pen.desc = 'Разбърках ти таблото.'; }
+    else if (t === 'changeDice') { pen.index = freeIdx[Math.floor(Math.random() * freeIdx.length)]; pen.face = 1 + Math.floor(Math.random() * 6); pen.desc = 'Смених ти един зар.'; }
+    else if (t === 'removeDice') { pen.n = 1; pen.desc = 'Взех ти един зар.'; }
+    else if (t === 'pretend') { pen.desc = 'Сега играе другарят до теб.'; }
+    else { pen.desc = 'Обявявам те за загубил!'; }   // youlose
+
+    penalties.push(pen);
+    pen.timer = setTimeout(function () { expirePenalty(pen); }, TIP_MS + PEN_EXTRA);
+    syncPenalties();
+    return pen;
   }
-  function clearPenalty() {
-    fx = {};
-    $('youLose').classList.add('hidden');
-    renderAll();
+
+  function expirePenalty(pen) {
+    var i = penalties.indexOf(pen); if (i < 0) return;
+    penalties.splice(i, 1);
+    syncPenalties();
     var pb = $('pointsBubble');
     pb.textContent = 'Ебавам се, ей ти ги пак.';
     pb.classList.remove('hidden');
-    setTimeout(function () { pb.classList.add('hidden'); }, 2600);
-    tipBusy = false;
+    clearTimeout(refundTimer);
+    refundTimer = setTimeout(function () { pb.classList.add('hidden'); }, 2600);
+  }
+
+  function clearAllPenalties() {           // hard reset (e.g. on restart)
+    penalties.forEach(function (q) { clearTimeout(q.timer); });
+    penalties = [];
+    fx = {};
+    $('youLose').classList.add('hidden');
+  }
+
+  function rebuildFx() {                    // fold the live penalties into one override
+    var f = {}, hide = [], blank = [], forfeit = [], points = 0, removed = 0, order = null, faces = [], pretend = false, lose = false;
+    penalties.forEach(function (q) {
+      if (q.type === 'points') points += q.points;
+      else if (q.type === 'hideReq' || q.type === 'hideRand') hide.push(q.key);
+      else if (q.type === 'blank') blank.push(q.key);
+      else if (q.type === 'forfeit') forfeit.push(q.key);
+      else if (q.type === 'shuffle') order = q.order;
+      else if (q.type === 'removeDice') removed += q.n;
+      else if (q.type === 'changeDice') faces.push(q);
+      else if (q.type === 'pretend') pretend = true;
+      else if (q.type === 'youlose') lose = true;
+    });
+    if (penalties.length) f.lock = true;
+    if (points) f.points = points;
+    if (hide.length) f.hide = hide;
+    if (blank.length) f.blank = blank;
+    if (forfeit.length) f.forfeit = forfeit;
+    if (order) f.order = order;
+    if (pretend) f.pretendNext = true;
+    if (lose) f.youlose = true;
+    if (faces.length || removed > 0) {
+      var shown = dice.slice();
+      faces.forEach(function (q) { if (q.index < shown.length) shown[q.index] = q.face; });
+      if (faces.length) f.dice = shown;
+      if (removed > 0) f.diceKeep = Math.max(0, G.DICE_COUNT - removed);
+    }
+    fx = f;
+  }
+  function syncPenalties() {
+    rebuildFx();
+    $('youLose').classList.toggle('hidden', !fx.youlose);
+    renderAll();
   }
 
   // ---------- how to play + in-game menu ----------
@@ -1394,6 +1512,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай тези за прехвърляне (✛) и стреляй с <b>ОГИН</b> — или спри по-рано. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
       + '<h3 class="hth">Категориите и какво искат</h3>'
       + '<ul class="htlist">' + combos + '</ul>'
+      + '<p class="ht">Забрави ли коя категория какво иска? Докосни името ѝ в игра и щабът ще ти го припомни.</p>'
       + '<h3 class="hth">Полеви отчет</h3>'
       + '<p class="ht">Режим без зарове за игра на маса: избираш категория, удряш заровете, които я направиха, и натискаш <b>Запиши</b>. <b>ОПА!</b> връща назад при грешка.</p>'
       + '<h3 class="hth">Как се чете рапортът</h3>'
@@ -1420,27 +1539,72 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('menuRestart').onclick = function () {
     $('menuModal').classList.add('hidden');
     $('overModal').classList.add('hidden');
-    $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
+    // fresh game, same seats and same number of AI players — but brand-new names,
+    // so nobody carries a rare-name bonus across games.
+    setupPlayers.forEach(regenName);
+    startGame(buildPlayers(), manualMode);
   };
 
-  // ---------- settings ----------
+  // ---------- settings (with a secret developer mode) ----------
+  var SETTINGS_ROWS = [
+    { key: 'noBonus', label: 'Изключи бонусите за редки имена', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
+    { key: 'noAdvice', label: 'Изключи съветите в игра', onChange: function () { if (game) { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice); renderAll(); } } },
+  ];
+  var devProgress = 0, devClicks = 0;
+  function buildSettingsRows() {
+    var host = $('settingsRows'); host.innerHTML = '';
+    SETTINGS_ROWS.forEach(function (row, idx) {
+      var div = document.createElement('div'); div.className = 'setrow';
+      var span = document.createElement('span'); span.textContent = row.label;
+      var tog = document.createElement('button'); tog.className = 'toggle' + (settings[row.key] ? ' on' : ''); tog.innerHTML = '<span class="switch"></span>';
+      tog.onclick = function () { settings[row.key] = !settings[row.key]; tog.classList.toggle('on', settings[row.key]); if (row.onChange) row.onChange(); };
+      var box = document.createElement('span'); box.className = 'devbox';            // hidden unlock box (right edge)
+      box.onclick = function (e) { e.stopPropagation(); devBoxClick(idx); };
+      div.appendChild(span); div.appendChild(tog); div.appendChild(box);
+      host.appendChild(div);
+    });
+  }
+  // unlock: tap box 0 once, box 1 twice, … box i (i+1) times, in order
+  function devBoxClick(idx) {
+    if (settings.dev) return;
+    if (idx === devProgress) {
+      devClicks++;
+      if (devClicks === devProgress + 1) { devProgress++; devClicks = 0; if (devProgress >= SETTINGS_ROWS.length) activateDev(); }
+    } else if (idx === 0) { devProgress = 0; devClicks = 1; }
+    else { devProgress = 0; devClicks = 0; }
+  }
+  function activateDev() { settings.dev = true; $('devPanel').innerHTML = buildDevPanel(); $('devPanel').classList.remove('hidden'); }
+  function pctStr(p) { return p == null ? '—' : (p < 1 ? p.toFixed(1) : p) + '%'; }
+  function buildDevPanel() {
+    var d = G.dumpPools();
+    function poolSec(t, arr) {
+      var s = arr.slice().sort(function (a, b) { return (a.pct == null ? 1e9 : a.pct) - (b.pct == null ? 1e9 : b.pct); });
+      return '<details class="devsec"><summary>' + t + ' (' + arr.length + ')</summary><div class="devlist">'
+        + s.map(function (e) { return '<div class="devrow"><span>' + esc(e.w) + (e.g ? ' <i>[' + e.g + ']</i>' : '') + '</span><span class="devpct' + (e.pct != null ? ' rare' : '') + '">' + pctStr(e.pct) + '</span></div>'; }).join('')
+        + '</div></details>';
+    }
+    function msgSec(t, arr) {
+      return '<details class="devsec"><summary>' + t + ' (' + arr.length + ')</summary><div class="devlist">'
+        + arr.map(function (m) { return '<div class="devmsg">' + esc(m) + '</div>'; }).join('') + '</div></details>';
+    }
+    var combos = G.CATEGORIES.map(function (c) { return G.COMBO_DESC[c.key]; });
+    return '<div class="devhdr">🔧 РЕЖИМ РАЗРАБОТЧИК</div>'
+      + poolSec('Титли', d.titles) + poolSec('Прилагателни', d.adjs) + poolSec('Съществителни', d.nouns)
+      + poolSec('AI прилагателни', d.aiAdjs) + poolSec('AI съществителни', d.aiNouns)
+      + msgSec('Подигравки', G.ROASTS.flop) + msgSec('Подигравки (риск)', G.ROASTS.risk) + msgSec('Подигравки (провал)', G.ROASTS.fail)
+      + msgSec('Засрамвания', G.SHAME_LINES) + msgSec('Описания на комбо', combos);
+  }
   function openSettings() {
-    $('setBonus').classList.toggle('on', settings.noBonus);
-    $('setAdvice').classList.toggle('on', settings.noAdvice);
+    if (!settings.dev) { devProgress = 0; devClicks = 0; }
+    buildSettingsRows();
+    if (settings.dev) { $('devPanel').innerHTML = buildDevPanel(); $('devPanel').classList.remove('hidden'); }
+    else $('devPanel').classList.add('hidden');
     $('settingsModal').classList.remove('hidden');
   }
   $('settingsBtn').onclick = openSettings;
   $('menuSettings').onclick = function () { $('menuModal').classList.add('hidden'); openSettings(); };
   $('settingsClose').onclick = function () { $('settingsModal').classList.add('hidden'); };
   $('settingsModal').onclick = function (e) { if (e.target === $('settingsModal')) $('settingsModal').classList.add('hidden'); };
-  $('setBonus').onclick = function () {
-    settings.noBonus = !settings.noBonus; $('setBonus').classList.toggle('on', settings.noBonus);
-    if (!$('setup').classList.contains('hidden')) renderSetup(); // refresh bubbles
-  };
-  $('setAdvice').onclick = function () {
-    settings.noAdvice = !settings.noAdvice; $('setAdvice').classList.toggle('on', settings.noAdvice);
-    if (game) { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice); renderAll(); }
-  };
 
   // ---------- peek (mini scoreboard, like the in-game one) ----------
   function miniBoard(p) {

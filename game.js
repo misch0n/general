@@ -650,49 +650,69 @@
   function randomAiName(rng, gender) { return randomName(AI_ADJS, AI_NOUNS, rng, gender); }
   function randomBet(rng) { return pick(BETS, rng); }
 
-  // ----------------------------------------------------- rare names & bonuses
+  // ----------------------------------------------------- dynamic rarity & bonuses
   //
-  // Each pool also has a set of RARE entries with an explicit selection chance
-  // (pct). Common entries share the remaining probability. A name's rarity is
-  // the rarest component it drew; sub-10% earns a bragging bubble and sub-5% a
-  // starting-point bonus (5%→1 … 1%→5).
+  // Rarity is assigned DYNAMICALLY at load: each pool gets a fixed split of rare
+  // tiers (down to sub-1%) sprinkled onto RANDOM entries, so which names are rare
+  // changes every page load. A name's rarity = its rarest component; sub-10% earns
+  // a brag bubble, sub-5% a starting bonus (5%→1 … 1%→5; sub-1% → 5).
 
-  // ~12% rare per pool: one bubble-only tier (≈8%) + two bonus tiers (3%, 1%).
-  var TITLES_RARE = [
-    { w: 'Маршал', pct: 8 }, { w: 'Воевода', pct: 3 }, { w: 'Хан', pct: 1 },
-  ];
-  var ADJS_RARE = [
-    { base: 'величав', pct: 8 },
-    { base: 'легендарен', f: 'легендарна', n: 'легендарно', pct: 3 },
-    { base: 'безсмъртен', f: 'безсмъртна', n: 'безсмъртно', pct: 1 },
-  ];
-  var NOUNS_RARE = [
-    { w: 'Великан', g: 'm', pct: 8 }, { w: 'Дракон', g: 'm', pct: 3 }, { w: 'Феникс', g: 'm', pct: 1 },
-    { w: 'Кралица', g: 'f', pct: 8 }, { w: 'Богиня', g: 'f', pct: 3 }, { w: 'Валкирия', g: 'f', pct: 1 },
-    { w: 'Светило', g: 'n', pct: 8 }, { w: 'Божество', g: 'n', pct: 3 }, { w: 'Привидение', g: 'n', pct: 1 },
-  ];
-  var AI_ADJS_RARE = [
-    { base: 'квантов', pct: 8 }, { base: 'плазмен', pct: 3 }, { base: 'термоядрен', pct: 1 },
-  ];
-  var AI_NOUNS_RARE = [
-    { w: 'Суперкомпютър', g: 'm', pct: 8 }, { w: 'Реактор', g: 'm', pct: 3 }, { w: 'Андроид', g: 'm', pct: 1 },
-    { w: 'Матрица', g: 'f', pct: 8 }, { w: 'Совалка', g: 'f', pct: 3 }, { w: 'Сингулярност', g: 'f', pct: 1 },
-    { w: 'Ядро', g: 'n', pct: 8 }, { w: 'Сонда', g: 'n', pct: 3 },
-  ];
+  // extra "epic" words mixed into the pools as ordinary candidates
+  var EPIC_TITLES = ['Маршал', 'Воевода', 'Хан', 'Фелдмаршал'];
+  var EPIC_ADJS = ['величав', { base: 'легендарен', f: 'легендарна', n: 'легендарно' },
+    { base: 'безсмъртен', f: 'безсмъртна', n: 'безсмъртно' }, { base: 'митичен', f: 'митична', n: 'митично' }];
+  var EPIC_NOUNS = [{ w: 'Великан', g: 'm' }, { w: 'Дракон', g: 'm' }, { w: 'Феникс', g: 'm' },
+    { w: 'Кралица', g: 'f' }, { w: 'Сирена', g: 'f' }, { w: 'Богиня', g: 'f' }, { w: 'Валкирия', g: 'f' },
+    { w: 'Светило', g: 'n' }, { w: 'Привидение', g: 'n' }, { w: 'Божество', g: 'n' }];
+  var EPIC_AI_ADJS = [{ base: 'квантов' }, { base: 'плазмен' }, { base: 'термоядрен' }];
+  var EPIC_AI_NOUNS = [{ w: 'Суперкомпютър', g: 'm' }, { w: 'Реактор', g: 'm' }, { w: 'Андроид', g: 'm' },
+    { w: 'Матрица', g: 'f' }, { w: 'Совалка', g: 'f' }, { w: 'Сингулярност', g: 'f' }, { w: 'Ядро', g: 'n' }];
 
-  // pick from a common list + rare list (rare entries carry .pct). Returns the
-  // chosen entry and its rarity pct (null when common).
-  function pickRare(common, rare, rng) {
+  var RARE_TIERS = [0.5, 1, 2, 4, 7]; // rarity split sprinkled onto each pool (per gender for nouns)
+
+  function entryWord(e) { return typeof e === 'string' ? e : (e.w || e.base); }
+  function entryAdj(e) { return typeof e === 'string' ? { base: e } : e; }
+  function shuffleInPlace(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+  function buildPool(list) {
+    var pool = list.map(function (e) { return { e: e, pct: null }; });
+    var idx = shuffleInPlace(pool.map(function (_, i) { return i; }));
+    for (var k = 0; k < RARE_TIERS.length && k < pool.length; k++) pool[idx[k]].pct = RARE_TIERS[k];
+    return pool;
+  }
+  function buildNounPool(list) {
+    var pool = list.map(function (e) { return { e: e, pct: null }; });
+    ['m', 'f', 'n'].forEach(function (g) {
+      var idx = shuffleInPlace(pool.map(function (_, i) { return i; }).filter(function (i) { return pool[i].e.g === g; }));
+      for (var k = 0; k < RARE_TIERS.length && k < idx.length; k++) pool[idx[k]].pct = RARE_TIERS[k];
+    });
+    return pool;
+  }
+
+  var titlePool, adjPool, nounPool, aiAdjPool, aiNounPool;
+  function rollPools() {
+    titlePool  = buildPool(TITLES.concat(EPIC_TITLES));
+    adjPool    = buildPool(ADJS.concat(EPIC_ADJS));
+    nounPool   = buildNounPool(NOUNS.concat(EPIC_NOUNS));
+    aiAdjPool  = buildPool(AI_ADJS.concat(EPIC_AI_ADJS));
+    aiNounPool = buildNounPool(AI_NOUNS.concat(EPIC_AI_NOUNS));
+  }
+  rollPools(); // assign rarity once, per page load
+
+  function pickFromPool(pool, gender, rng) {
+    var cand = gender ? pool.filter(function (p) { return p.e.g === gender; }) : pool;
+    if (!cand.length) cand = pool;
+    var rare = cand.filter(function (p) { return p.pct != null; });
+    var common = cand.filter(function (p) { return p.pct == null; });
     var sum = 0; for (var i = 0; i < rare.length; i++) sum += rare[i].pct;
     var r = (rng || Math.random)() * 100;
     if (rare.length && r < sum) {
-      var acc = 0;
-      for (var j = 0; j < rare.length; j++) { acc += rare[j].pct; if (r <= acc) return { e: rare[j], pct: rare[j].pct }; }
+      var acc = 0; for (var j = 0; j < rare.length; j++) { acc += rare[j].pct; if (r <= acc) return { e: rare[j].e, pct: rare[j].pct }; }
     }
-    return { e: common[Math.floor((rng || Math.random)() * common.length)], pct: null };
+    var c = common.length ? common : cand;
+    return { e: c[Math.floor((rng || Math.random)() * c.length)].e, pct: null };
   }
 
-  // sub-5% → bonus 1..5 (5%→1 … 1%→5); 6–9% → 0 (bubble only).
   function bonusForPct(pct) {
     if (pct == null) return 0;
     if (pct <= 1) return 5; if (pct <= 2) return 4; if (pct <= 3) return 3;
@@ -702,27 +722,55 @@
 
   // Generate a name and report its rarity. { name, pct, bonus } (pct null = common).
   function randomNameRarity(kind, gender, rng) {
-    var adjsC = kind === 'ai' ? AI_ADJS : ADJS, adjsR = kind === 'ai' ? AI_ADJS_RARE : ADJS_RARE;
-    var nounsAll = kind === 'ai' ? AI_NOUNS : NOUNS, nounsRall = kind === 'ai' ? AI_NOUNS_RARE : NOUNS_RARE;
-    var nounsC = gender ? nounsAll.filter(function (n) { return n.g === gender; }) : nounsAll;
-    var nounsR = gender ? nounsRall.filter(function (n) { return n.g === gender; }) : nounsRall;
-    if (!nounsC.length) nounsC = nounsAll;
-    var t = pickRare(TITLES, TITLES_RARE, rng);
-    var a = pickRare(adjsC, adjsR, rng);
-    var n = pickRare(nounsC, nounsR, rng);
-    var title = typeof t.e === 'string' ? t.e : t.e.w;
-    var adj = typeof a.e === 'string' ? { base: a.e } : a.e;
-    var noun = n.e;
-    var name = title + ' ' + capitalize(inflectAdj(adj, noun.g)) + ' ' + noun.w;
+    var ap = kind === 'ai' ? aiAdjPool : adjPool;
+    var np = kind === 'ai' ? aiNounPool : nounPool;
+    var t = pickFromPool(titlePool, null, rng);
+    var a = pickFromPool(ap, null, rng);
+    var n = pickFromPool(np, gender, rng);
+    var name = entryWord(t.e) + ' ' + capitalize(inflectAdj(entryAdj(a.e), n.e.g)) + ' ' + n.e.w;
     var pcts = [t.pct, a.pct, n.pct].filter(function (p) { return p != null; });
     var pct = pcts.length ? Math.min.apply(null, pcts) : null;
     return { name: name, pct: pct, bonus: bonusForPct(pct) };
   }
 
-  // Comical brag about a rare name.
+  // Check a hand-typed "Title Adj Noun" against the human seed; if it lands an
+  // existing (and rare) combo, the bonus still applies.
+  // Parse a hand-typed "Title Adjective Noun" against the live seed pools. The
+  // name itself encodes its gender (noun gender + adjective inflection), so we
+  // try the caller's preferred gender first (to stay coherent with the toggle)
+  // and otherwise auto-detect it — returning the matched gender so the UI can
+  // adopt it. A match under a rare component still earns the bonus.
+  function matchSeed(name, gender) {
+    var parts = (name || '').trim().split(/\s+/);
+    if (parts.length !== 3) return { matched: false, pct: null, bonus: 0 };
+    var title = parts[0], adjForm = parts[1], noun = parts[2], te = null, i;
+    for (i = 0; i < titlePool.length; i++) if (entryWord(titlePool[i].e) === title) { te = titlePool[i]; break; }
+    if (!te) return { matched: false, pct: null, bonus: 0 };
+    var order = ['m', 'f', 'n'];
+    if (gender) order = [gender].concat(order.filter(function (g) { return g !== gender; }));
+    for (var gi = 0; gi < order.length; gi++) {
+      var g = order[gi], ae = null, ne = null;
+      for (i = 0; i < nounPool.length; i++) if (nounPool[i].e.w === noun && nounPool[i].e.g === g) { ne = nounPool[i]; break; }
+      if (!ne) continue;
+      for (i = 0; i < adjPool.length; i++) if (capitalize(inflectAdj(entryAdj(adjPool[i].e), g)) === adjForm) { ae = adjPool[i]; break; }
+      if (!ae) continue;
+      var pcts = [te.pct, ae.pct, ne.pct].filter(function (p) { return p != null; });
+      var pct = pcts.length ? Math.min.apply(null, pcts) : null;
+      return { matched: true, pct: pct, bonus: bonusForPct(pct), gender: g };
+    }
+    return { matched: false, pct: null, bonus: 0 };
+  }
+
   function rarityLine(pct, bonus) {
+    var pctStr = pct < 1 ? pct.toFixed(1) : String(Math.round(pct));
     var b = bonus > 0 ? ' Щабът ти отпуска +' + bonus + ' т. начален аванс!' : '';
-    return 'Рядка порода — само ' + pct + '% шанс за такова име!' + b;
+    return 'Рядка порода — само ' + pctStr + '% шанс за такова име!' + b;
+  }
+
+  // dev-mode dump of the current (per-load) pools, with assigned rarity.
+  function dumpPools() {
+    function fmt(pool) { return pool.map(function (p) { return { w: entryWord(p.e), pct: p.pct, g: p.e.g || null }; }); }
+    return { titles: fmt(titlePool), adjs: fmt(adjPool), nouns: fmt(nounPool), aiAdjs: fmt(aiAdjPool), aiNouns: fmt(aiNounPool) };
   }
 
   // ----------------------------------------------------- bot personas & ranks
@@ -829,6 +877,8 @@
     randomNameRarity: randomNameRarity,
     bonusForPct: bonusForPct,
     rarityLine: rarityLine,
+    matchSeed: matchSeed,
+    dumpPools: dumpPools,
     COMBO_DESC: COMBO_DESC,
     SHAME_LINES: SHAME_LINES,
     nameGenerator: nameGenerator,

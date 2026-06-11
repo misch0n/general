@@ -51,10 +51,20 @@ edition): camouflage field, classification banner, brass medals and stencil type
   manual scorekeeper for a real table game — no number pad: **pick a category,
   then tap the dice that made it** (each tap counts; re-pick the combo to reset)
   and hit **Запиши!**. The two straights are fixed (15 / 20). An **ОПА** button in
-  the bottom action row undoes action-by-action across the whole game. Roasts and
-  HQ orders still fire; luck/skill is omitted (dice are unknown).
+  the bottom action row undoes action-by-action across the whole game. Roasts, HQ
+  orders, rare-name bonuses and the shaming combo penalties (the non-dice ones)
+  all still fire; only luck/skill is omitted (dice are unknown).
 - **Table setup.** **Drag the grip** (⠿) to reorder seats to match how people sit
   around the real table.
+- **Rare names & starting bonuses.** Word pools are re-rolled **on every page
+  load** — a slice of titles, adjectives and nouns is dealt a rarity percentile
+  (down to sub-1%), so each session has its own rare breeds. Draw (or **type**) a
+  rare _Title + Adjective + Noun_ and a brag bubble announces the odds and an HQ
+  **starting bonus** (rarer ⇒ bigger). Typing a name checks it live (debounced)
+  against the seed — _🎯 Позна!_ — and adopts the name's own gender; landing a
+  rare combo still earns the bonus. Switching gender re-rolls the name, so the
+  bonus doesn't carry over (nor across a restart — see below). The whole feature
+  works in manual mode too.
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
 - **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f). It's
@@ -62,10 +72,25 @@ edition): camouflage field, classification banner, brass medals and stencil type
   — the agreement engine inflects names and roasts (incl. neuter) coherently.
 - **How to play + menu.** A **📖 Как се играе** briefing on setup, and an in-game
   **☰ menu** (how-to + restart) explain the turn and every combo's requirement.
+  **Restart** deals a fresh game with the **same seats and AI count but brand-new
+  names**, so nobody smuggles a rare-name bonus into the next round.
 - **Shaming combo tooltips.** Touch a category name in-game and HQ explains the
-  combo — then "fines" you a random (sometimes absurd, −9999999) number of points
-  for needing a refresher, refunding them after 5s with _"Ебавам се, ей ти ги
-  пак."_
+  combo — then ambushes you with a random **penalty** (the tooltip names it): a
+  points fine (sometimes an absurd −9999999), a hidden field, a blanked score, a
+  forfeited slot, a shuffled board, a swapped or confiscated die, a "your turn
+  is the next guy's", or an outright **ГУБИШ!**. Each penalty runs on its **own
+  clock**, reverting after a few seconds with _"Ебавам се, ей ти ги пак."_ You
+  can rack up **several at once** — asking for a new hint hides the old tooltip
+  but the earlier penalty stands, and the same penalty can stack as long as it
+  hits a fresh target. (The how-to deliberately keeps quiet about the fine — the
+  ambush is the joke. Dice penalties don't apply in manual mode; everything else
+  does.)
+- **Settings + a secret dev mode.** A **⚙ settings** panel toggles the rare-name
+  bonuses and the in-game advice. Each row hides a tiny clickable box on its right
+  edge; tap them **in order with rising counts** (1st row once, 2nd row twice, …)
+  to unlock a **developer panel** that lists every title / adjective / noun (and
+  the AI pools) with their dealt percentiles, plus all the roast / shame / combo
+  message banks — a way to inspect the live seed without reading the source.
 - **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
   (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
   first is settled with a **manual dice roll** (highest wins, re-roll on ties).

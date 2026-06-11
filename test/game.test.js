@@ -456,6 +456,38 @@ test('randomNameRarity returns a coherent name + rarity/bonus', function () {
   }
 });
 
+test('matchSeed recognises a generated name and its rarity', function () {
+  // any generated name must be found in the seed with matching rarity/bonus
+  for (var i = 0; i < 100; i++) {
+    var r = G.randomNameRarity('human', 'm', undefined);
+    var m = G.matchSeed(r.name, 'm');
+    assert.strictEqual(m.matched, true, 'should match: ' + r.name);
+    assert.strictEqual(m.pct, r.pct);
+    assert.strictEqual(m.bonus, r.bonus);
+  }
+  // a made-up name is not part of the seed
+  assert.strictEqual(G.matchSeed('Зззз Яяяя Ккк', 'm').matched, false);
+  assert.strictEqual(G.matchSeed('само две', 'f').matched, false);
+});
+
+test('matchSeed auto-detects a name gender that differs from the hint', function () {
+  // build a neuter name, then look it up while "preferring" masculine: it must
+  // still match and report the name's true (neuter) gender
+  var r = G.randomNameRarity('human', 'n', function () { return 0; });
+  var m = G.matchSeed(r.name, 'm');
+  assert.strictEqual(m.matched, true, 'should still match: ' + r.name);
+  assert.strictEqual(m.gender, 'n');
+  assert.strictEqual(m.bonus, r.bonus);
+});
+
+test('dumpPools exposes pools with rarity percentiles', function () {
+  var d = G.dumpPools();
+  ['titles', 'adjs', 'nouns', 'aiAdjs', 'aiNouns'].forEach(function (k) {
+    assert.ok(Array.isArray(d[k]) && d[k].length);
+    assert.ok(d[k].some(function (e) { return e.pct != null; }), k + ' has rare entries');
+  });
+});
+
 test('every category has a combo description; shame lines exist', function () {
   G.CATEGORIES.forEach(function (c) { assert.ok(G.COMBO_DESC[c.key], 'missing desc for ' + c.key); });
   assert.ok(G.SHAME_LINES.length > 0);
