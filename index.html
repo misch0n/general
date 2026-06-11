@@ -252,7 +252,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .evpick.sharp{ background:rgba(75,140,60,.16); color:#9bd17e; }
 .evpick.blunder{ background:rgba(178,58,46,.16); color:#e88; }
 .evpick .gap{ font-weight:700; }
-/* playstyle fingerprint chip (colour = the archetype) */
+/* EV explainer box */
+.evexplain{ margin:4px 0 10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.18); }
+.evexplain summary{ cursor:pointer; padding:7px 10px; font-family:var(--gen-font-display); font-weight:700; font-size:11.5px; letter-spacing:.4px; color:var(--gen-brass-bright); list-style:none; }
+.evexplain summary::-webkit-details-marker{ display:none; }
+.evexplain summary::before{ content:'❔ '; }
+.evexplain p{ font-size:11px; color:var(--gen-label); line-height:1.5; margin:0; padding:0 10px 9px; }
+.evexplain p b{ color:var(--gen-text); }
+/* combined playstyle box */
+.stylebox{ margin:8px 0; padding:10px 11px; border-radius:10px; background:rgba(0,0,0,.28); border:1px solid var(--gen-pill-line); }
+.styhead{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.stychip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-ink); border-radius:5px; padding:2px 8px; }
+.styrank{ font-family:var(--gen-font-display); font-size:11px; letter-spacing:.4px; color:var(--gen-muted); text-transform:uppercase; }
+.stydesc{ font-size:11px; color:var(--gen-label); margin:5px 0 4px; line-height:1.4; }
+.stymetrics{ font-size:11.5px; color:var(--gen-muted); }
+/* coloured stat lines (laser-scannable labels + numbers) */
+.evstat{ font-size:11.5px; color:var(--gen-label); margin:4px 0; line-height:1.45; }
+.evstat .slbl{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; }
+.np{ color:#9bd17e; font-weight:700; } .nn{ color:#e8807a; font-weight:700; } .nu{ color:var(--gen-brass-bright); font-weight:700; }
+/* playstyle fingerprint chip (colour = the archetype) — legacy alias */
 .stylechip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px;
   font-size:11px; color:var(--gen-ink); border-radius:5px; padding:2px 7px; margin-right:4px; }
 /* turn-by-turn breakdown (collapsed by default) */
@@ -268,6 +286,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .evtrow .tc{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); flex:1; min-width:0; }
 .evtrow .tv{ flex:none; color:var(--gen-brass); font-weight:700; }
 .evtrow .tl{ flex:none; } .evtrow .tl.plus{ color:#9bd17e; } .evtrow .tl.minus{ color:#e88; }
+/* per-turn quality marker + the 1/2/3 dice rolls of the turn */
+.evtrow .tq{ flex:none; width:16px; text-align:center; font-weight:700; }
+.evtrow.q-great .tq{ color:#9bd17e; } .evtrow.q-ok .tq{ color:var(--gen-muted); } .evtrow.q-blunder .tq{ color:#e8807a; }
+.evtrow.q-great{ background:rgba(75,140,60,.10); } .evtrow.q-blunder{ background:rgba(178,58,46,.10); }
+.evrolls{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; padding:1px 10px 6px 32px; font-size:10px; color:var(--gen-muted); border-top:0; }
+.evrolls .rroll{ display:inline-flex; gap:2px; opacity:.7; } .evrolls .rroll.last{ opacity:1; }
+.rdie{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:3px; background:#d8cfa8; color:var(--gen-pip);
+  font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
+.evrolls .rroll.last .rdie{ box-shadow:0 0 0 1px var(--gen-brass); }
+.evrolls .rarrow{ color:var(--gen-disabled); }
 
 /* AI persona subtitle in the header */
 .ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); margin-top:-2px; }
@@ -424,6 +452,28 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
+.histgame .hg-play{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-brass); border:1px solid var(--gen-pill-line); background:transparent; font-size:11px; }
+.histgame .hg-play:hover{ border-color:var(--gen-brass); }
+/* replay viewer */
+.rpinfo{ display:flex; align-items:center; justify-content:space-between; font-family:var(--gen-font-display); font-weight:700;
+  text-transform:uppercase; letter-spacing:.5px; font-size:13px; color:var(--gen-text); margin-bottom:8px; }
+.rpinfo .rpround{ font-size:11px; color:var(--gen-muted); }
+.rpboard{ margin-bottom:10px; }
+.rpboard .mtile.hl{ box-shadow:inset 0 0 0 2px var(--gen-brass), 0 0 10px rgba(200,166,75,.6); }
+.rpboard .mtile.hl .mval{ color:var(--gen-canvas-ink); }
+.rpdice{ display:flex; justify-content:center; gap:7px; min-height:46px; margin-bottom:8px; }
+.rpdie{ width:42px; height:42px; display:grid; place-items:center; background:#d8cfa8; border:2px solid var(--gen-ink-line);
+  border-radius:var(--gen-r-die); box-shadow:inset 0 0 0 2px rgba(255,255,255,.22); transition:transform .12s; }
+.rpdie .face{ width:30px; height:30px; }
+.rpdie.kept{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
+.rplabel{ text-align:center; font-size:12px; color:var(--gen-label); min-height:16px; margin-bottom:8px; }
+.rplabel b{ color:var(--gen-brass-bright); }
+.rpslider{ width:100%; margin:4px 0 12px; accent-color:var(--gen-brass); }
+.rpctrls{ display:flex; align-items:center; justify-content:center; gap:8px; }
+.rpbtn{ width:40px; height:36px; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); font-size:14px; }
+.rpbtn.play{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); width:50px; }
+.rpbtn:active{ transform:translateY(1px); }
+.rpspeed{ height:36px; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); font-family:var(--gen-font-body); font-size:11px; padding:0 4px; }
 
 /* rare-name brag bubble (setup) — colour-coded by rarity tier */
 .rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
@@ -667,6 +717,31 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   </div>
 </div>
 
+<!-- replay viewer -->
+<div id="replayModal" class="overlay hidden">
+  <div class="modal replaymodal">
+    <button class="x-close" id="replayClose">✕</button>
+    <h2>🎬 Реплей</h2>
+    <div id="replayInfo" class="rpinfo"></div>
+    <div id="replayBoard" class="rpboard"></div>
+    <div id="replayDice" class="rpdice"></div>
+    <div id="rpLabel" class="rplabel"></div>
+    <input id="rpSlider" class="rpslider" type="range" min="0" max="0" value="0" />
+    <div class="rpctrls">
+      <button id="rpRestart" class="rpbtn" title="Отначало">⏮</button>
+      <button id="rpStepB" class="rpbtn" title="Назад">◀</button>
+      <button id="rpPlay" class="rpbtn play" title="Пусни / пауза">▶</button>
+      <button id="rpStepF" class="rpbtn" title="Напред">▶❘</button>
+      <select id="rpSpeed" class="rpspeed" title="Скорост">
+        <option value="1300">🐢 Бавно</option>
+        <option value="750" selected>Нормално</option>
+        <option value="380">🐇 Бързо</option>
+        <option value="160">⚡ Светкавица</option>
+      </select>
+    </div>
+  </div>
+</div>
+
 <!-- how to play -->
 <div id="howtoModal" class="overlay hidden">
   <div class="modal">
@@ -717,15 +792,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function archiveGame(rec) { var arr = loadHistory(); arr.push(rec); persistHistory(arr); }
 
-  // The device owner is always seat #1 (index 0), shown with a ★ token.
-  function isOwnerIdx(i) { return i === 0; }
+  // The device owner is a FLAGGED player (p.owner) — the token follows them when
+  // the seats are reordered. Initialised on the first player.
+  function isOwnerP(p) { return !!(p && p.owner); }
   function ownerTokenHTML(small) { return '<span class="ownertok' + (small ? ' sm' : '') + '" title="Стопанин на устройството">★</span>'; }
-  // force seat-0's name to the configured owner name when the toggle is on
+  function ownerOf(players) { for (var i = 0; i < players.length; i++) if (players[i].owner) return players[i]; return players[0]; }
+  function ensureOwner() { if (setupPlayers.length && !setupPlayers.some(isOwnerP)) setupPlayers[0].owner = true; }
+  // force the owner's name to the configured owner name when the toggle is on
   function applyOwnerName() {
+    ensureOwner();
     if (!setupPlayers.length) return;
     if (settings.useOwnerName && settings.ownerName.trim()) {
-      var p = setupPlayers[0];
-      p.name = settings.ownerName.trim(); p.pct = null; p.bonus = 0; p.parts = null; p.typed = true; p.bubbleDismissed = true;
+      var p = ownerOf(setupPlayers);
+      p.name = settings.ownerName.trim(); p.pct = null; p.tier = 0; p.bonus = 0; p.parts = null; p.typed = true; p.bubbleDismissed = true;
     }
   }
 
@@ -807,7 +886,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // chosen parts (so a later gender switch can re-cohere without re-rolling)
   function regenName(p) {
     var r = G.randomNameRarity(p.isAI ? 'ai' : 'human', p.gender);
-    p.name = r.name; p.pct = r.pct; p.bonus = r.bonus; p.parts = r.parts; p.bubbleDismissed = false; p.typed = false;
+    p.name = r.name; p.pct = r.pct; p.tier = r.tier; p.bonus = r.bonus; p.parts = r.parts; p.bubbleDismissed = false; p.typed = false;
   }
   // §1 switching gender keeps the SAME name/rarity, only re-cohering grammatically
   // (the noun morphs in place when it can, else swaps for a same-rarity sibling).
@@ -824,12 +903,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // build the rare-name brag bubble for a player (or null)
   function rarityBubbleEl(p) {
-    if (p.pct == null || p.pct >= 10 || p.bubbleDismissed) return null; // notify on the sub-10% bracket
+    if (!p.tier || p.bubbleDismissed) return null;          // notify only the rarest ~10% of names
     var eff = settings.noBonus ? 0 : p.bonus;
     var bub = document.createElement('div');
-    bub.className = 'rarebubble rt' + G.rarityTier(p.pct); // colour = rarity tier
+    bub.className = 'rarebubble rt' + p.tier;                // colour = frequency tier
     var intro = p.typed ? '🎯 Позна! ' : '🏅 ';
-    bub.innerHTML = '<span>' + intro + esc(G.rarityLine(p.pct, eff)) + '</span><button class="rbx" title="Скрий">✕</button>';
+    bub.innerHTML = '<span>' + intro + esc(G.rarityLine(p.pct, eff, p.tier)) + '</span><button class="rbx" title="Скрий">✕</button>';
     bub.querySelector('.rbx').onclick = function () { p.bubbleDismissed = true; bub.remove(); };
     return bub;
   }
@@ -851,7 +930,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     setupPlayers.forEach(function (p, i) {
       var card = document.createElement('div'); card.className = 'pcard';
       card.__player = p;
-      var owner = isOwnerIdx(i);
+      var owner = isOwnerP(p);
 
       var top = document.createElement('div'); top.className = 'pcardtop';
       if (setupPlayers.length > 1) {
@@ -873,6 +952,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         p._seedTimer = setTimeout(function () {
           var m = G.matchSeed(p.name, p.gender);
           p.pct = m.matched ? m.pct : null;
+          p.tier = m.matched ? m.tier : 0;
           p.bonus = m.matched ? m.bonus : 0;
           p.parts = m.matched ? m.parts : null; // a matched name can still re-cohere on gender switch
           p.typed = true; p.bubbleDismissed = false;
@@ -1006,6 +1086,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     applyOwnerName(); // ensure seat #1 carries the owner's name if the toggle is on
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
+      pl.owner = !!p.owner; // the device-owner flag follows the player (token)
       pl.bonus = settings.noBonus ? 0 : (p.bonus || 0); // rare-name starting bonus
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
@@ -1163,7 +1244,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var idx = fx.pretendNext ? (game.current + 1) % game.players.length : game.current;
     var p = game.players[idx];
     $('curRank').textContent = initials(p.name);
-    $('curName').innerHTML = (isOwnerIdx(idx) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
+    $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
     else per.classList.add('hidden');
@@ -1975,7 +2056,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function openPeek(i) {
     var p = game.players[i];
-    $('peekTitle').innerHTML = (isOwnerIdx(i) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
+    $('peekTitle').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
     $('peekBody').innerHTML = miniBoard(p);
     $('peekTotal').textContent = total(p);
     $('peekModal').classList.remove('hidden');
@@ -1993,7 +2074,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       manualMode: manualMode,
       ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
       players: game.players.map(function (p) {
-        return { name: p.name, color: p.color, isAI: !!p.isAI, personaId: p.persona ? p.persona.id : null,
+        return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, personaId: p.persona ? p.persona.id : null,
                  gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [] };
       }),
       moveLog: moveLog,
@@ -2099,7 +2180,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       return '<div class="rankrow' + (i === 0 ? ' first' : '') + (pi === summary.sel ? ' picked' : '') + '" data-pi="' + pi + '">'
         + '<span class="rkbadge">' + esc(badge) + '</span>'
         + '<span class="pdot" style="width:16px;height:16px;border-radius:50%;background:' + p.color + '"></span>'
-        + '<span class="nm">' + (isOwnerIdx(pi) ? ownerTokenHTML(true) : '') + esc(p.name) + sub + '</span>'
+        + '<span class="nm">' + (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + sub + '</span>'
         + '<span class="tt">' + val + '</span></div>';
     }).join('');
     $('ranks').querySelectorAll('.rankrow').forEach(function (r) {
@@ -2112,12 +2193,48 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function signed(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 0 : d); }
 
+  // a coloured stat line: laser-scannable label + body (body carries .np/.nn/.nu numbers)
+  function stat(label, color, body) {
+    return '<div class="evstat"><span class="slbl" style="color:' + color + '">' + label + ':</span> ' + body + '</div>';
+  }
+  function nSigned(v, d) { var s = signed(v, d); return '<b class="' + (v >= 0 ? 'np' : 'nn') + '">' + s + '</b>'; } // ±, green/red
+  function nBad(v, d) { return '<b class="nn">' + (d != null ? v.toFixed(d) : v) + '</b>'; }                       // a loss (red)
+  function nNeut(v) { return '<b class="nu">' + v + '</b>'; }                                                       // neutral (brass)
+
+  // compact render of a turn's 1–3 rolls (last = the deciding one, emphasised)
+  function turnDiceHTML(pi, td, manual) {
+    var log = moveLog[pi] && moveLog[pi][td.turn];
+    var seq = manual ? (log && log.dice ? [log.dice] : (td.finalDice ? [td.finalDice] : []))
+                     : (log && log.rolls ? log.rolls : (td.finalDice ? [td.finalDice] : []));
+    if (!seq.length) return '';
+    var rolls = seq.map(function (d, i) {
+      var dice = (d || []).map(function (v) { return '<span class="rdie">' + v + '</span>'; }).join('');
+      return '<span class="rroll' + (i === seq.length - 1 ? ' last' : '') + '">' + dice + '</span>';
+    }).join('<span class="rarrow">→</span>');
+    return '<div class="evrolls">🎲 ' + rolls + '</div>';
+  }
+  function turnQuality(skill) {
+    if (skill >= -0.05) return { cls: 'q-great', mark: '★' };   // optimal turn
+    if (skill <= -3) return { cls: 'q-blunder', mark: '✗' };    // a real blunder
+    return { cls: 'q-ok', mark: '·' };
+  }
+
+  // colour palette for the stat labels (distinct hues for quick scanning)
+  var RC = { luck: '#9bd17e', skill: '#e8b06a', leak: '#e0b85a', sev: '#e05545', nerves: '#e0688a',
+             clutch: '#6fa8e8', bail: '#7ab8c0', zero: '#e0a05a', upper: '#7ab85a', stage: '#b39ddb', gen: 'var(--gen-brass-bright)' };
+
   function renderReport(pi) {
     var fp = game.players[pi], fa = summary.ana[pi];
     var perfRank = G.rankForAccuracy(fa.accuracy);
     var genVal = fp.scores.general;
     var html = '<div class="evpanel">';
-    html += '<div class="evhead">📋 Рапорт за ' + esc(fp.name) + (fp.isAI && fp.persona ? ' · ' + esc(fp.persona.name) : '') + '</div>';
+    html += '<div class="evhead">📋 Рапорт за ' + (isOwnerP(fp) ? ownerTokenHTML(true) : '') + esc(fp.name) + (fp.isAI && fp.persona ? ' · ' + esc(fp.persona.name) : '') + '</div>';
+
+    // §3 EV explainer (collapsed)
+    html += '<details class="evexplain"><summary>Какво е EV?</summary>'
+      + '<p><b>EV (очаквана стойност)</b> = средно колко точки носи едно решение, ако се изиграе безброй пъти. '
+      + 'Щабът сравнява твоя ход с най-добрия възможен: разликата е „<b>загуба EV</b>“ — точките, които си оставил на масата. '
+      + 'Така отделяме <b>късмета</b> (какво ти дадоха заровете) от <b>уменията</b> (какво направи с тях).</p></details>';
 
     // §identity (dice mode only — manual games have no luck term)
     if (!fa.manual) {
@@ -2125,78 +2242,81 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + '<span class="luck">' + signed(fa.luck) + ' късмет</span> '
         + '<span class="skill">' + fa.skill.toFixed(0) + ' решения</span> → <b>' + G.playerTotal(fp) + '</b></div>';
     }
-    html += '<div class="evsub">Игра като <b>' + esc(perfRank) + '</b> — точност ' + Math.round(fa.accuracy * 100) + '%'
-      + ' · средна загуба <b>−' + fa.avgLostPerTurn.toFixed(1) + ' т. EV/ход</b></div>';
 
-    // playstyle fingerprint (colour-coded archetype)
+    // §5 combined playstyle box: chip + rank, description, then точност/загуба
     var st = G.playstyleFor(fa);
-    if (st) html += '<div class="evsub"><span class="stylechip" style="background:' + st.color + '">' + esc(st.name) + '</span> ' + esc(st.desc) + '</div>';
+    html += '<div class="stylebox"><div class="styhead">'
+      + (st ? '<span class="stychip" style="background:' + st.color + '">' + esc(st.name) + '</span>' : '')
+      + '<span class="styrank">игра като ' + esc(perfRank) + '</span></div>'
+      + (st ? '<div class="stydesc">' + esc(st.desc) + '</div>' : '')
+      + '<div class="stymetrics">точност <b class="nu">' + Math.round(fa.accuracy * 100) + '%</b> · средна загуба ' + nBad(fa.avgLostPerTurn, 1) + ' т. EV/ход</div></div>';
 
     // outstanding moves / costliest mistake
     if (fa.sharpest) html += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
     if (fa.blunder && fa.blunder.cost < -0.5) html += '<div class="evpick blunder">✗ Най-скъпа грешка: ' + decisionLabel(fa.blunder)
       + ' <span class="gap">(−' + (-fa.blunder.cost).toFixed(1) + ' т.)</span></div>';
 
+    // §6 coloured stat lines ----------------------------------------------------
     // hold/category efficiency + mistake counts
     if (!fa.manual) {
       var leakWord = fa.leak.keep <= fa.leak.category ? 'задържанията' : 'избора на категория';
-      html += '<div class="evsub">Изтичане: задържания ' + fa.leak.keep.toFixed(0) + ' т. (' + fa.mistakes.keep + '/' + fa.leakCounts.keep + ' грешни)'
-        + ' · категории ' + fa.leak.category.toFixed(0) + ' т. (' + fa.mistakes.category + '/' + fa.leakCounts.category + ')'
-        + ' — повече губиш в <b>' + leakWord + '</b></div>';
+      html += stat('Изтичане', RC.leak, 'задържания ' + nBad(fa.leak.keep, 0) + ' т. (' + fa.mistakes.keep + '/' + fa.leakCounts.keep + ' грешни)'
+        + ' · категории ' + nBad(fa.leak.category, 0) + ' т. (' + fa.mistakes.category + '/' + fa.leakCounts.category + ') — повече губиш в <b>' + leakWord + '</b>');
     } else {
-      html += '<div class="evsub">Избор на категория: ' + fa.mistakes.category + ' от ' + fa.leakCounts.category + ' неоптимални'
-        + ' (' + (-fa.leak.category).toFixed(0) + ' т. изпуснати)</div>';
+      html += stat('Избор на категория', RC.leak, fa.mistakes.category + ' от ' + fa.leakCounts.category + ' неоптимални (' + nBad(-fa.leak.category, 0) + ' т. изпуснати)');
     }
 
     // blunder categorisation by severity
     var sevTotal = fa.severity.minor + fa.severity.major + fa.severity.fatal;
-    html += sevTotal
-      ? '<div class="evsub">Издънки: ' + fa.severity.minor + ' дребни · ' + fa.severity.major + ' сериозни · <b>' + fa.severity.fatal + ' фатални</b></div>'
-      : '<div class="evsub">Издънки: нито една. Чисто досие.</div>';
+    html += stat('Издънки', RC.sev, sevTotal
+      ? nNeut(fa.severity.minor) + ' дребни · ' + nNeut(fa.severity.major) + ' сериозни · <b class="nn">' + fa.severity.fatal + '</b> фатални'
+      : 'нито една — чисто досие');
 
-    // deep luck deconstruction + tilt + bailout (need the roll sequence)
+    // deep luck deconstruction + nerves + bailout (need the roll sequence)
     if (!fa.manual) {
-      html += '<div class="evsub">Късмет под лупа: първо хвърляне ' + signed(fa.luckFirst) + ' · прехвърляния ' + signed(fa.luckRerolls)
-        + ' · в края, когато боли (clutch) <b>' + signed(fa.clutch) + '</b></div>';
+      html += stat('Късмет под лупа', RC.luck, 'първо хвърляне ' + nSigned(fa.luckFirst, 0) + ' · прехвърляния ' + nSigned(fa.luckRerolls, 0)
+        + ' · в решителния край ' + nSigned(fa.clutch, 0));
       if (fa.tilt) {
-        html += '<div class="evsub">Тилт: ' + (fa.tilt.delta > 1.5
-          ? 'след гадно хвърляне губиш с <b>' + signed(fa.tilt.delta, 1) + ' т./ход</b> повече — дишай дълбоко'
-          : 'хладнокръвен — лошият късмет не те разклаща') + '</div>';
+        html += stat('Изнервяне', RC.nerves, fa.tilt.delta > 1.5
+          ? 'след гадно хвърляне губиш с <b class="nn">' + signed(fa.tilt.delta, 1) + '</b> т./ход повече — дишай дълбоко'
+          : 'хладнокръвен — лошият късмет не те разклаща');
       }
       if (fa.bailout) {
         var pivots = fa.bailout.avgCost <= fa.bailout.baseline + 0.5;
-        html += '<div class="evsub">Спасения: при счупен план (' + fa.bailout.n + ' хода) губиш средно '
-          + fa.bailout.avgCost.toFixed(1) + ' т./ход — ' + (pivots ? '<b>превключваш добре</b>' : 'инатиш се на стария план') + '</div>';
+        html += stat('Спасения', RC.bail, 'при счупен план (' + fa.bailout.n + ' хода) губиш средно ' + nBad(fa.bailout.avgCost, 1)
+          + ' т./ход — ' + (pivots ? '<b class="np">превключваш добре</b>' : '<b class="nn">инатиш се на стария план</b>'));
       }
     }
 
     // zero-out avoidance
     if (fa.zeroOuts.total) {
-      html += '<div class="evsub">Нули: ' + fa.zeroOuts.total + ' — математически принудени ' + fa.zeroOuts.forced
-        + ', от собствената ти игра ' + fa.zeroOuts.unforced + '</div>';
+      html += stat('Нули', RC.zero, nNeut(fa.zeroOuts.total) + ' — принудени ' + nNeut(fa.zeroOuts.forced) + ', от твоята игра <b class="nn">' + fa.zeroOuts.unforced + '</b>');
     }
 
     // upper-section efficiency (vs the "three of each" yardstick = 63)
     var upTot = 0;
     G.CATEGORIES.forEach(function (c) { if (c.group === 'upper' && typeof fp.scores[c.key] === 'number') upTot += fp.scores[c.key]; });
-    html += '<div class="evsub">Горна секция: ' + upTot + ' т. — ' + Math.round(100 * upTot / 63) + '% от целта „по три от всяко“ (63)</div>';
+    html += stat('Горна секция', RC.upper, nNeut(upTot) + ' т. — ' + nNeut(Math.round(100 * upTot / 63) + '%') + ' от целта „по три от всяко“ (63)');
 
     // game-section ratings (the late game forgives nothing)
     function stageLoss(s) { return s.n ? (-s.skill / s.n).toFixed(1) : '0.0'; }
-    html += '<div class="evsub">По етапи (загуба т./ход): начало −' + stageLoss(fa.stages.early)
-      + ' · среда −' + stageLoss(fa.stages.mid) + ' · край −' + stageLoss(fa.stages.late) + ' — краят прощава най-малко</div>';
+    html += stat('По етапи', RC.stage, 'загуба т./ход — начало <b class="nn">' + stageLoss(fa.stages.early) + '</b> · среда <b class="nn">'
+      + stageLoss(fa.stages.mid) + '</b> · край <b class="nn">' + stageLoss(fa.stages.late) + '</b> (краят прощава най-малко)');
 
-    html += '<div class="evsub">генерал: ' + (typeof genVal === 'number' && genVal > 0 ? 'хвърлен (' + genVal + ')' : 'не') + '</div>';
+    html += stat('Генерал', RC.gen, (typeof genVal === 'number' && genVal > 0 ? 'хвърлен — ' + nNeut(genVal) + ' т.' : 'не е хвърлен'));
 
-    // turn-by-turn breakdown — collapsed by default
-    html += '<details class="evturns"><summary>Ход по ход</summary>';
+    // §7 turn-by-turn breakdown (quality marked + the 1/2/3 rolls per turn)
+    html += '<details class="evturns"><summary>Ход по ход (★ върхов · · окей · ✗ издънка)</summary>';
     fa.turns.forEach(function (td) {
+      var q = turnQuality(td.skill);
       var luckCell = fa.manual ? '' : '<span class="tl ' + (td.luck >= 0 ? 'plus' : 'minus') + '">' + signed(td.luck, 1) + '</span>';
       var skillCell = '<span class="tl' + (td.skill < -0.05 ? ' minus' : ' plus') + '">'
         + (td.skill < -0.05 ? '−' + (-td.skill).toFixed(1) : '✓') + '</span>';
-      html += '<div class="evtrow"><span class="tn">' + (td.turn + 1) + '</span>'
+      html += '<div class="evtrow ' + q.cls + '"><span class="tn">' + (td.turn + 1) + '</span>'
+        + '<span class="tq">' + q.mark + '</span>'
         + '<span class="tc">' + esc(CAT_LABEL[td.category] || td.category) + '</span>'
         + '<span class="tv">' + td.score + ' т.</span>' + luckCell + skillCell + '</div>';
+      html += turnDiceHTML(pi, td, fa.manual);
     });
     html += '</details>';
 
@@ -2217,6 +2337,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function recTotal(sp) { var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
+  function recOwnerIdx(rec) { for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // legacy games: seat 0
   function analyzeRec(rec, i) {
     var log = rec.moveLog && rec.moveLog[i];
     if (!evReady || !log || !log.length) return null;
@@ -2231,7 +2352,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function reconstructPlayers(rec) {
     return rec.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
-      pl.gender = sp.gender || 'm'; pl.bet = sp.bet; pl.scores = sp.scores || {}; pl.bonus = sp.bonus || 0; pl.ribbons = sp.ribbons || RIBBON_COLORS;
+      pl.gender = sp.gender || 'm'; pl.bet = sp.bet; pl.scores = sp.scores || {}; pl.bonus = sp.bonus || 0; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.owner = !!sp.owner;
       if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
       return pl;
     });
@@ -2257,13 +2378,93 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   $('overBack').onclick = function () { exitHistoryGame(true); };
 
-  // owner trends: aggregate seat-0 (the device owner, when human) across games
+  // ---------- §8 replay viewer (turn-by-turn + roll-by-roll, scrubbable) ----------
+  var replay = null;
+  // flatten a saved game into atomic actions in true play order (round-robin)
+  function buildReplayActions(rec) {
+    var actions = [], nP = rec.players.length, R = G.CATEGORIES.length;
+    for (var r = 0; r < R; r++) {
+      for (var p = 0; p < nP; p++) {
+        var log = rec.moveLog[p] && rec.moveLog[p][r];
+        if (!log) continue;
+        var score = rec.players[p].scores[log.category];
+        if (rec.manualMode) {
+          actions.push({ type: 'roll', p: p, r: r, dice: log.dice || [], kept: null, rollNo: 1, rolls: 1 });
+          actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: log.dice || [] });
+        } else {
+          var rolls = log.rolls || [];
+          for (var i = 0; i < rolls.length; i++) actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], kept: i > 0 ? log.keeps[i - 1] : null, rollNo: i + 1, rolls: rolls.length });
+          actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: rolls.length ? rolls[rolls.length - 1] : [] });
+        }
+      }
+    }
+    return actions;
+  }
+  function rpStateAt(idx) {
+    var sc = replay.rec.players.map(function () { return {}; });
+    for (var k = 0; k <= idx; k++) { var a = replay.actions[k]; if (a.type === 'commit') sc[a.p][a.category] = a.score; }
+    return sc;
+  }
+  function replayBoardHTML(scores, hlKey) {
+    function tile(c, up) {
+      var f = typeof scores[c.key] === 'number', hl = c.key === hlKey ? ' hl' : '';
+      return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + '"><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] : '–') + '</span></div>';
+    }
+    var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
+    var low = G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).map(function (c) { return tile(c, false); }).join('');
+    return '<div class="miniboard"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>';
+  }
+  function renderReplay() {
+    var a = replay.actions[replay.idx], rec = replay.rec, sc = rpStateAt(replay.idx), pl = rec.players[a.p];
+    var run = 0; G.CATEGORIES.forEach(function (c) { if (typeof sc[a.p][c.key] === 'number') run += sc[a.p][c.key]; });
+    $('replayInfo').innerHTML = '<span>' + (pl.owner ? ownerTokenHTML(true) : '') + esc(pl.name) + '</span><span class="rpround">рунд ' + (a.r + 1) + '/' + G.CATEGORIES.length + ' · ' + (run + (pl.bonus || 0)) + ' т.</span>';
+    $('replayBoard').innerHTML = replayBoardHTML(sc[a.p], a.type === 'commit' ? a.category : null);
+    $('replayDice').innerHTML = (a.dice || []).map(function (v, i) { return '<div class="rpdie' + (a.kept && a.kept[i] ? ' kept' : '') + '">' + pipFace(v) + '</div>'; }).join('');
+    $('rpLabel').innerHTML = a.type === 'roll'
+      ? 'Хвърляне <b>' + a.rollNo + '/' + a.rolls + '</b>' + (a.kept ? ' · задържа маркираните' : '')
+      : 'Записва <b>' + esc(CAT_LABEL[a.category] || a.category) + '</b> = <b>' + a.score + '</b> т.';
+    $('rpSlider').value = String(replay.idx);
+  }
+  function rpLast() { return replay.actions.length - 1; }
+  function rpPause() { replay.playing = false; $('rpPlay').textContent = '▶'; clearTimeout(replay.timer); }
+  function rpSchedule() {
+    clearTimeout(replay.timer);
+    replay.timer = setTimeout(function () {
+      if (!replay.playing) return;
+      if (replay.idx < rpLast()) { replay.idx++; renderReplay(); rpSchedule(); } else rpPause();
+    }, replay.speed);
+  }
+  function rpPlay() {
+    if (replay.idx >= rpLast()) replay.idx = 0;
+    replay.playing = true; $('rpPlay').textContent = '⏸'; renderReplay(); rpSchedule();
+  }
+  function openReplay(rec) {
+    var actions = buildReplayActions(rec);
+    if (!actions.length) return;
+    $('historyModal').classList.add('hidden');
+    replay = { rec: rec, actions: actions, idx: 0, timer: null, playing: false, speed: +$('rpSpeed').value };
+    $('rpSlider').max = String(rpLast());
+    $('replayModal').classList.remove('hidden');
+    rpPlay(); // auto-start
+  }
+  $('rpPlay').onclick = function () { if (replay.playing) rpPause(); else rpPlay(); };
+  $('rpRestart').onclick = function () { replay.idx = 0; rpPause(); renderReplay(); };
+  $('rpStepF').onclick = function () { rpPause(); if (replay.idx < rpLast()) { replay.idx++; renderReplay(); } };
+  $('rpStepB').onclick = function () { rpPause(); if (replay.idx > 0) { replay.idx--; renderReplay(); } };
+  $('rpSlider').oninput = function () { rpPause(); replay.idx = +$('rpSlider').value; renderReplay(); };
+  $('rpSpeed').onchange = function () { replay.speed = +$('rpSpeed').value; if (replay.playing) rpSchedule(); };
+  function closeReplay() { if (replay) rpPause(); $('replayModal').classList.add('hidden'); openHistory(); }
+  $('replayClose').onclick = closeReplay;
+  $('replayModal').onclick = function (e) { if (e.target === $('replayModal')) closeReplay(); };
+
+  // owner trends: aggregate the flagged owner (when human) across games
   function ownerOverview(games) {
-    var owned = games.filter(function (r) { return r.players[0] && !r.players[0].isAI; });
+    var owned = games.filter(function (r) { var o = r.players[recOwnerIdx(r)]; return o && !o.isAI; });
     var data = owned.map(function (r) {
-      var ana = analyzeRec(r, 0);
-      return { rec: r, ana: ana, total: recTotal(r.players[0]), place: recPlacement(r, 0), n: r.players.length,
-               general: (r.players[0].scores.general || 0) > 0, name: r.players[0].name };
+      var oi = recOwnerIdx(r), o = r.players[oi];
+      var ana = analyzeRec(r, oi);
+      return { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
+               general: (o.scores.general || 0) > 0, name: o.name };
     }).filter(function (d) { return d.ana; }); // need analysis for trends
     if (!data.length) {
       return '<div class="histover"><div class="noowner"><div class="nohd">🤷 Няма досие на стопанина</div>'
@@ -2313,21 +2514,24 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     }
     var html = '<div class="histhd">Битки (' + games.length + ')</div>';
     games.forEach(function (rec) {
-      var oTotal = recTotal(rec.players[0]), place = recPlacement(rec, 0), winR = place === 1;
+      var oi = recOwnerIdx(rec), oTotal = recTotal(rec.players[oi]), place = recPlacement(rec, oi), winR = place === 1;
       var winnerName = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0].name;
       var res = winR ? 'П' : place + '/' + rec.players.length;
       html += '<div class="histgame" data-id="' + esc(rec.id) + '">'
         + '<span class="hg-res ' + (winR ? 'win' : 'loss') + '">' + esc(res) + '</span>'
-        + '<span class="hg-main"><span class="hg-top">' + ownerTokenHTML(true) + esc(rec.players[0].name)
+        + '<span class="hg-main"><span class="hg-top">' + ownerTokenHTML(true) + esc(rec.players[oi].name)
         + (winR ? '' : ' · 🏆 ' + esc(winnerName)) + '</span>'
         + '<span class="hg-sub">' + fmtWhen(rec.ts) + ' · ' + rec.players.length + ' бойци' + (rec.manualMode ? ' · отчет' : '') + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
+        + '<button class="hg-play" title="Реплей">🎬</button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
     });
     $('historyList').innerHTML = html;
     $('historyList').querySelectorAll('.histgame').forEach(function (row) {
       var id = row.getAttribute('data-id');
-      row.onclick = function () { var rec = loadHistory().filter(function (r) { return r.id === id; })[0]; if (rec) openHistoryGame(rec); };
+      var find = function () { return loadHistory().filter(function (r) { return r.id === id; })[0]; };
+      row.onclick = function () { var rec = find(); if (rec) openHistoryGame(rec); };
+      row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
     });
   }
@@ -2356,7 +2560,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('ownerToggle').classList.toggle('on', settings.useOwnerName);
     saveSettings();
     if (!$('setup').classList.contains('hidden')) {
-      if (!settings.useOwnerName && setupPlayers[0]) regenName(setupPlayers[0]); // give seat-0 a fresh random name
+      if (!settings.useOwnerName && setupPlayers.length) regenName(ownerOf(setupPlayers)); // give the owner a fresh random name
       renderSetup();
     }
   };

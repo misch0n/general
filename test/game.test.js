@@ -439,33 +439,37 @@ test('neuter names resolve to a neuter noun + agreeing adjective', function () {
   }
 });
 
-test('bonusForPct awards points by the final name-percentage bracket', function () {
-  // 0-1→5, 1-2→4, 2-3→3, 3-4→2, 4-5→1, 5-10→0 (smile), 10+→0
-  assert.strictEqual(G.bonusForPct(null), 0);
-  assert.strictEqual(G.bonusForPct(0.5), 5);
-  assert.strictEqual(G.bonusForPct(1.5), 4);
-  assert.strictEqual(G.bonusForPct(2.5), 3);
-  assert.strictEqual(G.bonusForPct(3.5), 2);
-  assert.strictEqual(G.bonusForPct(4.5), 1);
-  assert.strictEqual(G.bonusForPct(7), 0);   // 5–10%: smile only, no points
-  assert.strictEqual(G.bonusForPct(40), 0);  // common
+test('§awards: only the rarest ~5% of name rolls earn a bonus (frequency-based)', function () {
+  // award rate must track the rarest-5% target, NOT fire on a majority of names
+  var N = 12000, award = 0, smile = 0, tiers = {};
+  for (var i = 0; i < N; i++) {
+    var r = G.randomNameRarity('human', i % 3 === 0 ? 'n' : (i % 2 ? 'f' : 'm'));
+    if (r.bonus > 0) award++;
+    if (r.tier === 10) smile++;
+    tiers[r.tier] = (tiers[r.tier] || 0) + 1;
+    assert.strictEqual(r.bonus, G.bonusForPct(r.pct), 'bonus must match the tier');
+  }
+  var rate = award / N;
+  assert.ok(rate > 0.02 && rate < 0.09, 'award rate ~5%, got ' + (100 * rate).toFixed(1) + '%');
+  assert.ok(smile / N < 0.09, 'smile (5–10%) band is small');
+  // rarer tiers map to bigger bonuses (monotonic)
+  assert.strictEqual(G.bonusForTier(1), 5);
+  assert.strictEqual(G.bonusForTier(5), 1);
+  assert.strictEqual(G.bonusForTier(10), 0);
+  assert.strictEqual(G.bonusForTier(0), 0);
 });
 
-test('rarityTier buckets the name % (5–10 is the smile tier); rarityLine per tier', function () {
+test('rarityTier is frequency-ranked; rarer chance ⇒ rarer tier; rarityLine talks odds', function () {
+  // a near-impossible chance is the rarest tier; a common chance is tier 0
   assert.strictEqual(G.rarityTier(null), 0);
-  assert.strictEqual(G.rarityTier(0.5), 1);
-  assert.strictEqual(G.rarityTier(1.5), 2);
-  assert.strictEqual(G.rarityTier(2.5), 3);
-  assert.strictEqual(G.rarityTier(3.5), 4);
-  assert.strictEqual(G.rarityTier(4.5), 5);
-  assert.strictEqual(G.rarityTier(7), 10);   // 5–10% smile tier
-  assert.strictEqual(G.rarityTier(40), 0);   // common, no notification
-  // exclamations for the bonus tiers, a smile for 5–10, bonus suffix when earned
-  assert.ok(/^ГОСПОДИ! 0\.5% шанс/.test(G.rarityLine(0.5, 5)));
-  assert.ok(/^Ебаси, 1\.5% шанс/.test(G.rarityLine(1.5, 4)));
-  assert.ok(/^🙂 7% шанс/.test(G.rarityLine(7, 0)));   // smile, no bonus text
-  assert.ok(G.rarityLine(0.5, 5).indexOf('+5 т.') > 0);
-  assert.strictEqual(G.rarityLine(7, 0).indexOf('аванс'), -1);
+  assert.strictEqual(G.rarityTier(0.0001, 'human'), 1); // far below the 1% threshold
+  assert.strictEqual(G.rarityTier(90, 'human'), 0);     // a common name
+  // the brag line is in frequency terms (1 на N · топ X%), no raw tiny %
+  var line = G.rarityLine(0.001, 5, 1);
+  assert.ok(/^ГОСПОДИ! 1 на [\d ]+ имена — топ 1% рядкост!/.test(line), line);
+  assert.ok(line.indexOf('+5 т.') > 0);
+  assert.ok(/^🙂 Рядко име — 1 на /.test(G.rarityLine(0.05, 0, 10)));
+  assert.strictEqual(G.rarityLine(90, 0, 0), ''); // common → no line
 });
 
 test('randomNameRarity returns a coherent name + rarity/bonus', function () {

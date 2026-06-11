@@ -718,7 +718,7 @@
   }
 
   var censorNSFW = false; // when true (the menu "censor" toggle) NSFW entries are excluded
-  function setCensor(on) { censorNSFW = !!on; }
+  function setCensor(on) { censorNSFW = !!on; if (awardThresh.human) computeAwardThresholds(); }
   function isCensored(e) { return censorNSFW && e && e.nsfw; }
 
   var titlePool, adjPool, nounPool, aiAdjPool, aiNounPool;
@@ -728,8 +728,8 @@
     nounPool   = buildPool(NOUNS.concat(EPIC_NOUNS));
     aiAdjPool  = buildPool(AI_ADJS.concat(EPIC_AI_ADJS));
     aiNounPool = buildPool(AI_NOUNS.concat(EPIC_AI_NOUNS));
+    computeAwardThresholds();
   }
-  rollPools();
 
   // Pick a pool entry honoring its bracket. `gender` (nouns only) filters to
   // entries that can render it; NSFW entries drop out while censoring. A rare
@@ -762,14 +762,44 @@
     return cand[Math.floor((rng || Math.random)() * cand.length)];
   }
 
-  // §pts Name point award by the FINAL (combined) name percentage: <1→5, <2→4,
-  // <3→3, <4→2, <5→1, 5–10→0 (a smile, no points), 10+→0.
-  function bonusForPct(pct) {
+  // §awards Because a name's chance is the PRODUCT of its three components, raw
+  // percentages get tiny and skewed, so fixed %-brackets fire far too often. We
+  // instead award by FREQUENCY RANK: at load we Monte-Carlo the distribution of
+  // combined name-chances and keep the rarest-tail thresholds (1/2/3/4/5/10th
+  // percentiles). A roll is awarded only if it lands in the rarest 5% of names —
+  // tier 1 = rarest 1% → +5, … tier 5 = the 4–5% band → +1; the 5–10% band is a
+  // smile (no points). The thresholds are recomputed whenever the pools change.
+  var AWARD_PCTILES = [1, 2, 3, 4, 5, 10];
+  var awardThresh = { human: null, ai: null };
+  function computeAwardThresholds() {
+    ['human', 'ai'].forEach(function (kind) {
+      var ap = kind === 'ai' ? aiAdjPool : adjPool, np = kind === 'ai' ? aiNounPool : nounPool, M = 12000, arr = [];
+      for (var i = 0; i < M; i++) {
+        var g = ['m', 'f', 'n'][i % 3];
+        var t = pickFromPool(titlePool, null, Math.random, false);
+        var a = pickFromPool(ap, null, Math.random, false);
+        var n = pickFromPool(np, g, Math.random, true);
+        arr.push(t.frac * a.frac * n.frac * 100);
+      }
+      arr.sort(function (x, y) { return x - y; });
+      awardThresh[kind] = AWARD_PCTILES.map(function (p) { return arr[Math.floor(p / 100 * M)]; });
+    });
+  }
+  rollPools(); // build pools + award thresholds once at load
+
+  // frequency tier of a combined name-chance: 1..5 = rarest 1..5% bands, 10 = the
+  // 5–10% band (smile), 0 = common. `kind` selects the human/ai distribution.
+  function rarityTier(pct, kind) {
     if (pct == null) return 0;
-    if (pct < 1) return 5; if (pct < 2) return 4; if (pct < 3) return 3;
-    if (pct < 4) return 2; if (pct < 5) return 1;
+    var T = awardThresh[kind === 'ai' ? 'ai' : 'human'] || awardThresh.human;
+    if (!T) return 0;
+    for (var i = 0; i < 5; i++) if (pct <= T[i]) return i + 1;
+    if (pct <= T[5]) return 10;
     return 0;
   }
+  function bonusForTier(tier) { return tier >= 1 && tier <= 5 ? 6 - tier : 0; }
+  // (kind-aware) starting bonus for a combined name-chance
+  function bonusForPct(pct, kind) { return bonusForTier(rarityTier(pct, kind)); }
 
   // The combined name percentage = product of the three component fractions
   // (×100). Lower = rarer. Used for the bubble, the bonus and the notification.
@@ -777,16 +807,16 @@
 
   // Assemble a name (+ rarity) from chosen pool parts for a given gender. The
   // adjective agrees with the gender; the noun shows its form for that gender.
-  function buildFromParts(parts, gender) {
+  function buildFromParts(parts, gender, kind) {
     var name = entryWord(parts.title.e) + ' '
       + capitalize(inflectAdj(entryAdj(parts.adj.e), gender)) + ' '
       + nounWordFor(parts.noun.e, gender);
-    var pct = comboPct(parts);
-    return { name: name, pct: pct, bonus: bonusForPct(pct), parts: parts };
+    var pct = comboPct(parts), tier = rarityTier(pct, kind);
+    return { name: name, pct: pct, tier: tier, bonus: bonusForTier(tier), parts: parts };
   }
 
   // Generate a name and report its rarity + the chosen parts (so a later gender
-  // switch can re-cohere it without re-rolling). { name, pct, bonus, parts }.
+  // switch can re-cohere it without re-rolling). { name, pct, tier, bonus, parts }.
   function randomNameRarity(kind, gender, rng) {
     var ap = kind === 'ai' ? aiAdjPool : adjPool;
     var np = kind === 'ai' ? aiNounPool : nounPool;
@@ -795,7 +825,7 @@
       adj: pickFromPool(ap, null, rng, false),
       noun: pickFromPool(np, gender, rng, true),
     };
-    return buildFromParts(parts, gender);
+    return buildFromParts(parts, gender, kind);
   }
 
   // §1 re-cohere a name for a new gender WITHOUT changing its rarity. Title and
@@ -809,7 +839,7 @@
       var repl = pickNounSameBracket(np, gender, noun.b);
       if (repl) noun = repl;
     }
-    return buildFromParts({ title: parts.title, adj: parts.adj, noun: noun }, gender);
+    return buildFromParts({ title: parts.title, adj: parts.adj, noun: noun }, gender, kind);
   }
 
   // Check a hand-typed "Title Adj Noun" against the human seed; if it lands an
@@ -835,35 +865,27 @@
       for (i = 0; i < adjPool.length; i++) if (!isCensored(adjPool[i].e) && capitalize(inflectAdj(entryAdj(adjPool[i].e), g)) === adjForm) { ae = adjPool[i]; break; }
       if (!ae) continue;
       var parts = { title: te, adj: ae, noun: ne };
-      var pct = comboPct(parts);
-      return { matched: true, pct: pct, bonus: bonusForPct(pct), gender: g, parts: parts };
+      var pct = comboPct(parts), tier = rarityTier(pct, 'human');
+      return { matched: true, pct: pct, tier: tier, bonus: bonusForTier(tier), gender: g, parts: parts };
     }
     return { matched: false, pct: null, bonus: 0 };
   }
 
-  // Rarity tier of a FINAL name percentage (bubble colour + exclamation): 1..5
-  // for the 0–5% brackets, 10 for 5–10% (a smile, no bonus), 0 = common (10+).
-  function rarityTier(pct) {
-    if (pct == null) return 0;
-    if (pct < 1) return 1; if (pct < 2) return 2; if (pct < 3) return 3;
-    if (pct < 4) return 4; if (pct < 5) return 5;
-    if (pct < 10) return 10;
-    return 0;
-  }
   var RARITY_EXCL = { 1: 'ГОСПОДИ!', 2: 'Ебаси,', 3: 'Лееееле, майко!', 4: 'Татенце!', 5: 'ЕХЕ!' };
-
-  function fmtPct(p) {
-    if (p >= 10) return String(Math.round(p));
-    if (p >= 0.1) return p.toFixed(1).replace(/\.0$/, ''); // 7 → "7", 1.5 → "1.5"
-    return Number(p.toPrecision(2)).toString();            // tiny products: 2 sig-figs
+  // "1 на N" odds from a combined name-chance (with thousands separators)
+  function odds1inN(pct) {
+    var n = Math.max(1, Math.round(100 / pct));
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
-  function rarityLine(pct, bonus) {
-    var tier = rarityTier(pct);
-    var pctStr = fmtPct(pct);
-    if (tier === 10) return '🙂 ' + pctStr + '% шанс за такова име!'; // 5–10%: just a smile
+  // The brag line talks in FREQUENCY (1 на N · топ X%), not the tiny raw chance.
+  function rarityLine(pct, bonus, tier) {
+    if (tier == null) tier = rarityTier(pct);
+    if (!tier) return '';
+    var odds = '1 на ' + odds1inN(pct) + ' имена';
+    if (tier === 10) return '🙂 Рядко име — ' + odds + '.';
     var excl = RARITY_EXCL[tier] || 'Брей,';
     var b = bonus > 0 ? ' Щабът ти отпуска +' + bonus + ' т. начален аванс!' : '';
-    return excl + ' ' + pctStr + '% шанс за такова име!' + b;
+    return excl + ' ' + odds + ' — топ ' + tier + '% рядкост!' + b;
   }
 
   // dev-mode dump of the live pools, with each entry's hardcoded bracket.
@@ -903,6 +925,7 @@
     nounPool   = buildPool(clean(src.nouns, toNounEntry));
     aiAdjPool  = buildPool(clean(src.aiAdjs, toAdjEntry));
     aiNounPool = buildPool(clean(src.aiNouns, toNounEntry));
+    computeAwardThresholds();
   }
 
   // ----------------------------------------------------- bot personas & ranks
@@ -1038,6 +1061,7 @@
     genderFill: genderFill,
     randomNameRarity: randomNameRarity,
     bonusForPct: bonusForPct,
+    bonusForTier: bonusForTier,
     rarityLine: rarityLine,
     rarityTier: rarityTier,
     matchSeed: matchSeed,

@@ -48,20 +48,21 @@ edition): camouflage field, classification banner, brass medals and stencil type
   нарежда да стреляш по 1, 2, 3. Търсиш малка кента."_ — plus the **top-3 keeps
   with their EVs** (off for serious play).
 - **Per-game report (luck vs skill).** Each game is decomposed via the engine's
-  value function into `final = par + luck + skill`, then dissected: **decision
-  accuracy** and avg EV loss/turn, **hold vs category** leak (with mistake
-  counts), **blunder categorisation** (minor / major / fatal), **outstanding
-  moves**, a **deep luck deconstruction** (net dice variance split first throw vs
-  rerolls, plus the **clutch factor** — late-game luck), **zero-out avoidance**
-  (mathematically forced vs self-inflicted), a **tilt metric** (does your EV loss
-  spike after a terrible roll?), a **bailout rating** (how well you pivot when
-  the opening throw breaks the plan), **upper-section efficiency** (vs the
-  three-of-each yardstick), **early/mid/late section ratings**, and a colour-coded
-  **playstyle fingerprint** (Хирургът, Комарджията, Чиновникът, Късметлията…).
-  A collapsed **Ход по ход** panel expands into the turn-by-turn breakdown. The
-  end screen has two tabs — **Класиране** (standings, points only) and **По
-  умение** (luck-fair, by decision quality) — and the report is **selectable per
-  player** (any seat, incl. AI). Per-game only (no cross-game storage).
+  value function into `final = par + luck + skill`, then dissected — with a built-in
+  **„Какво е EV?“** explainer and all jargon in Bulgarian: **decision accuracy**
+  and avg EV loss/turn folded into the colour-coded **playstyle box** (archetype +
+  rank + metrics in one), **hold vs category** leak (with mistake counts),
+  **blunder categorisation** (дребни / сериозни / фатални), **outstanding moves**,
+  a **deep luck deconstruction** (first throw vs rerolls, plus luck _в решителния
+  край_), **zero-out avoidance**, an **Изнервяне** metric (does your EV loss spike
+  after a terrible roll?), a **bailout rating**, **upper-section efficiency**,
+  **early/mid/late ratings**, and the colour-coded **playstyle fingerprint**
+  (Хирургът, Комарджията, Чиновникът, Късметлията…). Every stat line has a
+  **colour-coded label and numbers** for quick scanning. A collapsed **Ход по ход**
+  panel expands into a turn-by-turn breakdown that **marks each turn** (★ върхов / ·
+  окей / ✗ издънка) and shows the **1–3 dice rolls** the player decided from (the
+  deciding roll emphasised). Two tabs — **Класиране** (standings) and **По умение**
+  (luck-fair) — and the report is **selectable per player** (any seat, incl. AI).
 - **Полеви отчет (manual mode).** A second start option runs the board as a
   manual scorekeeper for a real table game: **tap in all five table dice** on the
   six entry dice at the bottom, and the scoreboard lights up with **every fillable
@@ -76,21 +77,20 @@ edition): camouflage field, classification banner, brass medals and stencil type
 - **Table setup.** **Drag the grip** (⠿) to reorder seats to match how people sit
   around the real table.
 - **Rare names & starting bonuses.** Every name component (title / adjective /
-  noun) sits in a **hardcoded percentile bracket** — `0-1`, `1-2`, `2-3`, `3-4`,
-  `4-5`, `5-10` or `10+` (common) — so rarities are **consistent across loads**
-  (the only randomness is the draw). A component is drawn with a probability set
-  by its bracket; the **name's percentage is the product** of its three
-  components' fractions, so _common title × rare adjective × rare noun_ multiplies
-  into something genuinely scarce. Titles span **every Bulgarian age** (modern
-  ranks, imperial dignities — _Хан, Боляр, Кавхан_ — and revival-era resistance —
-  _Войвода, Хайдутин, Комита, Опълченец_). Draw (or **type**) a rare _Title +
-  Adjective + Noun_ and a brag bubble exclaims the odds tier-style — _ГОСПОДИ!
-  0.1% шанс…_, _Ебаси, 1.5%…_, _ЕХЕ! 4.5%…_ — plus an HQ **starting bonus** by the
-  name's bracket (`0-1`→5 … `4-5`→1, `5-10`→just a 🙂, no points), **colour-coded**:
-  0-1 purple, 1-2 gold, 2-3 orange, 3-4 yellow, 4-5 green, 5-10 blue. Typing a name
-  checks it live (debounced) against the seed — _🎯 Позна!_ — and adopts the
-  name's own gender; landing a rare combo still earns the bonus. Works in manual
-  mode too. (Initial brackets are arbitrary — tune them in the dev editor.)
+  noun) sits in a **hardcoded percentile bracket** — `0-1` … `5-10` or `10+`
+  (common) — so rarities are **consistent across loads**. A component is drawn
+  with a probability set by its bracket, and a name's chance is the **product** of
+  its three components, so _common title × rare adjective × rare noun_ multiplies
+  into something genuinely scarce (chances like `1 на 100 000`). Because that
+  product skews tiny, awards are **frequency-ranked, not fixed-bracket**: at load
+  the engine Monte-Carlos the chance distribution and only the **rarest ~5% of
+  name rolls** earn a bonus — rarest 1% → +5 … the 4–5% band → +1, the 5–10% band
+  gets just a 🙂. The brag bubble talks **odds, not the raw tiny %** — _ГОСПОДИ! 1
+  на 106 667 имена — топ 1% рядкост!_ — colour-coded by tier. Titles span **every
+  Bulgarian age** (_Хан, Боляр, Кавхан, Войвода, Хайдутин, Комита, Опълченец_).
+  Draw (or **type**) a rare _Title + Adjective + Noun_; typing checks it live
+  against the seed — _🎯 Позна!_ — and adopts the name's own gender. Works in
+  manual mode too. (Brackets are tuned in the dev editor.)
 - **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
   _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
 - **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f), random
@@ -117,23 +117,27 @@ edition): camouflage field, classification banner, brass medals and stencil type
   game can be tapped away** — tooltips, refunds, roasts and orders alike. (The
   how-to deliberately keeps quiet about the fine — the ambush is the joke. Dice
   penalties don't apply in manual mode; everything else does.)
-- **Device owner (seat #1).** The first player is always **you, the device
-  owner**, marked with a brass **★ token** next to the name (in setup, the header,
-  peek and the standings). In **⚙ settings** you can enter your **battle name** and
-  toggle **„Използвай моето име“**: on → seat #1 is always that name; off → seat #1
-  gets a standard random name and is still the owner. The name persists across
-  sessions.
+- **Device owner.** One player is **you, the device owner**, marked with a brass
+  **★ token** (in setup, the header, peek, the standings and the report). The
+  token **follows the player** if you drag them to a different seat. In **⚙
+  settings** you can enter your **battle name** and toggle **„Използвай моето
+  име“**: on → the owner is always that name; off → the owner gets a random name
+  and is still the owner. The name persists across sessions.
 - **Военен архив (game history).** Every finished battle is saved to the browser
   (`localStorage`) in a format that **reproduces its end-game summary and analysis
   exactly** — open a game from the archive and you get the same standings, tabs
-  and per-player report as when it was played. As many games as storage allows
-  are kept; on a quota error the oldest are dropped. A game can be deleted inline,
-  or the whole archive **cleared from settings (with a confirmation)**. The archive
-  opens to an **owner overview**: multi-game trends for seat #1 — battles, wins,
-  win-rate, average decision accuracy (→ a rank), personal best, average luck,
-  generals thrown, your **favourite blunder**, and recent form. If no analysable
-  owner games exist yet, a goofy **„Няма досие на стопанина“** notice (with a
-  tooltip) explains you need to play as seat #1 (★, not an AI) to build trends.
+  and per-player report. As many games as storage allows are kept (oldest dropped
+  on overflow); games can be deleted inline or the whole archive **cleared from
+  settings (with a confirmation)**. Each game also has a **🎬 replay**: a
+  scrubbable, auto-playing turn-by-turn / roll-by-roll viewer with a **speed
+  selector** (🐢→⚡), **play/pause**, step buttons and an **action slider** that
+  jumps to any individual roll or commit — the board fills and the dice (kept ones
+  marked) update as it plays. The archive opens to an **owner overview**:
+  multi-game trends for the owner — battles, wins, win-rate, average decision
+  accuracy (→ a rank), personal best, average luck, generals, your **favourite
+  blunder**, and recent form. If no analysable owner games exist yet, a goofy
+  **„Няма досие на стопанина“** notice (with a tooltip) explains you need to play
+  as the owner (★, not an AI) to build trends.
 - **Censor toggle.** A **⚙ settings** switch — _Цензура, само прилични имена_ —
   is **off by default** (this is an adult party game). Flip it **on** to drop all
   NSFW-flagged words and generate from the SFW set only; names already on the
