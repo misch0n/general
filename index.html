@@ -354,6 +354,52 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .tab{ flex:1; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:12px;
   padding:8px; border-radius:8px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-muted); }
 .tab.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
+.tabs4{ gap:4px; } .tabs4 .tab{ font-size:11px; padding:7px 3px; letter-spacing:.2px; }
+.tabs4 .tab.hidden{ display:none; }
+/* §1.1–1.5 winner headline + verdict + badges */
+.winhead{ text-align:center; margin:-2px 0 10px; }
+.winhead .wh-hero{ font-family:var(--gen-font-display); font-size:19px; letter-spacing:.3px; color:var(--gen-text); }
+.winhead .wh-hero .wh-name{ font-weight:800; text-transform:uppercase; }
+.winhead .wh-hero b{ color:var(--gen-brass-bright); }
+.winhead .wh-split{ font-family:var(--gen-font-body); font-size:12.5px; color:var(--gen-muted); margin-top:3px; }
+.winhead .wh-verdict{ display:inline-block; margin-top:7px; padding:5px 11px; border-radius:8px; font-size:12.5px; line-height:1.35;
+  font-family:var(--gen-font-body); background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line); }
+.winhead .wh-verdict b{ font-family:var(--gen-font-display); letter-spacing:.4px; }
+.winhead .v-total{ border-color:#9bd17e; } .winhead .v-total b{ color:#9bd17e; }
+.winhead .v-earned{ border-color:var(--gen-brass); } .winhead .v-earned b{ color:var(--gen-brass-bright); }
+.winhead .v-lucky{ border-color:#e0b85a; } .winhead .v-lucky b{ color:#e0b85a; }
+.winbadges{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:12px; }
+.winbadges:empty{ display:none; }
+.wbadge{ display:inline-flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; font-size:10.5px; letter-spacing:.3px;
+  text-transform:uppercase; padding:4px 9px; border-radius:20px; color:var(--gen-text); background:rgba(255,255,255,.05);
+  border:1px solid var(--c); box-shadow:inset 0 0 12px -6px var(--c); }
+/* §1.5 category board */
+.catboard{ margin-bottom:12px; }
+.catboard .cb-head, .catboard .cb-row{ display:grid; grid-template-columns:1fr 56px 1fr; align-items:center; gap:8px; padding:5px 10px; }
+.catboard .cb-head{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:10px; color:var(--gen-muted); }
+.catboard .cb-row{ border-top:1px solid var(--gen-pill-line); font-size:12px; }
+.catboard .cb-row.miss{ opacity:.5; }
+.catboard .cb-cat{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); }
+.catboard .cb-hit{ text-align:center; font-variant-numeric:tabular-nums; color:var(--gen-label); }
+.catboard .cb-rec{ text-align:right; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.catboard .cb-rec.none{ color:var(--gen-disabled); }
+.catboard .cb-rec-h{ text-align:right; }
+.catboard .cb-master{ margin-top:10px; text-align:center; font-size:12px; color:var(--gen-label); }
+/* §1.7 luck panel */
+.luckpanel{ margin-bottom:12px; }
+.luckpanel .lp-head, .luckpanel .lp-row{ display:grid; grid-template-columns:1fr 64px 60px 76px; align-items:center; gap:6px; padding:6px 10px; }
+.luckpanel .lp-head{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.4px; font-size:9.5px; color:var(--gen-muted); }
+.luckpanel .lp-row{ border-top:1px solid var(--gen-pill-line); font-size:13px; font-variant-numeric:tabular-nums; }
+.luckpanel .lp-nm{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.3px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.luckpanel .lp-raw, .luckpanel .lp-luck, .luckpanel .lp-adj{ text-align:right; }
+.luckpanel .lp-adj{ font-weight:700; color:var(--gen-brass-bright); }
+.luckpanel .lp-note, .luckpanel .lp-none{ font-size:10.5px; color:var(--gen-muted); margin-top:8px; padding:0 4px; line-height:1.45; }
+/* §1.6 chart swing label */
+.pc-swing{ font-size:8px; font-weight:700; font-family:var(--gen-font-body); }
+/* §1.8 per-game coaching line */
+.coachline{ margin:8px 0; padding:8px 11px; border-radius:9px; font-size:12.5px; color:var(--gen-text);
+  background:rgba(123,184,90,.10); border:1px solid rgba(123,184,90,.35); }
+.coachline b{ color:#9bd17e; }
 .rankrow{ cursor:pointer; }
 .rankrow.picked{ box-shadow:inset 0 0 0 2px var(--gen-brass); }
 .rankrow.nodata{ cursor:default; }
@@ -776,14 +822,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="modal">
     <button id="reportHelp" class="qmark over-qmark" title="Как се чете рапортът?">?</button>
     <h2>🏆 ОТБОЙ — КРАЙ НА БИТКАТА</h2>
-    <div class="tabs">
+    <div id="winHeadline" class="winhead"></div>
+    <div id="winBadges" class="winbadges"></div>
+    <div class="tabs tabs4">
       <button id="tabStand" class="tab on">Класиране</button>
-      <button id="tabSkill" class="tab">По умение</button>
+      <button id="tabSkill" class="tab">Умение</button>
+      <button id="tabLuck" class="tab">Късмет</button>
+      <button id="tabCats" class="tab">Категории</button>
     </div>
     <div id="progressChart" class="progchart"></div>
     <div id="ranks"></div>
+    <div id="luckPanel" class="luckpanel hidden"></div>
+    <div id="catBoard" class="catboard hidden"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
+      <button id="shareCard" class="btn">📤 Сподели</button>
       <button id="overBack" class="btn hidden">← Архив</button>
       <button id="overUndo" class="btn hidden">ОПА!</button>
       <button id="playAgain" class="btn primary">↻ Нов набор</button>
@@ -2408,10 +2461,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
     // sel = -1: nobody expanded by default (tap a player to reveal details); chartOpen: graph expanded
     summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: -1, chartOpen: true };
+    summary.meta = computeSummaryMeta();   // §1 winner/skill/luck leaders + category board
 
+    // luck has meaning only for dice games; the category board needs only scores
+    var luckable = !manualMode && anyAnalysis;
     $('tabSkill').classList.toggle('hidden', !anyAnalysis);
     $('tabStand').classList.toggle('hidden', !anyAnalysis);
+    $('tabLuck').classList.toggle('hidden', !luckable);
+    $('tabCats').classList.toggle('hidden', false);
     $('overUndo').classList.toggle('hidden', !manualMode || !undoStack.length);
+    renderWinHeadline();   // WD-01 + WD-03 + WD-05 verdict
+    renderWinBadges();     // WD-04 badges
 
     // bet stakes — only in казарма mode
     if (fun()) {
@@ -2424,13 +2484,191 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('overModal').classList.remove('hidden');
   }
 
+  // §1.10 DA-19 — a shareable PNG of the currently-selected player's result
+  function shareSelected() {
+    if (!summary) return;
+    var pi = summary.sel >= 0 ? summary.sel : summary.meta.winIdx;
+    var p = game.players[pi], a = summary.ana[pi];
+    var place = summary.ordered.indexOf(p) + 1, n = game.players.length;
+    var rank = G.rankForPlacement(place - 1, n), tot = total(p);
+    var W = 720, H = 940, c = document.createElement('canvas'); c.width = W; c.height = H;
+    var x = c.getContext('2d'), cx = W / 2;
+    if (!x) return;                                   // no canvas (shouldn't happen in a browser)
+    x.fillStyle = '#15160e'; x.fillRect(0, 0, W, H);
+    x.strokeStyle = '#b8923a'; x.lineWidth = 8; x.strokeRect(16, 16, W - 32, H - 32);
+    x.textAlign = 'center';
+    x.fillStyle = '#b8923a'; x.font = '700 30px Georgia, serif'; x.fillText('★ ГЕНЕРАЛ ★', cx, 92);
+    x.fillStyle = '#9a9476'; x.font = '600 22px Arial, sans-serif';
+    x.fillText('КРАЙ НА БИТКАТА', cx, 130);
+    // player name in their colour
+    x.fillStyle = p.color; x.font = '800 56px Arial, sans-serif';
+    x.fillText(p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name, cx, 230);
+    // rank badge
+    x.fillStyle = '#b8923a'; x.font = '700 30px Georgia, serif'; x.fillText(rank.toUpperCase(), cx, 296);
+    // result line
+    x.fillStyle = '#e8e2c8'; x.font = '700 40px Arial, sans-serif';
+    x.fillText(tot + ' точки · ' + place + '/' + n + ' място', cx, 380);
+    // stat tiles
+    var tiles = [['Точки', String(tot)]];
+    if (a) {
+      tiles.push(['Оптимално', Math.round(a.accuracy * 100) + '%']);
+      if (!a.manual && typeof a.luck === 'number') tiles.push(['Без късмет', String(Math.round(tot - a.luck))]);
+    }
+    if ((p.scores.general || 0) > 0) tiles.push(['Генерал', String(p.scores.general)]);
+    var tw = 300, th = 92, gap = 24, cols = 2, startY = 440;
+    tiles.slice(0, 4).forEach(function (t, i) {
+      var col = i % cols, row = Math.floor(i / cols);
+      var tx = cx - (cols * tw + (cols - 1) * gap) / 2 + col * (tw + gap), ty = startY + row * (th + gap);
+      x.fillStyle = 'rgba(255,255,255,.05)'; roundRect(x, tx, ty, tw, th, 12); x.fill();
+      x.strokeStyle = 'rgba(184,146,58,.5)'; x.lineWidth = 2; roundRect(x, tx, ty, tw, th, 12); x.stroke();
+      x.fillStyle = '#9a9476'; x.font = '600 20px Arial, sans-serif'; x.fillText(t[0], tx + tw / 2, ty + 34);
+      x.fillStyle = '#e8c356'; x.font = '800 38px Arial, sans-serif'; x.fillText(t[1], tx + tw / 2, ty + 74);
+    });
+    // a roast / brag at the bottom
+    var pool = place === 1 ? (G.ROASTS.risk || []) : (G.ROASTS.fail || G.ROASTS.flop || []);
+    var quip = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '';
+    x.fillStyle = '#c8c2a8'; x.font = 'italic 600 26px Georgia, serif';
+    wrapText(x, '„' + quip + '“', cx, H - 150, W - 120, 34);
+    x.fillStyle = '#6b6754'; x.font = '500 20px Arial, sans-serif';
+    x.fillText(fmtDate(Date.now()), cx, H - 56);
+
+    c.toBlob(function (blob) {
+      if (!blob) return;
+      var file = new File([blob], 'general.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'Генерал', text: p.name + ' — ' + tot + ' т., ' + rank }).catch(function () {});
+      } else {
+        var url = URL.createObjectURL(blob), el = document.createElement('a');
+        el.href = url; el.download = 'general-' + p.name + '.png'; el.click();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      }
+    }, 'image/png');
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function wrapText(ctx, text, cx, y, maxW, lh) {
+    var words = String(text).split(' '), line = '', lines = [];
+    words.forEach(function (w) { var t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; });
+    if (line) lines.push(line);
+    lines.slice(0, 3).forEach(function (l, i) { ctx.fillText(l, cx, y + i * lh); });
+  }
+  $('shareCard').onclick = shareSelected;
+
   $('tabStand').onclick = function () { if (summary) { summary.tab = 'stand'; renderSummary(); } };
   $('tabSkill').onclick = function () { if (summary) { summary.tab = 'skill'; renderSummary(); } };
+  $('tabLuck').onclick = function () { if (summary) { summary.tab = 'luck'; renderSummary(); } };
+  $('tabCats').onclick = function () { if (summary) { summary.tab = 'cats'; renderSummary(); } };
+
+  // ---- §1 shared award metadata: points winner, skill leader, luck champ, category board ----
+  function computeSummaryMeta() {
+    var players = game.players, ana = summary.ana, pts = players.map(function (p) { return total(p); });
+    var winIdx = 0; for (var i = 1; i < players.length; i++) if (pts[i] > pts[winIdx]) winIdx = i;
+    // skill leader: highest accuracy among analysed; tie → lower avg EV loss
+    var skillIdx = -1;
+    players.forEach(function (p, i) {
+      if (!ana[i]) return;
+      if (skillIdx < 0) { skillIdx = i; return; }
+      var a = ana[i], b = ana[skillIdx];
+      if (a.accuracy > b.accuracy + 1e-9 || (Math.abs(a.accuracy - b.accuracy) < 1e-9 && a.avgLostPerTurn < b.avgLostPerTurn)) skillIdx = i;
+    });
+    // luck champ: highest luck among dice-mode analysed
+    var luckIdx = -1;
+    players.forEach(function (p, i) {
+      if (!ana[i] || ana[i].manual || typeof ana[i].luck !== 'number') return;
+      if (luckIdx < 0 || ana[i].luck > ana[luckIdx].luck) luckIdx = i;
+    });
+    // §1.5 category board: reduce scores across players → hit fraction + record (first-to-score holds ties)
+    var board = G.CATEGORIES.map(function (c) {
+      var hit = 0, recVal = -1, recPi = -1;
+      players.forEach(function (p, i) {
+        var v = p.scores[c.key];
+        if (typeof v !== 'number') return;
+        if (v > 0) hit++;
+        if (v > recVal) { recVal = v; recPi = i; }
+      });
+      return { key: c.key, label: c.label, hit: hit, n: players.length, recVal: recVal, recPi: recVal > 0 ? recPi : -1 };
+    });
+    var recCount = players.map(function () { return 0; });
+    board.forEach(function (b) { if (b.recPi >= 0) recCount[b.recPi]++; });
+    var masterIdx = -1; recCount.forEach(function (c, i) { if (c > 0 && (masterIdx < 0 || c > recCount[masterIdx])) masterIdx = i; });
+    return { winIdx: winIdx, skillIdx: skillIdx, luckIdx: luckIdx, board: board, recCount: recCount, masterIdx: masterIdx, pts: pts };
+  }
+
+  // §1.1 WD-01 hero line + §1.4 WD-03 margin split + §1.2 WD-05/06/08 verdict
+  function renderWinHeadline() {
+    var m = summary.meta, players = game.players, ana = summary.ana, P = players[m.winIdx];
+    var runnerUp = summary.ordered[1] ? game.players.indexOf(summary.ordered[1]) : -1;
+    var margin = runnerUp >= 0 ? m.pts[m.winIdx] - m.pts[runnerUp] : 0;
+    var html = '<div class="wh-hero"><span class="wh-name" style="color:' + P.color + '">' + esc(P.name) + '</span> '
+      + (margin > 0 ? 'спечели с <b>' + margin + ' т.</b>' : 'спечели') + '</div>';
+
+    // WD-03: split the margin against the runner-up so the parts sum to it
+    var split = (runnerUp >= 0 && ana[m.winIdx] && ana[runnerUp]) ? EV.marginSplit(ana[m.winIdx], ana[runnerUp], margin) : null;
+    if (split && margin > 0) {
+      var parts = '<b class="' + (split.skill >= 0 ? 'np' : 'nn') + '">' + signed(split.skill) + ' умение</b>';
+      if (split.luck != null) parts += ' / <b class="' + (split.luck >= 0 ? 'np' : 'nn') + '">' + signed(split.luck) + ' късмет</b>';
+      html += '<div class="wh-split">' + parts + '</div>';
+    }
+
+    // WD-05/06/08: verdict, anchored on the field's skill leader
+    var verdict = verdictFor(m, ana, margin, runnerUp);
+    if (verdict) html += '<div class="wh-verdict ' + verdict.cls + '"><b>' + verdict.title + '</b>' + (verdict.sub ? ' — ' + verdict.sub : '') + '</div>';
+    $('winHeadline').innerHTML = html;
+  }
+
+  function verdictFor(m, ana, margin, runnerUp) {
+    if (m.skillIdx < 0 || !ana[m.winIdx]) return null;
+    var players = game.players, W = m.winIdx, S = m.skillIdx;
+    // field luck average over the OTHER analysed dice players (for the "luckier than field" test)
+    function fieldLuckAvg(exclude) {
+      var s = 0, k = 0;
+      players.forEach(function (p, i) { if (i !== exclude && ana[i] && !ana[i].manual && typeof ana[i].luck === 'number') { s += ana[i].luck; k++; } });
+      return k ? s / k : null;
+    }
+    var manual = !!ana[W].manual;
+    if (W === S) {
+      if (manual) return { cls: 'v-earned', title: 'Заслужена победа', sub: 'реши умението' };
+      var fla = fieldLuckAvg(W), wl = ana[W].luck;
+      if (fla != null && wl > fla + 2) return { cls: 'v-total', title: 'Тотална победа', sub: 'надигра ги и късметът беше с теб' };
+      if (fla != null && wl < fla - 2) return { cls: 'v-earned', title: 'Заслужена победа', sub: 'надигра ги въпреки късмета' };
+      return { cls: 'v-earned', title: 'Заслужена победа', sub: 'реши умението' };
+    }
+    // winner is NOT the skill leader → luck decided it
+    var Sname = esc(players[S].name);
+    if (manual) return { cls: 'v-lucky', title: 'Късметлийска победа', sub: esc(players[W].name) + ' спечели, но ' + Sname + ' игра по-точно' };
+    var sp = EV.marginSplit(ana[W], ana[S], m.pts[W] - m.pts[S]);  // WD-06: quote the overturning luck
+    var lq = sp && sp.luck != null && sp.luck > 0 ? ' — <b class="np">+' + sp.luck + ' т. късмет</b> обърнаха мача' : '';
+    return { cls: 'v-lucky', title: 'Късметлийска победа', sub: esc(players[W].name) + ' спечели, но ' + Sname + ' го надигра' + lq };
+  }
+
+  // §1.3 WD-04 badges: Победител (points) · Тактик (skill) · luck roast · Майстор (category records)
+  function renderWinBadges() {
+    var m = summary.meta, players = game.players, b = [];
+    b.push('<span class="wbadge b-win" style="--c:' + players[m.winIdx].color + '">🥇 Победител · ' + esc(players[m.winIdx].name) + '</span>');
+    if (m.skillIdx >= 0) b.push('<span class="wbadge b-tac" style="--c:' + players[m.skillIdx].color + '">🎯 Тактик · ' + esc(players[m.skillIdx].name) + '</span>');
+    // luck is a roast, not an honour (Късметлия is already a playstyle) — only when it's not just one player
+    if (m.luckIdx >= 0 && players.length > 1 && summary.ana[m.luckIdx] && summary.ana[m.luckIdx].luck > 4)
+      b.push('<span class="wbadge b-luck" style="--c:' + players[m.luckIdx].color + '">🍀 Глезеник на заровете · ' + esc(players[m.luckIdx].name) + '</span>');
+    if (m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2)
+      b.push('<span class="wbadge b-mas" style="--c:' + players[m.masterIdx].color + '">📋 Майстор на категориите · ' + esc(players[m.masterIdx].name) + ' (×' + m.recCount[m.masterIdx] + ')</span>');
+    $('winBadges').innerHTML = b.join('');
+  }
 
   function renderSummary() {
     var n = game.players.length;
-    $('tabStand').classList.toggle('on', summary.tab === 'stand');
-    $('tabSkill').classList.toggle('on', summary.tab === 'skill');
+    ['stand', 'skill', 'luck', 'cats'].forEach(function (t) {
+      $('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('on', summary.tab === t);
+    });
+    // Класиране/Умение share the chart+rows; Късмет and Категории are their own panels
+    var listView = summary.tab === 'stand' || summary.tab === 'skill';
+    $('progressChart').classList.toggle('hidden', !listView);
+    $('ranks').classList.toggle('hidden', !listView);
+    $('luckPanel').classList.toggle('hidden', summary.tab !== 'luck');
+    $('catBoard').classList.toggle('hidden', summary.tab !== 'cats');
+    if (summary.tab === 'luck') { renderLuckPanel(); return; }
+    if (summary.tab === 'cats') { renderCatBoard(); return; }
 
     // standings are ALWAYS points-only; the skill tab re-orders by accuracy
     var rows = summary.ordered.slice();
@@ -2477,11 +2715,60 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     renderProgressChart(); // re-paint so the expanded player is highlighted on the graph
   }
 
+  // §1.5 DA-08 (match) — cross-player category board: per category, hit fraction + record holder
+  function renderCatBoard() {
+    var m = summary.meta, players = game.players;
+    var rows = m.board.map(function (b) {
+      var holder = b.recPi >= 0 ? players[b.recPi] : null;
+      var rec = holder
+        ? '<span class="cb-rec" style="color:' + holder.color + '">' + b.recVal + ' · ' + esc(holder.name) + '</span>'
+        : '<span class="cb-rec none">—</span>';
+      return '<div class="cb-row' + (holder ? '' : ' miss') + '">'
+        + '<span class="cb-cat">' + esc(b.label) + '</span>'
+        + '<span class="cb-hit">' + b.hit + '/' + b.n + '</span>'
+        + rec + '</div>';
+    }).join('');
+    var master = m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2
+      ? '<div class="cb-master">📋 Майстор на категориите: <b style="color:' + players[m.masterIdx].color + '">' + esc(players[m.masterIdx].name) + '</b> · ' + m.recCount[m.masterIdx] + ' рекорда</div>' : '';
+    $('catBoard').innerHTML = '<div class="cb-head"><span class="cb-cat">комбо</span><span class="cb-hit">влезли</span><span class="cb-rec-h">рекорд</span></div>'
+      + rows + master;
+  }
+
+  // §1.7 RT-06 + RT-10 — luck lens: raw score · luck (±) · luck-adjusted (= score − luck)
+  function renderLuckPanel() {
+    var players = game.players, ana = summary.ana, m = summary.meta;
+    var data = players.map(function (p, i) {
+      return { p: p, i: i, raw: total(p), luck: ana[i] && typeof ana[i].luck === 'number' ? ana[i].luck : null };
+    }).filter(function (d) { return d.luck != null; });
+    if (!data.length) { $('luckPanel').innerHTML = '<div class="lp-none">Няма данни за късмета (ръчен режим).</div>'; return; }
+    data.sort(function (a, b) { return (b.raw - b.luck) - (a.raw - a.luck); }); // by luck-adjusted (skill-native)
+    var head = '<div class="lp-head"><span>боец</span><span>резултат</span><span>късмет</span><span>без късмет</span></div>';
+    var rows = data.map(function (d) {
+      var adj = Math.round(d.raw - d.luck), lk = Math.round(d.luck);
+      return '<div class="lp-row"><span class="lp-nm" style="color:' + d.p.color + '">' + esc(d.p.name) + (d.i === m.luckIdx && lk > 4 ? ' 🍀' : '') + '</span>'
+        + '<span class="lp-raw">' + d.raw + '</span>'
+        + '<span class="lp-luck ' + (lk >= 0 ? 'np' : 'nn') + '">' + signed(lk) + '</span>'
+        + '<span class="lp-adj">' + adj + '</span></div>';
+    }).join('');
+    $('luckPanel').innerHTML = head + rows
+      + '<div class="lp-note">„Без късмет“ = резултат минус късмета — точките, които идват от решенията ти. Късметът не е заслуга.</div>';
+  }
+
   // cumulative category points for player pi, round by round (starts at 0)
   function progressSeries(pi) {
     var log = moveLog[pi] || [], sc = game.players[pi].scores || {}, run = 0, pts = [0];
     for (var r = 0; r < log.length; r++) { var v = sc[log[r].category]; run += (typeof v === 'number' ? v : 0); pts.push(run); }
     return pts;
+  }
+  // §1.6 RT-07 — a turn's "swings": a Генерал, or a big single-turn placement
+  function swingsFor(pi) {
+    var log = moveLog[pi] || [], sc = game.players[pi].scores || {}, out = [];
+    for (var r = 0; r < log.length; r++) {
+      var cat = log[r].category, v = (typeof sc[cat] === 'number' ? sc[cat] : 0);
+      if (cat === 'general' && v > 0) out.push({ round: r + 1, delta: v, gen: true });
+      else if (v >= 25) out.push({ round: r + 1, delta: v, gen: false });
+    }
+    return out;
   }
   // running optimal-play % for player pi over the turns (skill tab); starts at 100
   function optimalSeries(pi) {
@@ -2520,10 +2807,36 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var dots = muted ? '' : s.pts.map(function (v, r) { return '<circle cx="' + x(r) + '" cy="' + y(v) + '" r="2" fill="' + s.p.color + '"/>'; }).join('');
       return '<polyline points="' + poly + '" fill="none" stroke="' + s.p.color + '" stroke-width="' + (muted ? 1.8 : 2.4) + '" stroke-opacity="' + (muted ? 0.45 : 1) + '" stroke-linejoin="round" stroke-linecap="round"/>' + dots;
     }).join('');
+    // §1.6 swing annotations (points chart only): lead-change rings + big-jump dots,
+    // with a "+X т." label on the highlighted player's swings
+    var overlay = '';
+    if (!skillTab) {
+      var byI = {}; series.forEach(function (s) { byI[s.i] = s; });
+      var prevLeader = -1;
+      for (var r = 1; r <= maxR; r++) {
+        var leader = -1, best = -Infinity;
+        game.players.forEach(function (p, i) { var pp = byI[i].pts, v = pp[Math.min(r, pp.length - 1)]; if (v > best) { best = v; leader = i; } });
+        if (leader >= 0 && prevLeader >= 0 && leader !== prevLeader && !(hl >= 0 && leader !== hl)) {
+          var lp = byI[leader].pts;
+          overlay += '<circle cx="' + x(r) + '" cy="' + y(lp[Math.min(r, lp.length - 1)]) + '" r="3.4" fill="none" stroke="' + game.players[leader].color + '" stroke-width="1.6"/>';
+        }
+        prevLeader = leader;
+      }
+      game.players.forEach(function (p, i) {
+        if (hl >= 0 && i !== hl) return;
+        var sp = byI[i].pts;
+        swingsFor(i).forEach(function (sw) {
+          if (sw.round >= sp.length) return;
+          var cx = x(sw.round), cy = y(sp[sw.round]);
+          overlay += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (sw.gen ? 3.6 : 2.8) + '" fill="' + p.color + '" stroke="#16160e" stroke-width="0.7"/>';
+          if (hl === i) overlay += '<text x="' + cx + '" y="' + (cy - 5) + '" class="pc-swing" text-anchor="middle" fill="' + p.color + '">' + (sw.gen ? '★ ' : '') + '+' + sw.delta + '</text>';
+        });
+      });
+    }
     var xlab = '<text x="' + (padL + iw / 2) + '" y="' + (H - 4) + '" class="pc-axis" text-anchor="middle">' + (skillTab ? 'ходове →' : 'рундове →') + '</text>';
     var open = !summary || summary.chartOpen !== false;
     el.innerHTML = '<details class="pc-details"' + (open ? ' open' : '') + '><summary class="pc-title">' + (skillTab ? 'Оптимална игра' : 'Ход на битката') + '</summary>'
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">' + grid + lines + xlab + '</svg></details>';
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">' + grid + lines + overlay + xlab + '</svg></details>';
     var dt = el.querySelector('details'); if (dt) dt.addEventListener('toggle', function () { if (summary) summary.chartOpen = dt.open; });
   }
 
@@ -2593,11 +2906,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var html = '<div class="evpanel">';
     // (no "Рапорт за…" header — the details speak for themselves; EV lives in the ? window)
 
-    // §identity (dice mode only — manual games have no luck term)
+    // §identity (dice mode only — manual games have no luck term). §1.9 DA-21:
+    // round the parts so they SUM to the shown final — absorb the remainder into
+    // par (the largest term, 195.41), so a user adding them up never sees a gap.
     if (!fa.manual) {
-      html += '<div class="evline"><b>' + Math.round(fa.par) + '</b> норма '
-        + '<span class="luck">' + signed(fa.luck) + ' късмет</span> '
-        + '<span class="skill">' + fa.skill.toFixed(0) + ' решения</span> → <b>' + G.playerTotal(fp) + '</b></div>';
+      var tot = G.playerTotal(fp), luckShown = Math.round(fa.luck), skillShown = Math.round(fa.skill);
+      var parShown = tot - luckShown - skillShown;
+      html += '<div class="evline"><b>' + parShown + '</b> норма '
+        + '<span class="luck">' + signed(luckShown) + ' късмет</span> '
+        + '<span class="skill">' + signed(skillShown) + ' решения</span> → <b>' + tot + '</b></div>';
     }
 
     // §5 playstyle box: stylised persona + Генерал badge, optimal% (right), description, avg EV/turn
@@ -2610,6 +2927,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<span class="styopt"><b class="nu">' + Math.round(fa.accuracy * 100) + '%</b></span></div>'
       + (st ? '<div class="stydesc">' + esc(st.desc) + '</div>' : '')
       + '<div class="stymetrics">средно ' + nBad(fa.avgLostPerTurn, 1) + ' т. EV/ход загуба</div></div>';
+
+    // §1.8 DA-16 (game) — one synthesised "work on X" prescription for THIS game
+    html += '<div class="coachline">' + coachLine(fa) + '</div>';
 
     // outstanding moves / costliest mistake (the blunder reads as a headline + detail line)
     if (fa.sharpest) html += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
@@ -2702,6 +3022,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + (d.chosenKey !== d.optimalKey ? ' (по-добре ' + (CAT_LABEL[d.optimalKey] || d.optimalKey) + ')' : '');
     }
     return 'задържане на заровете';
+  }
+
+  // §1.8 DA-16 — collapse the leak/blunder/stage diagnostics into ONE prescription
+  function coachLine(fa) {
+    if (fa.accuracy >= 0.93) return '🎯 Малко за пипане — решенията ти са почти оптимални.';
+    var what;
+    if (!fa.manual && fa.leak.keep < fa.leak.category - 0.5) what = 'задържането на заровете';
+    else if (fa.manual || fa.leak.category < fa.leak.keep - 0.5) what = 'избора на категория';
+    else what = 'дребните решения';
+    var stages = [['началото', fa.stages.early], ['средата', fa.stages.mid], ['края', fa.stages.late]], worst = null;
+    stages.forEach(function (s) { if (s[1].n) { var l = -s[1].skill / s[1].n; if (!worst || l > worst.l) worst = { name: s[0], l: l }; } });
+    var where = worst && worst.l > 0.6 ? ', особено в ' + worst.name : '';
+    return '🎯 Поработи над: <b>' + what + '</b>' + where + '.';
   }
 
   // ============================================================ ARCHIVE / HISTORY
