@@ -381,9 +381,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* drag-to-reorder setup cards */
 .pcardtop{ display:flex; align-items:center; gap:8px; }
 /* owner star (CSS-drawn), to the right of the name box */
-.ownerstar{ flex:none; width:22px; height:22px; background:var(--gen-brass);
+.ownerstar{ flex:none; width:22px; height:22px; padding:0; border:none; cursor:pointer; background:var(--gen-brass);
   clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
   box-shadow:0 0 8px rgba(200,166,75,.5); }
+.ownerstar:hover{ background:var(--gen-brass-bright); }
 .grip{ flex:none; width:34px; height:40px; display:grid; place-items:center; cursor:grab; color:var(--gen-brass);
   background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; -webkit-user-select:none; }
 .grip .gripdots{ display:grid; grid-template-columns:repeat(2,4px); grid-template-rows:repeat(3,4px); gap:4px; }
@@ -456,6 +457,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ownerbubble{ margin-top:9px; padding:9px 11px; border-radius:9px; background:var(--gen-brass-bright); color:var(--gen-ink);
   font-size:11.5px; line-height:1.45; cursor:pointer; box-shadow:0 5px 14px rgba(0,0,0,.4); }
 .ownerbubble b{ font-weight:700; }
+/* floating owner-token explainer (tap the ★ in setup) */
+.ownerinfo{ position:fixed; z-index:55; max-width:250px; padding:10px 12px; border-radius:10px; background:var(--gen-brass-bright);
+  color:var(--gen-ink); font-size:11.5px; line-height:1.45; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.5); border:2px solid var(--gen-brass-stroke); }
+.ownerinfo b{ font-weight:700; }
 .ownername{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
 .ownername:focus{ outline:none; border-color:var(--gen-brass); }
@@ -744,10 +749,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="modal" style="max-width:300px">
     <h2 style="text-align:center">Щаб</h2>
     <div class="setup-actions" style="flex-direction:column">
-      <button id="menuHowto" class="btn">📖 Как се играе</button>
+      <button id="menuHowto" class="btn">📖 Правила</button>
       <button id="menuCombos" class="btn">📋 Комбинации</button>
       <button id="menuSettings" class="btn">⚙ Настройки</button>
-      <button id="menuRestart" class="btn">↺ Начало</button>
+      <button id="menuRestart" class="btn">Начало</button>
       <button id="menuClose" class="btn primary">Назад</button>
     </div>
   </div>
@@ -757,8 +762,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 <div id="settingsModal" class="overlay hidden">
   <div class="modal" style="max-width:340px">
     <h2>⚙ Настройки</h2>
-    <!-- device owner (the старшина) — at the top -->
-    <div class="ownerbox">
+    <!-- device owner (the старшина) — at the top; pre-game only -->
+    <div class="ownerbox" id="ownerBox">
       <div class="ownersub">Име на старшината <button id="ownerHelp" class="qmark" aria-label="Какво е това?">?</button></div>
       <input id="ownerName" class="ownername" type="text" maxlength="40" placeholder="Бойното ти име, командире…" />
       <label class="ownertog setrow" style="cursor:pointer">
@@ -768,7 +773,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <div id="ownerBubble" class="ownerbubble hidden"></div>
     </div>
     <div id="settingsRows"></div>
-    <div class="setup-actions" style="margin-top:8px">
+    <div id="clearArchiveRow" class="setup-actions" style="margin-top:8px">
       <button id="clearHistory" class="btn">🗑 Изчисти архива</button>
     </div>
     <div id="clearConfirm" class="clearconfirm hidden">
@@ -834,6 +839,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="combosBody"></div>
   </div>
 </div>
+
+<!-- floating owner-token explainer (tap the ★) -->
+<div id="ownerInfo" class="ownerinfo hidden"></div>
 
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
@@ -1061,8 +1069,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         }, 450);
       };
       top.appendChild(name);
-      // owner token sits to the RIGHT of the name box (CSS star, vertically centred)
-      if (owner) { var tk = document.createElement('span'); tk.className = 'ownerstar'; tk.title = 'Старшината — ти'; top.appendChild(tk); }
+      // owner token sits to the RIGHT of the name box (CSS star, vertically centred);
+      // tap it for a dismissible explainer
+      if (owner) {
+        var tk = document.createElement('button'); tk.className = 'ownerstar'; tk.title = 'Старшината — ти'; tk.setAttribute('aria-label', 'Старшината');
+        tk.onclick = function (e) { e.stopPropagation(); showOwnerInfo(tk); };
+        top.appendChild(tk);
+      }
       card.appendChild(top);
 
       var row = document.createElement('div'); row.className = 'prow2';
@@ -1316,10 +1329,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var head, alts;
     if (throwsLeft > 0) {
       head = 'Щабът съветва:';
-      alts = ev.keep_ranked.slice(0, 3).map(function (k) {
-        var kept = dice.filter(function (v, j) { return k.keep[j]; });
+      // the top keeps cluster on the same target, so pick the best keep per
+      // DISTINCT target — three genuinely different directions to aim at
+      var seen = {}, picks = [];
+      ev.keep_ranked.forEach(function (k) {
+        if (picks.length >= 3) return;
         var target = EV.bestTarget(p.scores, dice, k.keep);
-        var tname = G.ORDER_NAMES[target] || target;
+        if (seen[target]) return;
+        seen[target] = true;
+        picks.push({ keep: k.keep, target: target });
+      });
+      alts = picks.map(function (pk) {
+        var kept = dice.filter(function (v, j) { return pk.keep[j]; });
+        var tname = G.ORDER_NAMES[pk.target] || pk.target;
         if (kept.length === G.DICE_COUNT) return '<span class="kr">спри · <b>' + esc(tname) + '</b></span>';
         var d = kept.length ? '<span class="krd">' + kept.map(hintDie).join('') + '</span>' : '<span class="kr-none">нищо</span>';
         return '<span class="kr">дръж ' + d + ' · търсиш <b>' + esc(tname) + '</b></span>';
@@ -1881,14 +1903,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   // ---------- how to play + in-game menu ----------
   function buildHowTo() {
-    var combos = G.CATEGORIES.map(function (c) { return '<li>' + esc(G.COMBO_DESC[c.key]) + '</li>'; }).join('');
     return '<h2>📖 Бойна задача</h2>'
       + '<p class="ht">Печели бойният, който събере най-много точки — и грабва чин <b>Генерал</b>. Последният получава <b>Редник</b>.</p>'
       + '<h3 class="hth">Ходът</h3>'
       + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай тези за прехвърляне (✛) и стреляй с <b>ОГИН!</b> — или спри по-рано. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
       + '<h3 class="hth">Категориите и какво искат</h3>'
-      + '<ul class="htlist">' + combos + '</ul>'
-      + '<p class="ht">Забрави ли коя категория какво иска? Докосни името ѝ в игра и щабът ще ти го припомни.</p>'
+      + '<button id="howtoCombos" class="btn">📋 Виж комбинациите</button>'
       + '<h3 class="hth">Полеви отчет</h3>'
       + '<p class="ht">Режим за игра на маса с истински зарове: удряш долу <b>петте зара</b> от хвърлянето си и таблото само ти предлага всички възможни категории — избираш една, точно както в нормална игра. Така не пропускаш комбинация и щабът пак ти прави рапорт накрая. <b>ОПА!</b> връща назад действие по действие.</p>';
   }
@@ -1908,7 +1928,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<li>Разделът <b>По умение</b> подрежда по качество на решенията, не по късмет.</li>'
       + '</ul>';
   }
-  function openHowto() { $('howtoBody').innerHTML = buildHowTo(); $('howtoModal').classList.remove('hidden'); }
+  function openHowto() {
+    $('howtoBody').innerHTML = buildHowTo();
+    $('howtoCombos').onclick = function () { $('howtoModal').classList.add('hidden'); openCombos(); };
+    $('howtoModal').classList.remove('hidden');
+  }
   function openReportHelp() { $('howtoBody').innerHTML = buildReportHelp(); $('howtoModal').classList.remove('hidden'); }
   $('reportHelp').onclick = openReportHelp;
   $('howtoBtn').onclick = openHowto;
@@ -1975,8 +1999,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         if (game) renderAll();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
-    { key: 'bonus', label: 'Бонус за име', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
-    { key: 'advice', label: 'Съвети', onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
+    { key: 'bonus', label: 'Бонус за име', preGameOnly: true, onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
+    { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
     { key: 'censor', label: 'Цензура', onChange: function () {
         G.setCensor(settings.censor);
         // re-cohere existing setup names so none keep an NSFW word (or regain one)
@@ -1985,10 +2009,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       } },
   ];
   var devTaps = [];
-  function buildSettingsRows() {
+  function buildSettingsRows(inGame) {
     var host = $('settingsRows'); host.innerHTML = '';
     SETTINGS_ROWS.forEach(function (row, idx) {
-      var div = document.createElement('div'); div.className = 'setrow';
+      // pre-game-only rows (Бонус за име, Съвети) are hidden once a battle is on
+      var div = document.createElement('div'); div.className = 'setrow' + (inGame && row.preGameOnly ? ' hidden' : '');
       var span = document.createElement('span'); span.textContent = row.label;
       var tog = document.createElement('button'); tog.className = 'toggle' + (settings[row.key] ? ' on' : ''); tog.innerHTML = '<span class="switch"></span>';
       tog.onclick = function () { settings[row.key] = !settings[row.key]; tog.classList.toggle('on', settings[row.key]); if (row.onChange) row.onChange(); saveSettings(); };
@@ -2191,11 +2216,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function openSettings() {
     if (!settings.dev) { devTaps = []; }
-    buildSettingsRows();
+    // mid-game: hide the pre-game-only bits (старшина, name-bonus + advice toggles,
+    // archive housekeeping) — those are decisions to make before a battle
+    var inGame = !$('game').classList.contains('hidden');
+    buildSettingsRows(inGame);
+    $('ownerBox').classList.toggle('hidden', inGame);
+    $('clearArchiveRow').classList.toggle('hidden', inGame);
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
-    $('clearConfirm').classList.add('hidden');
+    $('clearConfirm').classList.add('hidden'); $('ownerBubble').classList.add('hidden');
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
     $('settingsModal').classList.remove('hidden');
@@ -2721,15 +2751,26 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('archiveBtn').onclick = openHistory; // archive lives only on the start screen now
 
   // ---------- owner name + clear-archive controls (settings) ----------
+  var OWNER_INFO = '<b>Старшината си ти</b> — собственикът на устройството.<br>'
+    + 'Това винаги е играч №1, но може да се размести на друга позиция преди да започне играта.<br>'
+    + 'Използва се, за да играеш с име, което ти харесва, и за да се изготвя личен анализ на игрите от архива.';
   $('ownerHelp').onclick = function () {
     var b = $('ownerBubble');
     if (!b.classList.contains('hidden')) { b.classList.add('hidden'); return; }
-    b.innerHTML = '<b>Старшината си ти</b> — собственикът на устройството.<br>'
-      + 'Това винаги е играч №1, но може да се размести на друга позиция преди да започне играта.<br>'
-      + 'Използва се, за да играеш с име, което ти харесва, и за да се изготвя личен анализ на игрите от архива.';
-    b.classList.remove('hidden');
+    b.innerHTML = OWNER_INFO; b.classList.remove('hidden');
   };
   $('ownerBubble').onclick = function () { $('ownerBubble').classList.add('hidden'); };
+  // tapping the ★ owner token (in setup) pops a dismissible explainer
+  function showOwnerInfo(anchor) {
+    var b = $('ownerInfo');
+    if (!b.classList.contains('hidden')) { b.classList.add('hidden'); return; }
+    b.innerHTML = OWNER_INFO; b.classList.remove('hidden');
+    var r = anchor.getBoundingClientRect();
+    b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
+    var below = r.bottom + 8;
+    b.style.top = (below + b.offsetHeight < window.innerHeight - 8 ? below : r.top - b.offsetHeight - 8) + 'px';
+  }
+  $('ownerInfo').onclick = function () { $('ownerInfo').classList.add('hidden'); };
   $('ownerName').oninput = function () {
     settings.ownerName = $('ownerName').value; saveSettings();
     if (settings.useOwnerName && !$('setup').classList.contains('hidden')) renderSetup();
