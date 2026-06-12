@@ -23,6 +23,7 @@ node --test                      # run the dependency-free test suite
 | `game.js` | **Pure, DOM-free logic** (UMD): scoring, dice, turn/player/game state, the greedy AI, names, roasts, personas, ranks, rarity and the Bulgarian morphology engine. The single source of truth for the rules. |
 | `engine.js` | The **EV engine** (UMD): an MDP solver, `evaluate()`, the luck/skill decomposition and the calibrated bot policies. Consumes `game.js`'s scoring — never re-implements the rules. |
 | `ev-table.js` | The precomputed optimal value table (16384 floats), generated offline so the page needs no heavy compute at load. |
+| `mp.js` | **Acoustic multiplayer** (UMD): a layered, dependency-free data-over-sound stack — L1 framing, General-specific schemas, a host-authoritative `Session`, and a browser-only `AudioFSK` modem. Pure protocol logic is DOM-free and unit-tested. |
 | `tools/` | Offline `build-ev.js` (writes `ev-table.js`) and `calibrate-bots.js` (the τ ↔ strength curve). |
 | `test/` | `node:test` unit tests for `game.js` and `engine.js`. |
 
@@ -314,6 +315,39 @@ so it shows a ⊘ in the archive and is **excluded from your trends** rather tha
 polluting them with a result that wasn't yours. It's a one-game decision and
 resets when the game starts.
 
+## Acoustic multiplayer — „🔊 Мрежова игра“ (`mp.js`)
+
+Play across **several phones in the same room with no server and no network** —
+the speaker→microphone channel carries the game. The protocol is built in the
+spec's layers and is **dependency-free**:
+
+- **L1 framing** — `[TYPE][SENDER][SEQ][payload][CRC-8]`; schema-packed payloads
+  carry only values (both ends run the same code).
+- **L3 General payloads** — the roster (each player's **name / colour / gender**),
+  `GRANT`, `MOVE` (a turn's category + rolls/keeps + score), and `STATE`
+  delta/snapshot.
+- **Host-authoritative `Session`** — one device is the host (single source of
+  truth, channel arbiter, referee). The **turn token is the transmit token**, so
+  contention only exists in the lobby (ALOHA-style join) and recovery. It runs the
+  whole lobby → `GRANT`/`MOVE`/`STATE` loop → `END`, with **idempotent** moves,
+  **version-gap resync** (snapshot re-baseline) and retransmit timeouts.
+- **L0 `AudioFSK`** — a browser-only Web-Audio FSK modem (sync preamble + length +
+  CRC-16; mic echo-cancel/noise-suppression/AGC disabled, since that DSP destroys
+  data-over-sound). Pluggable: swap it for ggwave without touching the layers above.
+
+In the app: tap **🔊 Мрежова игра**, then host or join. The roster broadcasts, and
+`START` builds the **same game on every phone**. In network mode the **active
+player drives input on their own device**; the host's `GRANT`/`STATE` advance
+everyone else's board (you watch the score land). Crucially, **each device owns its
+own player** — that seat is flagged the owner locally (the ★ on your own name), so
+the archived game and your dossier attribute *your* performance. The local player
+keeps a full move log; remote players are mirrored score-only.
+
+The pure protocol logic is covered by `test/mp.test.js` — framing/CRC, every
+schema, a full **3-device game converging to identical state**, idempotency and
+gap→snapshot resync. The acoustic L0 itself needs real two-device tuning (range,
+volume, room noise) and is best-effort.
+
 ## Военен архив — history & replay
 
 Every finished battle is saved to `localStorage` (`archiveGame`) in a format that
@@ -502,13 +536,14 @@ runner (no `npm install` needed):
 node --test     # or: npm test
 ```
 
-The suite (`test/game.test.js`, `test/engine.test.js`) covers every scoring
-category (including multi-option suggestions and the worked examples `1 2 2 5 5`
-and `2 2 4 4 4`), dice rolling, score assignment and forfeit, turn rotation,
-game-over, ranking, hit-probabilities, risk detection, the AI's choices, the
-Bulgarian agreement engine, and the EV engine (table sanity, `evaluate`,
-luck/skill bookkeeping, the `byCategory` cube, the `marginSplit` reconciliation
-and the bot policies).
+The suite (`test/game.test.js`, `test/engine.test.js`, `test/mp.test.js`) covers
+every scoring category (including multi-option suggestions and the worked examples
+`1 2 2 5 5` and `2 2 4 4 4`), dice rolling, score assignment and forfeit, turn
+rotation, game-over, ranking, hit-probabilities, risk detection, the AI's choices,
+the Bulgarian agreement engine, the EV engine (table sanity, `evaluate`, luck/skill
+bookkeeping, the `byCategory` cube, the `marginSplit` reconciliation and the bot
+policies), and the **multiplayer protocol** (framing/CRC, schemas, a full 3-device
+game converging to identical state, idempotency and resync).
 
 The game screen (`index.html`) is verified separately with an ad-hoc **jsdom**
 smoke test during development — driving the real controller to check the summary
@@ -528,7 +563,8 @@ index.html   # single-page app: military UI, game loop, summary, history, replay
 game.js      # pure logic: scoring, heuristic AI, roasts, personas, ranks, rarity, BG engine
 engine.js    # EV engine: MDP solver, evaluate(), luck/skill decomposition, bot policies
 ev-table.js  # precomputed optimal value table (generated by tools/build-ev.js)
+mp.js        # acoustic multiplayer: framing, schemas, host Session, audio FSK modem
 tools/       # offline build + calibration scripts
-test/        # node:test unit tests (game + engine)
+test/        # node:test unit tests (game + engine + multiplayer protocol)
 .github/     # CI + Pages deploy workflow
 ```
