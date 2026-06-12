@@ -567,18 +567,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .deveditbox{ padding:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.2); }
 .deveditbox .devfields{ margin-bottom:8px; }
 
-/* РЕЖИМ КАЗАРМА — master switch that hides all the goofy stuff (setup screen) */
-.barracks{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:11px 13px; border-radius:10px;
-  background:rgba(0,0,0,.28); border:1px solid var(--gen-pill-line); color:var(--gen-text); }
-.barracks .bk-txt{ flex:1; display:flex; flex-direction:column; gap:2px; }
-.barracks .bk-txt b{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:1px; font-size:13px; color:var(--gen-label); }
-.barracks .bk-txt i{ font-style:normal; font-size:10.5px; color:var(--gen-muted); line-height:1.35; }
-.barracks .bk-sw .switch{ width:46px; height:24px; }
-.barracks .bk-sw .switch::after{ width:18px; height:18px; }
-.barracks.on{ border-color:var(--gen-brass); background:rgba(200,166,75,.1); }
-.barracks.on .bk-txt b{ color:var(--gen-brass-bright); }
-.barracks.on .bk-sw .switch{ background:var(--gen-brass); }
-.barracks.on .bk-sw .switch::after{ transform:translateX(22px); }
+@media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 </style>
@@ -592,10 +581,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="banner">ЩАБ · НАБОР НА ЛИЧЕН СЪСТАВ</div>
   <div class="setup-body">
     <p class="setup-intro">Български „Генерал“ — зарова битка. Сформирайте отряда: имена, цветове, AI противници и по един безумен облог. Подредете бойците по масата със стрелките.</p>
-    <button id="barracksToggle" class="barracks">
-      <span class="bk-txt"><b>РЕЖИМ КАЗАРМА</b><i>Само сух устав — без закачки, облози и наказания.</i></span>
-      <span class="bk-sw"><span class="switch"></span></span>
-    </button>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
     <div id="setupErr" class="err"></div>
@@ -812,8 +797,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
-  // `barracks` (РЕЖИМ КАЗАРМА) is the master switch that hides every fun feature
-  var settings = { noBonus: false, noAdvice: false, censor: false, barracks: false, ownerName: '', useOwnerName: false };
+  var settings = { noBonus: false, noAdvice: false, censor: false, ownerName: '', useOwnerName: false };
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   // ---------- persistent settings + game archive (localStorage) ----------
@@ -823,13 +807,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
 
   function saveSettings() {
-    var s = { noBonus: settings.noBonus, noAdvice: settings.noAdvice, censor: settings.censor, barracks: settings.barracks,
+    var s = { noBonus: settings.noBonus, noAdvice: settings.noAdvice, censor: settings.censor,
               ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
-    try { var s = JSON.parse(raw); ['noBonus', 'noAdvice', 'censor', 'barracks', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; }); } catch (e) {}
+    try { var s = JSON.parse(raw); ['noBonus', 'noAdvice', 'censor', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; }); } catch (e) {}
     G.setCensor(settings.censor);
   }
 
@@ -952,7 +936,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // build the rare-name brag bubble for a player (or null)
   function rarityBubbleEl(p) {
-    if (!p.tier || p.bubbleDismissed || settings.barracks) return null; // no brag in barracks mode
+    if (!p.tier || p.bubbleDismissed) return null;          // notify only the rarest ~10% of names
     var eff = settings.noBonus ? 0 : p.bonus;
     var bub = document.createElement('div');
     bub.className = 'rarebubble rt' + p.tier;                // colour = frequency tier
@@ -1080,12 +1064,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         card.appendChild(box);
       }
 
-      // the stupid wager — hidden in barracks mode
-      if (fun()) {
-        var bet = document.createElement('div'); bet.className = 'betline';
-        bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
-        card.appendChild(bet);
-      }
+      var bet = document.createElement('div'); bet.className = 'betline';
+      // the wager is fixed at draw — you're stuck with whatever you got
+      bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
+      card.appendChild(bet);
 
       // rare-name brag bubble (dismissable); awards the bonus unless disabled
       var bub0 = rarityBubbleEl(p); if (bub0) card.appendChild(bub0);
@@ -1093,14 +1075,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     });
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
-
-  // РЕЖИМ КАЗАРМА — the master switch for all the goofy stuff
-  function fun() { return !settings.barracks; }                 // are fun features on?
-  function syncBarracks() { $('barracksToggle').classList.toggle('on', !!settings.barracks); }
-  $('barracksToggle').onclick = function () {
-    settings.barracks = !settings.barracks; syncBarracks(); saveSettings();
-    renderSetup(); // re-renders bet lines / rarity bubbles
-  };
 
   // drag-to-reorder player cards: touch/drag the grip and swipe up/down; cards
   // shuffle live as you cross their midpoints. Document-level pointer listeners
@@ -1149,7 +1123,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.owner = !!p.owner; // the device-owner flag follows the player (token)
-      pl.bonus = (settings.noBonus || settings.barracks) ? 0 : (p.bonus || 0); // rare-name starting bonus
+      pl.bonus = settings.noBonus ? 0 : (p.bonus || 0); // rare-name starting bonus
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
       return pl;
@@ -1164,7 +1138,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('startManual').onclick = function () { startFromSetup(true); };
 
   loadSettings();   // restore censor + owner name/toggle before the first muster
-  syncBarracks();
   paintCamo($('setup'));
   addSetupPlayer(false); addSetupPlayer(false);
 
@@ -1326,7 +1299,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   // make a category name tappable for the shaming reminder tooltip (human only)
   function attachTip(nameEl, key, isAI) {
-    if (isAI || settings.barracks) return;                    // no shaming tooltips in barracks mode
+    if (isAI) return;
     nameEl.classList.add('tappable');
     nameEl.onclick = function (e) { e.stopPropagation(); comboReminder(key, nameEl); };
   }
@@ -1566,7 +1539,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('fire').disabled = true;
     // after an AI turn, hold the board a beat so players can read it
     var delay = !manualMode && p.isAI ? AI_VIEW_DELAY : END_DELAY;
-    if (fun() && (manualMode || !p.isAI) && G.isDisappointing(value, rerolledAll)) { showRoast(); delay = ROAST_MS + 250; }
+    if ((manualMode || !p.isAI) && G.isDisappointing(value, rerolledAll)) { showRoast(); delay = ROAST_MS + 250; }
     turnTimer = setTimeout(endTurn, delay);
   }
   var turnTimer = null;
@@ -1636,7 +1609,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   // the general's order at turn start: aim for a still-open category
   function showOrder(player) {
-    if (settings.barracks) return;                            // no marching-order bubbles in barracks mode
     var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(player, c.key); });
     if (!open.length) return;
     var cat = open[Math.floor(Math.random() * open.length)];
@@ -1650,7 +1622,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   function showRoast() {
-    if (settings.barracks) return;                            // no roasting in barracks mode
     var line = G.genderFill(G.ROASTS.flop[roastIx % G.ROASTS.flop.length], G.currentPlayer(game).gender);
     roastIx++;
     var box = $('roast');
@@ -1672,7 +1643,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var penalties = [], tipHideTimer = null, refundTimer = null;
 
   function comboReminder(key, anchor) {
-    if (locked || settings.noAdvice || settings.barracks) return;
+    if (locked || settings.noAdvice) return;
     // measure the anchor BEFORE the penalty re-renders the board (which would
     // detach it and zero its rect, dumping the tooltip in the top-left corner)
     var r = anchor.getBoundingClientRect();
@@ -2196,12 +2167,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('tabStand').classList.toggle('hidden', !anyAnalysis);
     $('overUndo').classList.toggle('hidden', !manualMode || !undoStack.length);
 
-    // the stupid-bet stakes — hidden in barracks mode
-    if (fun()) {
-      var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
-      others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
-      $('betMsgs').innerHTML = msgs;
-    } else $('betMsgs').innerHTML = '';
+    // bets (stakes) — unchanged in both modes
+    var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
+    others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
+    $('betMsgs').innerHTML = msgs;
 
     renderSummary();
     $('overModal').classList.remove('hidden');
