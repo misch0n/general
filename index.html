@@ -373,17 +373,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .wbadge{ display:inline-flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; font-size:10.5px; letter-spacing:.3px;
   text-transform:uppercase; padding:4px 9px; border-radius:20px; color:var(--gen-text); background:rgba(255,255,255,.05);
   border:1px solid var(--c); box-shadow:inset 0 0 12px -6px var(--c); }
-/* §1.5 category board */
+/* §1.5 category board — in-game scoreboard layout, each cell tinted by the record holder */
 .catboard{ margin-bottom:12px; }
-.catboard .cb-head, .catboard .cb-row{ display:grid; grid-template-columns:1fr 56px 1fr; align-items:center; gap:8px; padding:5px 10px; }
-.catboard .cb-head{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:10px; color:var(--gen-muted); }
-.catboard .cb-row{ border-top:1px solid var(--gen-pill-line); font-size:12px; }
-.catboard .cb-row.miss{ opacity:.5; }
-.catboard .cb-cat{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); }
-.catboard .cb-hit{ text-align:center; font-variant-numeric:tabular-nums; color:var(--gen-label); }
-.catboard .cb-rec{ text-align:right; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.catboard .cb-rec.none{ color:var(--gen-disabled); }
-.catboard .cb-rec-h{ text-align:right; }
+.catboard .cb-legend{ font-size:10px; color:var(--gen-muted); text-align:center; margin-bottom:8px; }
+.catboard .cb-legend b{ color:var(--gen-label); font-weight:700; }
+.catgrid .cgtile{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 3px; border-radius:5px;
+  background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); text-align:center; min-width:0; }
+.catgrid .cgtile.none{ opacity:.45; }
+.catgrid .cg-lab{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:.2px;
+  color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.catgrid .cg-pct{ font-size:9px; color:var(--gen-muted); font-variant-numeric:tabular-nums; line-height:1.3; }
+.catgrid .cg-rec{ font-family:var(--gen-font-display); font-weight:800; font-size:15px; color:var(--gen-text); font-variant-numeric:tabular-nums; line-height:1.1; }
 .catboard .cb-master{ margin-top:10px; text-align:center; font-size:12px; color:var(--gen-label); }
 /* §1.7 luck panel */
 .luckpanel{ margin-bottom:12px; }
@@ -2737,23 +2737,34 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     renderProgressChart(); // re-paint so the expanded player is highlighted on the graph
   }
 
-  // §1.5 DA-08 (match) — cross-player category board: per category, hit fraction + record holder
+  // hex → rgba string (for tinting a cell in a player's colour)
+  function rgba(hex, a) {
+    var h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+    var n = parseInt(h, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  // §1.5 DA-08 (match) — category board on the in-game scoreboard layout: each cell
+  // shows the % of players who scored it (top row) and the highest result (bottom),
+  // and is tinted in the colour of the player who holds that record.
   function renderCatBoard() {
-    var m = summary.meta, players = game.players;
-    var rows = m.board.map(function (b) {
-      var holder = b.recPi >= 0 ? players[b.recPi] : null;
-      var rec = holder
-        ? '<span class="cb-rec" style="color:' + holder.color + '">' + b.recVal + ' · ' + esc(holder.name) + '</span>'
-        : '<span class="cb-rec none">—</span>';
-      return '<div class="cb-row' + (holder ? '' : ' miss') + '">'
-        + '<span class="cb-cat">' + esc(b.label) + '</span>'
-        + '<span class="cb-hit">' + b.hit + '/' + b.n + '</span>'
-        + rec + '</div>';
-    }).join('');
+    var m = summary.meta, players = game.players, byKey = {};
+    m.board.forEach(function (b) { byKey[b.key] = b; });
+    function tile(c) {
+      var b = byKey[c.key], holder = b.recPi >= 0 ? players[b.recPi] : null;
+      var pct = Math.round(100 * b.hit / b.n), hi = b.recVal >= 0 ? b.recVal : '–';
+      var style = holder ? ' style="background:' + rgba(holder.color, 0.26) + ';border-color:' + holder.color + '"' : '';
+      return '<div class="cgtile' + (holder ? '' : ' none') + '"' + style + '>'
+        + '<span class="cg-lab">' + esc(c.label) + '</span>'
+        + '<span class="cg-pct">' + pct + '%</span>'
+        + '<span class="cg-rec">' + hi + '</span></div>';
+    }
+    var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(tile).join('');
+    var low = G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).map(tile).join('');
     var master = m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2
       ? '<div class="cb-master">📋 Майстор на категориите: <b style="color:' + players[m.masterIdx].color + '">' + esc(players[m.masterIdx].name) + '</b> · ' + m.recCount[m.masterIdx] + ' рекорда</div>' : '';
-    $('catBoard').innerHTML = '<div class="cb-head"><span class="cb-cat">комбо</span><span class="cb-hit">влезли</span><span class="cb-rec-h">рекорд</span></div>'
-      + rows + master;
+    $('catBoard').innerHTML = '<div class="cb-legend">всяка клетка: <b>% вкарали</b> · <b>най-висок резултат</b> · цвят = рекордьорът</div>'
+      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>' + master;
   }
 
   // §1.7 RT-06 + RT-10 — luck lens: raw score · luck (±) · luck-adjusted (= score − luck)

@@ -197,9 +197,11 @@ sum *exactly* to the visible margin.
   accuracy; chart switches to optimal %) share the chart + rows. **Късмет**
   (`renderLuckPanel`) is a luck lens — per player **raw · luck (±) · luck-adjusted
   (= score − luck)**, the points-native skill number; hidden in manual mode.
-  **Категории** (`renderCatBoard`) is the cross-player matrix — per category the
-  **hit fraction** (`3/4`, not a misleading percent) and the **record**, the
-  record cell tinted in the holder's colour, plus the category-master sub-award.
+  **Категории** (`renderCatBoard`) is the cross-player view, laid out as the
+  **in-game scoreboard** (6 upper tiles + 8 lower): each category cell shows the
+  **% of players who scored it** and the **highest result**, and is **tinted in
+  the colour of the player who holds that record** — domination is visible at a
+  glance, and the category-master sub-award names whoever holds the most.
 - **Share card** (`shareSelected`): a 📤 button renders the **selected** player's
   result to a PNG (canvas) — headline, rank, key stats and a roast — via the Web
   Share API on mobile, download elsewhere.
