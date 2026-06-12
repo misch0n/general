@@ -232,10 +232,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* live hint line */
 .hintline{ text-align:center; background:rgba(0,0,0,.3); border:1px solid var(--gen-alert-line); border-radius:8px; padding:6px 10px; }
 .hintline .hh{ font-family:var(--gen-font-display); font-weight:600; font-size:12px; letter-spacing:.4px; color:var(--gen-brass-bright); }
-.hintline .krs{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:6px; }
-.hintline .kr{ display:inline-flex; align-items:center; gap:4px; flex:1 1 44%; justify-content:center;
+.hintline .krs{ display:flex; flex-direction:column; gap:5px; align-items:stretch; margin-top:6px; }
+.hintline .kr{ display:flex; align-items:center; justify-content:center; gap:5px;
   font-family:var(--gen-font-body); font-size:11px; color:var(--gen-label); background:rgba(255,255,255,.05);
-  border:1px solid var(--gen-pill-line); border-radius:6px; padding:3px 7px; }
+  border:1px solid var(--gen-pill-line); border-radius:6px; padding:4px 7px; }
 .hintline .kr b{ color:var(--gen-brass); }
 .hintline .krd{ display:inline-flex; gap:2px; }
 .hintline .hdie{ display:inline-grid; place-items:center; width:18px; height:18px; background:#d8cfa8; border:1px solid var(--gen-ink-line); border-radius:3px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
@@ -461,6 +461,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ownerinfo{ position:fixed; z-index:55; max-width:250px; padding:10px 12px; border-radius:10px; background:var(--gen-brass-bright);
   color:var(--gen-ink); font-size:11.5px; line-height:1.45; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.5); border:2px solid var(--gen-brass-stroke); }
 .ownerinfo b{ font-weight:700; }
+.ownerinfo .oi-skip-note{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-ink-line); font-size:11px; opacity:.9; }
+.ownerinfo .oi-skip{ display:block; width:100%; margin-top:8px; padding:8px 10px; border-radius:7px; cursor:pointer; font-family:var(--gen-font-display);
+  font-weight:700; font-size:11px; letter-spacing:.3px; color:var(--gen-ink); background:rgba(0,0,0,.18); border:1.5px solid var(--gen-brass-stroke); }
+.ownerinfo .oi-skip.on{ background:var(--gen-ink); color:var(--gen-brass-bright); }
+.ownerstar.skipped{ opacity:.4; }
 .ownername{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
 .ownername:focus{ outline:none; border-color:var(--gen-brass); }
@@ -485,15 +490,26 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histgame{ display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:6px; color:var(--gen-text); }
 .histgame:hover{ border-color:var(--gen-brass); }
-.histgame .hg-res{ width:30px; height:30px; flex:none; display:grid; place-items:center; border-radius:6px; font-family:var(--gen-font-display);
-  font-weight:700; font-size:13px; }
-.histgame .hg-res.win{ background:var(--gen-brass); color:var(--gen-ink); } .histgame .hg-res.loss{ background:var(--gen-pill); color:var(--gen-muted); border:1px solid var(--gen-pill-line); }
+.histgame .hg-count{ min-width:32px; height:30px; flex:none; padding:0 5px; display:grid; place-items:center; border-radius:6px; font-family:var(--gen-font-display);
+  font-weight:700; font-size:14px; background:var(--gen-pill); color:var(--gen-text); border:1px solid var(--gen-pill-line); font-variant-numeric:tabular-nums; }
 .histgame .hg-main{ flex:1; min-width:0; }
-.histgame .hg-top{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.histgame .hg-top{ font-family:var(--gen-font-display); font-weight:600; letter-spacing:.3px; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:5px; }
+.histgame .hg-crown{ font-size:12px; }
+.histgame .hg-skip{ font-size:12px; color:var(--gen-muted); }
 .histgame .hg-sub{ font-size:10px; color:var(--gen-muted); margin-top:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
+/* end-game / history progress chart */
+.progchart{ margin:10px 0 4px; padding:10px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--gen-pill-line); }
+.progchart:empty{ display:none; }
+.progchart .pc-title{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.8px; color:var(--gen-brass); font-size:11px; margin-bottom:4px; }
+.progchart .pc-svg{ width:100%; height:auto; display:block; }
+.progchart .pc-grid{ stroke:var(--gen-pill-line); stroke-width:1; }
+.progchart .pc-axis{ fill:var(--gen-muted); font-size:8px; font-family:var(--gen-font-body); }
+.progchart .pc-legend{ display:flex; flex-wrap:wrap; gap:5px 10px; margin-top:6px; justify-content:center; }
+.progchart .pc-leg{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; color:var(--gen-text); }
+.progchart .pc-sw{ width:10px; height:10px; border-radius:50%; flex:none; }
 .histgame .hg-play{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; display:grid; place-items:center; }
 .histgame .hg-play .gl{ position:relative; width:10px; height:10px; display:block; }
 .histgame .hg-play .gl::before{ content:''; position:absolute; inset:0; background:var(--gen-brass); clip-path:polygon(0 0,0 100%,100% 50%); }
@@ -734,6 +750,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="tabSkill" class="tab">По умение</button>
     </div>
     <div id="ranks"></div>
+    <div id="progressChart" class="progchart"></div>
     <div id="evPanel"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
@@ -878,8 +895,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     try {
       var s = JSON.parse(raw);
       ['bonus', 'advice', 'censor', 'barracks', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
-      if (s.noBonus != null) settings.bonus = !s.noBonus;   // migrate the old negative toggles
-      if (s.noAdvice != null) settings.advice = !s.noAdvice;
+      if (s.noBonus != null && s.bonus == null) settings.bonus = !s.noBonus; // migrate only if not already set
+      // advice intentionally NOT migrated — it must default OFF
     } catch (e) {}
     G.setCensor(settings.censor);
   }
@@ -1072,7 +1089,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       // owner token sits to the RIGHT of the name box (CSS star, vertically centred);
       // tap it for a dismissible explainer
       if (owner) {
-        var tk = document.createElement('button'); tk.className = 'ownerstar'; tk.title = 'Старшината — ти'; tk.setAttribute('aria-label', 'Старшината');
+        var tk = document.createElement('button'); tk.className = 'ownerstar' + (skipOwnerNext ? ' skipped' : ''); tk.title = 'Старшината — ти'; tk.setAttribute('aria-label', 'Старшината');
         tk.onclick = function (e) { e.stopPropagation(); showOwnerInfo(tk); };
         top.appendChild(tk);
       }
@@ -1196,7 +1213,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     applyOwnerName(); // ensure seat #1 carries the owner's name if the toggle is on
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
-      pl.owner = !!p.owner; // the device-owner flag follows the player (token)
+      pl.owner = skipOwnerNext ? false : !!p.owner; // owner skipped → nobody carries the flag this game
       pl.bonus = (!settings.bonus || !fun()) ? 0 : (p.bonus || 0); // rare-name starting bonus (казарма only)
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
@@ -1221,6 +1238,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var moveLog = [];   // per player index: array of completed turn logs
   var curLog = null;  // the in-progress turn log
   var hintsOn = false;
+  var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
@@ -1231,6 +1249,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function startGame(players, manual) {
     clearAllPenalties();
     game = G.createGame(players);
+    game.ownerSkipped = skipOwnerNext; // record so this game is excluded from owner trends
+    skipOwnerNext = false;             // the skip is a one-game decision
     manualMode = !!manual;
     undoStack = [];
     moveLog = players.map(function () { return []; });
@@ -1317,37 +1337,58 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); renderHint();
   };
   function hintDie(v) { return '<span class="hdie">' + pipFace(v) + '</span>'; }
+  var HINT_FACE = { ones: 1, twos: 2, threes: 3, fours: 4, fives: 5, sixes: 6 };
+  // the dice you'd naturally KEEP to chase a given category — only the relevant
+  // ones (so "търсиш четворки" never tells you to hold a stray 1)
+  function keepForTarget(d, key) {
+    var counts = {}; d.forEach(function (v) { counts[v] = (counts[v] || 0) + 1; });
+    if (HINT_FACE[key]) return d.map(function (v) { return v === HINT_FACE[key]; });
+    if (key === 'twoKind' || key === 'threeKind' || key === 'fourKind' || key === 'general') {
+      var best = 0, bf = 0; for (var f = 6; f >= 1; f--) if ((counts[f] || 0) > best) { best = counts[f]; bf = f; }
+      return d.map(function (v) { return v === bf; });
+    }
+    if (key === 'fullHouse') return d.map(function (v) { return counts[v] >= 2; }); // keep the pairs/triples
+    if (key === 'smallStraight' || key === 'largeStraight') {
+      var need = key === 'smallStraight' ? [1, 2, 3, 4, 5] : [2, 3, 4, 5, 6], seen = {};
+      return d.map(function (v) { if (need.indexOf(v) >= 0 && !seen[v]) { seen[v] = 1; return true; } return false; });
+    }
+    if (key === 'chance') return d.map(function (v) { return v >= 4; }); // keep the high dice
+    return d.map(function () { return false; });
+  }
   function renderHint() {
     var line = $('hintLine');
     var p = G.currentPlayer(game);
     var show = hintsOn && evReady && !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
     // raise the speech bubble when the hint line lifts the dice (avoids overlap)
-    document.documentElement.style.setProperty('--roast-bottom', show ? '232px' : '172px');
+    document.documentElement.style.setProperty('--roast-bottom', show ? '244px' : '172px');
     if (!show) { line.classList.add('hidden'); return; }
-    var ev = EV.evaluate(p.scores, dice, throwsLeft);
-    // surface the top-3 optimal moves, no EV numbers, in plain "дръж X, търсиш Y" form
     var head, alts;
     if (throwsLeft > 0) {
       head = 'Щабът съветва:';
-      // the top keeps cluster on the same target, so pick the best keep per
-      // DISTINCT target — three genuinely different directions to aim at
-      var seen = {}, picks = [];
-      ev.keep_ranked.forEach(function (k) {
-        if (picks.length >= 3) return;
-        var target = EV.bestTarget(p.scores, dice, k.keep);
-        if (seen[target]) return;
-        seen[target] = true;
-        picks.push({ keep: k.keep, target: target });
+      // for each open category use its NATURAL keep, rank by EV, then dedupe by the
+      // kept-dice signature so the three lines are genuinely different directions
+      var mask = EV.maskOfScores(p.scores);
+      var ranked = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(p, c.key); }).map(function (c) {
+        var keep = keepForTarget(dice, c.key);
+        return { key: c.key, keep: keep, ev: EV.keepValue(mask, dice, throwsLeft, keep) };
+      }).sort(function (a, b) { return b.ev - a.ev; });
+      var sigSeen = {}, opts = [];
+      ranked.forEach(function (o) {
+        if (opts.length >= 3) return;
+        var sig = o.keep.map(function (b) { return b ? 1 : 0; }).join('');
+        if (sigSeen[sig]) return;
+        sigSeen[sig] = 1; opts.push(o);
       });
-      alts = picks.map(function (pk) {
-        var kept = dice.filter(function (v, j) { return pk.keep[j]; });
-        var tname = G.ORDER_NAMES[pk.target] || pk.target;
-        if (kept.length === G.DICE_COUNT) return '<span class="kr">спри · <b>' + esc(tname) + '</b></span>';
+      alts = opts.map(function (o) {
+        var kept = dice.filter(function (v, j) { return o.keep[j]; });
+        var tname = G.ORDER_NAMES[o.key] || o.key;
+        if (kept.length === G.DICE_COUNT) return '<span class="kr">спри · отчети <b>' + esc(tname) + '</b></span>';
         var d = kept.length ? '<span class="krd">' + kept.map(hintDie).join('') + '</span>' : '<span class="kr-none">нищо</span>';
         return '<span class="kr">дръж ' + d + ' · търсиш <b>' + esc(tname) + '</b></span>';
       }).join('');
     } else {
       head = 'Щабът съветва да отчетеш:';
+      var ev = EV.evaluate(p.scores, dice, throwsLeft);
       alts = ev.category_ranked.slice(0, 3).map(function (c) {
         return '<span class="kr"><b>' + esc(G.ORDER_NAMES[c.key] || c.key) + '</b></span>';
       }).join('');
@@ -2265,6 +2306,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4),
       ts: Date.now(),
       manualMode: manualMode,
+      ownerSkipped: !!(game && game.ownerSkipped),
       ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
       players: game.players.map(function (p) {
         return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, personaId: p.persona ? p.persona.id : null,
@@ -2339,6 +2381,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     } else $('betMsgs').innerHTML = '';
 
     renderSummary();
+    renderProgressChart();
     $('overModal').classList.remove('hidden');
   }
 
@@ -2384,6 +2427,41 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
     // report for the selected player (any seat, incl AI; manual = category-only)
     $('evPanel').innerHTML = summary.ana[summary.sel] ? renderReport(summary.sel) : '';
+  }
+
+  // cumulative category points for player pi, round by round (starts at 0)
+  function progressSeries(pi) {
+    var log = moveLog[pi] || [], sc = game.players[pi].scores || {}, run = 0, pts = [0];
+    for (var r = 0; r < log.length; r++) { var v = sc[log[r].category]; run += (typeof v === 'number' ? v : 0); pts.push(run); }
+    return pts;
+  }
+  // line chart of every player's running total over the rounds, in their colour
+  function renderProgressChart() {
+    var el = $('progressChart'); if (!el) return;
+    var series = game.players.map(function (p, i) { return { p: p, pts: progressSeries(i) }; });
+    var maxR = 0, maxY = 0;
+    series.forEach(function (s) { maxR = Math.max(maxR, s.pts.length - 1); s.pts.forEach(function (v) { maxY = Math.max(maxY, v); }); });
+    if (maxR < 1 || maxY <= 0) { el.innerHTML = ''; return; }
+    var W = 320, H = 168, padL = 30, padR = 10, padT = 12, padB = 22, iw = W - padL - padR, ih = H - padT - padB;
+    var x = function (r) { return padL + (maxR ? r / maxR * iw : 0); };
+    var y = function (v) { return padT + ih - (maxY ? v / maxY * ih : 0); };
+    var grid = '';
+    [0, 0.5, 1].forEach(function (f) {
+      var yy = padT + ih - f * ih;
+      grid += '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" class="pc-grid"/>'
+        + '<text x="' + (padL - 4) + '" y="' + (yy + 3) + '" class="pc-axis" text-anchor="end">' + Math.round(maxY * f) + '</text>';
+    });
+    var lines = series.map(function (s) {
+      var poly = s.pts.map(function (v, r) { return x(r) + ',' + y(v); }).join(' ');
+      var dots = s.pts.map(function (v, r) { return '<circle cx="' + x(r) + '" cy="' + y(v) + '" r="2" fill="' + s.p.color + '"/>'; }).join('');
+      return '<polyline points="' + poly + '" fill="none" stroke="' + s.p.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' + dots;
+    }).join('');
+    var xlab = '<text x="' + (padL + iw / 2) + '" y="' + (H - 4) + '" class="pc-axis" text-anchor="middle">рундове →</text>';
+    var legend = '<div class="pc-legend">' + series.map(function (s) {
+      return '<span class="pc-leg"><span class="pc-sw" style="background:' + s.p.color + '"></span>' + (isOwnerP(s.p) ? ownerTokenHTML(true) : '') + esc(s.p.name) + '</span>';
+    }).join('') + '</div>';
+    el.innerHTML = '<div class="pc-title">Ход на битката</div>'
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">' + grid + lines + xlab + '</svg>' + legend;
   }
 
   function signed(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 0 : d); }
@@ -2532,16 +2610,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function recTotal(sp) { var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
-  function recOwnerIdx(rec) { for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // legacy games: seat 0
+  function recOwnerIdx(rec) { if (rec.ownerSkipped) return -1; for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // -1: owner skipped; legacy: seat 0
   function analyzeRec(rec, i) {
     var log = rec.moveLog && rec.moveLog[i];
     if (!evReady || !log || !log.length) return null;
     try { return rec.manualMode ? EV.analyzeManualGame(log) : EV.analyzeGame(log); } catch (e) { return null; }
   }
-  function fmtWhen(ts) {
-    var d = new Date(ts), p = function (x) { return (x < 10 ? '0' : '') + x; };
-    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
-  }
+  function fmtDate(ts) { var d = new Date(ts), p = function (x) { return (x < 10 ? '0' : '') + x; }; return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear(); }
+  function fmtTime(ts) { var d = new Date(ts), p = function (x) { return (x < 10 ? '0' : '') + x; }; return p(d.getHours()) + ':' + p(d.getMinutes()); }
 
   // reconstruct a saved game into the live state and show its end-game summary
   function reconstructPlayers(rec) {
@@ -2661,7 +2737,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   // owner trends: aggregate the flagged owner (when human) across games
   function ownerOverview(games) {
-    var owned = games.filter(function (r) { var o = r.players[recOwnerIdx(r)]; return o && !o.isAI; });
+    var owned = games.filter(function (r) { var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
       var ana = analyzeRec(r, oi);
@@ -2716,14 +2792,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     }
     var html = '<div class="histhd">Битки (' + games.length + ')</div>';
     games.forEach(function (rec) {
-      var oi = recOwnerIdx(rec), oTotal = recTotal(rec.players[oi]), place = recPlacement(rec, oi), winR = place === 1;
-      var winnerName = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0].name;
-      var res = winR ? 'П' : place + '/' + rec.players.length;
+      var oi = recOwnerIdx(rec), skipped = oi < 0;
+      var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
+      var ptsPlayer = skipped ? top : rec.players[oi];
+      var oTotal = recTotal(ptsPlayer), winR = !skipped && recPlacement(rec, oi) === 1;
       html += '<div class="histgame" data-id="' + esc(rec.id) + '">'
-        + '<span class="hg-res ' + (winR ? 'win' : 'loss') + '">' + esc(res) + '</span>'
-        + '<span class="hg-main"><span class="hg-top">' + ownerTokenHTML(true) + esc(rec.players[oi].name)
-        + (winR ? '' : ' · 🏆 ' + esc(winnerName)) + '</span>'
-        + '<span class="hg-sub">' + fmtWhen(rec.ts) + ' · ' + rec.players.length + ' бойци' + (rec.manualMode ? ' · отчет' : '') + '</span></span>'
+        + '<span class="hg-count" title="' + rec.players.length + ' бойци">' + rec.players.length + '</span>'
+        + '<span class="hg-main"><span class="hg-top">' + esc(fmtDate(rec.ts))
+        + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
+        + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
+        + '<span class="hg-sub">' + esc(fmtTime(rec.ts)) + (rec.manualMode ? ' · отчет' : '') + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
@@ -2760,11 +2838,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     b.innerHTML = OWNER_INFO; b.classList.remove('hidden');
   };
   $('ownerBubble').onclick = function () { $('ownerBubble').classList.add('hidden'); };
-  // tapping the ★ owner token (in setup) pops a dismissible explainer
+  // tapping the ★ owner token (in setup) pops a dismissible explainer + skip control
+  function skipBtnLabel() { return skipOwnerNext ? '✓ Старшината е пропуснат за следващата игра' : 'Пропусни старшината за следващата игра'; }
   function showOwnerInfo(anchor) {
     var b = $('ownerInfo');
     if (!b.classList.contains('hidden')) { b.classList.add('hidden'); return; }
-    b.innerHTML = OWNER_INFO; b.classList.remove('hidden');
+    b.innerHTML = OWNER_INFO
+      + '<div class="oi-skip-note">Друг играе на телефона? Пропусни старшината — тази игра няма да влезе в личната статистика.</div>'
+      + '<button class="oi-skip' + (skipOwnerNext ? ' on' : '') + '" id="ownerSkipBtn">' + skipBtnLabel() + '</button>';
+    b.classList.remove('hidden');
+    $('ownerSkipBtn').onclick = function (e) {
+      e.stopPropagation();
+      skipOwnerNext = !skipOwnerNext;
+      this.textContent = skipBtnLabel(); this.classList.toggle('on', skipOwnerNext);
+      var star = document.querySelector('.ownerstar'); if (star) star.classList.toggle('skipped', skipOwnerNext);
+    };
     var r = anchor.getBoundingClientRect();
     b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
     var below = r.bottom + 8;
