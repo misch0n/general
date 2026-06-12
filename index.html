@@ -614,9 +614,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histgame .hg-play .gl::before{ content:''; position:absolute; inset:0; background:var(--gen-brass); clip-path:polygon(0 0,0 100%,100% 50%); }
 .histgame .hg-play:hover{ border-color:var(--gen-brass); }
 /* replay viewer */
-.rpinfo{ display:flex; align-items:center; justify-content:space-between; font-family:var(--gen-font-display); font-weight:700;
+.rpinfo{ position:relative; display:flex; align-items:center; gap:8px; font-family:var(--gen-font-display); font-weight:700;
   text-transform:uppercase; letter-spacing:.5px; font-size:13px; color:var(--gen-text); margin-bottom:8px; }
-.rpinfo .rpround{ font-size:11px; color:var(--gen-muted); }
+.rpinfo .rpname{ display:flex; align-items:center; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* player filter: a small dropdown left of the name */
+.rpfilter{ flex:none; width:26px; height:26px; border-radius:6px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); display:grid; place-items:center; cursor:pointer; }
+.rpfilter.filtered{ border-color:var(--gen-brass); }
+.rpfilter .rpcaret{ width:8px; height:8px; border-right:2px solid var(--gen-text); border-bottom:2px solid var(--gen-text); transform:translateY(-2px) rotate(45deg); }
+.rpfiltermenu{ position:absolute; top:30px; left:0; z-index:5; min-width:150px; background:var(--gen-ink); border:1px solid var(--gen-brass); border-radius:8px; padding:4px; box-shadow:0 10px 26px rgba(0,0,0,.5); }
+.rpfiltermenu .rpfopt{ display:flex; align-items:center; gap:7px; width:100%; text-align:left; padding:7px 9px; border-radius:6px; background:transparent; border:none;
+  font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:12px; color:var(--gen-text); cursor:pointer; }
+.rpfiltermenu .rpfopt:hover{ background:rgba(255,255,255,.06); }
+.rpfiltermenu .rpfopt.on{ color:var(--gen-brass-bright); }
+.rpfiltermenu .rpfdot{ width:10px; height:10px; border-radius:50%; flex:none; }
 .rpboard{ margin-bottom:10px; }
 .rpboard .mtile.hl{ box-shadow:inset 0 0 0 2px var(--gen-brass), 0 0 10px rgba(200,166,75,.6); }
 .rpboard .mtile.hl .mval{ color:var(--gen-canvas-ink); }
@@ -624,7 +634,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .rpdie{ width:42px; height:42px; display:grid; place-items:center; background:#d8cfa8; border:2px solid var(--gen-ink-line);
   border-radius:var(--gen-r-die); box-shadow:inset 0 0 0 2px rgba(255,255,255,.22); transition:transform .12s; }
 .rpdie .face{ width:30px; height:30px; }
-.rpdie.kept{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
+.rpdie.rr{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
 .rplabel{ text-align:center; font-size:12px; color:var(--gen-label); min-height:16px; margin-bottom:8px; }
 .rplabel b{ color:var(--gen-brass-bright); }
 .rpslider{ width:100%; margin:4px 0 12px; accent-color:var(--gen-brass); }
@@ -647,7 +657,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* ⏮ restart — leading bar + left triangle */
 .ic-restart .gl::before{ inset:0; clip-path:polygon(100% 0,100% 100%,22% 50%); }
 .ic-restart .gl::after{ display:block; left:0; top:0; bottom:0; width:3px; }
-.rpspeed{ height:38px; border-radius:7px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); font-family:var(--gen-font-display); font-size:11px; letter-spacing:.4px; padding:0 6px; text-transform:uppercase; }
+.rpspeed{ width:40px; height:38px; flex:none; display:grid; place-items:center; background:transparent; border:none; cursor:pointer;
+  font-family:var(--gen-font-display); font-weight:700; font-size:16px; letter-spacing:.3px; color:#fff; }
 
 /* rare-name brag bubble (setup) — colour-coded by rarity tier */
 .rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
@@ -942,7 +953,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div class="modal replaymodal">
     <button class="x-close" id="replayClose">✕</button>
     <h2>Бойна хроника</h2>
-    <div id="replayInfo" class="rpinfo"></div>
+    <div id="replayInfo" class="rpinfo">
+      <button id="rpFilterBtn" class="rpfilter" title="Филтър по играч"><span class="rpcaret"></span></button>
+      <span id="rpName" class="rpname"></span>
+      <div id="rpFilterMenu" class="rpfiltermenu hidden"></div>
+    </div>
     <div id="replayBoard" class="rpboard"></div>
     <div id="replayDice" class="rpdice"></div>
     <div id="rpLabel" class="rplabel"></div>
@@ -952,12 +967,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="rpStepB" class="rpbtn ic-prev" title="Назад"><span class="gl"></span></button>
       <button id="rpPlay" class="rpbtn play ic-play" title="Пусни / пауза"><span class="gl"></span></button>
       <button id="rpStepF" class="rpbtn ic-next" title="Напред"><span class="gl"></span></button>
-      <select id="rpSpeed" class="rpspeed" title="Темпо">
-        <option value="1300">Походно</option>
-        <option value="750" selected>Боен ход</option>
-        <option value="380">Щурмово</option>
-        <option value="160">Блиц</option>
-      </select>
+      <button id="rpSpeed" class="rpspeed" title="Темпо (клик = следваща скорост)">x1</button>
     </div>
   </div>
 </div>
@@ -3268,7 +3278,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
           actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: log.dice || [] });
         } else {
           var rolls = log.rolls || [];
-          for (var i = 0; i < rolls.length; i++) actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], kept: i > 0 ? log.keeps[i - 1] : null, rollNo: i + 1, rolls: rolls.length });
+          for (var i = 0; i < rolls.length; i++) {
+            // mark the dice that get RE-ROLLED after this throw (= not kept), to match
+            // the in-game flow where you select the dice you're about to re-throw
+            var last = i === rolls.length - 1;
+            var reroll = (!last && log.keeps[i]) ? log.keeps[i].map(function (k) { return !k; }) : null;
+            actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], reroll: reroll, rollNo: i + 1, rolls: rolls.length });
+          }
           actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: rolls.length ? rolls[rolls.length - 1] : [] });
         }
       }
@@ -3292,20 +3308,43 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function renderReplay() {
     var a = replay.actions[replay.idx], rec = replay.rec, sc = rpStateAt(replay.idx), pl = rec.players[a.p];
     var run = 0; G.CATEGORIES.forEach(function (c) { if (typeof sc[a.p][c.key] === 'number') run += sc[a.p][c.key]; });
-    $('replayInfo').innerHTML = '<span>' + (pl.owner ? ownerTokenHTML(true) : '') + esc(pl.name) + '</span><span class="rpround">рунд ' + (a.r + 1) + '/' + G.CATEGORIES.length + ' · ' + (run + (pl.bonus || 0)) + ' т.</span>';
+    $('rpName').innerHTML = (pl.owner ? ownerTokenHTML(true) : '') + esc(pl.name);
     $('replayBoard').innerHTML = replayBoardHTML(sc[a.p], a.type === 'commit' ? a.category : null);
-    $('replayDice').innerHTML = (a.dice || []).map(function (v, i) { return '<div class="rpdie' + (a.kept && a.kept[i] ? ' kept' : '') + '">' + pipFace(v) + '</div>'; }).join('');
-    // military-comic narration
-    if (a.type === 'roll') {
-      $('rpLabel').innerHTML = a.rollNo === 1
-        ? 'Открива огън — <b>залп ' + a.rollNo + '/' + a.rolls + '</b>!'
-        : 'Презарежда и стреля — <b>залп ' + a.rollNo + '/' + a.rolls + '</b>' + (a.kept ? ' (държи маркираните)' : '');
-    } else {
-      $('rpLabel').innerHTML = a.score > 0
-        ? 'Вписва <b>' + esc(CAT_LABEL[a.category] || a.category) + '</b> в дневника — <b>' + a.score + '</b> т.!'
-        : 'Жертва <b>' + esc(CAT_LABEL[a.category] || a.category) + '</b> — нула, ама с чест.';
-    }
+    // marked dice = the ones being re-rolled after this throw
+    $('replayDice').innerHTML = (a.dice || []).map(function (v, i) { return '<div class="rpdie' + (a.reroll && a.reroll[i] ? ' rr' : '') + '">' + pipFace(v) + '</div>'; }).join('');
+    // a static one-liner where the narration used to be: Х{ход}/14 · точки
+    $('rpLabel').innerHTML = '<b>Х' + (a.r + 1) + '/' + G.CATEGORIES.length + '</b> · ' + (run + (pl.bonus || 0)) + ' т.';
     $('rpSlider').value = String(replay.idx);
+  }
+  // speed gears: a modifier over the 1 s/move base; click cycles to the next gear
+  var RP_BASE = 1000, RP_GEARS = [
+    { mod: 0.5, color: '#6fa8e8' }, { mod: 1, color: '#ffffff' }, { mod: 1.5, color: '#9bd17e' },
+    { mod: 2, color: '#e8b06a' }, { mod: 4, color: '#e8807a' },
+  ];
+  function syncSpeedBtn() {
+    var g = RP_GEARS[replay.gear];
+    replay.speed = RP_BASE / g.mod;
+    var b = $('rpSpeed'); b.textContent = 'x' + g.mod; b.style.color = g.color;
+  }
+  // filter menu: All + one entry per player; selecting filters to that player's turns
+  function buildFilterMenu() {
+    var html = '<button class="rpfopt' + (replay.filter < 0 ? ' on' : '') + '" data-f="-1">Всички</button>';
+    replay.rec.players.forEach(function (p, i) {
+      html += '<button class="rpfopt' + (replay.filter === i ? ' on' : '') + '" data-f="' + i + '"><span class="rpfdot" style="background:' + p.color + '"></span>' + esc(p.name) + '</button>';
+    });
+    $('rpFilterMenu').innerHTML = html;
+    $('rpFilterMenu').querySelectorAll('.rpfopt').forEach(function (b) {
+      b.onclick = function () { setReplayFilter(+b.getAttribute('data-f')); $('rpFilterMenu').classList.add('hidden'); };
+    });
+  }
+  function setReplayFilter(f) {
+    replay.filter = f;
+    replay.actions = f < 0 ? replay.all.slice() : replay.all.filter(function (a) { return a.p === f; });
+    if (!replay.actions.length) replay.actions = replay.all.slice(), replay.filter = -1;
+    replay.idx = 0; rpPause();
+    $('rpSlider').max = String(rpLast());
+    $('rpFilterBtn').classList.toggle('filtered', replay.filter >= 0);
+    renderReplay();
   }
   function rpLast() { return replay.actions.length - 1; }
   function rpPause() { replay.playing = false; $('rpPlay').classList.remove('playing'); clearTimeout(replay.timer); }
@@ -3324,7 +3363,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var actions = buildReplayActions(rec);
     if (!actions.length) return;
     $('historyModal').classList.add('hidden');
-    replay = { rec: rec, actions: actions, idx: 0, timer: null, playing: false, speed: +$('rpSpeed').value };
+    replay = { rec: rec, all: actions, actions: actions.slice(), idx: 0, timer: null, playing: false, gear: 1, filter: -1 };
+    syncSpeedBtn();
+    buildFilterMenu();
+    $('rpFilterBtn').classList.remove('filtered');
+    $('rpFilterMenu').classList.add('hidden');
     $('rpSlider').max = String(rpLast());
     $('replayModal').classList.remove('hidden');
     rpPlay(); // auto-start
@@ -3334,7 +3377,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('rpStepF').onclick = function () { rpPause(); if (replay.idx < rpLast()) { replay.idx++; renderReplay(); } };
   $('rpStepB').onclick = function () { rpPause(); if (replay.idx > 0) { replay.idx--; renderReplay(); } };
   $('rpSlider').oninput = function () { rpPause(); replay.idx = +$('rpSlider').value; renderReplay(); };
-  $('rpSpeed').onchange = function () { replay.speed = +$('rpSpeed').value; if (replay.playing) rpSchedule(); };
+  $('rpSpeed').onclick = function () { replay.gear = (replay.gear + 1) % RP_GEARS.length; syncSpeedBtn(); if (replay.playing) rpSchedule(); };
+  $('rpFilterBtn').onclick = function (e) { e.stopPropagation(); buildFilterMenu(); $('rpFilterMenu').classList.toggle('hidden'); };
+  document.addEventListener('click', function (e) { if (!$('rpFilterMenu').classList.contains('hidden') && !$('replayInfo').contains(e.target)) $('rpFilterMenu').classList.add('hidden'); });
   function closeReplay() { if (replay) rpPause(); $('replayModal').classList.add('hidden'); openHistory(); }
   $('replayClose').onclick = closeReplay;
   $('replayModal').onclick = function (e) { if (e.target === $('replayModal')) closeReplay(); };
