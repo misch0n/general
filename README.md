@@ -55,12 +55,13 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
   None of them ever scratches at random — a forfeit happens only when nothing
   scores (Господ бог alone may scratch _strategically_).
-- **Optimal-play hints.** Toggle **СЪВЕТ** for a live tip from HQ — _"Щабът
-  съветва да стреляш по 1, 2, 3. Търсиш малка кента."_ — plus the **top-3 keeps
-  with their EVs** (off for serious play).
-- **Combo reference sheet.** A quick-glance **📋 Справочник комбинации** (from the
-  setup screen and the in-game ☰ menu) lists every category, what it needs and what
-  it scores.
+- **Optimal-play hints.** Enable **Съвети** in settings (off by default) and tap
+  **СЪВЕТ** for the top-3 optimal moves from HQ — _Щабът съветва: дръж 🎲🎲 · търсиш
+  малка кента_ — shown with **mini dice** for what to keep and the target combo, no
+  EV jargon.
+- **Combo reference sheet.** A quick-glance **📋 Комбинации** (from the setup
+  screen and the in-game ☰ menu) lists every category, what it needs and what it
+  scores, **with an example roll of dice** under each.
 - **Per-game report (luck vs skill).** Each game is decomposed via the engine's
   value function into `final = par + luck + skill`, then dissected — with a built-in
   **„Какво е EV?“** explainer and all jargon in Bulgarian: **decision accuracy**
