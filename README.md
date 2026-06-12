@@ -1,198 +1,362 @@
 # Генерал 🎲
 
 A web player for **Генерал** (General), the Bulgarian dice game in the family of
-Yahtzee / Generala. Single-page, no build step, no dependencies — just open
-`index.html`.
+Yahtzee / Generala. Single-page, **no build step, no dependencies, no network** —
+just open `index.html`.
 
 The UI is a phone-first, comically over-decorated **military parody** (ЩАБ
 edition): camouflage field, classification banner, brass medals and stencil type.
+Under the gloss sits a real **expected-value engine** that solves the game
+optimally and powers the AI, the hints and a deep post-game analysis.
 
-## Features
+```bash
+# it's a static page — just open it, or serve the folder:
+python3 -m http.server 8000      # → http://localhost:8000
+node --test                      # run the dependency-free test suite
+```
 
-- **РЕЖИМ КАЗАРМА (the goofy layer switch).** A settings toggle (default **off**,
-  flippable **even mid-game**) that gates the whole comedy layer. **Off** strips
-  the game to its core for play and manual modes — no callouts, no combo
-  tooltips/penalties, no rare-name bonuses or rarity notifications, no bets (nor
-  end-screen stakes). **On** switches all of it back on: marching orders + roasts,
-  the shaming combo tooltips and their pranks, name bonuses, rarity bubbles and the
-  stupid wagers. The features all live in the background regardless — the switch
-  just blocks them. (The СЪВЕТ optimal-play hint and the analytics report are core
-  and stay available either way.)
-- **Full-screen board.** Fills the viewport with a thin margin: scoreboard up
-  top, a **medal divider**, and the **dice console** anchored at the bottom.
-- **Select-to-reroll.** The turn opens on the general's order with the dice
-  **unrolled** (`?`); **tap the dice to make your first throw** (anticipation).
-  Then dice default to **kept** — tap the ones to re-roll (a ✛ reticle marks
-  them) and hit **ОГИН!**; selection clears each throw. 3 throws per turn. Thrown
+## Architecture at a glance
+
+| File | Role |
+| --- | --- |
+| `index.html` | The whole app: inline CSS + one IIFE controller. Owns the DOM, the game loop, settings, history, the summary screen, the replay viewer and the dev editor. |
+| `game.js` | **Pure, DOM-free logic** (UMD): scoring, dice, turn/player/game state, the greedy AI, names, roasts, personas, ranks, rarity and the Bulgarian morphology engine. The single source of truth for the rules. |
+| `engine.js` | The **EV engine** (UMD): an MDP solver, `evaluate()`, the luck/skill decomposition and the calibrated bot policies. Consumes `game.js`'s scoring — never re-implements the rules. |
+| `ev-table.js` | The precomputed optimal value table (16384 floats), generated offline so the page needs no heavy compute at load. |
+| `tools/` | Offline `build-ev.js` (writes `ev-table.js`) and `calibrate-bots.js` (the τ ↔ strength curve). |
+| `test/` | `node:test` unit tests for `game.js` and `engine.js`. |
+
+The controller talks to the engine through a tiny ready-gate: `ev-table.js`
+calls `EV.setTable(...)`, the controller flips `evReady`, and every EV-dependent
+feature (hints, AI lookups, post-game report) checks that flag and degrades
+gracefully to the greedy heuristic if the table never loads.
+
+Two `localStorage` keys persist everything: `general:settings:v1` and
+`general:history:v1`.
+
+## Gameplay
+
+- **Full-screen board.** Fills the viewport with a thin margin: the scoreboard up
+  top, a **medal divider**, and the **dice console** anchored at the bottom. The
+  header carries the current player's name, their ★/persona, and the in-game **☰
+  menu** (which sits where the player badge used to be).
+- **Select-to-reroll.** A turn opens on the general's order with the dice
+  **unrolled** (`?`); **tap the dice to make the first throw**. After that, dice
+  default to **kept** — tap the ones to re-roll (a ✛ reticle marks them) and hit
+  **ОГИН!**; the selection clears each throw. Three throws per turn, and thrown
   dice are always **sorted by face**.
 - **Suggestions live inside the scoreboard.** After each throw every open
-  category shows the points the dice would score as a tappable brass chip; combos
-  fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
-  small **×** forfeits a slot. **Tapping the combo box** submits it when there's a
-  single way to score; a multi-way combo nudges you (a small tooltip) to **tap the
-  exact number** instead.
-- **Marching orders.** Each turn opens with a brass comic **speech bubble** —
-  _🎖 Майор, генералът ти заповядва да хвърлиш каре!_ — naming one of your still
-  open categories to aim for (flavour only). Shows for ~4s.
-- **Roasts.** End a turn in disappointment — re-roll the whole hand, or commit
-  next to nothing — and a brutal comic-book **speech bubble** pops up for a
-  couple of seconds (_Майка ти съжалява, че те е родила…_). The criterion lives
-  in `isDisappointing()`.
-- **Any number of players** with custom names, colours and AI toggles; a
-  separate scoreboard each, with the current player's shown and the rest
-  reachable from the player pills (tap to peek).
-- **AI players & personas.** AI seats keep a generated metallic name (_Сержант
-  Нано Динамо_) and show their persona under it; the **persona is the playstyle** —
-  a five-tier ladder of genuinely different decision procedures (calibrated in
-  `tools/calibrate-bots.js`):
-  | Persona | Tier | Policy | Strength |
-  | --- | --- | --- | --- |
-  | Мушица | Random | 1–2 blind rethrows of the whole hand, then the best immediate placement | ~25% |
-  | Комар | Easy | no table lookup — pure immediate-gain heuristics | ~64% |
-  | Леля ти | Medium | ε-greedy (ε = 0.2) over the optimal table | ~77% |
-  | Кварталния любител | Hard | softmax (τ = 0.8) over the optimal table | ~85% |
-  | Господ бог | God | always the optimal move | 100% |
+  category shows what the current dice would score, as a tappable brass chip.
+  Combos fillable several ways (e.g. two different pairs for `2x`) show **one chip
+  per distinct value**. A small **×** sacrifices a slot.
+- **Tap-the-box submit.** Tapping a combo's row commits it **when there's exactly
+  one way to score it**; a multi-way combo nudges you with a small guide tooltip
+  to *tap the exact number*, and an unscoreable row points you at the ×. (Wiring
+  in `renderLower` → `row.onclick`, deciding on `positives.length`.)
+- **Any number of players** with custom names, colours and AI toggles, each with
+  a separate scoreboard. The current player's board is shown; the rest are
+  reachable by tapping their **player pill**. **Drag the grip (⠿)** to reorder
+  seats to match the real table.
 
-  None of them ever scratches at random — a forfeit happens only when nothing
-  scores (Господ бог alone may scratch _strategically_).
-- **Optimal-play hints.** Enable **Съвети** in settings (off by default) and tap
-  **СЪВЕТ** for the top-3 optimal moves from HQ — _Щабът съветва: дръж 🎲🎲 · търсиш
-  малка кента_ — shown with **mini dice** for what to keep and the target combo, no
-  EV jargon.
-- **Combo reference sheet.** A quick-glance **📋 Комбинации** (from the setup
-  screen and the in-game ☰ menu) lists every category, what it needs and what it
-  scores, **with an example roll of dice** under each.
-- **Per-game report (luck vs skill).** Each game is decomposed via the engine's
-  value function into `final = par + luck + skill`, then dissected — with a built-in
-  **„Какво е EV?“** explainer and all jargon in Bulgarian: **decision accuracy**
-  and avg EV loss/turn folded into the colour-coded **playstyle box** (archetype +
-  rank + metrics in one), **hold vs category** leak (with mistake counts),
-  **blunder categorisation** (дребни / сериозни / фатални), **outstanding moves**,
-  a **deep luck deconstruction** (first throw vs rerolls, plus luck _в решителния
-  край_), **zero-out avoidance**, an **Изнервяне** metric (does your EV loss spike
-  after a terrible roll?), a **bailout rating**, **upper-section efficiency**,
-  **early/mid/late ratings**, and the colour-coded **playstyle fingerprint**
-  (Хирургът, Комарджията, Чиновникът, Късметлията…). Every stat line has a
-  **colour-coded label and numbers** for quick scanning. A collapsed **Ход по ход**
-  panel expands into a turn-by-turn breakdown that **marks each turn** (★ върхов / ·
-  окей / ✗ издънка) and shows the **1–3 dice rolls** the player decided from (the
-  deciding roll emphasised). Two tabs — **Класиране** (standings) and **По умение**
-  (luck-fair) — and the report is **selectable per player** (any seat, incl. AI).
-- **Полеви отчет (manual mode).** A second start option runs the board as a
-  manual scorekeeper for a real table game: **tap in all five table dice** on the
-  six entry dice at the bottom, and the scoreboard lights up with **every fillable
-  category** exactly like in regular play — pick one (or scratch with ×). Entering
-  the full hand means you can't mentally miss a combo, and it feeds the
-  analytics: manual games get the same report **adapted to what's knowable** —
-  category-decision accuracy, blunders, zero-outs, stage ratings, the turn
-  breakdown — while the luck/keep metrics are omitted (the real rolls/rerolls
-  were never seen). An **ОПА** button undoes action-by-action (dice taps and
-  commits) across the whole game. Roasts, HQ orders, rare-name bonuses and the
-  non-dice penalties all still fire.
-- **Table setup.** **Drag the grip** (⠿) to reorder seats to match how people sit
-  around the real table.
+## The goofy layer — РЕЖИМ КАЗАРМА
+
+A single settings switch, `settings.barracks`, gates the entire comedy layer
+through the helper `fun()`. It is **off by default** and flippable **even
+mid-game**.
+
+- **Off** strips the game to its core — clean play and manual modes, no callouts,
+  no combo tooltips or their pranks, no rare-name bonuses or rarity bubbles, no
+  bets and no end-screen stakes.
+- **On** switches all of it back on. Everything below lives in the code
+  regardless; the switch just blocks it. (The СЪВЕТ hint and the analytics report
+  are *core* and stay available either way.)
+
+What the switch governs:
+
+- **Marching orders.** Each turn opens with a brass comic **speech bubble** —
+  *🎖 Майор, генералът ти заповядва да хвърлиш каре!* — naming one of your still-open
+  categories to aim for (flavour only; `showOrder()`, built from `ORDER_NAMES`).
+- **Roasts.** End a turn in disappointment — re-roll the whole hand, or commit
+  next to nothing — and a brutal comic **bubble** pops up for a couple of seconds.
+  The trigger is `game.js`'s `isDisappointing()`; the line is rendered with
+  gender agreement (see below).
+- **Shaming combo tooltips + penalties.** Touch a category name in-game and HQ
+  "explains" the combo — the tooltip pops **right next to it**, then ambushes you
+  with a random **penalty** that it names out loud. `applyPenalty()` draws from a
+  context-aware pool:
+
+  | Penalty | Effect |
+  | --- | --- |
+  | `points` | a fine (`3–47`, or an occasional absurd **−9999999**) |
+  | `hideReq` / `hideRand` | hides a category field |
+  | `blank` | temporarily zeroes a filled score |
+  | `forfeit` | sacrifices an open slot |
+  | `shuffle` | reorders the whole board |
+  | `changeDice` / `removeDice` | swaps a die's face / confiscates a die (dice mode only) |
+  | `pretend` | "the guy next to you is playing now" |
+  | `youlose` | an outright **ГУБИШ!** |
+
+  Each penalty runs on its **own timer** and reverts after a few seconds with
+  *"Ебавам се, ей ти ги пак."* floated **next to whatever it hit** (the tile, the
+  dice, the score — `penAnchor()`). You can stack **several at once**: a new hint
+  replaces the tooltip but earlier penalties stand, and the pool refuses to
+  double-target (it tallies what's already live before picking). Dice penalties
+  are skipped in manual mode; everything else applies.
+- **Rare-name starting bonuses, rarity bubbles and the stupid bets** (all below).
+- **Every bubble in the game is tappable-away** — tooltips, refunds, roasts and
+  orders alike.
+
+## AI players & personas
+
+AI seats keep a generated metallic name (*Сержант Нано Динамо*) and show their
+persona beneath it. The **persona is the playstyle** — a five-tier ladder of
+genuinely different decision procedures, calibrated in `tools/calibrate-bots.js`
+and implemented as `EV.botKeep` / `EV.botCategory`:
+
+| Persona | Tier | Policy | Strength |
+| --- | --- | --- | --- |
+| Мушица | `random` | 1–2 blind rethrows of the whole hand, then the best immediate placement | ~25% |
+| Комар | `greedy` | no table lookup — pure immediate-gain heuristics (`game.js`) | ~64% |
+| Леля ти | `epsilon` | ε-greedy (ε = 0.2) over the optimal table | ~77% |
+| Кварталния любител | `softmax` | softmax (τ = 0.8) over the optimal table | ~85% |
+| Господ бог | `optimal` | always the EV-maximising move | 100% |
+
+None of them ever scratches at random — a forfeit happens only when nothing
+scores (Господ бог alone may scratch *strategically*, when the EV table says a
+zero now beats a bad placement later).
+
+## Optimal-play hints — СЪВЕТ
+
+Enable **Съвети** in settings (off by default) and a **СЪВЕТ** button appears
+in-game (`syncHintBtn()` shows it only when the EV table is loaded, you're in
+dice mode and advice is on). Tapping it surfaces **three distinct top moves** from
+HQ, each on its own line, with **mini dice** for what to keep and the target
+combo — *Щабът съветва: дръж 🎲🎲 · търсиш малка кента* — and **no EV jargon**.
+
+How it's built (`renderHint` + `keepForTarget`):
+
+1. For every still-open category, `keepForTarget(dice, key)` returns the
+   **intuitive** keep — only the dice that actually contribute to that target
+   (the matching face for `1…6`, the largest group for x-of-a-kind/general, the
+   pairs for full house, the distinct run dice for a straight, the high dice for
+   chance). No stray dice — if you're chasing fours it keeps the fours, not a
+   spare one.
+2. Each candidate keep is scored with `EV.keepValue(mask, dice, throwsLeft, keep)`
+   and the list is sorted by EV.
+3. The list is **deduped by keep signature** so the three lines are genuinely
+   different holds, then the top three are shown. On the final throw (no rerolls
+   left) it instead lists the three best categories to score right now.
+
+## The post-game report — luck vs skill
+
+Every finished game opens a summary screen, also reachable by opening any archive
+entry (the same code path renders both — `showGameOver()` works off the live
+`game`/`moveLog`, and the archive reconstructs those before calling it).
+
+### Layout
+
+- **A progress chart first.** A collapsible SVG line chart (open by default) sits
+  **above** the player list, because it's the general overview. `renderProgressChart()`:
+  - On the **Класиране** (standings) tab it plots each player's **running total**
+    over the rounds (`progressSeries`).
+  - On the **По умение** (skill) tab it plots each player's **running
+    optimal-play %** over the turns (`optimalSeries`), with a percentage axis.
+  - Every player is drawn in **their own colour**; when you expand a player below,
+    the other lines **dim to 45%** so their trajectory stands out. No legend — the
+    colours are read straight off the results.
+  - The collapse state survives re-renders via `summary.chartOpen`.
+- **Collapsed player rows.** Each standings row is a coloured **rank title** (the
+  rank itself is tinted in the player's colour — that *is* their colour key, so
+  there's no separate dot), the name, and the value (points, or optimal % on the
+  skill tab). **Tap a name** to expand that player's full report **inline, right
+  between the rows**; tap again to collapse. Nothing is expanded by default.
+- **Two tabs.** **Класиране** is always points-only; **По умение** re-orders by
+  decision accuracy and swaps the chart and the per-row value to the skill view.
+
+### Per-player report (`renderReport`)
+
+The engine decomposes the game via its value function into
+`final = par + luck + skill`, then dissects it. Highlights:
+
+- A **playstyle box**: the stylised archetype chip (`playstyleFor` →
+  Хирург / Комарджия / Чиновник / Каскадьор / Късметлия / Новобранец / Боец), a
+  **🎖 ГЕНЕРАЛ** badge when a general was rolled, the **optimal %** on the right,
+  the archetype's one-liner, and the average EV lost per turn.
+- **Biggest blunder** as a headline + a detail line: *✗ Най-скъпа грешка: игра X*
+  then *по-добре Y · −Z т.*; and the **best move** above it.
+- Colour-coded stat lines, several broken onto **one item per row**: **Изтичане**
+  (hold vs category leak with mistake counts), **Издънки** (дребни / сериозни /
+  фатални), **Късмет под лупа** (first throw vs rerolls vs *в решителния край*),
+  **Изнервяне** (does EV loss spike after a bad roll?), **Спасения** (bailout
+  rating), **Нули** (forced vs self-inflicted), and — **last** — **По етапи**,
+  the early/mid/late EV-loss-per-turn each labelled with **its turn range**
+  (*начало (ход 1–5) — …*).
+- A collapsed **Ход по ход** panel. Each turn row reads
+  `[Хn] [combo]` on the left and `[points] [luck EV] [decision EV] [quality]` on
+  the right, in uniform columns:
+  - **Хn** turn markers; the **combo name turns red** when the slot was
+    sacrificed, and the whole row glows **gold when a Генерал was rolled**.
+  - Two signed EV numbers (luck, then decision) where a zero reads as a green
+    **+0**.
+  - A **CSS/SVG quality thumb**: 👍👍 optimal · 👍 okay · 👎 blunder.
+  - Beneath it, the **1–3 dice rolls** the player decided from, with the **kept
+    dice highlighted between throws** (each non-final roll lights up the dice it
+    carried forward; the final roll lights up in full).
+
+EV itself is explained once, in the **?** help window (`buildReportHelp`), whose
+terms are colour-matched to the report.
+
+## Полеви отчет — manual mode
+
+A second start option runs the board as a **manual scorekeeper** for a real
+table game: tap in all five table dice on the six entry dice at the bottom, and
+the scoreboard lights up with **every fillable category** exactly like in regular
+play — pick one (or scratch with ×). Entering the full hand means you can't
+mentally miss a combo, and it feeds the analytics: manual games get the same
+report **adapted to what's knowable** (`EV.analyzeManualGame` — category-decision
+accuracy, blunders, zero-outs, stage ratings, the turn breakdown) while the
+luck/keep metrics are omitted, since the real rolls were never seen. An **ОПА**
+button undoes action-by-action — every die tap and every commit — across the
+whole game. Roasts, HQ orders, rare-name bonuses and the non-dice penalties all
+still fire.
+
+## Names, rarity, bets & gender
+
 - **Rare names & starting bonuses.** Every name component (title / adjective /
   noun) sits in a **hardcoded percentile bracket** — `0-1` … `5-10` or `10+`
   (common) — so rarities are **consistent across loads**. A component is drawn
   with a probability set by its bracket, and a name's chance is the **product** of
-  its three components, so _common title × rare adjective × rare noun_ multiplies
+  its three components, so *common title × rare adjective × rare noun* multiplies
   into something genuinely scarce (chances like `1 на 100 000`). Because that
   product skews tiny, awards are **frequency-ranked, not fixed-bracket**: at load
-  the engine Monte-Carlos the chance distribution and only the **rarest ~5% of
-  name rolls** earn a bonus — rarest 1% → +5 … the 4–5% band → +1, the 5–10% band
-  gets just a 🙂. The brag bubble talks **odds, not the raw tiny %** — _ГОСПОДИ! 1
-  на 106 667 имена — топ 1% рядкост!_ — colour-coded by tier. Titles span **every
-  Bulgarian age** (_Хан, Боляр, Кавхан, Войвода, Хайдутин, Комита, Опълченец_).
-  Draw (or **type**) a rare _Title + Adjective + Noun_; typing checks it live
-  against the seed — _🎯 Позна!_ — and adopts the name's own gender. Works in
-  manual mode too. (Brackets are tuned in the dev editor.)
-- **Stupid bets.** Every player is dealt one idiotic wager (_Залага кучето си_,
-  _майка си_, _достойнството си_…) and is stuck with it — no take-backs.
+  the engine Monte-Carlos the chance distribution (`randomNameRarity`,
+  `bonusForPct`) and only the **rarest ~5 % of name rolls** earn a bonus —
+  rarest 1 % → +5 … the 4–5 % band → +1, the 5–10 % band gets just a 🙂. The brag
+  bubble talks **odds, not the raw tiny %** — *ГОСПОДИ! 1 на 106 667 имена — топ
+  1 % рядкост!* — colour-coded by tier. Titles span **every Bulgarian age** (Хан,
+  Боляр, Кавхан, Войвода, Хайдутин, Комита, Опълченец). Draw or **type** a name;
+  typing checks it live against the seed (*🎯 Позна!*, `matchSeed`) and adopts the
+  name's own gender. Works in manual mode too. (Brackets are tuned in the dev
+  editor.)
+- **Stupid bets.** Each player is dealt one idiotic wager (*Залага кучето си*,
+  *майка си*, *достойнството си*…) from `BETS` and is stuck with it — no
+  take-backs.
 - **Gender switch.** Each seat picks **мъжко / то / женско** (m / n / f), random
   initially. Switching gender **morphs the same name in place** when the noun
-  carries a sibling-gender form (_Маймун → Маймуна → Маймунче_) — rarity unchanged;
-  if the noun has no form for the new gender, it **rolls a fresh name with
-  refreshed rarity** instead. Callouts and roasts agree too (incl. neuter).
-- **How to play + menu.** A **📖 Как се играе** briefing on setup, and an in-game
-  **☰ menu** (the hamburger sits in the header where the player badge used to be)
-  explain the turn and every combo's requirement. **Restart** returns to the muster screen with the
-  **same roster** (player & AI counts intact) so the lineup can be tweaked before
-  the next battle.
-- **Shaming combo tooltips.** Touch a category name in-game and HQ explains the
-  combo — the tooltip pops **right next to it** and then ambushes you with a
-  random **penalty** (the tooltip names it): a points fine (sometimes an absurd
-  −9999999), a hidden field, a blanked score, a forfeited slot, a shuffled board,
-  a swapped or confiscated die, a "your turn is the next guy's", or an outright
-  **ГУБИШ!**. Each penalty runs on its **own clock**, reverting after a few
-  seconds with _"Ебавам се, ей ти ги пак."_ floated **next to whatever the
-  penalty hit** (the tile, the dice, the score). You can rack up **several at
-  once** — a new hint replaces the tooltip but earlier penalties stand, and the
-  same penalty stacks as long as it claims a fresh target. **Every bubble in the
-  game can be tapped away** — tooltips, refunds, roasts and orders alike. (The
-  how-to deliberately keeps quiet about the fine — the ambush is the joke. Dice
-  penalties don't apply in manual mode; everything else does.)
-- **Device owner.** One player is **you, the device owner**, marked with a brass
-  **★ token** (in setup, the header, peek, the standings and the report). The
-  token **follows the player** if you drag them to a different seat. In **⚙
-  settings** you can enter your **battle name** and toggle **„Използвай моето
-  име“**: on → the owner is always that name; off → the owner gets a random name
-  and is still the owner. The name persists across sessions.
-- **Военен архив (game history).** Every finished battle is saved to the browser
-  (`localStorage`) in a format that **reproduces its end-game summary and analysis
-  exactly** — open a game from the archive and you get the same standings, tabs
-  and per-player report. As many games as storage allows are kept (oldest dropped
-  on overflow); games can be deleted inline or the whole archive **cleared from
-  settings (with a confirmation)**. Each game also has a **replay** — _Бойна
-  хроника_: a scrubbable, auto-playing turn-by-turn / roll-by-roll viewer with
-  CSS-drawn transport controls (play/pause, step, restart), a military **tempo
-  selector** (_Походно · Боен ход · Щурмово · Блиц_) and an **action slider** that
-  jumps to any individual roll or commit — the board fills and the dice (kept ones
-  marked) update as it plays, narrated in the comic register (_Открива огън —
-  залп 2/3!_). The archive opens to an **owner overview**:
-  multi-game trends for the owner — battles, wins, win-rate, average decision
-  accuracy (→ a rank), personal best, average luck, generals, your **favourite
-  blunder**, and recent form. If no analysable owner games exist yet, a goofy
-  **„Няма досие на стопанина“** notice (with a tooltip) explains you need to play
-  as the owner (★, not an AI) to build trends.
-- **Censor toggle.** A **⚙ settings** switch — _Цензура, само прилични имена_ —
-  is **off by default** (this is an adult party game). Flip it **on** to drop all
-  NSFW-flagged words and generate from the SFW set only; names already on the
-  muster screen are re-cohered so nothing crude slips through.
-- **Settings + a secret dev editor.** Settings also toggle the rare-name bonuses
-  and the in-game advice. Each row hides a tiny clickable box on its right edge;
-  a **rolling tap-sequence matcher** unlocks **developer mode** when the recent
-  taps hit the key (box 0 once, box 1 twice, … the 1-2-3-x escalating pattern) —
-  a mistap just means re-tapping. Dev mode is a full **editor over every game
-  string** — word pools (titles / adjectives / nouns + AI), all roast / shame
-  banks, bets, ranks, combo descriptions, HQ orders, rarity exclamations, AI
-  persona names + flavour, and playstyle names + descriptions. **Touching an
-  entry opens an edit panel** (so the list stays clean) with **Приложи / Отказ**,
-  a **Възстанови** for modified ones, and **Премахни**; words also get the
-  **м / ср / ж** forms, a **percentile-bracket selector** and an **NSFW** flag.
-  Add entries anywhere. **↻ Приложи всичко** loads the applyable edits live for
-  preview, and **📋 Копирай промените** exports a compact **diff** — only the
-  changes, each with an executable identifier and an action marker
-  (`~ nouns[21]: {…}`, `+ roasts.flop: "…"`, `- adjs[4]`) — to hand back for
+  carries a sibling-gender form (`gv` — *Маймун → Маймуна → Маймунче*), keeping the
+  rarity; if the noun has no form for the new gender, it **rolls a fresh name with
+  refreshed rarity** instead (`recohereName`). Callouts and roasts agree too,
+  including neuter.
+
+## Device owner — the ★ token
+
+One player is **you, the device owner**, marked with a brass **★ token** (in
+setup, the header, the peek, the standings and the report). The flag `p.owner`
+**follows the player** if you drag them to another seat (`recOwnerIdx` finds it).
+In **⚙ settings** you can enter your **battle name** and toggle **„Използвай моето
+име“**: on → the owner is always that name; off → the owner gets a random name but
+is still the owner. The name persists across sessions.
+
+The setup ★ is **touchable**: tapping it pops a dismissible explainer and a
+**„Пропусни старшината за следващата игра“** toggle. That covers the case where
+someone else is playing on your phone — flip it and the next game is saved
+**without owner attribution** (`game.ownerSkipped`, surfaced as `recOwnerIdx → -1`),
+so it shows a ⊘ in the archive and is **excluded from your trends** rather than
+polluting them with a result that wasn't yours. It's a one-game decision and
+resets when the game starts.
+
+## Военен архив — history & replay
+
+Every finished battle is saved to `localStorage` (`archiveGame`) in a format that
+**reproduces its end-game summary and analysis exactly** — the record carries the
+players (scores, colours, owner flag, persona) and the full `moveLog`, so opening
+a game replays the identical standings, tabs, chart and per-player report. Games
+are kept as far as storage allows (oldest dropped on overflow), deleted inline,
+or the whole archive **cleared from settings** (with a confirm).
+
+- **The archive list.** Each row is a **player-count square** + the game's **date**
+  (with a 👑 next to it if the owner won, or a ⊘ if the owner was skipped) on top,
+  the **24-hour time** below, then the owner's score and the play / delete
+  buttons (`renderHistory`).
+- **Owner overview.** The archive opens to multi-game **trends for the owner**
+  (`ownerOverview`, owner-flagged human games only): battles, wins, win-rate,
+  average decision accuracy → a rank, personal best, average score and luck,
+  generals rolled, your **favourite blunder** (the category most often fingered),
+  average place and **recent form**. If no analysable owner games exist yet, a
+  goofy *„Няма досие на стопанина“* notice explains you need to play as the owner
+  (★, not an AI) to start a dossier.
+- **Replay — Бойна хроника.** Every game has a scrubbable, auto-playing
+  turn-by-turn / roll-by-roll viewer (`buildReplayActions` flattens the move log
+  into atomic roll/commit actions in true round-robin order). It has CSS-drawn
+  transport controls (play / pause / step / restart), a military **tempo selector**
+  (*Походно · Боен ход · Щурмово · Блиц*) and an **action slider** that jumps to any
+  individual roll or commit. The board fills and the dice (kept ones marked)
+  update as it plays, narrated in the comic register (*Открива огън — залп 2/3!*).
+
+## Settings & the secret dev editor
+
+Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
+**owner block** (battle name + „Използвай моето име“ with a `?` helper), then
+positive toggles: **КАЗАРМА**, **Бонус за име**, **Съвети**, **Цензура**. The two
+pre-game-only rows (Бонус, Съвети) hide once a battle is on; you can also clear
+the archive here.
+
+- **Censor toggle** — *Цензура, само прилични имена* — is **off by default** (this
+  is an adult party game). On, it drops every NSFW-flagged word and regenerates
+  from the SFW set only (`setCensor`); names already on the muster screen are
+  re-cohered so nothing crude slips through.
+- **Secret dev editor.** Each settings row hides a tiny clickable box on its right
+  edge. A **rolling tap-sequence matcher** (`devBoxClick` against `devKey()`)
+  unlocks **developer mode** when the recent taps hit the escalating key — box 0
+  once, box 1 twice, … the 1-2-3-x pattern — so a mistap just means re-tapping. Dev
+  mode is a full **editor over every game string**: word pools (titles / adjectives
+  / nouns + their AI variants), all roast / shame banks, bets, ranks, combo
+  descriptions, HQ orders, rarity exclamations, AI persona names + flavour, and
+  playstyle names + descriptions. **Touching an entry opens an edit panel** (so the
+  list stays clean) with **Приложи / Отказ**, a **Възстанови** for modified ones,
+  and **Премахни**; words also get **м / ср / ж** forms, a percentile-bracket
+  selector and an NSFW flag. **↻ Приложи всичко** loads the editable changes live
+  for preview (`rebuildFromSource`), and **📋 Копирай промените** exports a compact
+  **diff** — only the changes, each with an executable identifier and an action
+  marker (`~ nouns[21]: {…}`, `+ roasts.flop: "…"`, `- adjs[4]`) — to hand back for
   baking into the source.
-- **End screen.** Final ranking plus the stakes: the winner **keeps** their bet
-  (_X запази Y_) while everyone else **loses** theirs (_Z загуби W_). A tie for
-  first is settled with a **manual dice roll** (highest wins, re-roll on ties).
+
+## How to play + menu
+
+A **📖 Правила** briefing (setup and the in-game ☰ menu) explains the turn, and a
+**📋 Комбинации** reference sheet lists every category, what it needs and what it
+scores, **with an example roll of dice** under each (`buildComboSheet`). **Начало**
+returns to the muster screen with the **same roster** (player & AI counts intact)
+so the lineup can be tweaked before the next battle.
+
+## End screen
+
+Final ranking plus the stakes (in КАЗАРМА mode): the winner **keeps** their bet
+(*X запази Y*) while everyone else **loses** theirs (*Z загуби W*). A tie for
+first is settled with a **manual dice roll** (highest wins, re-roll on ties).
 
 ## EV engine (`engine.js`)
 
 The optimal-play features sit on one expected-value engine that solves Генерал as
-an acyclic MDP by backward induction over the bare 14-bit category mask (16384
-states). It **consumes `game.js`'s scoring as the single source of truth** — it
-never re-implements the rules.
+an **acyclic MDP by backward induction** over the bare 14-bit category mask
+(16384 states). It **consumes `game.js`'s scoring as the single source of truth** —
+it never re-implements the rules.
 
 - `evaluate(scores, dice, rolls_left)` → state value, ranked keeps, ranked
   categories. Pure and deterministic.
+- `keepValue(mask, dice, rolls_left, keepBools)` → the EV of a specific hold (used
+  by the СЪВЕТ hint); `bestTarget` → the category a hold is aiming at.
 - `analyzeGame(turns)` → the luck/skill decomposition over a move log, plus the
   deep metrics (severity, stages, clutch, tilt, bailout, aggression…).
-- `analyzeManualGame(turns)` → the category-only variant for manual games
-  (final dice + pick per turn; judged against the table at `rolls_left = 0`).
+- `analyzeManualGame(turns)` → the category-only variant for manual games (final
+  dice + pick per turn; judged against the table at `rolls_left = 0`).
 - `botKeep` / `botCategory` → the persona policies: `optimal`, `softmax`,
   `epsilon` (ε-greedy), `greedy` (no lookup) and `random` (blind rethrows).
+
+Within a turn the engine pre-builds the reroll transition table over dice
+multisets (`MULTISETS`, `KEEPS`, `keepResult`) and solves the three-throw stage
+game (`turnArrays`, `expectRoll`); the across-turn value comes from one pass over
+masks ordered by population count (`computeTable`).
 
 The value table is **precomputed offline** and shipped as `ev-table.js` (~115 KB)
 so the page needs no heavy compute at load:
@@ -208,84 +372,79 @@ mean converges to par (a divergence would expose a reroll-table bug). The
 well-known ≈254.59 figure is standard Yahtzee's par (upper bonus + joker), a
 different game, so it isn't compared here.
 
-## Bulgarian agreement engine
+## Bulgarian agreement engine (`game.js`)
 
 Names and roasts are generated from word lists, so they must be grammatically
-coherent. A small morphology engine in [`game.js`](game.js) handles agreement:
+coherent. A small morphology engine handles agreement:
 
-- **Names** are _Title + Adjective + Noun_, and the **adjective agrees with the
-  noun's gender** — _Ефрейтор Смотан**а** Пишка_ (f), _Майор Смотан Петел_ (m),
-  _Капитан Стоманен**о** Динамо_ (n). Indeclinable prefixes (_Електро_, _Турбо_)
-  stay put. AIs draw from electric / metallic word lists. Noun entries can carry
-  optional **sibling-gender forms** (`gv`) so a gender switch morphs the word in
-  place rather than re-rolling; each entry also carries an optional `nsfw` flag
-  (censor toggle) and an optional `b` **percentile bracket** (hardcoded rarity).
-- **Roasts** agree with the staked combo's gender via possessive forms — _Твоят
-  генерал си замина_ (m), _Твоята малка кента си замина_ (f), _Твоето каре_ (n).
+- **Names** are *Title + Adjective + Noun*, and the **adjective agrees with the
+  noun's gender** — *Ефрейтор Смотан**а** Пишка* (f), *Майор Смотан Петел* (m),
+  *Капитан Стоманен**о** Динамо* (n) — via `inflectAdj`. Indeclinable prefixes
+  (*Електро*, *Турбо*) stay put. AIs draw from electric / metallic word lists.
+  Noun entries can carry optional **sibling-gender forms** (`gv`) so a gender
+  switch morphs the word in place rather than re-rolling; each entry also carries
+  an optional `nsfw` flag (censor) and an optional `b` **percentile bracket**.
+- **Roasts** agree with the staked combo's gender via possessive forms
+  (`possessive`, `renderRoast`) — *Твоят генерал си замина* (m), *Твоята малка
+  кента си замина* (f), *Твоето каре* (n).
 
 `inflectAdj`, `possessive`, `renderRoast` and the word/grammar tables are all
 pure and unit-tested.
 
 ## Scoreboard & scoring
 
-| Category        | Bulgarian      | Scores |
-| --------------- | -------------- | ------ |
-| Ones … Sixes    | 1 … 6          | Sum of the dice showing that face (or 0) |
-| Two of a kind   | 2x             | Sum of **two** equal dice (you choose which pair) |
-| Three of a kind | 3x             | Sum of the **three** equal dice |
-| Four of a kind  | 4x             | Sum of the **four** equal dice |
-| Full house      | фул хаус       | A pair + a triple → **sum of all five dice** |
-| Small straight  | малка кента    | Exactly **1-2-3-4-5** → 15 |
-| Large straight  | голяма кента   | Exactly **2-3-4-5-6** → 20 |
-| General         | генерал        | All five dice equal → **50 + the dice total** |
-| Chance          | шанс           | Sum of all five dice |
+| Category | Bulgarian | Scores |
+| --- | --- | --- |
+| Ones … Sixes | 1 … 6 | Sum of the dice showing that face (or 0) |
+| Two of a kind | 2x | Sum of **two** equal dice (you choose which pair) |
+| Three of a kind | 3x | Sum of the **three** equal dice |
+| Four of a kind | 4x | Sum of the **four** equal dice |
+| Full house | фул хаус | A pair + a triple → **sum of all five dice** |
+| Small straight | малка кента | Exactly **1-2-3-4-5** → 15 |
+| Large straight | голяма кента | Exactly **2-3-4-5-6** → 20 |
+| General | генерал | All five dice equal → **50 + the dice total** |
+| Chance | шанс | Sum of all five dice |
 
 Each category is scored exactly once per player. When nothing qualifies you can
-**sacrifice** a category by recording it as 0.
-
-The point values live in one place — the `SCORING` object and the `candidates()`
-function near the top of [`game.js`](game.js) — so they're easy to tune later.
+**sacrifice** a category by recording it as 0. The point values live in one place
+— the `SCORING` object and the `candidates()` function near the top of `game.js` —
+so they're easy to tune, and the EV engine reads them rather than hard-coding its
+own copy.
 
 ## The greedy heuristic (`game.js`)
 
-The no-lookup brain used by the **Комар** (Easy) and **Мушица** (Random)
-personas, in pure functions (`aiChooseHolds`, `aiChooseCategory`):
+The no-lookup brain used by the **Комар** (Easy) and **Мушица** (Random) personas,
+in pure functions (`aiChooseHolds`, `aiChooseCategory`):
 
 - **Holds** the largest matching group of dice (chasing x-of-a-kind / general);
   with no pair, it keeps the high dice (5s and 6s). (Мушица skips even this and
   rethrows blindly.)
-- **Scores** the highest-value open category; if nothing scores, it sacrifices
-  in a fixed order (hardest combos first) — never a random forfeit.
+- **Scores** the highest-value open category; if nothing scores, it sacrifices in
+  a fixed order (hardest combos first) — never a random forfeit.
 
 It also doubles as the engine-free fallback if the EV table fails to load.
 
-## Running locally
-
-It's a static page — open `index.html`, or serve the folder:
-
-```bash
-python3 -m http.server 8000   # then visit http://localhost:8000
-```
-
 ## Tests
 
-All rules, the suggestion engine, the AI and the name generators live in
-dependency-free, DOM-free code in [`game.js`](game.js) and are covered by Node's
-built-in test runner (no `npm install` needed):
+All rules, the suggestion engine, the AI, the name generators and the EV engine
+live in dependency-free, DOM-free code and are covered by Node's built-in test
+runner (no `npm install` needed):
 
 ```bash
 node --test     # or: npm test
 ```
 
-The suite covers every scoring category (including multi-option suggestions and
-the worked examples `1 2 2 5 5` and `2 2 4 4 4`), dice rolling, score assignment
-and forfeit, turn rotation, game-over, ranking, hit-probabilities, risk
-detection, the AI's choices, and the Bulgarian agreement engine (adjective /
-possessive agreement, name coherence, roast rendering).
+The suite (`test/game.test.js`, `test/engine.test.js`) covers every scoring
+category (including multi-option suggestions and the worked examples `1 2 2 5 5`
+and `2 2 4 4 4`), dice rolling, score assignment and forfeit, turn rotation,
+game-over, ranking, hit-probabilities, risk detection, the AI's choices, the
+Bulgarian agreement engine, and the EV engine (table sanity, `evaluate`,
+luck/skill bookkeeping and the bot policies).
 
-The game screen itself (`index.html`) is verified separately with an ad-hoc
-jsdom smoke test during development; it is not part of the dependency-free CI
-suite.
+The game screen (`index.html`) is verified separately with an ad-hoc **jsdom**
+smoke test during development — driving the real controller to check the summary
+screen, the chart, the history list and the dev editor — but it is not part of the
+dependency-free CI suite.
 
 ## Deployment
 
@@ -296,9 +455,9 @@ already enabled for this repo, so a push publishes the latest build.
 ## Project layout
 
 ```
-index.html   # single-page app: military UI + controller
-game.js      # pure logic: scoring, heuristic AI, roasts, personas, ranks, BG engine
-engine.js    # EV engine: solver, evaluate(), luck/skill, calibrated bot policies
+index.html   # single-page app: military UI, game loop, summary, history, replay, dev editor
+game.js      # pure logic: scoring, heuristic AI, roasts, personas, ranks, rarity, BG engine
+engine.js    # EV engine: MDP solver, evaluate(), luck/skill decomposition, bot policies
 ev-table.js  # precomputed optimal value table (generated by tools/build-ev.js)
 tools/       # offline build + calibration scripts
 test/        # node:test unit tests (game + engine)
