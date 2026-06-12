@@ -559,6 +559,27 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .hstat span{ font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
 .histline{ font-size:11.5px; color:var(--gen-label); margin:4px 0; line-height:1.4; }
 .histline b{ color:var(--gen-brass-bright); }
+.histline .hmuted{ color:var(--gen-muted); }
+/* §2.1 career category table */
+.catcareer{ margin-top:9px; border-top:1px solid var(--gen-pill-line); padding-top:8px; }
+.catcareer summary{ cursor:pointer; list-style:none; font-family:var(--gen-font-display); font-weight:700; font-size:11px;
+  letter-spacing:.5px; text-transform:uppercase; color:var(--gen-brass); }
+.catcareer summary::-webkit-details-marker{ display:none; }
+.catcareer summary::before{ content:'▸ '; } .catcareer[open] summary::before{ content:'▾ '; }
+.catcareer .cc-head, .catcareer .cc-row{ display:grid; grid-template-columns:1fr 42px 46px 46px 46px; gap:4px; align-items:center; padding:3px 2px; font-variant-numeric:tabular-nums; }
+.catcareer .cc-head{ font-size:9px; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-muted); margin-top:6px; }
+.catcareer .cc-head span:not(:first-child), .catcareer .cc-row span:not(.cc-cat){ text-align:right; }
+.catcareer .cc-row{ font-size:11px; color:var(--gen-label); border-top:1px solid rgba(255,255,255,.04); }
+.catcareer .cc-cat{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.2px; color:var(--gen-text); }
+.catcareer .cc-leak{ color:var(--gen-muted); } .catcareer .cc-leak.bad{ color:#e8807a; font-weight:700; }
+/* §2.6 career coaching variant + §2.5 dossier delta line */
+.coachline.career{ background:rgba(232,195,86,.08); border-color:rgba(232,195,86,.35); }
+.coachline.career b{ color:var(--gen-brass-bright); }
+.dossierdelta{ margin:7px 0; padding:6px 10px; border-radius:8px; font-size:11.5px; color:var(--gen-muted);
+  background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); }
+/* §2.4 percentile tag on archive rows */
+.hg-pct{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:9px; background:rgba(255,255,255,.08); color:var(--gen-label); }
+.hg-pct.hi{ background:rgba(75,140,60,.25); color:#9bd17e; } .hg-pct.lo{ background:rgba(178,58,46,.22); color:#e88; }
 .histform{ display:flex; gap:4px; margin-top:6px; }
 .histform i{ width:18px; height:18px; display:grid; place-items:center; border-radius:4px; font-size:10px; font-weight:700; font-style:normal; }
 .histform i.w{ background:rgba(75,140,60,.3); color:#9bd17e; } .histform i.l{ background:rgba(178,58,46,.25); color:#e88; }
@@ -2459,6 +2480,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
+    dossierCtx = null;  // live game; openHistoryGame re-sets this after, for archived owner games
     // sel = -1: nobody expanded by default (tap a player to reveal details); chartOpen: graph expanded
     summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: -1, chartOpen: true };
     summary.meta = computeSummaryMeta();   // §1 winner/skill/luck leaders + category board
@@ -2841,6 +2863,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   function signed(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 0 : d); }
+  // signed delta vs a baseline, green when above / red when below (for dossier annotations)
+  function deltaTag(v, d, unit) {
+    var near = Math.abs(v) < (d ? Math.pow(10, -d) / 2 : 0.5);
+    return '<b class="' + (near ? 'nu' : v > 0 ? 'np' : 'nn') + '">' + signed(v, d) + (unit ? ' ' + unit : '') + '</b>';
+  }
 
   // a coloured stat line: laser-scannable label + body (body carries .np/.nn/.nu numbers)
   function stat(label, color, body) {
@@ -2930,6 +2957,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
     // §1.8 DA-16 (game) — one synthesised "work on X" prescription for THIS game
     html += '<div class="coachline">' + coachLine(fa) + '</div>';
+
+    // §2.5 DA-14 — viewing a past owner game: how this result compares to your average
+    if (dossierCtx && dossierCtx.career && pi === dossierCtx.ownerPi) {
+      var car = dossierCtx.career, parts = [];
+      parts.push('резултат ' + deltaTag(G.playerTotal(fp) - car.avgScore, 0, 'т.'));
+      parts.push('точност ' + deltaTag(fa.accuracy * 100 - car.avgAcc * 100, 0, '%'));
+      if (!fa.manual && car.avgLuck != null) parts.push('късмет ' + deltaTag(fa.luck - car.avgLuck, 0, 'т.'));
+      html += '<div class="dossierdelta">спрямо средното ти: ' + parts.join(' · ') + '</div>';
+    }
 
     // outstanding moves / costliest mistake (the blunder reads as a headline + detail line)
     if (fa.sharpest) html += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
@@ -3038,7 +3074,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   // ============================================================ ARCHIVE / HISTORY
-  var viewingHistory = false, histSnapshot = null;
+  var viewingHistory = false, histSnapshot = null, dossierCtx = null;
 
   function recTotal(sp) { var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
@@ -3070,13 +3106,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var winner = game.players.filter(function (p) { return total(p) === top; })[0];
     $('historyModal').classList.add('hidden');
     showGameOver(winner);
+    // §2.5 dossier context: viewing a PAST owner game → annotate its report with deltas
+    var oi = recOwnerIdx(rec);
+    dossierCtx = (oi >= 0 && !rec.players[oi].isAI) ? { ownerPi: oi, career: computeOwnerCareer() } : null;
     $('overBack').classList.remove('hidden'); $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
   }
   function exitHistoryGame(toArchive) {
     $('overModal').classList.add('hidden');
     $('overBack').classList.add('hidden'); $('playAgain').classList.remove('hidden');
     if (histSnapshot) { game = histSnapshot.game; moveLog = histSnapshot.moveLog; manualMode = histSnapshot.manualMode; summary = histSnapshot.summary; undoStack = histSnapshot.undo; histSnapshot = null; }
-    viewingHistory = false;
+    viewingHistory = false; dossierCtx = null;
     if (toArchive) openHistory();
   }
   $('overBack').onclick = function () { exitHistoryGame(true); };
@@ -3168,72 +3207,148 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('replayModal').onclick = function (e) { if (e.target === $('replayModal')) closeReplay(); };
 
   // owner trends: aggregate the flagged owner (when human) across games
-  function ownerOverview(games) {
+  function stdev(arr, mean) {
+    if (arr.length < 2) return 0;
+    var v = arr.reduce(function (s, x) { return s + (x - mean) * (x - mean); }, 0) / (arr.length - 1);
+    return Math.sqrt(v);
+  }
+  // least-squares slope of ys against their index (per-game trend); null if too few
+  function trendSlope(ys) {
+    var k = ys.length; if (k < 3) return null;
+    var sx = 0, sy = 0, sxx = 0, sxy = 0;
+    ys.forEach(function (y, i) { sx += i; sy += y; sxx += i * i; sxy += i * y; });
+    var den = k * sxx - sx * sx; return den ? (k * sxy - sx * sy) / den : 0;
+  }
+  // §2 owner dossier aggregates (cached per render). Reduces the per-category cube
+  // across the owner's games; honours ownerSkipped + AI exactly like the old overview.
+  function computeOwnerCareer() {
+    var games = loadHistory();
     var owned = games.filter(function (r) { var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
-      var ana = analyzeRec(r, oi);
-      return { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
-               general: (o.scores.general || 0) > 0, name: o.name };
-    }).filter(function (d) { return d.ana; }); // need analysis for trends
-    if (!data.length) {
+      return { rec: r, ana: analyzeRec(r, oi), total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
+               general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
+    }).filter(function (d) { return d.ana; });
+    if (!data.length) return null;
+    var n = data.length;
+    var scores = data.map(function (d) { return d.total; });
+    var avgScore = scores.reduce(function (s, x) { return s + x; }, 0) / n;
+    var avgAcc = data.reduce(function (s, d) { return s + d.ana.accuracy; }, 0) / n;
+    var diceData = data.filter(function (d) { return !d.manual; });
+    // §2.1 per-category mastery: reduce byCategory across games
+    var cat = {};
+    G.CATEGORIES.forEach(function (c) { cat[c.key] = { key: c.key, label: c.label, fills: 0, hits: 0, sum: 0, rec: 0, leak: 0 }; });
+    data.forEach(function (d) {
+      var bc = d.ana.byCategory || {};
+      Object.keys(bc).forEach(function (k) {
+        var cell = bc[k], t = cat[k]; if (!t) return;
+        t.fills++; if (cell.score > 0) { t.hits++; t.sum += cell.score; } if (cell.score > t.rec) t.rec = cell.score; t.leak += cell.leak;
+      });
+    });
+    var catList = G.CATEGORIES.map(function (c) {
+      var t = cat[c.key];
+      return { key: c.key, label: c.label, fills: t.fills, hitRate: t.fills ? t.hits / t.fills : 0,
+               avg: t.hits ? t.sum / t.hits : 0, rec: t.rec, avgLeak: t.fills ? t.leak / t.fills : 0 };
+    }).filter(function (c) { return c.fills; });
+    return {
+      data: data, n: n, scores: scores, avgScore: avgScore, scoreSd: stdev(scores, avgScore),
+      avgAcc: avgAcc, accSd: stdev(data.map(function (d) { return d.ana.accuracy * 100; }), avgAcc * 100),
+      accSlope: trendSlope(data.map(function (d) { return d.ana.accuracy * 100; })),
+      wins: data.filter(function (d) { return d.place === 1; }).length,
+      best: Math.max.apply(null, scores), avgPlace: data.reduce(function (s, d) { return s + d.place; }, 0) / n,
+      generals: data.filter(function (d) { return d.general; }).length,
+      avgLuck: diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null,
+      catList: catList,
+    };
+  }
+
+  function ownerOverview() {
+    var c = computeOwnerCareer();
+    if (!c) {
       return '<div class="histover"><div class="noowner"><div class="nohd">🤷 Няма досие на стопанина</div>'
         + 'Щабът не намира нито една битка с теб на боец №1. За да следим бойната ти форма, '
         + '<b title="В настройките включи „Използвай моето име“, или просто играй като боец №1 (★) — без да го пускаш AI.">влез в боя сам</b> '
         + '(★ боец №1, не AI). Тогава архивът ще почне да трупа графиката на величието ти.</div></div>';
     }
-    var n = data.length;
-    var wins = data.filter(function (d) { return d.place === 1; }).length;
-    var avgAcc = data.reduce(function (s, d) { return s + d.ana.accuracy; }, 0) / n;
-    var diceData = data.filter(function (d) { return !d.rec.manualMode; });
-    var avgLuck = diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null;
-    var best = data.reduce(function (m, d) { return d.total > m ? d.total : m; }, 0);
-    var avgScore = Math.round(data.reduce(function (s, d) { return s + d.total; }, 0) / n);
-    var generals = data.filter(function (d) { return d.general; }).length;
-    var avgPlace = data.reduce(function (s, d) { return s + d.place; }, 0) / n;
-    // favourite blunder: the category most often fingered as the biggest mistake
+    var n = c.n, data = c.data;
+    // favourite blunder still summarised here (the full leak table lives in §2.1 below)
     var bl = {};
     data.forEach(function (d) { var b = d.ana.blunder; if (b && b.cost < -0.5) { var k = b.chosenKey || b.turnCategory; if (k) bl[k] = (bl[k] || 0) + 1; } });
     var favBl = null, favN = 0; Object.keys(bl).forEach(function (k) { if (bl[k] > favN) { favN = bl[k]; favBl = k; } });
     var name = (settings.useOwnerName && settings.ownerName.trim()) || data[data.length - 1].name;
-    var rank = G.rankForAccuracy(avgAcc);
+    var rank = G.rankForAccuracy(c.avgAcc);
     var form = data.slice(-7).map(function (d) { return d.place === 1 ? '<i class="w">П</i>' : '<i class="l">' + d.place + '</i>'; }).join('');
 
     var h = '<div class="histover">';
     h += '<div class="oname">' + ownerTokenHTML(true) + esc(name) + '</div>';
     h += '<div class="histstats">'
       + '<div class="hstat"><b>' + n + '</b><span>битки</span></div>'
-      + '<div class="hstat"><b>' + wins + '</b><span>победи</span></div>'
-      + '<div class="hstat"><b>' + Math.round(avgAcc * 100) + '%</b><span>точност</span></div></div>';
-    h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * wins / n) + '%</b> · средно място <b>' + avgPlace.toFixed(1) + '</b></div>';
-    h += '<div class="histline">Личен рекорд: <b>' + best + '</b> т. · среден резултат <b>' + avgScore + '</b> т.'
-      + (avgLuck != null ? ' · среден късмет <b>' + (avgLuck >= 0 ? '+' : '') + avgLuck.toFixed(0) + '</b>' : '') + '</div>';
-    h += '<div class="histline">Хвърлени генерали: <b>' + generals + '</b> от ' + n + ' битки'
+      + '<div class="hstat"><b>' + c.wins + '</b><span>победи</span></div>'
+      + '<div class="hstat"><b>' + Math.round(c.avgAcc * 100) + '%</b><span>точност</span></div></div>';
+    h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * c.wins / n) + '%</b> · средно място <b>' + c.avgPlace.toFixed(1) + '</b></div>';
+    h += '<div class="histline">Личен рекорд: <b>' + c.best + '</b> т. · среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'
+      + (c.avgLuck != null ? ' · среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>' : '') + '</div>';
+    h += '<div class="histline">Хвърлени генерали: <b>' + c.generals + '</b> от ' + n + ' битки'
       + (favBl ? ' · любима издънка: <b>' + esc(CAT_LABEL[favBl] || favBl) + '</b> (×' + favN + ')' : '') + '</div>';
+    // §2.2 consistency (spread, not momentum) + §2.3 improvement slope
+    var consTag = c.scoreSd < 18 ? 'стабилен' : c.scoreSd > 32 ? 'нестабилен' : 'умерен';
+    h += '<div class="histline">Постоянство: <b>±' + Math.round(c.scoreSd) + ' т.</b> резултат · <b>±' + Math.round(c.accSd) + '%</b> точност <span class="hmuted">(' + consTag + ')</span></div>';
+    if (c.accSlope != null) {
+      var arrow = c.accSlope > 0.3 ? '↗' : c.accSlope < -0.3 ? '↘' : '→';
+      var word = c.accSlope > 0.3 ? 'качваш се' : c.accSlope < -0.3 ? 'спадаш' : 'стабилно';
+      h += '<div class="histline">Развитие: <b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b> <span class="hmuted">(' + word + ')</span></div>';
+    }
     h += '<div class="histline">Последна форма:</div><div class="histform">' + (form || '—') + '</div>';
+    // §2.6 career coaching synthesis (worst box by average EV-leak)
+    var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
+    if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎯 Кариерата ти изпуска най-много в <b>' + esc(worst.label) + '</b> — средно −' + worst.avgLeak.toFixed(1) + ' т. на игра. Това е боксът за трениране.</div>';
+    // §2.1 per-category mastery table (collapsed)
+    h += '<details class="catcareer"><summary>Категории (кариера)</summary>'
+      + '<div class="cc-head"><span>комбо</span><span>влиз.</span><span>средно</span><span>рекорд</span><span>EV-теч</span></div>';
+    c.catList.slice().sort(function (a, b) { return b.avgLeak - a.avgLeak; }).forEach(function (x) {
+      h += '<div class="cc-row"><span class="cc-cat">' + esc(x.label) + '</span>'
+        + '<span>' + Math.round(x.hitRate * 100) + '%</span>'
+        + '<span>' + (x.avg ? x.avg.toFixed(0) : '—') + '</span>'
+        + '<span>' + (x.rec || '—') + '</span>'
+        + '<span class="cc-leak' + (x.avgLeak > 1 ? ' bad' : '') + '">−' + x.avgLeak.toFixed(1) + '</span></div>';
+    });
+    h += '</details>';
     h += '</div>';
     return h;
   }
 
+  // §2.4 percentile of an owner game's score within the owner's score distribution to date
+  function ownerScorePercentile(scoresAll, val) {
+    if (scoresAll.length < 3) return null;                      // too few games to rank meaningfully
+    var below = scoresAll.filter(function (s) { return s < val; }).length;
+    var equal = scoresAll.filter(function (s) { return s === val; }).length;
+    return Math.round(100 * (below + 0.5 * equal) / scoresAll.length);
+  }
   function renderHistory() {
     var games = loadHistory().slice().reverse(); // newest first
-    $('historyOverview').innerHTML = ownerOverview(loadHistory());
+    $('historyOverview').innerHTML = ownerOverview();
     if (!games.length) {
       $('historyList').innerHTML = '<div class="noowner">Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.</div>';
       return;
     }
+    // owner score distribution (for the percentile tags), drift-as-it-grows by design
+    var career = computeOwnerCareer();
+    var ownerScores = career ? career.scores : [];
     var html = '<div class="histhd">Битки (' + games.length + ')</div>';
     games.forEach(function (rec) {
       var oi = recOwnerIdx(rec), skipped = oi < 0;
       var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
       var ptsPlayer = skipped ? top : rec.players[oi];
       var oTotal = recTotal(ptsPlayer), winR = !skipped && recPlacement(rec, oi) === 1;
+      var pct = !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
+      var pctTag = pct != null
+        ? ' <span class="hg-pct' + (pct >= 80 ? ' hi' : pct <= 20 ? ' lo' : '') + '" title="по-добра от ' + pct + '% от игрите ти">топ ' + (100 - pct) + '%</span>' : '';
       html += '<div class="histgame" data-id="' + esc(rec.id) + '">'
         + '<span class="hg-count" title="' + rec.players.length + ' бойци">' + rec.players.length + '</span>'
         + '<span class="hg-main"><span class="hg-top">' + esc(fmtDate(rec.ts))
         + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + esc(fmtTime(rec.ts)) + (rec.manualMode ? ' · отчет' : '') + '</span></span>'
+        + '<span class="hg-sub">' + esc(fmtTime(rec.ts)) + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
