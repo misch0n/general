@@ -9,6 +9,15 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
 ## Features
 
+- **РЕЖИМ КАЗАРМА (serious mode).** A settings toggle (default off, flippable
+  **even mid-game**) that trims the goofy layer down without removing it: rare-name
+  **bonuses and rarity notifications off**, **bets off** (setup *and* the end-screen
+  stakes), the **СЪВЕТ** optimal-play hint **off**, **callouts fire only now and
+  then** (and the marching order drops the commanding tense for a playful _„Бас
+  хващам, че не можеш да хвърлиш X“_), and the combo-tooltip **penalties are limited
+  to the two non-intrusive ones** — a points fine or a temporary zero-out of a
+  submitted combo — that **never freeze play**. The core (dice, scoring, manual
+  mode, the full analytics report) is untouched.
 - **Full-screen board.** Fills the viewport with a thin margin: scoreboard up
   top, a **medal divider**, and the **dice console** anchored at the bottom.
 - **Select-to-reroll.** The turn opens on the general's order with the dice
@@ -19,7 +28,9 @@ edition): camouflage field, classification banner, brass medals and stencil type
 - **Suggestions live inside the scoreboard.** After each throw every open
   category shows the points the dice would score as a tappable brass chip; combos
   fillable several ways (e.g. two pairs for `2x`) show **one chip per option**. A
-  small **×** forfeits a slot. The single best move is flagged with a ★.
+  small **×** forfeits a slot. **Tapping the combo box** submits it when there's a
+  single way to score; a multi-way combo nudges you (a small tooltip) to **tap the
+  exact number** instead.
 - **Marching orders.** Each turn opens with a brass comic **speech bubble** —
   _🎖 Майор, генералът ти заповядва да хвърлиш каре!_ — naming one of your still
   open categories to aim for (flavour only). Shows for ~4s.
@@ -44,9 +55,12 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
   None of them ever scratches at random — a forfeit happens only when nothing
   scores (Господ бог alone may scratch _strategically_).
-- **Optimal-play hints.** Toggle **СЪВЕТ** for a live order from HQ — _"Щабът
-  нарежда да стреляш по 1, 2, 3. Търсиш малка кента."_ — plus the **top-3 keeps
+- **Optimal-play hints.** Toggle **СЪВЕТ** for a live tip from HQ — _"Щабът
+  съветва да стреляш по 1, 2, 3. Търсиш малка кента."_ — plus the **top-3 keeps
   with their EVs** (off for serious play).
+- **Combo reference sheet.** A quick-glance **📋 Справочник комбинации** (from the
+  setup screen and the in-game ☰ menu) lists every category, what it needs and what
+  it scores.
 - **Per-game report (luck vs skill).** Each game is decomposed via the engine's
   value function into `final = par + luck + skill`, then dissected — with a built-in
   **„Какво е EV?“** explainer and all jargon in Bulgarian: **decision accuracy**

@@ -90,8 +90,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   font-size:14px; cursor:pointer; line-height:1; font-family:inherit; }
 .lval{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; color:var(--gen-canvas-locked); }
 .tile.done{ background:var(--gen-canvas-done); box-shadow:none; cursor:default; }
-.tile.best{ box-shadow:inset 0 0 0 2px var(--gen-brass), 0 0 12px rgba(200,166,75,.55), 0 2px 0 rgba(0,0,0,.3); }
-.tile.best::after{ content:'★'; position:absolute; top:-7px; right:-4px; font-size:14px; color:var(--gen-brass-bright); text-shadow:0 1px 2px rgba(0,0,0,.6); }
 .tile.flash{ animation:stamp var(--gen-dur-stamp) ease; }
 @keyframes stamp{ 0%{ box-shadow:inset 0 0 0 2px var(--gen-brass), 0 0 0 6px rgba(200,166,75,.5); } 100%{ box-shadow:inset 0 0 0 2px rgba(0,0,0,0); } }
 .tile.low.void .cname{ color:#7a6a4c; }
@@ -298,7 +296,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .evrolls .rarrow{ color:var(--gen-disabled); }
 
 /* AI persona subtitle in the header */
-.ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); margin-top:-2px; }
+.ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); }
+/* ribbons + AI persona share one row beneath the name (persona no longer pushes a row) */
+.pmeta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 
 /* setup: add-button, reorder arrows, manual mode */
 .addbtn{ width:100%; margin-top:4px; }
@@ -399,6 +399,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .fxbubble{ position:fixed; z-index:50; max-width:240px; background:var(--gen-brass-bright); color:var(--gen-ink);
   border:2px solid var(--gen-brass-stroke); border-radius:9px; padding:6px 10px; box-shadow:0 6px 18px rgba(0,0,0,.5);
   font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.3px; cursor:pointer; }
+/* small guide tooltip: "tap the exact number" for multi-way combos */
+.guidetip{ position:fixed; z-index:50; max-width:220px; background:var(--gen-ink); color:var(--gen-brass-bright);
+  border:1px solid var(--gen-brass-stroke); border-radius:8px; padding:6px 10px; box-shadow:0 6px 16px rgba(0,0,0,.55);
+  font-family:var(--gen-font-display); font-weight:600; font-size:11.5px; letter-spacing:.3px; }
 .combotip .shame{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); margin-bottom:5px; }
 .combotip .cdesc{ color:#2a230c; }
 .combotip .cfine{ margin-top:6px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); font-size:11px; letter-spacing:.3px; }
@@ -412,6 +416,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .hth{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:13px; margin:14px 0 6px; }
 .htlist{ margin:0 0 8px; padding-left:18px; }
 .htlist li{ font-size:12px; color:var(--gen-text); margin-bottom:5px; line-height:1.4; }
+/* combo reference sheet */
+.cssec{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:12px 0 6px; }
+.csrow{ display:flex; align-items:baseline; gap:8px; padding:6px 0; border-bottom:1px solid var(--gen-pill-line); }
+.cslab{ flex:none; width:78px; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.3px; font-size:12px; color:var(--gen-text); }
+.csdesc{ flex:1; font-size:11px; color:var(--gen-muted); line-height:1.35; }
+.csval{ flex:none; font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-brass-bright); white-space:nowrap; }
 
 /* device-owner token (seat #1) */
 .ownertok{ display:inline-grid; place-items:center; width:16px; height:16px; margin-right:5px; vertical-align:middle; flex:none;
@@ -593,7 +603,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="howtoBtn" class="btn">📖 Как се играе</button>
       <button id="settingsBtn" class="btn">⚙ Настройки</button>
     </div>
-    <button id="archiveBtn" class="btn addbtn">📜 Военен архив</button>
+    <div class="setup-actions">
+      <button id="combosBtn" class="btn">📋 Комбинации</button>
+      <button id="archiveBtn" class="btn">📜 Военен архив</button>
+    </div>
   </div>
 </div>
 
@@ -605,8 +618,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <button id="menuBtn" class="rank menubtn" title="Меню" aria-label="Меню"><span class="burger"></span></button>
     <span class="pinfo">
       <span id="curName" class="pn"></span>
-      <span id="curPersona" class="ppersona hidden"></span>
-      <span id="curRibbons" class="ribbons"></span>
+      <span class="pmeta">
+        <span id="curRibbons" class="ribbons"></span>
+        <span id="curPersona" class="ppersona hidden"></span>
+      </span>
     </span>
     <span class="totalbox">
       <span id="curTotal" class="ptotal">0</span>
@@ -616,7 +631,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   <div class="pstrip">
     <span id="pillWrap" style="display:contents"></span>
-    <button id="hintBtn" class="minibtn" title="Заповед от щаба (оптимален ход)">ЗАПОВЕД</button>
+    <button id="hintBtn" class="minibtn" title="Съвет от щаба (оптимален ход)">СЪВЕТ</button>
   </div>
 
   <div class="sheet">
@@ -653,6 +668,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   <div id="comboTip" class="combotip hidden"></div>
   <div id="fxBubble" class="fxbubble hidden"></div>
+  <div id="guideTip" class="guidetip hidden"></div>
   <div id="youLose" class="youlose hidden"><span>ГУБИШ!</span></div>
 </div>
 
@@ -702,6 +718,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <h2>Щаб</h2>
     <div class="setup-actions" style="flex-direction:column">
       <button id="menuHowto" class="btn">📖 Как се играе</button>
+      <button id="menuCombos" class="btn">📋 Справочник комбинации</button>
       <button id="menuArchive" class="btn">📜 Военен архив</button>
       <button id="menuSettings" class="btn">⚙ Настройки</button>
       <button id="menuRestart" class="btn">↺ Нов набор</button>
@@ -783,6 +800,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   </div>
 </div>
 
+<!-- combo reference sheet -->
+<div id="combosModal" class="overlay hidden">
+  <div class="modal">
+    <button class="x-close" id="combosClose">✕</button>
+    <h2>📋 Справочник комбинации</h2>
+    <div id="combosBody"></div>
+  </div>
+</div>
+
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
 <script src="engine.js"></script>
@@ -797,7 +823,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
-  var settings = { noBonus: false, noAdvice: false, censor: false, ownerName: '', useOwnerName: false };
+  // `barracks` (РЕЖИМ КАЗАРМА) trims the goofy layer — see the settings row
+  var settings = { noBonus: false, noAdvice: false, censor: false, barracks: false, ownerName: '', useOwnerName: false };
+  function fun() { return !settings.barracks; } // are the full goofy features on?
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   // ---------- persistent settings + game archive (localStorage) ----------
@@ -807,13 +835,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
 
   function saveSettings() {
-    var s = { noBonus: settings.noBonus, noAdvice: settings.noAdvice, censor: settings.censor,
+    var s = { noBonus: settings.noBonus, noAdvice: settings.noAdvice, censor: settings.censor, barracks: settings.barracks,
               ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
-    try { var s = JSON.parse(raw); ['noBonus', 'noAdvice', 'censor', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; }); } catch (e) {}
+    try { var s = JSON.parse(raw); ['noBonus', 'noAdvice', 'censor', 'barracks', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; }); } catch (e) {}
     G.setCensor(settings.censor);
   }
 
@@ -936,7 +964,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // build the rare-name brag bubble for a player (or null)
   function rarityBubbleEl(p) {
-    if (!p.tier || p.bubbleDismissed) return null;          // notify only the rarest ~10% of names
+    if (!p.tier || p.bubbleDismissed || settings.barracks) return null; // no rarity notifications in barracks
     var eff = settings.noBonus ? 0 : p.bonus;
     var bub = document.createElement('div');
     bub.className = 'rarebubble rt' + p.tier;                // colour = frequency tier
@@ -1064,10 +1092,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         card.appendChild(box);
       }
 
-      var bet = document.createElement('div'); bet.className = 'betline';
-      // the wager is fixed at draw — you're stuck with whatever you got
-      bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
-      card.appendChild(bet);
+      if (fun()) { // the stupid wager — hidden in barracks mode
+        var bet = document.createElement('div'); bet.className = 'betline';
+        bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
+        card.appendChild(bet);
+      }
 
       // rare-name brag bubble (dismissable); awards the bonus unless disabled
       var bub0 = rarityBubbleEl(p); if (bub0) card.appendChild(bub0);
@@ -1123,7 +1152,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.owner = !!p.owner; // the device-owner flag follows the player (token)
-      pl.bonus = settings.noBonus ? 0 : (p.bonus || 0); // rare-name starting bonus
+      pl.bonus = (settings.noBonus || settings.barracks) ? 0 : (p.bonus || 0); // rare-name starting bonus
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
       return pl;
@@ -1165,7 +1194,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
-    $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice);
+    syncHintBtn();
     document.querySelector('.dock').classList.toggle('hidden', manualMode);
     $('manualDock').classList.toggle('hidden', !manualMode);
     beginTurn();
@@ -1254,10 +1283,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (throwsLeft > 0) {
       var discard = dice.filter(function (v, i) { return !ev.best_keep[i]; });
       if (discard.length === 0) {
-        head = 'Щабът нарежда да спреш. Отчети ' + (G.ORDER_NAMES[ev.best_category.key] || ev.best_category.key) + '.';
+        head = 'Щабът съветва да спреш. Отчети ' + (G.ORDER_NAMES[ev.best_category.key] || ev.best_category.key) + '.';
       } else {
         var target = EV.bestTarget(p.scores, dice, ev.best_keep);
-        head = 'Щабът нарежда да стреляш по ' + discard.join(', ') + '. Търсиш ' + (G.ORDER_NAMES[target] || target) + '.';
+        head = 'Щабът съветва да стреляш по ' + discard.join(', ') + '. Търсиш ' + (G.ORDER_NAMES[target] || target) + '.';
       }
       // top-N keeps with their EVs
       alts = ev.keep_ranked.slice(0, 3).map(function (k, i) {
@@ -1266,7 +1295,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
           + ' <b>' + k.ev.toFixed(1) + '</b></span>';
       }).join('');
     } else {
-      head = 'Щабът нарежда да отчетеш ' + (G.ORDER_NAMES[ev.best_category.key] || ev.best_category.key) + '.';
+      head = 'Щабът съветва да отчетеш ' + (G.ORDER_NAMES[ev.best_category.key] || ev.best_category.key) + '.';
       alts = ev.category_ranked.slice(0, 3).map(function (c, i) {
         return '<span class="kr' + (i === 0 ? ' top' : '') + '">' + (CAT_LABEL[c.key] || c.key) + ' <b>' + c.ev.toFixed(1) + '</b></span>';
       }).join('');
@@ -1283,7 +1312,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
     else per.classList.add('hidden');
-    $('curTotal').textContent = total(p) - (fx.points || 0);
+    // temporary penalties trim the DISPLAYED total: a fine, plus any zeroed-out combos
+    var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
+    $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
@@ -1325,7 +1356,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var val = done ? p.scores[key] : pv.prev[key];
       var forf = (fx.forfeit || []).indexOf(key) >= 0;
       var isVoid = (done && p.scores[key] === 0) || forf;
-      var cls = 'tile up' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === key ? ' best' : '');
+      var cls = 'tile up' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '');
       var el = document.createElement('button');
       el.className = cls;
       var pts = forf ? '·' : (done ? (blanked.indexOf(key) >= 0 ? '·' : p.scores[key]) : (val > 0 ? val : '·'));
@@ -1344,7 +1375,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var forf = (fx.forfeit || []).indexOf(key) >= 0;
       var isVoid = (done && p.scores[key] === 0) || forf;
       var row = document.createElement('div');
-      row.className = 'tile low' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '') + (pv.best === key ? ' best' : '');
+      row.className = 'tile low' + (done || forf ? ' done' : '') + (isVoid ? ' void' : '');
       var html = '<span class="cname">' + c.label + '</span>';
       if (forf) {
         row.innerHTML = html + '<span class="lval">·</span>';
@@ -1354,16 +1385,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         row.innerHTML = html + '<span class="acts"></span>';
         var acts = row.querySelector('.acts');
         if (canScore) {
-          pv.cand[key].forEach(function (v) {
-            if (v > 0) {
-              var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v;
-              chip.onclick = function () { commitScore(key, v); };
-              acts.appendChild(chip);
-            }
+          var positives = pv.cand[key].filter(function (v) { return v > 0; });
+          positives.forEach(function (v) {
+            var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v;
+            chip.onclick = function (e) { e.stopPropagation(); commitScore(key, v); };
+            acts.appendChild(chip);
           });
           var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се');
-          x.onclick = function () { commitForfeit(key); };
+          x.onclick = function (e) { e.stopPropagation(); commitForfeit(key); };
           acts.appendChild(x);
+          // tap the box to submit — but a multi-way combo still needs the exact number
+          row.style.cursor = 'pointer';
+          row.onclick = function () {
+            if (positives.length === 1) commitScore(key, positives[0]);
+            else if (positives.length > 1) showGuide(row, 'Няколко начина — удари точното число.');
+            else showGuide(row, 'Нищо не става тук — откажи с ×.');
+          };
         }
       }
       attachTip(row.querySelector('.cname'), key, p.isAI && !manualMode);
@@ -1539,7 +1576,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('fire').disabled = true;
     // after an AI turn, hold the board a beat so players can read it
     var delay = !manualMode && p.isAI ? AI_VIEW_DELAY : END_DELAY;
-    if ((manualMode || !p.isAI) && G.isDisappointing(value, rerolledAll)) { showRoast(); delay = ROAST_MS + 250; }
+    if ((manualMode || !p.isAI) && G.isDisappointing(value, rerolledAll) && showRoast()) delay = ROAST_MS + 250;
     turnTimer = setTimeout(endTurn, delay);
   }
   var turnTimer = null;
@@ -1607,21 +1644,29 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ---------- speech bubbles ----------
   var ROAST_MS = 2600, ORDER_MS = 4000;
 
+  var BARRACKS_CALLOUT = 0.34; // in barracks, callouts fire only now and then
+
   // the general's order at turn start: aim for a still-open category
   function showOrder(player) {
     var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(player, c.key); });
     if (!open.length) return;
+    if (settings.barracks && Math.random() > BARRACKS_CALLOUT) return; // rarely, in barracks
     var cat = open[Math.floor(Math.random() * open.length)];
     var addressee = player.name.trim().split(/\s+/)[0]; // their military title
     var box = $('roast');
     box.className = 'roast show order';
-    box.innerHTML = '<span class="bubble">🎖 ' + esc(G.orderText(addressee, cat.key)) + '</span>';
+    // barracks drops the confusing commanding tense for a playful taunt
+    var text = settings.barracks
+      ? addressee + ', бас хващам, че не можеш да хвърлиш ' + (G.ORDER_NAMES[cat.key] || cat.key) + '!'
+      : G.orderText(addressee, cat.key);
+    box.innerHTML = '<span class="bubble">🎖 ' + esc(text) + '</span>';
     box.querySelector('.bubble').onclick = clearRoast; // tap to dismiss
     clearTimeout(roastTimer);
     roastTimer = setTimeout(clearRoast, ORDER_MS);
   }
 
   function showRoast() {
+    if (settings.barracks && Math.random() > BARRACKS_CALLOUT) return false; // rarely, in barracks
     var line = G.genderFill(G.ROASTS.flop[roastIx % G.ROASTS.flop.length], G.currentPlayer(game).gender);
     roastIx++;
     var box = $('roast');
@@ -1630,6 +1675,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     box.querySelector('.bubble').onclick = clearRoast; // tap to dismiss
     clearTimeout(roastTimer);
     roastTimer = setTimeout(clearRoast, ROAST_MS);
+    return true;
   }
   function clearRoast() { var b = $('roast'); b.className = 'roast'; b.innerHTML = ''; clearTimeout(roastTimer); }
 
@@ -1678,6 +1724,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     }
     return $('medals');                            // shuffle / youlose → the board middle
   }
+  var guideTimer = null;
+  function showGuide(anchor, text) {
+    var g = $('guideTip'); g.textContent = text; g.classList.remove('hidden');
+    var r = anchor.getBoundingClientRect();
+    g.style.left = Math.min(Math.max(8, r.left + r.width / 2 - g.offsetWidth / 2), window.innerWidth - g.offsetWidth - 8) + 'px';
+    var above = r.top - g.offsetHeight - 6;
+    g.style.top = (above >= 8 ? above : r.bottom + 6) + 'px';
+    clearTimeout(guideTimer);
+    guideTimer = setTimeout(function () { g.classList.add('hidden'); }, 1900);
+  }
   function showFxBubble(text, anchor) {
     var b = $('fxBubble');
     b.textContent = text;
@@ -1711,23 +1767,27 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var diceMode = !manualMode && dice.length === G.DICE_COUNT && !awaitingRoll;
     var freeIdx = []; for (var i = 0; i < remaining; i++) if (!usedIdx[i]) freeIdx.push(i);
 
+    // barracks keeps only the two NON-INTRUSIVE penalties (a fine, or a temporary
+    // zero-out of a submitted combo) — they never lock the board, so play goes on.
     var pool = ['points'];                              // a fine always stacks
-    if (!usedHide[reqKey]) pool.push('hideReq');
-    if (hideK.length) pool.push('hideRand');
     if (filledK.length) pool.push('blank');
-    if (openK.length) pool.push('forfeit');
-    pool.push('shuffle');
-    if (!hasPretend) pool.push('pretend');
-    if (!hasLose) pool.push('youlose');
-    if (diceMode && remaining > 0) pool.push('removeDice');
-    if (diceMode && freeIdx.length) pool.push('changeDice');
+    if (fun()) {
+      if (!usedHide[reqKey]) pool.push('hideReq');
+      if (hideK.length) pool.push('hideRand');
+      if (openK.length) pool.push('forfeit');
+      pool.push('shuffle');
+      if (!hasPretend) pool.push('pretend');
+      if (!hasLose) pool.push('youlose');
+      if (diceMode && remaining > 0) pool.push('removeDice');
+      if (diceMode && freeIdx.length) pool.push('changeDice');
+    }
 
     var t = pool[Math.floor(Math.random() * pool.length)];
     var pen = { type: t };
-    if (t === 'points') { pen.points = Math.random() < 0.18 ? 9999999 : 3 + Math.floor(Math.random() * 45); pen.desc = 'Глоба: −' + pen.points + ' точки!'; }
+    if (t === 'points') { pen.points = (fun() && Math.random() < 0.18) ? 9999999 : 3 + Math.floor(Math.random() * 45); pen.desc = 'Глоба: −' + pen.points + ' точки!'; }
     else if (t === 'hideReq') { pen.key = reqKey; pen.desc = 'Скрих ти полето „' + catLabel(reqKey) + '“.'; }
     else if (t === 'hideRand') { pen.key = hideK[Math.floor(Math.random() * hideK.length)]; pen.desc = 'Скрих ти полето „' + catLabel(pen.key) + '“.'; }
-    else if (t === 'blank') { pen.key = filledK[Math.floor(Math.random() * filledK.length)]; pen.desc = 'Изтрих ти точките от „' + catLabel(pen.key) + '“.'; }
+    else if (t === 'blank') { pen.key = filledK[Math.floor(Math.random() * filledK.length)]; pen.desc = 'Нулирах ти временно „' + catLabel(pen.key) + '“ (−' + (p.scores[pen.key] || 0) + ' т.).'; }
     else if (t === 'forfeit') { pen.key = openK[Math.floor(Math.random() * openK.length)]; pen.desc = 'Жертвам ти „' + catLabel(pen.key) + '“.'; }
     else if (t === 'shuffle') { pen.order = { upper: shuffled(boardKeys('upper')), lower: shuffled(boardKeys('lower')) }; pen.desc = 'Разбърках ти таблото.'; }
     else if (t === 'changeDice') { pen.index = freeIdx[Math.floor(Math.random() * freeIdx.length)]; pen.face = 1 + Math.floor(Math.random() * 6); pen.desc = 'Смених ти един зар.'; }
@@ -1771,7 +1831,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       else if (q.type === 'pretend') pretend = true;
       else if (q.type === 'youlose') lose = true;
     });
-    if (penalties.length) f.lock = true;
+    // only INTRUSIVE penalties freeze play; a fine or a temporary zero-out don't
+    if (penalties.some(function (q) { return q.type !== 'points' && q.type !== 'blank'; })) f.lock = true;
     if (points) f.points = points;
     if (hide.length) f.hide = hide;
     if (blank.length) f.blank = blank;
@@ -1824,6 +1885,29 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('howtoClose').onclick = function () { $('howtoModal').classList.add('hidden'); };
   $('howtoModal').onclick = function (e) { if (e.target === $('howtoModal')) $('howtoModal').classList.add('hidden'); };
 
+  // ---------- combo reference sheet (quick-glance scoring table) ----------
+  var COMBO_SCORE = {
+    ones: '1 × брой', twos: '2 × брой', threes: '3 × брой', fours: '4 × брой', fives: '5 × брой', sixes: '6 × брой',
+    twoKind: 'сбор на 2-те', threeKind: 'сбор на 3-те', fourKind: 'сбор на 4-те', fullHouse: 'сбор на петте',
+    smallStraight: '15 т.', largeStraight: '20 т.', general: '50 + сбора', chance: 'сбор на петте',
+  };
+  function buildComboSheet() {
+    function rows(group) {
+      return G.CATEGORIES.filter(function (c) { return c.group === group; }).map(function (c) {
+        return '<div class="csrow"><span class="cslab">' + esc(c.label) + '</span>'
+          + '<span class="csdesc">' + esc(G.COMBO_DESC[c.key] || '') + '</span>'
+          + '<span class="csval">' + esc(COMBO_SCORE[c.key] || '') + '</span></div>';
+      }).join('');
+    }
+    return '<div class="cssec">Горна секция</div>' + rows('upper')
+      + '<div class="cssec">Долна секция</div>' + rows('lower');
+  }
+  function openCombos() { $('combosBody').innerHTML = buildComboSheet(); $('combosModal').classList.remove('hidden'); }
+  $('combosBtn').onclick = openCombos;
+  $('combosClose').onclick = function () { $('combosModal').classList.add('hidden'); };
+  $('combosModal').onclick = function (e) { if (e.target === $('combosModal')) $('combosModal').classList.add('hidden'); };
+  $('menuCombos').onclick = function () { $('menuModal').classList.add('hidden'); openCombos(); };
+
   $('menuBtn').onclick = function () { $('menuModal').classList.remove('hidden'); };
   $('menuClose').onclick = function () { $('menuModal').classList.add('hidden'); };
   $('menuModal').onclick = function (e) { if (e.target === $('menuModal')) $('menuModal').classList.add('hidden'); };
@@ -1839,9 +1923,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   };
 
   // ---------- settings (with a secret developer mode) ----------
+  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice || settings.barracks); }
   var SETTINGS_ROWS = [
+    // РЕЖИМ КАЗАРМА — trims the goofy layer (callouts/bonuses/bets/notifications/
+    // advice off; tooltips kept but penalties softened). Toggleable even in-game.
+    { key: 'barracks', label: 'Режим казарма (сериозен режим)', onChange: function () {
+        if (game) { syncHintBtn(); renderAll(); }
+        if (!$('setup').classList.contains('hidden')) renderSetup();
+      } },
     { key: 'noBonus', label: 'Изключи бонусите за редки имена', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
-    { key: 'noAdvice', label: 'Изключи съветите в игра', onChange: function () { if (game) { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice); renderAll(); } } },
+    { key: 'noAdvice', label: 'Изключи съветите в игра', onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
     // ON = censor: drop NSFW words and use only the SFW set (off by default)
     { key: 'censor', label: 'Цензура — само прилични имена', onChange: function () {
         G.setCensor(settings.censor);
@@ -2167,10 +2258,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('tabStand').classList.toggle('hidden', !anyAnalysis);
     $('overUndo').classList.toggle('hidden', !manualMode || !undoStack.length);
 
-    // bets (stakes) — unchanged in both modes
-    var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
-    others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
-    $('betMsgs').innerHTML = msgs;
+    // bet stakes — hidden in barracks mode
+    if (fun()) {
+      var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
+      others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
+      $('betMsgs').innerHTML = msgs;
+    } else $('betMsgs').innerHTML = '';
 
     renderSummary();
     $('overModal').classList.remove('hidden');
