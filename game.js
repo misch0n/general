@@ -957,13 +957,13 @@
   // post-game analysis (accuracy / aggression / blunder severity / luck). The
   // checks are ordered most-specific first.
   var PLAYSTYLES = {
-    surgeon:  { name: 'Хирургът',     color: '#e8c356', desc: 'Точен, хладнокръвен, без излишни рискове.' },
-    recruit:  { name: 'Новобранецът', color: '#b39ddb', desc: 'Още учи кой зар за какво е.' },
-    gambler:  { name: 'Комарджията',  color: '#e05545', desc: 'Гони големите комбинации на всяка цена.' },
-    clerk:    { name: 'Чиновникът',   color: '#6fa8e8', desc: 'Прибира сигурното и спи спокойно.' },
-    stuntman: { name: 'Каскадьорът',  color: '#e8843a', desc: 'Грешките му са зрелищни.' },
-    lucky:    { name: 'Късметлията',  color: '#9bd17e', desc: 'Заровете го обичат повече, отколкото заслужава.' },
-    soldier:  { name: 'Боецът',       color: '#cdc9a8', desc: 'Стабилен среден кадър.' },
+    surgeon:  { name: 'Хирург',     color: '#e8c356', desc: 'Точен, хладнокръвен, без излишни рискове.' },
+    recruit:  { name: 'Новобранец', color: '#b39ddb', desc: 'Още учи кой зар за какво е.' },
+    gambler:  { name: 'Комарджия',  color: '#e05545', desc: 'Гони големите комбинации на всяка цена.' },
+    clerk:    { name: 'Чиновник',   color: '#6fa8e8', desc: 'Прибира сигурното и спи спокойно.' },
+    stuntman: { name: 'Каскадьор',  color: '#e8843a', desc: 'Грешките му са зрелищни.' },
+    lucky:    { name: 'Късметлия',  color: '#9bd17e', desc: 'Заровете го обичат повече, отколкото заслужава.' },
+    soldier:  { name: 'Боец',       color: '#cdc9a8', desc: 'Стабилен среден кадър.' },
   };
   function playstyleFor(a) {
     if (!a) return null;
