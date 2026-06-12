@@ -176,6 +176,47 @@ test('analyzeGame deep metrics: stages, luck split, zero-outs, severity, aggress
   assert.ok(st && st.name && /^#/.test(st.color));
 });
 
+test('byCategory cube: one cell per filled category, score/leak/optimal coherent', function () {
+  var seed = 7777;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  var game = simulateLoggedGame(rng);
+  var a = EV.analyzeGame(game.turns);
+  var keys = Object.keys(a.byCategory);
+  assert.strictEqual(keys.length, game.turns.length);          // one cell per turn (1:1 with category)
+  keys.forEach(function (k) {
+    var c = a.byCategory[k];
+    assert.strictEqual(c.category, k);
+    assert.ok(c.leak >= -1e-9, 'leak is EV given up (>=0): ' + c.leak);
+    assert.strictEqual(c.optimal, c.leak < 0.05);
+    assert.ok(typeof c.score === 'number');
+  });
+  // manual games still produce the cube (luck null)
+  var manual = game.turns.map(function (t) { return { mask: t.mask, dice: t.rolls[t.rolls.length - 1], category: t.category }; });
+  var m = EV.analyzeManualGame(manual);
+  assert.strictEqual(Object.keys(m.byCategory).length, manual.length);
+  assert.strictEqual(m.byCategory[manual[0].category].luck, null);
+});
+
+test('marginSplit: ΔLuck + ΔSkill sums exactly to the point margin', function () {
+  var seed = 2024;
+  var rng = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  var A = EV.analyzeGame(simulateLoggedGame(rng).turns);
+  var B = EV.analyzeGame(simulateLoggedGame(rng).turns);
+  var margin = Math.round(A.projectedFinal - B.projectedFinal);
+  var s = EV.marginSplit(A, B, margin);
+  assert.strictEqual(s.luck + s.skill, margin);               // parts reconcile to the visible margin
+  assert.strictEqual(s.margin, margin);
+  // identical analyses, zero margin → no luck and no skill gap
+  var same = EV.marginSplit(A, A, 0);
+  assert.strictEqual(same.skill, 0);
+  assert.strictEqual(same.luck, 0);
+  // manual side → luck unknown, whole margin attributed to the (skill) term
+  var man = EV.analyzeManualGame(simulateLoggedGame(rng).turns.map(function (t) { return { mask: t.mask, dice: t.rolls[t.rolls.length - 1], category: t.category }; }));
+  var ms = EV.marginSplit(man, B, 9);
+  assert.strictEqual(ms.luck, null);
+  assert.strictEqual(ms.skill, 9);
+});
+
 test('analyzeManualGame: optimal picks score 100%, a bad pick is charged', function () {
   // category-only analysis (manual mode logs just final dice + the pick)
   var seed = 31337;

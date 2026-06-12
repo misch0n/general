@@ -367,12 +367,22 @@
     turnDetails.forEach(function (td) {
       if (td.score === 0) { zeroOuts.total++; td.forcedZero ? zeroOuts.forced++ : zeroOuts.unforced++; }
     });
+    // §0.1 the per-category cube cell: each turn fills exactly one category, so this
+    // is just turnDetails re-keyed by category — the atom every per-category view reduces.
+    // score = points placed, leak = EV left on the table (≥0), optimal = was it the best fill.
+    var byCategory = {};
+    turnDetails.forEach(function (td) {
+      byCategory[td.category] = {
+        category: td.category, score: td.score, leak: -td.skill,
+        luck: (typeof td.luck === 'number' ? td.luck : null), optimal: td.skill > -EPS,
+      };
+    });
     return {
       decisions: decisions, nDecisions: decisions.length, turns: turnDetails,
       accuracy: decisions.length ? optimalCount / decisions.length : 1,
       blunder: blunder, sharpest: sharpest, topMoves: topMoves,
       severity: sev, mistakes: mistakes, leak: costs, leakCounts: counts,
-      stages: stages, zeroOuts: zeroOuts,
+      stages: stages, zeroOuts: zeroOuts, byCategory: byCategory,
     };
   }
 
@@ -448,6 +458,21 @@
     out.avgLostPerDecision = decisions.length ? -skill / decisions.length : 0;
     out.avgLostPerTurn = turns.length ? -skill / turns.length : 0;
     return out;
+  }
+
+  // §0.2 margin decomposition: M = points(A) − points(B) = ΔLuck + ΔSkill (par is
+  // constant and cancels). Returns integer parts that SUM EXACTLY to the visible
+  // point margin (the rounding remainder is absorbed into the larger-magnitude
+  // term), or { luck: null } when luck is unknown (either side a manual game).
+  function marginSplit(anaA, anaB, pointsMargin) {
+    if (!anaA || !anaB) return null;
+    var M = Math.round(pointsMargin);
+    var dSkill = (anaA.skill || 0) - (anaB.skill || 0);
+    var luckKnown = !anaA.manual && !anaB.manual && typeof anaA.luck === 'number' && typeof anaB.luck === 'number';
+    if (!luckKnown) return { luck: null, skill: M, margin: M };
+    var rl = Math.round(anaA.luck - anaB.luck), rs = Math.round(dSkill), rem = M - rl - rs;
+    if (Math.abs(dSkill) >= Math.abs(anaA.luck - anaB.luck)) rs += rem; else rl += rem;
+    return { luck: rl, skill: rs, margin: M };
   }
 
   // ============================================================ §3 bot policy
@@ -533,7 +558,7 @@
     setTable: setTable, hasTable: hasTable, par: par, vstar: vstar,
     maskOfScores: maskOfScores, evaluate: evaluate, evaluateMask: evaluateMask, catBit: catBit,
     nodeValue: nodeValue, keepValue: keepValue, keepPositions: keepPositions,
-    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame, analyzeManualGame: analyzeManualGame, bestTarget: bestTarget,
+    analyzeTurn: analyzeTurn, analyzeGame: analyzeGame, analyzeManualGame: analyzeManualGame, marginSplit: marginSplit, bestTarget: bestTarget,
     softmaxPick: softmaxPick, botCategory: botCategory, botKeep: botKeep,
   };
 });
