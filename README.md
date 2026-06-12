@@ -57,6 +57,10 @@ Two `localStorage` keys persist everything: `general:settings:v1` and
   a separate scoreboard. The current player's board is shown; the rest are
   reachable by tapping their **player pill**. **Drag the grip (⠿)** to reorder
   seats to match the real table.
+- **Resume an unfinished battle.** The game is snapshotted to `localStorage`
+  (`general:resume:v1`) at every turn boundary; reload (or come back later) and
+  you're offered **Продължи / Откажи** — resume rebuilds the state and continues
+  from that turn, abort discards it. Cleared automatically when a game ends.
 
 ## The goofy layer — РЕЖИМ КАЗАРМА
 
@@ -162,17 +166,17 @@ sum *exactly* to the visible margin.
 
 ### Headline, verdict & badges
 
-- **Hero line** (`renderWinHeadline`): *Иван спечели с 25 т.*, with the margin
-  **split** against the runner-up — *+18 умение / +7 късмет*.
+- **Hero line** (`renderWinHeadline`): the winner's name on its own line, then
+  *спечели с N точки*, with the margin **split** against the runner-up below
+  (*+18 умение / +7 късмет*).
 - **Verdict**, anchored on the field's **skill leader** (not necessarily 2nd on
   points): **Тотална победа** (won on skill *and* luck), **Заслужена победа** (won
   on skill, with or against the dice), or **Късметлийска победа** when the points
   winner wasn't the best player — and then it *quotes the exact luck margin that
   overturned it* (e.g. *+9 т. късмет обърнаха мача*).
-- **Badges** (`renderWinBadges`): **🥇 Победител** (points), **🎯 Тактик** (skill
-  leader), a **🍀 luck roast** (being lucky is a jab, not an honour — *Glezenik na
-  zarovete*), and **📋 Майстор на категориите** for the player holding the most
-  category records.
+- **Badges** (`renderWinBadges`) — small accents under the headline: **🥇 Победител**
+  (points), **🎯 Тактик** (skill leader), **🍀 Късметлия** (luckiest), and
+  **📋 Майстор** for the player holding the most category records.
 
 ### Layout
 
@@ -188,23 +192,22 @@ sum *exactly* to the visible margin.
   - **Swing annotations** (`swingsFor`): lead-change rings and big-jump / Генерал
     dots; when a player is highlighted, their swings get a **`+X т.`** label.
   - The collapse state survives re-renders via `summary.chartOpen`.
-- **Collapsed player rows.** Each standings row is a coloured **rank title** (the
-  rank itself is tinted in the player's colour — that *is* their colour key, so
-  there's no separate dot), the name, and the value (points, or optimal % on the
-  skill tab). **Tap a name** to expand that player's full report **inline, right
-  between the rows**; tap again to collapse. Nothing is expanded by default.
-- **Four tabs.** **Класиране** (points) and **Умение** (re-orders by decision
-  accuracy; chart switches to optimal %) share the chart + rows. **Късмет**
-  (`renderLuckPanel`) is a luck lens — per player **raw · luck (±) · luck-adjusted
-  (= score − luck)**, the points-native skill number; hidden in manual mode.
-  **Категории** (`renderCatBoard`) is the cross-player view, laid out as the
-  **in-game scoreboard** (6 upper tiles + 8 lower): each category cell shows the
-  **% of players who scored it** and the **highest result**, and is **tinted in
-  the colour of the player who holds that record** — domination is visible at a
-  glance, and the category-master sub-award names whoever holds the most.
-- **Share card** (`shareSelected`): a 📤 button renders the **selected** player's
-  result to a PNG (canvas) — headline, rank, key stats and a roast — via the Web
-  Share API on mobile, download elsewhere.
+- **Player rows in every tab.** Each row is a coloured **rank title** (the rank is
+  tinted in the player's colour — that *is* their colour key, so there's no
+  separate dot), the name, and a per-tab value. **Tap a name** to expand that
+  player's full report **inline, between the rows** (reachable from any tab); tap
+  again to collapse. Nothing is expanded by default.
+- **Four tabs**, each keeping the rows and swapping the top visual + the row value:
+  **Класиране** (points, points chart), **Умение** (re-orders by accuracy, optimal
+  % + optimal-play chart), **Късмет** (a cumulative-luck-over-turns chart with a
+  zero baseline; rows sort by luck and show *резултат · късмет · без късмет* =
+  score − luck; hidden in manual), and **Категории** (`renderCatBoard`) — the
+  cross-player board laid out as the **in-game scoreboard** (6 upper + 8 lower
+  tiles): each cell shows the **% who scored it** and the **highest result**,
+  **tinted in the record-holder's colour**, plus the category-master sub-award.
+- **Share** (`shareSelected`): the 📤 button captures the **actual summary panel as
+  shown** (including an expanded player) to a PNG via DOM → SVG `<foreignObject>` →
+  canvas, falling back to a hand-drawn card if the browser taints the canvas.
 
 ### Per-player report (`renderReport`)
 
@@ -317,33 +320,36 @@ or the whole archive **cleared from settings** (with a confirm).
 
 - **The archive list.** Each row is a **player-count square** + the game's **date**
   (with a 👑 next to it if the owner won, or a ⊘ if the owner was skipped) on top,
-  the **24-hour time** below, then the owner's score and the play / delete
-  buttons (`renderHistory`). Owner games carry a **percentile tag** (*топ 15%*)
-  ranking that score against your distribution to date — it **drifts as the
+  the **24-hour time** below, then the owner's score and the replay / **export** /
+  delete buttons (`renderHistory`). Owner games carry a **percentile tag** (*топ
+  15%*) ranking that score against your distribution to date — it **drifts as the
   archive grows**, by design.
+- **Export / import** (share local history across devices). Any game exports to a
+  JSON file (from its archive row, or the summary when opened from history). The
+  **📥 Импортирай игра** flow takes pasted JSON, validates it, asks **which player
+  is you** (or none), and files it sorted by timestamp; errors abort with an inline
+  notice. So a game tracked on someone else's phone can be merged into your dossier.
 - **Owner dossier** (`ownerOverview` / `computeOwnerCareer`, owner-flagged human
-  games only, honouring `ownerSkipped`). Reduces the per-category cube across your
-  games into a retrospective dossier: battles, wins, win-rate, average decision
-  accuracy → a rank, personal best, average score and luck, generals, your
-  **favourite blunder**, average place and **recent form**, plus
-  - **Consistency** — the spread (std-dev) of your score and accuracy (стабилен /
-    нестабилен), distinct from recent form's momentum.
-  - **Improvement slope** — the least-squares trend of your accuracy over time
-    (*+0.8%/битка ↗*), answering "am I getting better".
-  - **Career category table** (collapsible) — per category your **hit rate · avg ·
-    record · average EV-leak**, sorted worst-leak first (the coaching signal).
-  - **Career coaching line** — the single box you systematically misplay across
-    your whole history.
-
-  If no analysable owner games exist yet, a goofy *„Няма досие на стопанина“*
-  notice explains you need to play as the owner (★, not an AI) to start a dossier.
+  games only, honouring `ownerSkipped`) — a **collapsible** panel showing just your
+  name + battles / wins / accuracy until expanded. The ★ token is gone and the name
+  falls back to **„Старшина“** when no battle-name is set. Expanded it reduces the
+  per-category cube across your games into: win-rate, a rank, personal best, average
+  score and luck, generals, **favourite blunder**, **consistency** (score/accuracy
+  spread), an **improvement slope** of accuracy over time, the category section as
+  the **end-game board grid** (hit % + personal record, tinted red by EV-leak), a
+  **career-averages** block mirroring every per-player report stat (luck, decisions,
+  изтичане, издънки, късмет под лупа, нули, по етапи — all updating as games accrue),
+  and a **career coaching line**. If no analysable owner games exist yet, a goofy
+  *„Няма досие на стопанина“* notice explains you need to play as the owner.
 - **Replay — Бойна хроника.** Every game has a scrubbable, auto-playing
   turn-by-turn / roll-by-roll viewer (`buildReplayActions` flattens the move log
-  into atomic roll/commit actions in true round-robin order). It has CSS-drawn
-  transport controls (play / pause / step / restart), a military **tempo selector**
-  (*Походно · Боен ход · Щурмово · Блиц*) and an **action slider** that jumps to any
-  individual roll or commit. The board fills and the dice (kept ones marked)
-  update as it plays, narrated in the comic register (*Открива огън — залп 2/3!*).
+  into atomic roll/commit actions in true round-robin order). CSS-drawn transport
+  controls (play / pause / step / restart), a **speed gear** that clicks through
+  x0.5 · x1 · x1.5 · x2 · x4 over a 1 s/move base (x1 white, each other gear its own
+  colour), and an **action slider** that jumps to any roll or commit. The board
+  fills and the dice that get **re-rolled** light up (matching the select-to-reroll
+  flow); a static **Хn/14 · pts** line tracks the turn. A **filter** dropdown left
+  of the name replays a single player's turns (Всички / per player).
 
 ## Settings & the secret dev editor
 
