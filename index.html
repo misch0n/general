@@ -590,6 +590,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histgame .hg-sub{ font-size:10px; color:var(--gen-muted); margin-top:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
+.histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; font-size:12px; }
+.histgame .hg-exp:hover{ border-color:var(--gen-brass); }
+.importarea{ width:100%; min-height:120px; resize:vertical; font-family:monospace; font-size:11px; color:var(--gen-text);
+  background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:8px; padding:8px 10px; }
+.importarea:focus{ outline:none; border-color:var(--gen-brass); }
+.importowner{ margin-top:10px; }
+.importowner .iolbl{ font-family:var(--gen-font-display); font-weight:700; font-size:12px; color:var(--gen-brass); margin-bottom:5px; }
+.importowner .iorow{ display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:13px; color:var(--gen-text); cursor:pointer; }
+.importerr{ margin-top:9px; padding:8px 10px; border-radius:8px; font-size:12px; color:#e8807a; background:rgba(178,58,46,.16); border:1px solid var(--gen-alert-line); }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
 /* end-game / history progress chart */
 .progchart{ margin:10px 0 4px; padding:10px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--gen-pill-line); }
@@ -851,6 +860,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
       <button id="shareCard" class="btn">📤 Сподели</button>
+      <button id="overExport" class="btn hidden">📤 Експорт</button>
       <button id="overBack" class="btn hidden">← Архив</button>
       <button id="overUndo" class="btn hidden">ОПА!</button>
       <button id="playAgain" class="btn primary">↻ Нов набор</button>
@@ -909,6 +919,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <h2>📜 Военен архив</h2>
     <div id="historyOverview"></div>
     <div id="historyList"></div>
+    <div class="setup-actions"><button id="importBtn" class="btn">📥 Импортирай игра</button></div>
+  </div>
+</div>
+
+<!-- import a game from pasted JSON (games tracked on another device) -->
+<div id="importModal" class="overlay hidden">
+  <div class="modal" style="max-width:340px">
+    <button class="x-close" id="importClose">✕</button>
+    <h2>📥 Импортирай игра</h2>
+    <p class="ht">Постави JSON-а на играта тук:</p>
+    <textarea id="importText" class="importarea" placeholder='{ "players": […], "moveLog": […] }'></textarea>
+    <div id="importOwner" class="importowner hidden"></div>
+    <div id="importErr" class="importerr hidden"></div>
+    <div class="setup-actions">
+      <button id="importCancel" class="btn">Отказ</button>
+      <button id="importDo" class="btn primary">Провери</button>
+    </div>
   </div>
 </div>
 
@@ -2483,7 +2510,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
-    dossierCtx = null;  // live game; openHistoryGame re-sets this after, for archived owner games
+    dossierCtx = null; currentHistRec = null; $('overExport').classList.add('hidden'); // live game (history re-sets after)
     // sel = -1: nobody expanded by default (tap a player to reveal details); chartOpen: graph expanded
     summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: -1, chartOpen: true };
     summary.meta = computeSummaryMeta();   // §1 winner/skill/luck leaders + category board
@@ -2509,8 +2536,45 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('overModal').classList.remove('hidden');
   }
 
-  // §1.10 DA-19 — a shareable PNG of the currently-selected player's result
+  // §1.10 DA-19 — share the summary as an image. Primary: a pixel capture of the
+  // ACTUAL summary panel exactly as shown (incl. an expanded player), via
+  // DOM → SVG <foreignObject> → canvas. Falls back to a hand-drawn card if the
+  // browser taints the canvas or the capture fails.
   function shareSelected() {
+    if (!summary) return;
+    try { captureSummaryPanel(); } catch (e) { shareCardFallback(); }
+  }
+  function captureSummaryPanel() {
+    var modal = document.querySelector('#overModal .modal');
+    if (!modal || !document.createElement('canvas').getContext) { shareCardFallback(); return; }
+    var w = modal.clientWidth, h = modal.scrollHeight, scale = 2;
+    var clone = modal.cloneNode(true);
+    ['#reportHelp', '#shareCard', '.setup-actions'].forEach(function (sel) { var el = clone.querySelector(sel); if (el) el.parentNode.removeChild(el); });
+    clone.style.margin = '0'; clone.style.maxHeight = 'none'; clone.style.width = w + 'px'; clone.style.overflow = 'visible';
+    var css = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.textContent; }).join('\n');
+    var xml = new XMLSerializer().serializeToString(clone);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
+      + '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '">'
+      + '<div xmlns="http://www.w3.org/1999/xhtml"><style>' + css + '</style>' + xml + '</div></foreignObject></svg>';
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas'); canvas.width = w * scale; canvas.height = h * scale;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0e0f08'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      try { canvas.toBlob(function (blob) { blob ? deliverShare(blob) : shareCardFallback(); }, 'image/png'); }
+      catch (e) { shareCardFallback(); }
+    };
+    img.onerror = function () { shareCardFallback(); };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+  function deliverShare(blob) {
+    var file = new File([blob], 'general.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: 'Генерал — край на битката' }).catch(function () {});
+    else { var url = URL.createObjectURL(blob), el = document.createElement('a'); el.href = url; el.download = 'general.png'; el.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1500); }
+  }
+  // fallback: a hand-drawn card of the selected player's result
+  function shareCardFallback() {
     if (!summary) return;
     var pi = summary.sel >= 0 ? summary.sel : summary.meta.winIdx;
     var p = game.players[pi], a = summary.ana[pi];
@@ -2557,17 +2621,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     x.fillStyle = '#6b6754'; x.font = '500 20px Arial, sans-serif';
     x.fillText(fmtDate(Date.now()), cx, H - 56);
 
-    c.toBlob(function (blob) {
-      if (!blob) return;
-      var file = new File([blob], 'general.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: 'Генерал', text: p.name + ' — ' + tot + ' т., ' + rank }).catch(function () {});
-      } else {
-        var url = URL.createObjectURL(blob), el = document.createElement('a');
-        el.href = url; el.download = 'general-' + p.name + '.png'; el.click();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
-      }
-    }, 'image/png');
+    c.toBlob(function (blob) { if (blob) deliverShare(blob); }, 'image/png');
   }
   function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -2580,6 +2634,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     lines.slice(0, 3).forEach(function (l, i) { ctx.fillText(l, cx, y + i * lh); });
   }
   $('shareCard').onclick = shareSelected;
+  $('overExport').onclick = function () { if (currentHistRec) exportGame(currentHistRec); };
 
   $('tabStand').onclick = function () { if (summary) { summary.tab = 'stand'; renderSummary(); } };
   $('tabSkill').onclick = function () { if (summary) { summary.tab = 'skill'; renderSummary(); } };
@@ -3088,7 +3143,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
 
   // ============================================================ ARCHIVE / HISTORY
-  var viewingHistory = false, histSnapshot = null, dossierCtx = null;
+  var viewingHistory = false, histSnapshot = null, dossierCtx = null, currentHistRec = null;
 
   function recTotal(sp) { var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
@@ -3123,6 +3178,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // §2.5 dossier context: viewing a PAST owner game → annotate its report with deltas
     var oi = recOwnerIdx(rec);
     dossierCtx = (oi >= 0 && !rec.players[oi].isAI) ? { ownerPi: oi, career: computeOwnerCareer() } : null;
+    currentHistRec = rec; $('overExport').classList.remove('hidden');  // export is active only from history
     $('overBack').classList.remove('hidden'); $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
   }
   function exitHistoryGame(toArchive) {
@@ -3365,6 +3421,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + '<span class="hg-sub">' + esc(fmtTime(rec.ts)) + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
+        + '<button class="hg-exp" title="Експорт (JSON)">📤</button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
     });
     $('historyList').innerHTML = html;
@@ -3373,6 +3430,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var find = function () { return loadHistory().filter(function (r) { return r.id === id; })[0]; };
       row.onclick = function () { var rec = find(); if (rec) openHistoryGame(rec); };
       row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
+      row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) exportGame(rec); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
     });
   }
@@ -3380,6 +3438,64 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     persistHistory(loadHistory().filter(function (r) { return r.id !== id; }));
     renderHistory();
   }
+  // ---- export / import a game (share local history across devices) ----
+  function exportGame(rec) {
+    var blob = new Blob([JSON.stringify(rec, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob), el = document.createElement('a');
+    el.href = url; el.download = 'general-' + (rec.id || 'game') + '.json'; el.click();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+  function validateGameJSON(o) {
+    if (!o || typeof o !== 'object') return 'Невалиден JSON обект.';
+    if (!Array.isArray(o.players) || !o.players.length) return 'Липсват играчи.';
+    if (!Array.isArray(o.moveLog) || o.moveLog.length !== o.players.length) return 'moveLog не съвпада с играчите.';
+    for (var i = 0; i < o.players.length; i++) {
+      var p = o.players[i];
+      if (!p || typeof p.name !== 'string' || !p.scores || typeof p.scores !== 'object') return 'Играч ' + (i + 1) + ' е невалиден.';
+    }
+    return null;
+  }
+  var importParsed = null;   // the validated record awaiting an owner choice
+  function openImport() {
+    importParsed = null;
+    $('importText').value = '';
+    $('importOwner').innerHTML = ''; $('importOwner').classList.add('hidden');
+    $('importErr').classList.add('hidden'); $('importErr').textContent = '';
+    $('importDo').textContent = 'Провери';
+    $('historyModal').classList.add('hidden');
+    $('importModal').classList.remove('hidden');
+  }
+  function importError(msg) { $('importErr').textContent = '⚠ ' + msg; $('importErr').classList.remove('hidden'); }
+  function importStep() {
+    $('importErr').classList.add('hidden');
+    if (!importParsed) {                         // step 1: parse + validate, then ask for the owner
+      var obj; try { obj = JSON.parse($('importText').value); } catch (e) { importError('JSON не може да се прочете.'); return; }
+      var err = validateGameJSON(obj); if (err) { importError(err); return; }
+      importParsed = obj;
+      $('importOwner').innerHTML = '<div class="iolbl">Кой играч си ти (старшината)?</div>'
+        + obj.players.map(function (p, i) { return '<label class="iorow"><input type="radio" name="impown" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + esc(p.name) + '</label>'; }).join('')
+        + '<label class="iorow"><input type="radio" name="impown" value="-1"> Никой (само в архива)</label>';
+      $('importOwner').classList.remove('hidden');
+      $('importDo').textContent = 'Импортирай';
+      return;
+    }
+    // step 2: assign the chosen owner and file it
+    var sel = $('importOwner').querySelector('input[name="impown"]:checked');
+    var owner = sel ? +sel.value : -1, rec = importParsed;
+    rec.players.forEach(function (p, i) { p.owner = (i === owner); });
+    rec.ownerSkipped = owner < 0;
+    rec.id = 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4);
+    rec.ts = rec.ts || Date.now();
+    rec.manualMode = !!rec.manualMode;
+    var arr = loadHistory(); arr.push(rec); arr.sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); }); persistHistory(arr);
+    $('importModal').classList.add('hidden');
+    openHistory();
+  }
+  $('importBtn').onclick = openImport;
+  $('importDo').onclick = importStep;
+  $('importCancel').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
+  $('importClose').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
+  $('importModal').onclick = function (e) { if (e.target === $('importModal')) { $('importModal').classList.add('hidden'); openHistory(); } };
   function openHistory() {
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
