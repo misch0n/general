@@ -9,15 +9,15 @@ edition): camouflage field, classification banner, brass medals and stencil type
 
 ## Features
 
-- **РЕЖИМ КАЗАРМА (serious mode).** A settings toggle (default off, flippable
-  **even mid-game**) that trims the goofy layer down without removing it: rare-name
-  **bonuses and rarity notifications off**, **bets off** (setup *and* the end-screen
-  stakes), the **СЪВЕТ** optimal-play hint **off**, **callouts fire only now and
-  then** (and the marching order drops the commanding tense for a playful _„Бас
-  хващам, че не можеш да хвърлиш X“_), and the combo-tooltip **penalties are limited
-  to the two non-intrusive ones** — a points fine or a temporary zero-out of a
-  submitted combo — that **never freeze play**. The core (dice, scoring, manual
-  mode, the full analytics report) is untouched.
+- **РЕЖИМ КАЗАРМА (the goofy layer switch).** A settings toggle (default **off**,
+  flippable **even mid-game**) that gates the whole comedy layer. **Off** strips
+  the game to its core for play and manual modes — no callouts, no combo
+  tooltips/penalties, no rare-name bonuses or rarity notifications, no bets (nor
+  end-screen stakes). **On** switches all of it back on: marching orders + roasts,
+  the shaming combo tooltips and their pranks, name bonuses, rarity bubbles and the
+  stupid wagers. The features all live in the background regardless — the switch
+  just blocks them. (The СЪВЕТ optimal-play hint and the analytics report are core
+  and stay available either way.)
 - **Full-screen board.** Fills the viewport with a thin margin: scoreboard up
   top, a **medal divider**, and the **dice console** anchored at the bottom.
 - **Select-to-reroll.** The turn opens on the general's order with the dice

@@ -823,9 +823,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
-  // `barracks` (РЕЖИМ КАЗАРМА) trims the goofy layer — see the settings row
+  // `barracks` (РЕЖИМ КАЗАРМА) is the master switch for the whole goofy layer.
+  // OFF (default) = stripped, core-only gameplay; ON = callouts, penalties, combo
+  // tooltips, name bonuses + rarity notifications and bets all switched on.
   var settings = { noBonus: false, noAdvice: false, censor: false, barracks: false, ownerName: '', useOwnerName: false };
-  function fun() { return !settings.barracks; } // are the full goofy features on?
+  function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   // ---------- persistent settings + game archive (localStorage) ----------
@@ -964,7 +966,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // build the rare-name brag bubble for a player (or null)
   function rarityBubbleEl(p) {
-    if (!p.tier || p.bubbleDismissed || settings.barracks) return null; // no rarity notifications in barracks
+    if (!p.tier || p.bubbleDismissed || !fun()) return null; // rarity notifications only in казарма mode
     var eff = settings.noBonus ? 0 : p.bonus;
     var bub = document.createElement('div');
     bub.className = 'rarebubble rt' + p.tier;                // colour = frequency tier
@@ -1092,7 +1094,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         card.appendChild(box);
       }
 
-      if (fun()) { // the stupid wager — hidden in barracks mode
+      if (fun()) { // the stupid wager — only in казарма mode
         var bet = document.createElement('div'); bet.className = 'betline';
         bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
         card.appendChild(bet);
@@ -1152,7 +1154,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.owner = !!p.owner; // the device-owner flag follows the player (token)
-      pl.bonus = (settings.noBonus || settings.barracks) ? 0 : (p.bonus || 0); // rare-name starting bonus
+      pl.bonus = (settings.noBonus || !fun()) ? 0 : (p.bonus || 0); // rare-name starting bonus (казарма only)
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
       return pl;
@@ -1330,7 +1332,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   // make a category name tappable for the shaming reminder tooltip (human only)
   function attachTip(nameEl, key, isAI) {
-    if (isAI) return;
+    if (isAI || !fun()) return;                    // combo tooltips/penalties off outside казарма mode
     nameEl.classList.add('tappable');
     nameEl.onclick = function (e) { e.stopPropagation(); comboReminder(key, nameEl); };
   }
@@ -1644,29 +1646,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // ---------- speech bubbles ----------
   var ROAST_MS = 2600, ORDER_MS = 4000;
 
-  var BARRACKS_CALLOUT = 0.34; // in barracks, callouts fire only now and then
-
   // the general's order at turn start: aim for a still-open category
   function showOrder(player) {
+    if (!fun()) return;                            // callouts off outside казарма mode
     var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(player, c.key); });
     if (!open.length) return;
-    if (settings.barracks && Math.random() > BARRACKS_CALLOUT) return; // rarely, in barracks
     var cat = open[Math.floor(Math.random() * open.length)];
     var addressee = player.name.trim().split(/\s+/)[0]; // their military title
     var box = $('roast');
     box.className = 'roast show order';
-    // barracks drops the confusing commanding tense for a playful taunt
-    var text = settings.barracks
-      ? addressee + ', бас хващам, че не можеш да хвърлиш ' + (G.ORDER_NAMES[cat.key] || cat.key) + '!'
-      : G.orderText(addressee, cat.key);
-    box.innerHTML = '<span class="bubble">🎖 ' + esc(text) + '</span>';
+    box.innerHTML = '<span class="bubble">🎖 ' + esc(G.orderText(addressee, cat.key)) + '</span>';
     box.querySelector('.bubble').onclick = clearRoast; // tap to dismiss
     clearTimeout(roastTimer);
     roastTimer = setTimeout(clearRoast, ORDER_MS);
   }
 
   function showRoast() {
-    if (settings.barracks && Math.random() > BARRACKS_CALLOUT) return false; // rarely, in barracks
+    if (!fun()) return false;                      // roasts off outside казарма mode
     var line = G.genderFill(G.ROASTS.flop[roastIx % G.ROASTS.flop.length], G.currentPlayer(game).gender);
     roastIx++;
     var box = $('roast');
@@ -1689,7 +1685,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var penalties = [], tipHideTimer = null, refundTimer = null;
 
   function comboReminder(key, anchor) {
-    if (locked || settings.noAdvice) return;
+    if (locked || settings.noAdvice || !fun()) return;
     // measure the anchor BEFORE the penalty re-renders the board (which would
     // detach it and zero its rect, dumping the tooltip in the top-left corner)
     var r = anchor.getBoundingClientRect();
@@ -1767,24 +1763,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var diceMode = !manualMode && dice.length === G.DICE_COUNT && !awaitingRoll;
     var freeIdx = []; for (var i = 0; i < remaining; i++) if (!usedIdx[i]) freeIdx.push(i);
 
-    // barracks keeps only the two NON-INTRUSIVE penalties (a fine, or a temporary
-    // zero-out of a submitted combo) — they never lock the board, so play goes on.
+    // the full prank set (penalties only fire in казарма mode, gated upstream).
+    // A points fine and a temporary zero-out are non-intrusive (no lock); the rest
+    // freeze play until they expire.
     var pool = ['points'];                              // a fine always stacks
     if (filledK.length) pool.push('blank');
-    if (fun()) {
-      if (!usedHide[reqKey]) pool.push('hideReq');
-      if (hideK.length) pool.push('hideRand');
-      if (openK.length) pool.push('forfeit');
-      pool.push('shuffle');
-      if (!hasPretend) pool.push('pretend');
-      if (!hasLose) pool.push('youlose');
-      if (diceMode && remaining > 0) pool.push('removeDice');
-      if (diceMode && freeIdx.length) pool.push('changeDice');
-    }
+    if (!usedHide[reqKey]) pool.push('hideReq');
+    if (hideK.length) pool.push('hideRand');
+    if (openK.length) pool.push('forfeit');
+    pool.push('shuffle');
+    if (!hasPretend) pool.push('pretend');
+    if (!hasLose) pool.push('youlose');
+    if (diceMode && remaining > 0) pool.push('removeDice');
+    if (diceMode && freeIdx.length) pool.push('changeDice');
 
     var t = pool[Math.floor(Math.random() * pool.length)];
     var pen = { type: t };
-    if (t === 'points') { pen.points = (fun() && Math.random() < 0.18) ? 9999999 : 3 + Math.floor(Math.random() * 45); pen.desc = 'Глоба: −' + pen.points + ' точки!'; }
+    if (t === 'points') { pen.points = Math.random() < 0.18 ? 9999999 : 3 + Math.floor(Math.random() * 45); pen.desc = 'Глоба: −' + pen.points + ' точки!'; }
     else if (t === 'hideReq') { pen.key = reqKey; pen.desc = 'Скрих ти полето „' + catLabel(reqKey) + '“.'; }
     else if (t === 'hideRand') { pen.key = hideK[Math.floor(Math.random() * hideK.length)]; pen.desc = 'Скрих ти полето „' + catLabel(pen.key) + '“.'; }
     else if (t === 'blank') { pen.key = filledK[Math.floor(Math.random() * filledK.length)]; pen.desc = 'Нулирах ти временно „' + catLabel(pen.key) + '“ (−' + (p.scores[pen.key] || 0) + ' т.).'; }
@@ -1923,12 +1918,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   };
 
   // ---------- settings (with a secret developer mode) ----------
-  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice || settings.barracks); }
+  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || settings.noAdvice); }
   var SETTINGS_ROWS = [
-    // РЕЖИМ КАЗАРМА — trims the goofy layer (callouts/bonuses/bets/notifications/
-    // advice off; tooltips kept but penalties softened). Toggleable even in-game.
-    { key: 'barracks', label: 'Режим казарма (сериозен режим)', onChange: function () {
-        if (game) { syncHintBtn(); renderAll(); }
+    // РЕЖИМ КАЗАРМА — the master switch for the goofy layer (off = core only).
+    // Callouts, penalties, combo tooltips, name bonuses, rarity notifications and
+    // bets are all OFF by default and switched on here. Works even mid-game.
+    { key: 'barracks', label: 'Режим казарма (закачки, облози, наказания)', onChange: function () {
+        if (game) renderAll();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
     { key: 'noBonus', label: 'Изключи бонусите за редки имена', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
@@ -2258,7 +2254,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('tabStand').classList.toggle('hidden', !anyAnalysis);
     $('overUndo').classList.toggle('hidden', !manualMode || !undoStack.length);
 
-    // bet stakes — hidden in barracks mode
+    // bet stakes — only in казарма mode
     if (fun()) {
       var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
       others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
