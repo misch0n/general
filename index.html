@@ -597,6 +597,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .importowner .iolbl{ font-family:var(--gen-font-display); font-weight:700; font-size:12px; color:var(--gen-brass); margin-bottom:5px; }
 .importowner .iorow{ display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:13px; color:var(--gen-text); cursor:pointer; }
 .importerr{ margin-top:9px; padding:8px 10px; border-radius:8px; font-size:12px; color:#e8807a; background:rgba(178,58,46,.16); border:1px solid var(--gen-alert-line); }
+.exportcopied{ margin-top:8px; text-align:center; font-size:12px; font-weight:700; color:#9bd17e; }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
 /* end-game / history progress chart */
 .progchart{ margin:10px 0 4px; padding:10px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--gen-pill-line); }
@@ -929,6 +930,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="historyOverview"></div>
     <div id="historyList"></div>
     <div class="setup-actions"><button id="importBtn" class="btn">📥 Импортирай игра</button></div>
+  </div>
+</div>
+
+<!-- export a game: show the JSON to copy -->
+<div id="exportModal" class="overlay hidden">
+  <div class="modal" style="max-width:340px">
+    <button class="x-close" id="exportClose">✕</button>
+    <h2>📤 Експорт на игра</h2>
+    <p class="ht">Копирай този JSON и го запази (или го прати на друг боец):</p>
+    <textarea id="exportText" class="importarea" readonly></textarea>
+    <div class="setup-actions">
+      <button id="exportCopy" class="btn primary">📋 Копирай</button>
+    </div>
+    <div id="exportCopied" class="exportcopied hidden">✓ Копирано в клипборда</div>
   </div>
 </div>
 
@@ -3577,11 +3592,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // ---- export / import a game (share local history across devices) ----
   function exportGame(rec) {
-    var blob = new Blob([JSON.stringify(rec, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob), el = document.createElement('a');
-    el.href = url; el.download = 'general-' + (rec.id || 'game') + '.json'; el.click();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    $('exportText').value = JSON.stringify(rec, null, 2);
+    $('exportCopied').classList.add('hidden');
+    $('exportModal').classList.remove('hidden');
   }
+  function copyExport() {
+    var ta = $('exportText'), txt = ta.value;
+    function done() { $('exportCopied').classList.remove('hidden'); }
+    function legacy() { ta.removeAttribute('readonly'); ta.focus(); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.setAttribute('readonly', ''); ta.blur(); done(); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, legacy);
+    else legacy();
+  }
+  $('exportCopy').onclick = copyExport;
+  $('exportClose').onclick = function () { $('exportModal').classList.add('hidden'); };
+  $('exportModal').onclick = function (e) { if (e.target === $('exportModal')) $('exportModal').classList.add('hidden'); };
   function validateGameJSON(o) {
     if (!o || typeof o !== 'object') return 'Невалиден JSON обект.';
     if (!Array.isArray(o.players) || !o.players.length) return 'Липсват играчи.';
