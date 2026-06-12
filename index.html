@@ -545,12 +545,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* archive (history) */
 .histover{ padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); margin-bottom:12px; }
 .histover .oname{ display:flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px;
-  color:var(--gen-brass); font-size:14px; }
-/* collapsible owner dossier: summary shows name + the headline trio only */
+  color:var(--gen-brass); font-size:17px; }
+/* collapsible owner dossier: NAME on top, the headline trio (bigger, bolder) below */
 .ho-sum{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
 .ho-sum::-webkit-details-marker{ display:none; }
-.ho-sum .ho-mini{ display:flex; gap:10px; margin-left:auto; font-size:11px; color:var(--gen-muted); white-space:nowrap; }
-.ho-sum .ho-mini b{ color:var(--gen-text); font-variant-numeric:tabular-nums; }
+.ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.ho-sum .ho-mini{ display:flex; flex-wrap:wrap; gap:5px 16px; font-family:var(--gen-font-display); font-weight:700;
+  font-size:13px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-label); }
+.ho-sum .ho-mini > span{ white-space:nowrap; }
+.ho-sum .ho-mini b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
 .ho-sum .ho-caret{ flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted); transform:rotate(45deg); transition:transform .15s; }
 .histover[open] .ho-sum .ho-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
 .ho-body{ margin-top:10px; padding-top:9px; border-top:1px solid var(--gen-pill-line); }
@@ -3485,9 +3488,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var form = data.slice(-7).map(function (d) { return d.place === 1 ? '<i class="w">П</i>' : '<i class="l">' + d.place + '</i>'; }).join('');
 
     // collapsed: just the headline trio; everything else lives in the expandable body
-    var h = '<details class="histover"><summary class="ho-sum"><span class="oname">' + esc(name) + '</span>'
+    var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
+      + '<span class="oname">' + esc(name) + '</span>'
       + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
-      + '<span class="ho-caret"></span></summary><div class="ho-body">';
+      + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * c.wins / n) + '%</b> · средно място <b>' + c.avgPlace.toFixed(1) + '</b></div>';
     h += '<div class="histline">Личен рекорд: <b>' + c.best + '</b> т. · среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'
       + (c.avgLuck != null ? ' · среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>' : '') + '</div>';
