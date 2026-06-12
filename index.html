@@ -678,6 +678,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setrow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0; color:var(--gen-text); font-size:13px;
   border-bottom:1px solid var(--gen-pill-line); cursor:pointer; }
 .setrow span{ flex:1; }
+/* nested sub-toggle (e.g. „Бонус точки“ under Титли): indented + dimmer */
+.setrow.setrow-sub{ padding:9px 0 9px 18px; font-size:12px; color:var(--gen-label); }
+.setrow.setrow-sub span::before{ content:'↳ '; color:var(--gen-muted); }
 /* secret developer mode */
 .setrow .devbox{ flex:none; width:22px; height:22px; margin-left:4px; border-radius:4px; background:transparent; cursor:default; }
 .devpanel{ margin-top:14px; border-top:2px dashed var(--gen-brass-stroke); padding-top:12px; max-height:46vh; overflow-y:auto; }
@@ -1036,9 +1039,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
   var $ = function (id) { return document.getElementById(id); };
-  // positive toggles: bonus on, advice OFF by default, censor/barracks off
-  var settings = { bonus: true, advice: false, censor: false, barracks: false, ownerName: '', useOwnerName: false };
+  // positive toggles. Титли (rare-name notifications) is its own switch, independent
+  // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
+  var settings = { titles: false, titlePoints: false, advice: false, censor: false, barracks: false, ownerName: '', useOwnerName: false };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
+  function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   // ---------- persistent settings + game archive (localStorage) ----------
@@ -1048,17 +1053,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
 
   function saveSettings() {
-    var s = { bonus: settings.bonus, advice: settings.advice, censor: settings.censor, barracks: settings.barracks,
-              ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
+    var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, censor: settings.censor,
+              barracks: settings.barracks, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['bonus', 'advice', 'censor', 'barracks', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
-      if (s.noBonus != null && s.bonus == null) settings.bonus = !s.noBonus; // migrate only if not already set
-      // advice intentionally NOT migrated — it must default OFF
+      ['titles', 'titlePoints', 'advice', 'censor', 'barracks', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped: the
+      // rare-name system is now its own opt-in switch, so it starts off)
     } catch (e) {}
     G.setCensor(settings.censor);
   }
@@ -1204,8 +1209,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // build the rare-name brag bubble for a player (or null)
   function rarityBubbleEl(p) {
-    if (!p.tier || p.bubbleDismissed || !fun()) return null; // rarity notifications only in казарма mode
-    var eff = settings.bonus ? p.bonus : 0;
+    if (!p.tier || p.bubbleDismissed || !settings.titles) return null; // rarity notifications gated by Титли
+    var eff = namePointsOn() ? p.bonus : 0;                            // award line only when points are on
     var bub = document.createElement('div');
     bub.className = 'rarebubble rt' + p.tier;                // colour = frequency tier
     var intro = p.typed ? '🎯 Позна! ' : '🏅 ';
@@ -1398,7 +1403,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.owner = skipOwnerNext ? false : !!p.owner; // owner skipped → nobody carries the flag this game
-      pl.bonus = (!settings.bonus || !fun()) ? 0 : (p.bonus || 0); // rare-name starting bonus (казарма only)
+      pl.bonus = namePointsOn() ? (p.bonus || 0) : 0; // rare-name starting bonus (Титли + точки)
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
       return pl;
@@ -2272,12 +2277,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || !settings.advice); }
   var SETTINGS_ROWS = [
     // КАЗАРМА — master switch for the goofy layer (off = core only; on enables
-    // callouts, penalties, combo tooltips, name bonuses, rarity notifications, bets)
+    // callouts, penalties, combo tooltips and bets). Rare-name titles are separate.
     { key: 'barracks', label: 'КАЗАРМА', onChange: function () {
         if (game) renderAll();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
-    { key: 'bonus', label: 'Бонус за име', preGameOnly: true, onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
+    // Титли — rare-name notifications (own switch, independent of КАЗАРМА); its hidden
+    // sub-toggle „Бонус точки“ turns the rare-name extra points on
+    { key: 'titles', label: 'Титли', preGameOnly: true,
+      sub: { key: 'titlePoints', label: 'Бонус точки', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
+      onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
     { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
     { key: 'censor', label: 'Цензура', onChange: function () {
         G.setCensor(settings.censor);
@@ -2290,15 +2299,28 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function buildSettingsRows(inGame) {
     var host = $('settingsRows'); host.innerHTML = '';
     SETTINGS_ROWS.forEach(function (row, idx) {
-      // pre-game-only rows (Бонус за име, Съвети) are hidden once a battle is on
+      // pre-game-only rows (Титли, Съвети) are hidden once a battle is on
       var div = document.createElement('div'); div.className = 'setrow' + (inGame && row.preGameOnly ? ' hidden' : '');
       var span = document.createElement('span'); span.textContent = row.label;
       var tog = document.createElement('button'); tog.className = 'toggle' + (settings[row.key] ? ' on' : ''); tog.innerHTML = '<span class="switch"></span>';
-      tog.onclick = function () { settings[row.key] = !settings[row.key]; tog.classList.toggle('on', settings[row.key]); if (row.onChange) row.onChange(); saveSettings(); };
+      tog.onclick = function () {
+        settings[row.key] = !settings[row.key]; tog.classList.toggle('on', settings[row.key]);
+        if (row.onChange) row.onChange(); saveSettings();
+        if (row.sub) buildSettingsRows(inGame); // reveal/hide the sub-toggle as the parent flips
+      };
       var box = document.createElement('span'); box.className = 'devbox';            // hidden unlock box (right edge)
       box.onclick = function (e) { e.stopPropagation(); devBoxClick(idx); };
       div.appendChild(span); div.appendChild(tog); div.appendChild(box);
       host.appendChild(div);
+      // hidden mini-toggle (e.g. „Бонус точки“ under Титли) — shown only when the parent is on
+      if (row.sub && settings[row.key]) {
+        var sub = document.createElement('div'); sub.className = 'setrow setrow-sub' + (inGame && row.preGameOnly ? ' hidden' : '');
+        var sspan = document.createElement('span'); sspan.textContent = row.sub.label;
+        var stog = document.createElement('button'); stog.className = 'toggle' + (settings[row.sub.key] ? ' on' : ''); stog.innerHTML = '<span class="switch"></span>';
+        stog.onclick = function () { settings[row.sub.key] = !settings[row.sub.key]; stog.classList.toggle('on', settings[row.sub.key]); if (row.sub.onChange) row.sub.onChange(); saveSettings(); };
+        sub.appendChild(sspan); sub.appendChild(stog);
+        host.appendChild(sub);
+      }
     });
   }
   // the unlock KEY, flattened: box 0 once, box 1 twice, box i (i+1)× — i.e. the

@@ -69,11 +69,11 @@ through the helper `fun()`. It is **off by default** and flippable **even
 mid-game**.
 
 - **Off** strips the game to its core — clean play and manual modes, no callouts,
-  no combo tooltips or their pranks, no rare-name bonuses or rarity bubbles, no
-  bets and no end-screen stakes.
+  no combo tooltips or their pranks, no bets and no end-screen stakes.
 - **On** switches all of it back on. Everything below lives in the code
   regardless; the switch just blocks it. (The СЪВЕТ hint and the analytics report
-  are *core* and stay available either way.)
+  are *core* and stay available either way. The **rare-name titles** are their own
+  switch now — see below — independent of КАЗАРМА.)
 
 What the switch governs:
 
@@ -266,8 +266,13 @@ still fire.
 
 ## Names, rarity, bets & gender
 
-- **Rare names & starting bonuses.** Every name component (title / adjective /
-  noun) sits in a **hardcoded percentile bracket** — `0-1` … `5-10` or `10+`
+- **Rare names & starting bonuses — the „Титли“ switch.** This whole system is
+  **its own opt-in toggle**, independent of КАЗАРМА, and **off by default**. Turning
+  **Титли** on shows the rarity notifications and reveals a hidden sub-toggle
+  **„Бонус точки“**; turning *that* on as well makes rare names also award **extra
+  starting points**. So: off → nothing; Титли → notifications only; Титли + Бонус
+  точки → notifications *and* points (`namePointsOn()`). Every name component
+  (title / adjective / noun) sits in a **hardcoded percentile bracket** — `0-1` … `5-10` or `10+`
   (common) — so rarities are **consistent across loads**. A component is drawn
   with a probability set by its bracket, and a name's chance is the **product** of
   its three components, so *common title × rare adjective × rare noun* multiplies
@@ -355,8 +360,9 @@ or the whole archive **cleared from settings** (with a confirm).
 
 Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
 **owner block** (battle name + „Използвай моето име“ with a `?` helper), then
-positive toggles: **КАЗАРМА**, **Бонус за име**, **Съвети**, **Цензура**. The two
-pre-game-only rows (Бонус, Съвети) hide once a battle is on; you can also clear
+positive toggles: **КАЗАРМА**, **Титли** (with its nested **Бонус точки**
+sub-toggle, shown only while Титли is on), **Съвети**, **Цензура**. The two
+pre-game-only rows (Титли, Съвети) hide once a battle is on; you can also clear
 the archive here.
 
 - **Censor toggle** — *Цензура, само прилични имена* — is **off by default** (this
