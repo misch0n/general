@@ -267,9 +267,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .evexplain p b{ color:var(--gen-text); }
 /* combined playstyle box */
 .stylebox{ margin:8px 0; padding:10px 11px; border-radius:10px; background:rgba(0,0,0,.28); border:1px solid var(--gen-pill-line); }
-.styhead{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.styhead{ display:flex; align-items:center; justify-content:space-between; gap:7px; }
 .stychip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-ink); border-radius:5px; padding:2px 8px; }
-.styrank{ font-family:var(--gen-font-display); font-size:11px; letter-spacing:.4px; color:var(--gen-muted); text-transform:uppercase; }
+.styopt{ font-family:var(--gen-font-display); font-size:11px; letter-spacing:.4px; color:var(--gen-muted); text-transform:uppercase; white-space:nowrap; }
 .stydesc{ font-size:11px; color:var(--gen-label); margin:5px 0 4px; line-height:1.4; }
 .stymetrics{ font-size:11.5px; color:var(--gen-muted); }
 /* coloured stat lines (laser-scannable labels + numbers) */
@@ -286,21 +286,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .evturns summary::-webkit-details-marker{ display:none; }
 .evturns summary::before{ content:'▸ '; }
 .evturns[open] summary::before{ content:'▾ '; }
-.evtrow{ display:flex; align-items:center; gap:8px; padding:4px 10px; font-size:11px; color:var(--gen-label);
-  border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; }
-.evtrow .tn{ width:22px; color:var(--gen-muted); flex:none; }
-.evtrow .tc{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); flex:1; min-width:0; }
-.evtrow .tv{ flex:none; color:var(--gen-brass); font-weight:700; }
-.evtrow .tl{ flex:none; } .evtrow .tl.plus{ color:#9bd17e; } .evtrow .tl.minus{ color:#e88; }
-/* per-turn quality marker + the 1/2/3 dice rolls of the turn */
-.evtrow .tq{ flex:none; width:16px; text-align:center; font-weight:700; }
-.evtrow.q-great .tq{ color:#9bd17e; } .evtrow.q-ok .tq{ color:var(--gen-muted); } .evtrow.q-blunder .tq{ color:#e8807a; }
+/* left: [Хn][combo] · right: [points][luck/decision EV][quality thumb] — uniform columns so rows line up */
+.evtrow{ display:grid; grid-template-columns:26px minmax(0,1fr) 32px 76px 22px; align-items:center; column-gap:6px; padding:4px 10px; font-size:11px;
+  color:var(--gen-label); border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; }
+.evtrow .tn{ color:var(--gen-muted); font-family:var(--gen-font-display); font-weight:700; }
+.evtrow .tc{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.2px; color:var(--gen-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.evtrow .tv{ color:var(--gen-brass); font-weight:700; text-align:right; }
+.evtrow .tev{ display:flex; gap:6px; justify-content:flex-end; white-space:nowrap; font-size:10px; color:var(--gen-muted); }
+.evtrow .tev .tl{ display:inline-flex; gap:1px; align-items:baseline; }
+.evtrow .tev .tl i{ font-style:normal; color:var(--gen-disabled); }
+/* per-turn quality thumb (CSS/SVG, theme-coloured) */
+.qicon{ display:inline-flex; align-items:center; justify-content:flex-end; gap:1px; }
+.qicon .thumb{ width:14px; height:14px; display:block; }
+.qicon.great .thumb{ fill:#9bd17e; } .qicon.ok .thumb{ fill:var(--gen-brass-bright); } .qicon.blunder .thumb{ fill:#e8807a; }
 .evtrow.q-great{ background:rgba(75,140,60,.10); } .evtrow.q-blunder{ background:rgba(178,58,46,.10); }
-.evrolls{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; padding:1px 10px 6px 32px; font-size:10px; color:var(--gen-muted); border-top:0; }
-.evrolls .rroll{ display:inline-flex; gap:2px; opacity:.7; } .evrolls .rroll.last{ opacity:1; }
-.rdie{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:3px; background:#d8cfa8; color:var(--gen-pip);
+.evrolls{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; padding:1px 10px 6px 38px; font-size:10px; color:var(--gen-muted); border-top:0; }
+.evrolls .rroll{ display:inline-flex; gap:2px; }
+.rdie{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:3px; background:#6c6450; color:#cfc7ad; opacity:.5;
   font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
-.evrolls .rroll.last .rdie{ box-shadow:0 0 0 1px var(--gen-brass); }
+.rdie.kept{ background:#d8cfa8; color:var(--gen-pip); opacity:1; box-shadow:0 0 0 1px var(--gen-brass); }
 .evrolls .rarrow{ color:var(--gen-disabled); }
 
 /* AI persona subtitle in the header */
@@ -341,7 +345,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .tab.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
 .rankrow{ cursor:pointer; }
 .rankrow.picked{ box-shadow:inset 0 0 0 2px var(--gen-brass); }
+.rankrow.nodata{ cursor:default; }
 .rankrow .persub{ font-family:var(--gen-font-body); font-weight:500; text-transform:none; letter-spacing:0; font-size:10px; color:var(--gen-brass); }
+/* tap affordance: a chevron that points down when the player's report is open */
+.rankrow .rkcaret{ flex:none; width:10px; height:10px; margin-left:2px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted);
+  transform:rotate(-45deg); transition:transform .15s; }
+.rankrow .rkcaret.open{ transform:rotate(45deg); border-color:var(--gen-brass); }
+/* the expanded player's report, injected between the rows */
+.evinline{ margin:-2px 0 9px; }
+.evinline .evpanel{ margin-top:0; border-color:var(--gen-brass); }
+/* collapsible progress chart */
+.progchart .pc-details summary{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:6px; }
+.progchart .pc-details summary::-webkit-details-marker{ display:none; }
+.progchart .pc-details summary::before{ content:'▾'; color:var(--gen-brass); font-size:10px; }
+.progchart .pc-details:not([open]) summary::before{ content:'▸'; }
+/* EV help box in the ? window */
+.evxhd{ font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.4px; color:var(--gen-brass-bright); padding:8px 10px 0; }
+.evexplain .evxhd + p{ padding:6px 10px 9px; }
 .miniboard{ display:flex; flex-direction:column; gap:6px; }
 .miniboard .upper,.miniboard .lower{ display:grid; gap:5px; }
 .miniboard .upper{ grid-template-columns:repeat(6,1fr); }
@@ -749,9 +769,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="tabStand" class="tab on">Класиране</button>
       <button id="tabSkill" class="tab">По умение</button>
     </div>
-    <div id="ranks"></div>
     <div id="progressChart" class="progchart"></div>
-    <div id="evPanel"></div>
+    <div id="ranks"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
       <button id="overBack" class="btn hidden">← Архив</button>
@@ -1955,17 +1974,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   // the analytics-reading guide now lives behind the «?» on the end-game screen
   function buildReportHelp() {
+    // term colours mirror the player report: късмет = green, решения = brass-orange, числа = brass
+    var cLuck = 'color:#9bd17e', cSkill = 'color:#e8b06a', cNum = 'color:var(--gen-brass-bright)';
     return '<h2>📋 Как се чете рапортът</h2>'
+      + '<div class="evexplain" style="margin-bottom:12px"><div class="evxhd">❔ Какво е EV?</div>'
+      + '<p><b style="' + cNum + '">EV (очаквана стойност)</b> = средно колко точки носи едно решение, ако се изиграе безброй пъти. '
+      + 'Щабът сравнява твоя ход с най-добрия възможен: разликата е „<b>загуба EV</b>“ — точките, които си оставил на масата. '
+      + 'Така отделяме <b style="' + cLuck + '">късмета</b> (какво ти дадоха заровете) от <b style="' + cSkill + '">уменията</b> (какво направи с тях).</p></div>'
       + '<p class="ht">След битката щабът разбива резултата ти:</p>'
       + '<ul class="htlist">'
-      + '<li><b>Норма</b> — колко точки би вкарал перфектен играч средно (целта).</li>'
-      + '<li><b>Късмет</b> — колко ти дадоха или взеха заровете спрямо средното (плюс = вървя ти, минус = прецакаха те). Средно е нула.</li>'
-      + '<li><b>Решения</b> — колко точки си изпуснал заради грешни избори (винаги ≤ 0).</li>'
+      + '<li><b style="' + cNum + '">Норма</b> — колко точки би вкарал перфектен играч средно (целта).</li>'
+      + '<li><b style="' + cLuck + '">Късмет</b> — колко ти дадоха или взеха заровете спрямо средното (плюс = вървя ти, минус = прецакаха те). Средно е нула.</li>'
+      + '<li><b style="' + cSkill + '">Решения</b> — колко точки си изпуснал заради грешни избори (винаги ≤ 0).</li>'
       + '<li><b>норма + късмет + решения = крайният ти резултат.</b></li>'
-      + '<li><b>Точност</b> — какъв процент от ходовете са били оптималните; чинът ти отразява това.</li>'
-      + '<li><b>Най-добър ход / Най-скъпа грешка</b> — върховият ти момент и най-скъпата издънка.</li>'
+      + '<li><b style="' + cNum + '">Оптимално %</b> — какъв процент от ходовете са били оптималните; чинът ти отразява това.</li>'
+      + '<li><b style="' + cLuck + '">Най-добър ход</b> / <b style="color:#e8807a">Най-скъпа грешка</b> — върховият ти момент и най-скъпата издънка.</li>'
       + '<li><b>Стил</b> — щабът ти лепва досие: Хирург, Комарджия, Чиновник, Късметлия…</li>'
-      + '<li><b>Ход по ход</b> — разгъни го за пълния разбор на всяка отчетена категория.</li>'
+      + '<li><b>Ход по ход</b> — разгъни го за пълния разбор; всеки ред показва точки, '
+      + '<b style="' + cLuck + '">късмет (к)</b> и <b style="' + cSkill + '">избор (и)</b> в EV, плюс оценка: '
+      + '👍👍 върхов · 👍 окей · 👎 издънка. Удебелените зарове са задържаните между хвърлянията.</li>'
       + '<li>Разделът <b>По умение</b> подрежда по качество на решенията, не по късмет.</li>'
       + '</ul>';
   }
@@ -2367,7 +2394,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
-    summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: game.players.indexOf(winner) };
+    // sel = -1: nobody expanded by default (tap a player to reveal details); chartOpen: graph expanded
+    summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: -1, chartOpen: true };
 
     $('tabSkill').classList.toggle('hidden', !anyAnalysis);
     $('tabStand').classList.toggle('hidden', !anyAnalysis);
@@ -2380,8 +2408,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       $('betMsgs').innerHTML = msgs;
     } else $('betMsgs').innerHTML = '';
 
-    renderSummary();
-    renderProgressChart();
+    renderSummary(); // also paints the progress chart
     $('overModal').classList.remove('hidden');
   }
 
@@ -2401,10 +2428,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         return (ab ? ab.accuracy : -1) - (aa ? aa.accuracy : -1);
       });
     }
+    // rows are collapsed by default; the tapped player's full report is injected
+    // right after their own row (so details sit *between* players)
     $('ranks').innerHTML = rows.map(function (p, i) {
       var pi = game.players.indexOf(p);
       var a = summary.ana[pi];
-      var badge, sub = '', val;
+      var badge, sub = '', val, expanded = pi === summary.sel;
       if (summary.tab === 'stand') {
         badge = G.rankForPlacement(summary.ordered.indexOf(p), n);
         var bonusTag = p.bonus ? ' · +' + p.bonus + ' аванс' : '';
@@ -2415,18 +2444,24 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         sub = '<div class="persub">' + (a ? 'точност ' + Math.round(a.accuracy * 100) + '% · умение ' + a.skill.toFixed(0) : 'няма данни') + '</div>';
         val = a ? Math.round(a.accuracy * 100) + '%' : '–';
       }
-      return '<div class="rankrow' + (i === 0 ? ' first' : '') + (pi === summary.sel ? ' picked' : '') + '" data-pi="' + pi + '">'
+      var row = '<div class="rankrow' + (i === 0 ? ' first' : '') + (expanded ? ' picked' : '') + (a ? '' : ' nodata') + '" data-pi="' + pi + '">'
         + '<span class="rkbadge">' + esc(badge) + '</span>'
         + '<span class="pdot" style="width:16px;height:16px;border-radius:50%;background:' + p.color + '"></span>'
         + '<span class="nm">' + (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + sub + '</span>'
-        + '<span class="tt">' + val + '</span></div>';
+        + '<span class="tt">' + val + '</span>'
+        + (a ? '<span class="rkcaret' + (expanded ? ' open' : '') + '"></span>' : '') + '</div>';
+      if (expanded && a) row += '<div class="evinline">' + renderReport(pi) + '</div>';
+      return row;
     }).join('');
     $('ranks').querySelectorAll('.rankrow').forEach(function (r) {
-      r.onclick = function () { summary.sel = +r.getAttribute('data-pi'); renderSummary(); };
+      r.onclick = function () {
+        var pi = +r.getAttribute('data-pi');
+        if (!summary.ana[pi]) return;                       // no analysis → nothing to expand
+        summary.sel = (summary.sel === pi ? -1 : pi);       // tap again to collapse
+        renderSummary();
+      };
     });
-
-    // report for the selected player (any seat, incl AI; manual = category-only)
-    $('evPanel').innerHTML = summary.ana[summary.sel] ? renderReport(summary.sel) : '';
+    renderProgressChart(); // re-paint so the expanded player is highlighted on the graph
   }
 
   // cumulative category points for player pi, round by round (starts at 0)
@@ -2435,10 +2470,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     for (var r = 0; r < log.length; r++) { var v = sc[log[r].category]; run += (typeof v === 'number' ? v : 0); pts.push(run); }
     return pts;
   }
-  // line chart of every player's running total over the rounds, in their colour
+  // collapsible line chart of every player's running total over the rounds, in
+  // their colour. When a player is expanded below, the others are muted so his
+  // trajectory stands out. No legend — the colours are read off the results.
   function renderProgressChart() {
     var el = $('progressChart'); if (!el) return;
-    var series = game.players.map(function (p, i) { return { p: p, pts: progressSeries(i) }; });
+    var hl = summary && summary.sel >= 0 ? summary.sel : -1;
+    var series = game.players.map(function (p, i) { return { p: p, i: i, pts: progressSeries(i) }; });
     var maxR = 0, maxY = 0;
     series.forEach(function (s) { maxR = Math.max(maxR, s.pts.length - 1); s.pts.forEach(function (v) { maxY = Math.max(maxY, v); }); });
     if (maxR < 1 || maxY <= 0) { el.innerHTML = ''; return; }
@@ -2451,17 +2489,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       grid += '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" class="pc-grid"/>'
         + '<text x="' + (padL - 4) + '" y="' + (yy + 3) + '" class="pc-axis" text-anchor="end">' + Math.round(maxY * f) + '</text>';
     });
+    // draw muted lines first, highlighted one last so it sits on top
+    series.sort(function (a, b) { return (a.i === hl ? 1 : 0) - (b.i === hl ? 1 : 0); });
     var lines = series.map(function (s) {
+      var muted = hl >= 0 && s.i !== hl;
       var poly = s.pts.map(function (v, r) { return x(r) + ',' + y(v); }).join(' ');
-      var dots = s.pts.map(function (v, r) { return '<circle cx="' + x(r) + '" cy="' + y(v) + '" r="2" fill="' + s.p.color + '"/>'; }).join('');
-      return '<polyline points="' + poly + '" fill="none" stroke="' + s.p.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' + dots;
+      var dots = muted ? '' : s.pts.map(function (v, r) { return '<circle cx="' + x(r) + '" cy="' + y(v) + '" r="2" fill="' + s.p.color + '"/>'; }).join('');
+      return '<polyline points="' + poly + '" fill="none" stroke="' + s.p.color + '" stroke-width="' + (muted ? 1.5 : 2.4) + '" stroke-opacity="' + (muted ? 0.18 : 1) + '" stroke-linejoin="round" stroke-linecap="round"/>' + dots;
     }).join('');
     var xlab = '<text x="' + (padL + iw / 2) + '" y="' + (H - 4) + '" class="pc-axis" text-anchor="middle">рундове →</text>';
-    var legend = '<div class="pc-legend">' + series.map(function (s) {
-      return '<span class="pc-leg"><span class="pc-sw" style="background:' + s.p.color + '"></span>' + (isOwnerP(s.p) ? ownerTokenHTML(true) : '') + esc(s.p.name) + '</span>';
-    }).join('') + '</div>';
-    el.innerHTML = '<div class="pc-title">Ход на битката</div>'
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">' + grid + lines + xlab + '</svg>' + legend;
+    var open = !summary || summary.chartOpen !== false;
+    el.innerHTML = '<details class="pc-details"' + (open ? ' open' : '') + '><summary class="pc-title">Ход на битката</summary>'
+      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">' + grid + lines + xlab + '</svg></details>';
+    var dt = el.querySelector('details'); if (dt) dt.addEventListener('toggle', function () { if (summary) summary.chartOpen = dt.open; });
   }
 
   function signed(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 0 : d); }
@@ -2474,22 +2514,45 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function nBad(v, d) { return '<b class="nn">' + (d != null ? v.toFixed(d) : v) + '</b>'; }                       // a loss (red)
   function nNeut(v) { return '<b class="nu">' + v + '</b>'; }                                                       // neutral (brass)
 
-  // compact render of a turn's 1–3 rolls (last = the deciding one, emphasised)
+  // compact render of a turn's 1–3 rolls. Kept dice are highlighted: on each
+  // non-final roll the dice carried forward (keeps[i]) light up; the final roll
+  // (and any single-roll turn) lights up in full — that's the committed hand.
   function turnDiceHTML(pi, td, manual) {
     var log = moveLog[pi] && moveLog[pi][td.turn];
     var seq = manual ? (log && log.dice ? [log.dice] : (td.finalDice ? [td.finalDice] : []))
                      : (log && log.rolls ? log.rolls : (td.finalDice ? [td.finalDice] : []));
     if (!seq.length) return '';
+    var keeps = (log && log.keeps) || [];
     var rolls = seq.map(function (d, i) {
-      var dice = (d || []).map(function (v) { return '<span class="rdie">' + v + '</span>'; }).join('');
-      return '<span class="rroll' + (i === seq.length - 1 ? ' last' : '') + '">' + dice + '</span>';
+      var last = i === seq.length - 1, km = last ? null : (keeps[i] || []);
+      var dice = (d || []).map(function (v, j) {
+        var on = last || km[j];
+        return '<span class="rdie' + (on ? ' kept' : '') + '">' + v + '</span>';
+      }).join('');
+      return '<span class="rroll' + (last ? ' last' : '') + '">' + dice + '</span>';
     }).join('<span class="rarrow">→</span>');
-    return '<div class="evrolls">🎲 ' + rolls + '</div>';
+    return '<div class="evrolls">' + rolls + '</div>';
   }
   function turnQuality(skill) {
-    if (skill >= -0.05) return { cls: 'q-great', mark: '★' };   // optimal turn
-    if (skill <= -3) return { cls: 'q-blunder', mark: '✗' };    // a real blunder
-    return { cls: 'q-ok', mark: '·' };
+    if (skill >= -0.05) return { cls: 'q-great' };   // optimal turn
+    if (skill <= -3) return { cls: 'q-blunder' };    // a real blunder
+    return { cls: 'q-ok' };
+  }
+  // CSS/SVG thumb glyph (theme-coloured); double thumbs-up = great, single = ok, down = blunder
+  function thumbSVG(down) {
+    return '<svg class="thumb" viewBox="0 0 24 24" aria-hidden="true"' + (down ? ' style="transform:scaleY(-1)"' : '') + '>'
+      + '<path d="M2.5 10.2h3.4v9.3H2.5zM7.4 19.5v-9.1l3.3-5.2c.2-.3.6-.5 1-.4.8.1 1.4.9 1.2 1.7l-.8 3.6h5.2c1.2 0 2 1.1 1.7 2.2l-1.5 5.1c-.2.8-1 1.4-1.8 1.4z"/></svg>';
+  }
+  function qualityIcon(skill) {
+    var cls = turnQuality(skill).cls;
+    if (cls === 'q-great') return '<span class="qicon great" title="върхов ход">' + thumbSVG(false) + thumbSVG(false) + '</span>';
+    if (cls === 'q-blunder') return '<span class="qicon blunder" title="издънка">' + thumbSVG(true) + '</span>';
+    return '<span class="qicon ok" title="окей">' + thumbSVG(false) + '</span>';
+  }
+  // signed EV cell: zero shows as a green +0; negatives red, positives green
+  function evNum(v) {
+    if (Math.abs(v) < 0.05) return '<b class="np">+0</b>';
+    return '<b class="' + (v >= 0 ? 'np' : 'nn') + '">' + signed(v, 1) + '</b>';
   }
 
   // colour palette for the stat labels (distinct hues for quick scanning)
@@ -2498,16 +2561,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function renderReport(pi) {
     var fp = game.players[pi], fa = summary.ana[pi];
-    var perfRank = G.rankForAccuracy(fa.accuracy);
     var genVal = fp.scores.general;
     var html = '<div class="evpanel">';
     html += '<div class="evhead">📋 Рапорт за ' + (isOwnerP(fp) ? ownerTokenHTML(true) : '') + esc(fp.name) + (fp.isAI && fp.persona ? ' · ' + esc(fp.persona.name) : '') + '</div>';
-
-    // §3 EV explainer (collapsed)
-    html += '<details class="evexplain"><summary>Какво е EV?</summary>'
-      + '<p><b>EV (очаквана стойност)</b> = средно колко точки носи едно решение, ако се изиграе безброй пъти. '
-      + 'Щабът сравнява твоя ход с най-добрия възможен: разликата е „<b>загуба EV</b>“ — точките, които си оставил на масата. '
-      + 'Така отделяме <b>късмета</b> (какво ти дадоха заровете) от <b>уменията</b> (какво направи с тях).</p></details>';
+    // (EV is explained in the ? window now, not inline)
 
     // §identity (dice mode only — manual games have no luck term)
     if (!fa.manual) {
@@ -2516,13 +2573,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + '<span class="skill">' + fa.skill.toFixed(0) + ' решения</span> → <b>' + G.playerTotal(fp) + '</b></div>';
     }
 
-    // §5 combined playstyle box: chip + rank, description, then точност/загуба
+    // §5 playstyle box: stylised persona + optimal% (right), description, avg EV/turn.
+    // "игра като {ранг}" removed — it just echoed the persona.
     var st = G.playstyleFor(fa);
     html += '<div class="stylebox"><div class="styhead">'
-      + (st ? '<span class="stychip" style="background:' + st.color + '">' + esc(st.name) + '</span>' : '')
-      + '<span class="styrank">игра като ' + esc(perfRank) + '</span></div>'
+      + (st ? '<span class="stychip" style="background:' + st.color + '">' + esc(st.name) + '</span>' : '<span></span>')
+      + '<span class="styopt"><b class="nu">' + Math.round(fa.accuracy * 100) + '%</b> оптимално</span></div>'
       + (st ? '<div class="stydesc">' + esc(st.desc) + '</div>' : '')
-      + '<div class="stymetrics">точност <b class="nu">' + Math.round(fa.accuracy * 100) + '%</b> · средна загуба ' + nBad(fa.avgLostPerTurn, 1) + ' т. EV/ход</div></div>';
+      + '<div class="stymetrics">средно ' + nBad(fa.avgLostPerTurn, 1) + ' т. EV/ход загуба</div></div>';
 
     // outstanding moves / costliest mistake
     if (fa.sharpest) html += '<div class="evpick sharp">✓ Най-добър ход: ' + decisionLabel(fa.sharpest) + '</div>';
@@ -2578,17 +2636,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
     html += stat('Генерал', RC.gen, (typeof genVal === 'number' && genVal > 0 ? 'хвърлен — ' + nNeut(genVal) + ' т.' : 'не е хвърлен'));
 
-    // §7 turn-by-turn breakdown (quality marked + the 1/2/3 rolls per turn)
-    html += '<details class="evturns"><summary>Ход по ход (★ върхов · · окей · ✗ издънка)</summary>';
+    // §7 turn-by-turn breakdown. Row: [Хn][combo] | [points][luck/decision EV][quality thumb]
+    html += '<details class="evturns"><summary>Ход по ход</summary>';
     fa.turns.forEach(function (td) {
       var q = turnQuality(td.skill);
-      var luckCell = fa.manual ? '' : '<span class="tl ' + (td.luck >= 0 ? 'plus' : 'minus') + '">' + signed(td.luck, 1) + '</span>';
-      var skillCell = '<span class="tl' + (td.skill < -0.05 ? ' minus' : ' plus') + '">'
-        + (td.skill < -0.05 ? '−' + (-td.skill).toFixed(1) : '✓') + '</span>';
-      html += '<div class="evtrow ' + q.cls + '"><span class="tn">' + (td.turn + 1) + '</span>'
-        + '<span class="tq">' + q.mark + '</span>'
+      // compact EV: к = късмет (luck), и = избор (decision); both spelled out in the ? window
+      var ev = '<span class="tev">' + (fa.manual ? '' : '<span class="tl" title="късмет (EV)"><i>к</i>' + evNum(td.luck) + '</span>')
+        + '<span class="tl" title="избор (EV)"><i>и</i>' + evNum(td.skill) + '</span></span>';
+      html += '<div class="evtrow ' + q.cls + '">'
+        + '<span class="tn">Х' + (td.turn + 1) + '</span>'
         + '<span class="tc">' + esc(CAT_LABEL[td.category] || td.category) + '</span>'
-        + '<span class="tv">' + td.score + ' т.</span>' + luckCell + skillCell + '</div>';
+        + '<span class="tv">' + td.score + ' т.</span>'
+        + ev
+        + qualityIcon(td.skill) + '</div>';
       html += turnDiceHTML(pi, td, fa.manual);
     });
     html += '</details>';
