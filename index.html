@@ -545,7 +545,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* archive (history) */
 .histover{ padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); margin-bottom:12px; }
 .histover .oname{ display:flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px;
-  color:var(--gen-brass); font-size:14px; margin-bottom:8px; }
+  color:var(--gen-brass); font-size:14px; }
+/* collapsible owner dossier: summary shows name + the headline trio only */
+.ho-sum{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
+.ho-sum::-webkit-details-marker{ display:none; }
+.ho-sum .ho-mini{ display:flex; gap:10px; margin-left:auto; font-size:11px; color:var(--gen-muted); white-space:nowrap; }
+.ho-sum .ho-mini b{ color:var(--gen-text); font-variant-numeric:tabular-nums; }
+.ho-sum .ho-caret{ flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted); transform:rotate(45deg); transition:transform .15s; }
+.histover[open] .ho-sum .ho-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
+.ho-body{ margin-top:10px; padding-top:9px; border-top:1px solid var(--gen-pill-line); }
+.ho-sechd{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:11px; color:var(--gen-brass); margin:12px 0 7px; }
 .histstats{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:8px; }
 .hstat{ background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); border-radius:8px; padding:7px 6px; text-align:center; }
 .hstat b{ display:block; font-family:var(--gen-font-display); font-weight:700; font-size:18px; color:var(--gen-text); font-variant-numeric:tabular-nums; }
@@ -554,17 +563,6 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histline b{ color:var(--gen-brass-bright); }
 .histline .hmuted{ color:var(--gen-muted); }
 /* §2.1 career category table */
-.catcareer{ margin-top:9px; border-top:1px solid var(--gen-pill-line); padding-top:8px; }
-.catcareer summary{ cursor:pointer; list-style:none; font-family:var(--gen-font-display); font-weight:700; font-size:11px;
-  letter-spacing:.5px; text-transform:uppercase; color:var(--gen-brass); }
-.catcareer summary::-webkit-details-marker{ display:none; }
-.catcareer summary::before{ content:'▸ '; } .catcareer[open] summary::before{ content:'▾ '; }
-.catcareer .cc-head, .catcareer .cc-row{ display:grid; grid-template-columns:1fr 42px 46px 46px 46px; gap:4px; align-items:center; padding:3px 2px; font-variant-numeric:tabular-nums; }
-.catcareer .cc-head{ font-size:9px; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-muted); margin-top:6px; }
-.catcareer .cc-head span:not(:first-child), .catcareer .cc-row span:not(.cc-cat){ text-align:right; }
-.catcareer .cc-row{ font-size:11px; color:var(--gen-label); border-top:1px solid rgba(255,255,255,.04); }
-.catcareer .cc-cat{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.2px; color:var(--gen-text); }
-.catcareer .cc-leak{ color:var(--gen-muted); } .catcareer .cc-leak.bad{ color:#e8807a; font-weight:700; }
 /* §2.6 career coaching variant + §2.5 dossier delta line */
 .coachline.career{ background:rgba(232,195,86,.08); border-color:rgba(232,195,86,.35); }
 .coachline.career b{ color:var(--gen-brass-bright); }
@@ -984,6 +982,18 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 <!-- floating owner-token explainer (tap the ★) -->
 <div id="ownerInfo" class="ownerinfo hidden"></div>
 
+<!-- resume an unfinished game (offered on load) -->
+<div id="resumeModal" class="overlay hidden">
+  <div class="modal" style="max-width:320px;text-align:center">
+    <h2>↩ Незавършена битка</h2>
+    <p class="ht" id="resumeInfo"></p>
+    <div class="setup-actions">
+      <button id="resumeAbort" class="btn">Откажи</button>
+      <button id="resumeGo" class="btn primary">Продължи</button>
+    </div>
+  </div>
+</div>
+
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
 <script src="engine.js"></script>
@@ -1004,7 +1014,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   // ---------- persistent settings + game archive (localStorage) ----------
-  var SETTINGS_KEY = 'general:settings:v1', HISTORY_KEY = 'general:history:v1';
+  var SETTINGS_KEY = 'general:settings:v1', HISTORY_KEY = 'general:history:v1', RESUME_KEY = 'general:resume:v1';
   function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
@@ -1032,6 +1042,28 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     lsDel(HISTORY_KEY); return false;
   }
   function archiveGame(rec) { var arr = loadHistory(); arr.push(rec); persistHistory(arr); }
+
+  // serialise the live players (shared by the archive and the resume snapshot)
+  function serializePlayers() {
+    return game.players.map(function (p) {
+      return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, personaId: p.persona ? p.persona.id : null,
+               gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [] };
+    });
+  }
+  // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
+  function saveResume() {
+    if (!game || !game.players || !game.players.length || viewingHistory) return;
+    if (G.isGameOver(game)) { clearResume(); return; }
+    lsSet(RESUME_KEY, JSON.stringify({
+      v: 1, ts: Date.now(), manualMode: manualMode, current: game.current, round: game.round,
+      ownerSkipped: !!game.ownerSkipped, players: serializePlayers(), moveLog: moveLog,
+    }));
+  }
+  function loadResume() {
+    var raw = lsGet(RESUME_KEY); if (!raw) return null;
+    try { var s = JSON.parse(raw); return (s && Array.isArray(s.players) && s.players.length) ? s : null; } catch (e) { return null; }
+  }
+  function clearResume() { lsDel(RESUME_KEY); }
 
   // The device owner is a FLAGGED player (p.owner) — the token follows them when
   // the seats are reordered. Initialised on the first player.
@@ -1355,6 +1387,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   loadSettings();   // restore censor + owner name/toggle before the first muster
   paintCamo($('setup'));
   addSetupPlayer(false); addSetupPlayer(false);
+  maybeOfferResume();   // offer to continue an unfinished battle from a prior session
 
   // ===================================================== GAME STATE
   var game = null, dice = [], selected = [false,false,false,false,false], throwsLeft = 0;
@@ -1389,11 +1422,38 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     beginTurn();
   }
 
+  // rebuild an unfinished game from its resume snapshot and continue
+  function resumeGame(snap) {
+    clearAllPenalties();
+    game = G.createGame(reconstructPlayers(snap));
+    game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
+    manualMode = !!snap.manualMode; undoStack = []; viewingHistory = false;
+    moveLog = snap.moveLog || game.players.map(function () { return []; });
+    $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
+    paintCamo($('game'));
+    $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
+    syncHintBtn();
+    document.querySelector('.dock').classList.toggle('hidden', manualMode);
+    $('manualDock').classList.toggle('hidden', !manualMode);
+    beginTurn();
+  }
+  function maybeOfferResume() {
+    var snap = loadResume(); if (!snap) return;
+    var filled = (snap.moveLog || []).reduce(function (s, l) { return s + (l ? l.length : 0); }, 0);
+    var turns = snap.players.length * G.CATEGORIES.length;
+    $('resumeInfo').innerHTML = snap.players.length + ' бойци · ' + Math.min(filled, turns) + '/' + turns + ' хода'
+      + (snap.manualMode ? ' · отчет' : '') + '<br>от ' + esc(fmtDate(snap.ts)) + ' ' + esc(fmtTime(snap.ts));
+    $('resumeModal').classList.remove('hidden');
+  }
+  $('resumeGo').onclick = function () { var snap = loadResume(); $('resumeModal').classList.add('hidden'); if (snap) resumeGame(snap); };
+  $('resumeAbort').onclick = function () { clearResume(); $('resumeModal').classList.add('hidden'); };
+
   function beginTurn() {
     locked = false;
     rerolledAll = false;
     clearRoast();
     var p = G.currentPlayer(game);
+    saveResume();   // snapshot at every turn boundary (clean point: nothing committed yet)
     document.documentElement.style.setProperty('--pc', p.color);
     if (manualMode) {
       manualCounts = [0,0,0,0,0,0,0];
@@ -2112,9 +2172,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<b style="' + cBad + '">жертваните комбинации</b> са в червено.</li>'
       + '</ul>';
   }
+  var combosFromHowto = false;   // came into the combo sheet via the how-to page?
   function openHowto() {
     $('howtoBody').innerHTML = buildHowTo();
-    $('howtoCombos').onclick = function () { $('howtoModal').classList.add('hidden'); openCombos(); };
+    $('howtoCombos').onclick = function () { combosFromHowto = true; $('howtoModal').classList.add('hidden'); openCombos(); };
     $('howtoModal').classList.remove('hidden');
   }
   function openReportHelp() { $('howtoBody').innerHTML = buildReportHelp(); $('howtoModal').classList.remove('hidden'); }
@@ -2150,10 +2211,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       + '<div class="cssec">Долна секция</div>' + rows('lower');
   }
   function openCombos() { $('combosBody').innerHTML = buildComboSheet(); $('combosModal').classList.remove('hidden'); }
-  $('combosBtn').onclick = openCombos;
-  $('combosClose').onclick = function () { $('combosModal').classList.add('hidden'); };
-  $('combosModal').onclick = function (e) { if (e.target === $('combosModal')) $('combosModal').classList.add('hidden'); };
-  $('menuCombos').onclick = function () { $('menuModal').classList.add('hidden'); openCombos(); };
+  // closing the combo sheet returns to the how-to page when we arrived from there
+  function closeCombos() {
+    $('combosModal').classList.add('hidden');
+    if (combosFromHowto) { combosFromHowto = false; openHowto(); }
+  }
+  $('combosBtn').onclick = function () { combosFromHowto = false; openCombos(); };
+  $('combosClose').onclick = closeCombos;
+  $('combosModal').onclick = function (e) { if (e.target === $('combosModal')) closeCombos(); };
+  $('menuCombos').onclick = function () { combosFromHowto = false; $('menuModal').classList.add('hidden'); openCombos(); };
 
   $('menuBtn').onclick = function () {
     // bring the menu above any floating bubbles (tooltips/penalties/roasts)
@@ -2451,15 +2517,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       manualMode: manualMode,
       ownerSkipped: !!(game && game.ownerSkipped),
       ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
-      players: game.players.map(function (p) {
-        return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, personaId: p.persona ? p.persona.id : null,
-                 gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [] };
-      }),
+      players: serializePlayers(),
       moveLog: moveLog,
     });
   }
   function endGame() {
-    if (!viewingHistory) saveCurrentGame();   // archive every real game
+    if (!viewingHistory) { saveCurrentGame(); clearResume(); }   // archive + drop the resume snapshot
     var top = Math.max.apply(null, game.players.map(total)); // ranking includes the bonus
     var tied = game.players.filter(function (p) { return total(p) === top; });
     if (tied.length > 1) startTieBreak(tied, showGameOver); else showGameOver(tied[0]);
@@ -3320,15 +3383,27 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       return { key: c.key, label: c.label, fills: t.fills, hitRate: t.fills ? t.hits / t.fills : 0,
                avg: t.hits ? t.sum / t.hits : 0, rec: t.rec, avgLeak: t.fills ? t.leak / t.fills : 0 };
     }).filter(function (c) { return c.fills; });
+    // averages of every per-player report stat — updated as more games are played
+    function mean(get, dice) { var a = (dice ? diceData : data).map(get).filter(function (v) { return typeof v === 'number'; }); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
+    function stageLoss(s) { return s.n ? -s.skill / s.n : 0; }
+    var report = {
+      luck: mean(function (d) { return d.ana.luck; }, true), skill: mean(function (d) { return d.ana.skill; }),
+      lostPerTurn: mean(function (d) { return d.ana.avgLostPerTurn; }),
+      leakKeep: mean(function (d) { return d.ana.leak.keep; }, true), leakCat: mean(function (d) { return d.ana.leak.category; }),
+      sevMinor: mean(function (d) { return d.ana.severity.minor; }), sevMajor: mean(function (d) { return d.ana.severity.major; }), sevFatal: mean(function (d) { return d.ana.severity.fatal; }),
+      zeroTotal: mean(function (d) { return d.ana.zeroOuts.total; }), zeroForced: mean(function (d) { return d.ana.zeroOuts.forced; }), zeroUnforced: mean(function (d) { return d.ana.zeroOuts.unforced; }),
+      luckFirst: mean(function (d) { return d.ana.luckFirst; }, true), luckRerolls: mean(function (d) { return d.ana.luckRerolls; }, true), clutch: mean(function (d) { return d.ana.clutch; }, true),
+      stageEarly: mean(function (d) { return stageLoss(d.ana.stages.early); }), stageMid: mean(function (d) { return stageLoss(d.ana.stages.mid); }), stageLate: mean(function (d) { return stageLoss(d.ana.stages.late); }),
+    };
     return {
-      data: data, n: n, scores: scores, avgScore: avgScore, scoreSd: stdev(scores, avgScore),
+      data: data, n: n, dice: diceData.length, scores: scores, avgScore: avgScore, scoreSd: stdev(scores, avgScore),
       avgAcc: avgAcc, accSd: stdev(data.map(function (d) { return d.ana.accuracy * 100; }), avgAcc * 100),
       accSlope: trendSlope(data.map(function (d) { return d.ana.accuracy * 100; })),
       wins: data.filter(function (d) { return d.place === 1; }).length,
       best: Math.max.apply(null, scores), avgPlace: data.reduce(function (s, d) { return s + d.place; }, 0) / n,
       generals: data.filter(function (d) { return d.general; }).length,
       avgLuck: diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null,
-      catList: catList,
+      catList: catList, report: report,
     };
   }
 
@@ -3341,26 +3416,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + '(★ боец №1, не AI). Тогава архивът ще почне да трупа графиката на величието ти.</div></div>';
     }
     var n = c.n, data = c.data;
-    // favourite blunder still summarised here (the full leak table lives in §2.1 below)
     var bl = {};
     data.forEach(function (d) { var b = d.ana.blunder; if (b && b.cost < -0.5) { var k = b.chosenKey || b.turnCategory; if (k) bl[k] = (bl[k] || 0) + 1; } });
     var favBl = null, favN = 0; Object.keys(bl).forEach(function (k) { if (bl[k] > favN) { favN = bl[k]; favBl = k; } });
-    var name = (settings.useOwnerName && settings.ownerName.trim()) || data[data.length - 1].name;
+    // name: the settings battle-name, else „Старшина“ (no random game name, no ★ token)
+    var name = (settings.useOwnerName && settings.ownerName.trim()) || 'Старшина';
     var rank = G.rankForAccuracy(c.avgAcc);
     var form = data.slice(-7).map(function (d) { return d.place === 1 ? '<i class="w">П</i>' : '<i class="l">' + d.place + '</i>'; }).join('');
 
-    var h = '<div class="histover">';
-    h += '<div class="oname">' + ownerTokenHTML(true) + esc(name) + '</div>';
-    h += '<div class="histstats">'
-      + '<div class="hstat"><b>' + n + '</b><span>битки</span></div>'
-      + '<div class="hstat"><b>' + c.wins + '</b><span>победи</span></div>'
-      + '<div class="hstat"><b>' + Math.round(c.avgAcc * 100) + '%</b><span>точност</span></div></div>';
+    // collapsed: just the headline trio; everything else lives in the expandable body
+    var h = '<details class="histover"><summary class="ho-sum"><span class="oname">' + esc(name) + '</span>'
+      + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
+      + '<span class="ho-caret"></span></summary><div class="ho-body">';
     h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * c.wins / n) + '%</b> · средно място <b>' + c.avgPlace.toFixed(1) + '</b></div>';
     h += '<div class="histline">Личен рекорд: <b>' + c.best + '</b> т. · среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'
       + (c.avgLuck != null ? ' · среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>' : '') + '</div>';
     h += '<div class="histline">Хвърлени генерали: <b>' + c.generals + '</b> от ' + n + ' битки'
       + (favBl ? ' · любима издънка: <b>' + esc(CAT_LABEL[favBl] || favBl) + '</b> (×' + favN + ')' : '') + '</div>';
-    // §2.2 consistency (spread, not momentum) + §2.3 improvement slope
     var consTag = c.scoreSd < 18 ? 'стабилен' : c.scoreSd > 32 ? 'нестабилен' : 'умерен';
     h += '<div class="histline">Постоянство: <b>±' + Math.round(c.scoreSd) + ' т.</b> резултат · <b>±' + Math.round(c.accSd) + '%</b> точност <span class="hmuted">(' + consTag + ')</span></div>';
     if (c.accSlope != null) {
@@ -3369,21 +3441,41 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       h += '<div class="histline">Развитие: <b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b> <span class="hmuted">(' + word + ')</span></div>';
     }
     h += '<div class="histline">Последна форма:</div><div class="histform">' + (form || '—') + '</div>';
-    // §2.6 career coaching synthesis (worst box by average EV-leak)
     var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
     if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎯 Кариерата ти изпуска най-много в <b>' + esc(worst.label) + '</b> — средно −' + worst.avgLeak.toFixed(1) + ' т. на игра. Това е боксът за трениране.</div>';
-    // §2.1 per-category mastery table (collapsed)
-    h += '<details class="catcareer"><summary>Категории (кариера)</summary>'
-      + '<div class="cc-head"><span>комбо</span><span>влиз.</span><span>средно</span><span>рекорд</span><span>EV-теч</span></div>';
-    c.catList.slice().sort(function (a, b) { return b.avgLeak - a.avgLeak; }).forEach(function (x) {
-      h += '<div class="cc-row"><span class="cc-cat">' + esc(x.label) + '</span>'
-        + '<span>' + Math.round(x.hitRate * 100) + '%</span>'
-        + '<span>' + (x.avg ? x.avg.toFixed(0) : '—') + '</span>'
-        + '<span>' + (x.rec || '—') + '</span>'
-        + '<span class="cc-leak' + (x.avgLeak > 1 ? ' bad' : '') + '">−' + x.avgLeak.toFixed(1) + '</span></div>';
-    });
-    h += '</details>';
-    h += '</div>';
+    // category board (same layout as the end-game Категории)
+    h += '<div class="ho-sechd">Категории</div>' + careerCatBoard(c);
+    // averages of every per-player report stat
+    h += '<div class="ho-sechd">Средно от рапорта (за игра)</div>' + careerAverages(c.report);
+    h += '</div></details>';
+    return h;
+  }
+  // career category board — end-game Категории layout; tile = hit% + personal record, tinted red by EV-leak
+  function careerCatBoard(c) {
+    var byKey = {}; c.catList.forEach(function (x) { byKey[x.key] = x; });
+    function tile(cat) {
+      var x = byKey[cat.key];
+      if (!x) return '<div class="cgtile none"><span class="cg-lab">' + esc(cat.label) + '</span><span class="cg-pct">—</span><span class="cg-rec">—</span></div>';
+      var leak = x.avgLeak, a = Math.min(0.4, leak * 0.13);
+      var style = leak > 0.4 ? ' style="background:rgba(224,85,69,' + a.toFixed(2) + ');border-color:rgba(224,85,69,.55)"' : '';
+      return '<div class="cgtile"' + style + '><span class="cg-lab">' + esc(cat.label) + '</span>'
+        + '<span class="cg-pct">' + Math.round(x.hitRate * 100) + '%</span><span class="cg-rec">' + (x.rec || '—') + '</span></div>';
+    }
+    var up = G.CATEGORIES.filter(function (cc) { return cc.group === 'upper'; }).map(tile).join('');
+    var low = G.CATEGORIES.filter(function (cc) { return cc.group === 'lower'; }).map(tile).join('');
+    return '<div class="cb-legend">всяка клетка: <b>% вкарвания</b> · <b>твоят рекорд</b> · червено = теч на EV</div>'
+      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>';
+  }
+  // career averages of the per-player report stats (mirrors renderReport's stat lines)
+  function careerAverages(r) {
+    var h = '';
+    if (r.luck != null) h += '<div class="evline" style="font-size:13px"><span class="luck">' + signed(Math.round(r.luck)) + ' късмет</span> <span class="skill">' + signed(Math.round(r.skill)) + ' решения</span> · загуба ' + nBad(r.lostPerTurn, 1) + ' т./ход</div>';
+    if (r.leakKeep != null) h += statRows('Изтичане', RC.leak, ['задържания ' + nBad(r.leakKeep, 1) + ' т.', 'категории ' + nBad(r.leakCat, 1) + ' т.']);
+    else if (r.leakCat != null) h += stat('Изтичане', RC.leak, 'категории ' + nBad(r.leakCat, 1) + ' т.');
+    h += statRows('Издънки', RC.sev, [nNeut(r.sevMinor.toFixed(1)) + ' дребни', nNeut(r.sevMajor.toFixed(1)) + ' сериозни', '<b class="nn">' + r.sevFatal.toFixed(1) + '</b> фатални']);
+    if (r.luckFirst != null) h += statRows('Късмет под лупа', RC.luck, ['първо хвърляне ' + nSigned(r.luckFirst, 1), 'прехвърляния ' + nSigned(r.luckRerolls, 1), 'в решителния край ' + nSigned(r.clutch, 1)]);
+    if (r.zeroTotal != null) h += statRows('Нули', RC.zero, [nNeut(r.zeroTotal.toFixed(1)) + ' общо', nNeut(r.zeroForced.toFixed(1)) + ' принудени', '<b class="nn">' + r.zeroUnforced.toFixed(1) + '</b> от твоята игра']);
+    h += statRows('По етапи', RC.stage, ['начало <b class="nn">' + r.stageEarly.toFixed(1) + '</b> т./ход', 'среда <b class="nn">' + r.stageMid.toFixed(1) + '</b> т./ход', 'край <b class="nn">' + r.stageLate.toFixed(1) + '</b> т./ход']);
     return h;
   }
 
