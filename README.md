@@ -153,6 +153,27 @@ Every finished game opens a summary screen, also reachable by opening any archiv
 entry (the same code path renders both — `showGameOver()` works off the live
 `game`/`moveLog`, and the archive reconstructs those before calling it).
 
+Two pieces of shared math feed the whole layer (`engine.js`): the **per-category
+cube** — `analyzeGame`/`analyzeManualGame` emit a `byCategory` cell
+(`{score, leak, luck, optimal}`) per (player × category), the atom every
+per-category view reduces — and **`marginSplit(a, b, M)`**, which decomposes a
+point margin `M = ΔLuck + ΔSkill` (par cancels) into integer parts reconciled to
+sum *exactly* to the visible margin.
+
+### Headline, verdict & badges
+
+- **Hero line** (`renderWinHeadline`): *Иван спечели с 25 т.*, with the margin
+  **split** against the runner-up — *+18 умение / +7 късмет*.
+- **Verdict**, anchored on the field's **skill leader** (not necessarily 2nd on
+  points): **Тотална победа** (won on skill *and* luck), **Заслужена победа** (won
+  on skill, with or against the dice), or **Късметлийска победа** when the points
+  winner wasn't the best player — and then it *quotes the exact luck margin that
+  overturned it* (e.g. *+9 т. късмет обърнаха мача*).
+- **Badges** (`renderWinBadges`): **🥇 Победител** (points), **🎯 Тактик** (skill
+  leader), a **🍀 luck roast** (being lucky is a jab, not an honour — *Glezenik na
+  zarovete*), and **📋 Майстор на категориите** for the player holding the most
+  category records.
+
 ### Layout
 
 - **A progress chart first.** A collapsible SVG line chart (open by default) sits
@@ -164,24 +185,42 @@ entry (the same code path renders both — `showGameOver()` works off the live
   - Every player is drawn in **their own colour**; when you expand a player below,
     the other lines **dim to 45%** so their trajectory stands out. No legend — the
     colours are read straight off the results.
+  - **Swing annotations** (`swingsFor`): lead-change rings and big-jump / Генерал
+    dots; when a player is highlighted, their swings get a **`+X т.`** label.
   - The collapse state survives re-renders via `summary.chartOpen`.
 - **Collapsed player rows.** Each standings row is a coloured **rank title** (the
   rank itself is tinted in the player's colour — that *is* their colour key, so
   there's no separate dot), the name, and the value (points, or optimal % on the
   skill tab). **Tap a name** to expand that player's full report **inline, right
   between the rows**; tap again to collapse. Nothing is expanded by default.
-- **Two tabs.** **Класиране** is always points-only; **По умение** re-orders by
-  decision accuracy and swaps the chart and the per-row value to the skill view.
+- **Four tabs.** **Класиране** (points) and **Умение** (re-orders by decision
+  accuracy; chart switches to optimal %) share the chart + rows. **Късмет**
+  (`renderLuckPanel`) is a luck lens — per player **raw · luck (±) · luck-adjusted
+  (= score − luck)**, the points-native skill number; hidden in manual mode.
+  **Категории** (`renderCatBoard`) is the cross-player matrix — per category the
+  **hit fraction** (`3/4`, not a misleading percent) and the **record**, the
+  record cell tinted in the holder's colour, plus the category-master sub-award.
+- **Share card** (`shareSelected`): a 📤 button renders the **selected** player's
+  result to a PNG (canvas) — headline, rank, key stats and a roast — via the Web
+  Share API on mobile, download elsewhere.
 
 ### Per-player report (`renderReport`)
 
 The engine decomposes the game via its value function into
-`final = par + luck + skill`, then dissects it. Highlights:
+`final = par + luck + skill` (the header **rounds the parts so they sum to the
+shown final** — the remainder is absorbed into `par`, so adding them up never
+shows a gap), then dissects it. Highlights:
 
 - A **playstyle box**: the stylised archetype chip (`playstyleFor` →
   Хирург / Комарджия / Чиновник / Каскадьор / Късметлия / Новобранец / Боец), a
   **🎖 ГЕНЕРАЛ** badge when a general was rolled, the **optimal %** on the right,
   the archetype's one-liner, and the average EV lost per turn.
+- A **coaching line** (`coachLine`): one synthesised *„Поработи над: X“*
+  prescription for this game, collapsing the leak/blunder/stage diagnostics into a
+  single weakness (e.g. *избора на категория, особено в края*).
+- When you open a **past owner game from the archive**, the report adds a
+  **delta line** — this result vs your running averages (*резултат +12 т. ·
+  точност −3% …*).
 - **Biggest blunder** as a headline + a detail line: *✗ Най-скъпа грешка: игра X*
   then *по-добре Y · −Z т.*; and the **best move** above it.
 - Colour-coded stat lines, several broken onto **one item per row**: **Изтичане**
@@ -277,14 +316,25 @@ or the whole archive **cleared from settings** (with a confirm).
 - **The archive list.** Each row is a **player-count square** + the game's **date**
   (with a 👑 next to it if the owner won, or a ⊘ if the owner was skipped) on top,
   the **24-hour time** below, then the owner's score and the play / delete
-  buttons (`renderHistory`).
-- **Owner overview.** The archive opens to multi-game **trends for the owner**
-  (`ownerOverview`, owner-flagged human games only): battles, wins, win-rate,
-  average decision accuracy → a rank, personal best, average score and luck,
-  generals rolled, your **favourite blunder** (the category most often fingered),
-  average place and **recent form**. If no analysable owner games exist yet, a
-  goofy *„Няма досие на стопанина“* notice explains you need to play as the owner
-  (★, not an AI) to start a dossier.
+  buttons (`renderHistory`). Owner games carry a **percentile tag** (*топ 15%*)
+  ranking that score against your distribution to date — it **drifts as the
+  archive grows**, by design.
+- **Owner dossier** (`ownerOverview` / `computeOwnerCareer`, owner-flagged human
+  games only, honouring `ownerSkipped`). Reduces the per-category cube across your
+  games into a retrospective dossier: battles, wins, win-rate, average decision
+  accuracy → a rank, personal best, average score and luck, generals, your
+  **favourite blunder**, average place and **recent form**, plus
+  - **Consistency** — the spread (std-dev) of your score and accuracy (стабилен /
+    нестабилен), distinct from recent form's momentum.
+  - **Improvement slope** — the least-squares trend of your accuracy over time
+    (*+0.8%/битка ↗*), answering "am I getting better".
+  - **Career category table** (collapsible) — per category your **hit rate · avg ·
+    record · average EV-leak**, sorted worst-leak first (the coaching signal).
+  - **Career coaching line** — the single box you systematically misplay across
+    your whole history.
+
+  If no analysable owner games exist yet, a goofy *„Няма досие на стопанина“*
+  notice explains you need to play as the owner (★, not an AI) to start a dossier.
 - **Replay — Бойна хроника.** Every game has a scrubbable, auto-playing
   turn-by-turn / roll-by-roll viewer (`buildReplayActions` flattens the move log
   into atomic roll/commit actions in true round-robin order). It has CSS-drawn
@@ -347,9 +397,13 @@ it never re-implements the rules.
 - `keepValue(mask, dice, rolls_left, keepBools)` → the EV of a specific hold (used
   by the СЪВЕТ hint); `bestTarget` → the category a hold is aiming at.
 - `analyzeGame(turns)` → the luck/skill decomposition over a move log, plus the
-  deep metrics (severity, stages, clutch, tilt, bailout, aggression…).
+  deep metrics (severity, stages, clutch, tilt, bailout, aggression…) and the
+  `byCategory` cube (one cell per filled category).
 - `analyzeManualGame(turns)` → the category-only variant for manual games (final
   dice + pick per turn; judged against the table at `rolls_left = 0`).
+- `marginSplit(a, b, M)` → the `M = ΔLuck + ΔSkill` decomposition between two
+  players, parts reconciled to sum exactly to the point margin (luck `null` when
+  either side is manual). Backs the headline split and the verdict.
 - `botKeep` / `botCategory` → the persona policies: `optimal`, `softmax`,
   `epsilon` (ε-greedy), `greedy` (no lookup) and `random` (blind rethrows).
 
@@ -439,7 +493,8 @@ category (including multi-option suggestions and the worked examples `1 2 2 5 5`
 and `2 2 4 4 4`), dice rolling, score assignment and forfeit, turn rotation,
 game-over, ranking, hit-probabilities, risk detection, the AI's choices, the
 Bulgarian agreement engine, and the EV engine (table sanity, `evaluate`,
-luck/skill bookkeeping and the bot policies).
+luck/skill bookkeeping, the `byCategory` cube, the `marginSplit` reconciliation
+and the bot policies).
 
 The game screen (`index.html`) is verified separately with an ad-hoc **jsdom**
 smoke test during development — driving the real controller to check the summary
