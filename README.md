@@ -335,6 +335,12 @@ spec's layers and is **dependency-free**:
   CRC-16; mic echo-cancel/noise-suppression/AGC disabled, since that DSP destroys
   data-over-sound). Pluggable: swap it for ggwave without touching the layers above.
 
+Every sound workflow narrates itself: a **stage label + percentage** (so both
+devices see how much is left) and **rotating comic flavour** keyed to the protocol
+stage — *„Ехо, има ли някой?“* while a host hunts for players, *„А, видях те! ·
+Искам! · ГЕНЕРАЛ!“* as a client jumps in, *„Кога ще започваме?“* in the lobby,
+*„Ало, ще ти пратя една битка…“* while a transfer hand-shakes.
+
 In the app: tap **🔊 Мрежова игра**, then host or join. The roster broadcasts, and
 `START` builds the **same game on every phone**. In network mode the **active
 player drives input on their own device**; the host's `GRANT`/`STATE` advance

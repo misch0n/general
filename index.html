@@ -335,6 +335,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
 .xferbar{ height:10px; border-radius:6px; background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); overflow:hidden; margin:12px 0 4px; }
 .xferfill{ height:100%; width:0; background:var(--gen-brass); transition:width .2s; }
+.xferstage{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; color:var(--gen-brass-bright); font-size:14px; margin-top:6px; }
+.xferflavour, .netflavour{ font-style:italic; color:var(--gen-label); min-height:18px; }
 .reorder{ display:flex; flex-direction:column; gap:2px; }
 .reorder button{ width:24px; height:18px; border-radius:5px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:10px; line-height:1; }
 .reorder button:hover:not(:disabled){ color:var(--gen-brass); }
@@ -975,8 +977,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <button class="x-close" id="xferClose">✕</button>
     <h2 id="xferTitle">🔊 Пренос по звук</h2>
     <p class="ht">Дръж телефоните близо (~1 м), със звук нагоре.</p>
+    <div id="xferStage" class="xferstage">Свързване…</div>
     <div class="xferbar"><div id="xferFill" class="xferfill"></div></div>
-    <div id="xferStatus" class="netstatus"></div>
+    <div id="xferStatus" class="netstatus xferflavour"></div>
     <div class="setup-actions"><button id="xferCancel" class="btn">Откажи</button></div>
   </div>
 </div>
@@ -1038,7 +1041,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     </div>
     <div id="netLobby" class="hidden">
       <div id="netRoster" class="netroster"></div>
-      <div id="netStatus" class="netstatus"></div>
+      <div id="netStatus" class="netstatus netflavour"></div>
       <div class="setup-actions">
         <button id="netStart" class="btn primary hidden">⚔ Започни битката</button>
         <button id="netLeave" class="btn">Откажи</button>
@@ -1472,6 +1475,26 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('startManual').onclick = function () { startFromSetup(true); };
 
   // ===================================================== acoustic multiplayer (mp.js)
+  // rotating flavour accents per protocol stage — funny filler while sound negotiates
+  var FLAV = {
+    hostSearch: ['Ехо, има ли някой?', 'Търся някой за игра на Генерал…', 'Хайде да играем!', 'Кой е насреща?', 'Свирка! Сбор!'],
+    clientSearch: ['Чувам ли някого?', 'Подушвам игра наблизо…', 'Хост, къде си?', 'Ало-ало?'],
+    clientSaw: ['А, видях те!', 'Искам!', 'ГЕНЕРАЛ!', 'Пусни ме вътре!'],
+    lobbyWait: ['Кога ще започваме?', 'Готов съм, командире.', 'Заровете тръпнат…', 'Хайде де, мързеливци!'],
+    xSendSearch: ['Ало, ще ти пратя една битка…', 'Подай ухо, идва игра по звук.', 'Дръж телефона близо!', 'Чуваш ли ме?'],
+    xRecvSearch: ['Слушам внимателно…', 'Подавай, готов съм.', 'Ушите ми са отворени.', 'Къде си, изпращачо?'],
+    xMove: ['Бип-бууп… пренасям…', 'Не мърдай телефона!', 'Звукът работи, търпение…', 'Почти стигнахме…'],
+  };
+  var flavTimer = null, flavEl = null, flavKey = null;
+  function setFlavour(el, key) {
+    if (flavKey === key && flavEl === el) return;            // already on this stage
+    stopFlavour(); flavKey = key; flavEl = el;
+    var lines = FLAV[key] || []; if (!lines.length || !el) return;
+    var i = 0; el.textContent = lines[0];
+    flavTimer = setInterval(function () { i = (i + 1) % lines.length; if (flavEl) flavEl.textContent = lines[i]; }, 2300);
+  }
+  function stopFlavour() { if (flavTimer) clearInterval(flavTimer); flavTimer = null; flavEl = null; flavKey = null; }
+
   function netSay(s) { var el = $('netStatus'); if (el) el.innerHTML = s; }
   function localMeta() {
     applyOwnerName();
@@ -1487,11 +1510,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function netCallbacks() {
     return {
-      onStatus: netSay,
-      onRoster: function () { renderNetRoster(); if (net.isHost && net.roster.length >= net.minPlayers) $('netStart').classList.remove('hidden'); },
-      onJoined: function (id) { localPid = id; netSay('Влезе като боец №' + id + '. Изчакване на старшината…'); renderNetRoster(); },
-      onBeacon: function () { netSay('Намерих игра — пращам заявка…'); },
-      onStart: function (roster, order) { startNetGame(roster, order); },
+      onStatus: function () {},                               // app drives all user-facing text (flavour/stage)
+      onRoster: function () {
+        renderNetRoster();
+        if (net.isHost) { if (net.roster.length >= net.minPlayers) $('netStart').classList.remove('hidden'); setFlavour($('netStatus'), net.roster.length > 1 ? 'lobbyWait' : 'hostSearch'); }
+      },
+      onJoined: function (id) { localPid = id; renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait'); },
+      onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
+      onStart: function (roster, order) { stopFlavour(); startNetGame(roster, order); },
       onTurn: function (activeId) { netSetTurn(activeId); },
       onMove: function (mv) { netApplyRemote(mv); },
       onEnd: function () { if (netMode && game) endGame(); },
@@ -1516,18 +1542,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     netStartTransport(function () {
       net = newSession(true); localPid = MP.HOST_ID;
       $('netChoose').classList.add('hidden'); $('netLobby').classList.remove('hidden');
-      net.openLobby(); renderNetRoster();
+      net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
     });
   };
   $('netJoin').onclick = function () {
     netStartTransport(function () {
       net = newSession(false);
       $('netChoose').classList.add('hidden'); $('netLobby').classList.remove('hidden');
-      net.requestJoin(); netSay('🔊 Търся игра…');
+      net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
     });
   };
   $('netStart').onclick = function () { if (net && net.isHost) net.startGame(); };
   function leaveNet() {
+    stopFlavour();
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop();
     net = null; netFSK = null; netMode = false; localPid = null;
     $('netModal').classList.add('hidden');
@@ -3883,46 +3910,51 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     document.querySelectorAll('.netfeature').forEach(function (el) { el.classList.toggle('hidden', !(on && have)); });
   }
   var xfer = null, xferFSK = null;
-  function xferSay(s) { $('xferStatus').innerHTML = s; }
+  function xferStage(s) { $('xferStage').textContent = s; }
   function xferProgress(done, total) { $('xferFill').style.width = (total ? Math.round(100 * done / total) : 0) + '%'; }
+  // stage + percentage so both owners see exactly how far along the transfer is
+  function xferStep(verb, done, total) { var pct = total ? Math.round(100 * done / total) : 0; xferStage(verb + ' ' + pct + '% (' + done + '/' + total + ')'); xferProgress(done, total); setFlavour($('xferStatus'), 'xMove'); }
   function openXfer(title) {
-    $('xferTitle').textContent = title; xferSay(''); xferProgress(0, 1);
+    $('xferTitle').textContent = title; xferStage('Свързване…'); $('xferStatus').textContent = ''; xferProgress(0, 1);
     $('xferModal').classList.remove('hidden');
   }
   function closeXfer() {
+    stopFlavour();
     if (xfer) { try { xfer.dispose(); } catch (e) {} }
     if (xferFSK && xferFSK.stop) { try { xferFSK.stop(); } catch (e) {} }
     xfer = null; xferFSK = null; $('xferModal').classList.add('hidden');
   }
   $('xferCancel').onclick = closeXfer; $('xferClose').onclick = closeXfer;
   function xferTransport(then) {
-    if (!(window.MP && MP.AudioFSK)) { xferSay('Звукът не е наличен.'); return; }
+    if (!(window.MP && MP.AudioFSK)) { xferStage('Звукът не е наличен.'); return; }
     xferFSK = new MP.AudioFSK();
-    xferSay('🎙 Включвам микрофон/говорител…');
-    xferFSK.start().then(then).catch(function () { xferSay('Няма достъп до микрофона.'); });
+    xferStage('🎙 Включвам микрофон…');
+    xferFSK.start().then(then).catch(function () { xferStage('Няма достъп до микрофона.'); });
   }
   $('exportAcoustic').onclick = function () {
     if (!currentExportRec) return;
     $('exportModal').classList.add('hidden');
-    openXfer('📡 Изпращам по звук');
+    openXfer('📡 Изпращане на игра');
     xferTransport(function () {
+      xferStage('Търся приемник…'); setFlavour($('xferStatus'), 'xSendSearch');
       var blob = MP.packRecord(currentExportRec, CAT_KEYS);
       xfer = new MP.Transfer({ transport: xferFSK, mode: 'send', data: blob, callbacks: {
-        onStatus: xferSay, onProgress: xferProgress,
-        onSent: function () { xferProgress(1, 1); xferSay('✓ Изпратено.'); },
+        onProgress: function (done, total) { xferStep('Изпращам', done, total); },
+        onSent: function () { stopFlavour(); xferProgress(1, 1); xferStage('✓ Изпратено!'); $('xferStatus').textContent = 'Готово, командире.'; },
       } });
       xfer.start();
     });
   };
   $('importAcoustic').onclick = function () {
     $('historyModal').classList.add('hidden');
-    openXfer('🔊 Приемам по звук');
+    openXfer('🔊 Приемане на игра');
     xferTransport(function () {
+      xferStage('Търся изпращач…'); setFlavour($('xferStatus'), 'xRecvSearch');
       xfer = new MP.Transfer({ transport: xferFSK, mode: 'recv', callbacks: {
-        onStatus: xferSay, onProgress: xferProgress,
-        onError: function () { xferSay('Грешка при приемане.'); },
+        onProgress: function (done, total) { xferStep('Приемам', done, total); },
+        onError: function () { stopFlavour(); xferStage('Грешка при приемане.'); },
         onComplete: function (blob) {
-          xferProgress(1, 1); xferSay('✓ Получено.');
+          stopFlavour(); xferProgress(1, 1); xferStage('✓ Получено!');
           var rec; try { rec = MP.sanitizeRecord(MP.unpackRecord(blob, CAT_KEYS), CAT_KEYS); } catch (e) { rec = null; }
           closeXfer();
           if (!rec) { openImport(); importError('Получените данни са невалидни.'); return; }
