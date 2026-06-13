@@ -487,3 +487,33 @@ test('botPolicyForAccuracy ladders strength to measured accuracy', function () {
   assert.strictEqual(EV.botPolicyForAccuracy(null).type, 'softmax');   // unknown → solid default
   assert.ok(EV.botPolicyForAccuracy(0.85).tau < EV.botPolicyForAccuracy(0.72).tau, 'higher accuracy → sharper softmax');
 });
+
+// ---- L0 AudioFSK: the timestamp-based decoder actually reassembles a frame ----
+test('AudioFSK decoder round-trips a frame (software TX→RX over the symbol timer)', function () {
+  var fsk = new MP.AudioFSK({}); fsk.ctx = { sampleRate: 48000 }; fsk.baud = 12; fsk.os = 8; fsk._reset();
+  var got = null; fsk.onReceive(function (p) { got = Array.from(p); });
+  function crc16(b) { var c = 0xffff; for (var i = 0; i < b.length; i++) { c ^= b[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
+  var payload = [7, 42, 200, 13, 0], crc = crc16(payload), full = [payload.length].concat(payload, [(crc >> 8) & 255, crc & 255]);
+  var bits = []; full.forEach(function (B) { for (var b = 7; b >= 0; b--) bits.push((B >> b) & 1); });
+  var bitMs = 1000 / fsk.baud, tick = bitMs / 8, t = 0;        // ~8 reads/bit, evenly clocked
+  for (var i = 0; i < 80; i++) { fsk._decode(1, 0.01, 0.01, 0, true, t); t += tick; }                // preamble (sync tone)
+  bits.forEach(function (bit) { for (var j = 0; j < 8; j++) { fsk._decode(0.01, bit ? 0.02 : 1, bit ? 1 : 0.02, bit ? 2 : 1, true, t); t += tick; } });
+  for (var s = 0; s < 20; s++) { fsk._decode(0, 0, 0, -1, false, t); t += tick; }                    // trailing silence flushes the last bit
+  assert.deepStrictEqual(got, payload, 'payload decoded intact through the FSK symbol decoder');
+  assert.strictEqual(fsk.stats.framesOk, 1);
+});
+
+test('AudioFSK packet capture records ticks + frame outcomes', function () {
+  var fsk = new MP.AudioFSK({}); fsk.ctx = { sampleRate: 48000 }; fsk.baud = 12; fsk.os = 8; fsk._reset();
+  fsk.setRole('host'); fsk.startCapture();
+  fsk._cap(10, 0.5, 0.1, 0.1, 0, true, false); fsk._cap(20, 0.1, 0.6, 0.1, 1, true, false);
+  fsk._capFrame('ok', new Uint8Array([3, 1, 2, 3, 4, 5]));
+  fsk.stopCapture();
+  var cap = fsk.getCapture();
+  assert.strictEqual(cap.role, 'host');
+  assert.ok(cap.meta.baud === 12 && cap.meta.os === 8);
+  assert.strictEqual(cap.ticks.length, 2);
+  assert.strictEqual(cap.frames.length, 1);
+  assert.strictEqual(cap.frames[0].result, 'ok');
+  assert.ok(/^[0-9a-f]+$/.test(cap.frames[0].hex));
+});

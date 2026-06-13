@@ -397,6 +397,11 @@ body.modal-open{ overflow:hidden; }
 .nd-stats b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
 .nd-hint{ font-size:10.5px; color:var(--gen-muted); line-height:1.5; margin:6px 0; }
 .nd-hint b{ color:var(--gen-label); }
+.nd-cap{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-pill-line); }
+.nd-cap #ndRec.on{ background:rgba(178,58,46,.55); color:#fff; border-color:var(--gen-alert-line); }
+.nd-capstat{ font-size:11px; color:var(--gen-label); text-align:center; margin:6px 0; min-height:14px; }
+.nd-capout{ width:100%; height:70px; font-size:9px; font-family:monospace; color:var(--gen-muted); background:rgba(0,0,0,.3);
+  border:1px solid var(--gen-pill-line); border-radius:7px; padding:6px; resize:vertical; word-break:break-all; }
 /* link-quality signal bars + warnings */
 .netbars{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:var(--gen-muted); min-height:16px; margin:6px 0; }
 .netbars:empty{ display:none; }
@@ -961,7 +966,7 @@ body.modal-open{ overflow:hidden; }
     </div>
     <p class="modehint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
     <div class="setup-actions">
-      <button id="netBtn" class="btn netfeature hidden">🔊 Мрежова игра</button>
+      <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
     </div>
     <div class="setup-actions">
       <button id="howtoBtn" class="btn">📖 Правила</button>
@@ -1250,7 +1255,7 @@ body.modal-open{ overflow:hidden; }
 <div id="netModal" class="overlay hidden">
   <div class="modal" style="max-width:330px;text-align:center">
     <button class="x-close" id="netClose">✕</button>
-    <h2>🔊 Мрежова игра</h2>
+    <h2>🔊 Акустична игра</h2>
     <p class="ht">Играй на няколко телефона наблизо — звукът пренася ходовете. Дръж телефоните на ~1 м, със звук нагоре.</p>
     <div class="acwarn"><span class="acw-ic">🎧</span><span><b>Без слушалки!</b> Звукът трябва да минава през високоговорителя и микрофона — със слушалки преносът не работи.</span></div>
     <div id="netChoose">
@@ -1262,7 +1267,7 @@ body.modal-open{ overflow:hidden; }
         <button id="netJoin" class="btn">🎧 Влез в игра</button>
       </div>
       <div class="setup-actions">
-        <button id="netDiagBtn" class="btn small">🔧 Тест на звука (диагностика)</button>
+        <button id="netDiagBtn" class="btn small hidden">🔧 Тест на звука (диагностика)</button>
       </div>
     </div>
     <!-- acoustic diagnostics: live tone meters + test tones, to debug the link on real devices -->
@@ -1280,7 +1285,17 @@ body.modal-open{ overflow:hidden; }
         <button id="ndTone1" class="btn small">🔊 тон f1</button>
         <button id="ndToneFrame" class="btn small">📦 тестов пакет</button>
       </div>
-      <div class="nd-hint">Отвори това на <b>двете</b> устройства. Пусни тон на едното — на другото съответната лента трябва да <b>светне</b> (значи се чуват). „тестов пакет" праща истинска рамка: ако другото устройство я декодира, броячът <b>OK</b> се вдига.</div>
+      <div class="nd-hint">Отвори това на <b>двете</b> устройства. Пусни тон на едното — на другото съответната лента трябва да <b>светне</b> (значи се чуват). „тестов пакет" праща истинска рамка: ако другото устройство я декодира, броячът <b>декодирани</b> се вдига.</div>
+      <!-- packet capture: record everything, export base64 JSON from both devices -->
+      <div class="nd-cap">
+        <div class="setup-actions">
+          <button id="ndRec" class="btn small">⏺ Запиши</button>
+          <button id="ndCopy" class="btn small" disabled>📋 Копирай записа</button>
+        </div>
+        <div id="ndCapStatus" class="nd-capstat"></div>
+        <textarea id="ndCapOut" class="nd-capout hidden" readonly></textarea>
+        <div class="nd-hint">Натисни <b>Запиши</b> на двете устройства, пусни „тестов пакет", спри и <b>Копирай записа</b>. Прати и двата записа — те съдържат тоновете тик по тик и опитите за декодиране.</div>
+      </div>
       <div class="setup-actions"><button id="ndClose" class="btn primary">Затвори</button></div>
     </div>
     <div id="netLobby" class="hidden">
@@ -1367,7 +1382,7 @@ body.modal-open{ overflow:hidden; }
   // selectKeep: which dice you tap each throw — false = tap the ones to RE-THROW (ОГИН!),
   // true = tap the ones to KEEP (ДРЪЖ!). Per-device; travels with saved games so replays
   // and reports read back in the same flavour they were played.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, selectKeep: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, acousticDebug: false, selectKeep: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1380,14 +1395,14 @@ body.modal-open{ overflow:hidden; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, acoustic: settings.acoustic, selectKeep: settings.selectKeep, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
+              barracks: settings.barracks, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, selectKeep: settings.selectKeep, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'selectKeep', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'acousticDebug', 'selectKeep', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -1970,6 +1985,7 @@ body.modal-open{ overflow:hidden; }
     var s = netFSK.stats, ago = s.lastRxMs ? Math.round((Date.now() - s.lastRxMs) / 1000) + 'с назад' : '—';
     $('ndStats').innerHTML = 'декодирани <b>' + s.framesOk + '</b> · CRC-грешки <b>' + s.crcFail + '</b> · шум <b>' + s.junk + '</b><br>'
       + 'пратени <b>' + s.tx + '</b> · чути тонове <b>' + s.heard + '</b> · последна рамка <b>' + ago + '</b>';
+    ndUpdateCapStatus();
   }
   function openNetDiag() {
     function go() {
@@ -1993,12 +2009,34 @@ body.modal-open{ overflow:hidden; }
   $('ndTone0').onclick = function () { if (netFSK) netFSK.playTone(netFSK.f0, 800); };
   $('ndTone1').onclick = function () { if (netFSK) netFSK.playTone(netFSK.f1, 800); };
   $('ndToneFrame').onclick = function () { if (netFSK) netFSK.send(new Uint8Array([MP.T.PING, 0, 0])); };  // a real frame — the other device's „декодирани" rises if it reads it
+  // ---- packet capture (export base64 JSON from both devices for offline analysis) ----
+  function ndUpdateCapStatus() {
+    if (!netFSK) return;
+    if (netFSK._capOn) $('ndCapStatus').textContent = '⏺ записвам… ' + (netFSK._capTicks ? netFSK._capTicks.length : 0) + ' тика';
+    else if (netFSK._capTicks && netFSK._capTicks.length) $('ndCapStatus').textContent = 'записани ' + netFSK._capTicks.length + ' тика · ' + (netFSK._capFrames ? netFSK._capFrames.length : 0) + ' рамки — готово за копиране';
+    else $('ndCapStatus').textContent = '';
+  }
+  $('ndRec').onclick = function () {
+    if (!netFSK) return;
+    if (netFSK._capOn) { netFSK.stopCapture(); $('ndRec').classList.remove('on'); $('ndRec').textContent = '⏺ Запиши'; $('ndCopy').disabled = !(netFSK._capTicks && netFSK._capTicks.length); }
+    else { netFSK.setRole(net ? (net.isHost ? 'host' : 'client') : 'diag'); netFSK.startCapture(); $('ndRec').classList.add('on'); $('ndRec').textContent = '⏹ Спри'; $('ndCopy').disabled = true; $('ndCapOut').classList.add('hidden'); }
+    ndUpdateCapStatus();
+  };
+  $('ndCopy').onclick = function () {
+    if (!netFSK || !netFSK.getCapture) return;
+    var b64; try { b64 = 'GENCAP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(netFSK.getCapture())))); } catch (e) { b64 = 'грешка: ' + e.message; }
+    var ta = $('ndCapOut'); ta.value = b64; ta.classList.remove('hidden'); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(b64).then(function () {}, function () {});
+    $('ndCapStatus').textContent = (ok ? '✓ копирано · ' : '') + b64.length + ' знака (избери и копирай ръчно ако трябва)';
+  };
   function newSession(isHost) {
     return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
   }
   $('netBtn').onclick = function () {
     $('netMeName').textContent = localMeta().name;
     netShow('choose'); $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay('');
+    $('netDiagBtn').classList.toggle('hidden', !settings.acousticDebug);   // diagnostics gated behind the debug sub-switch
     $('netModal').classList.remove('hidden');
   };
   $('netHost').onclick = function () {
@@ -3034,8 +3072,11 @@ body.modal-open{ overflow:hidden; }
         setupPlayers.forEach(swapCensorName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
-    // Акустика — reveals every data-over-sound feature (network play + sound transfer)
-    { key: 'acoustic', label: 'Акустика', onChange: function () { syncAcousticUI(); } },
+    // Акустична мрежа — reveals every data-over-sound feature (network play + sound transfer);
+    // its hidden sub-toggle „Дебъг" exposes the acoustic test/diagnostics + packet capture
+    { key: 'acoustic', label: 'Акустична мрежа',
+      sub: { key: 'acousticDebug', label: 'Дебъг режим', onChange: function () { syncAcousticUI(); } },
+      onChange: function () { syncAcousticUI(); } },
   ];
   var devTaps = [];
   function buildSettingsRows(inGame) {
@@ -4654,6 +4695,8 @@ body.modal-open{ overflow:hidden; }
     var on = !!settings.acoustic;
     var have = !!(window.MP && MP.AudioFSK);
     document.querySelectorAll('.netfeature').forEach(function (el) { el.classList.toggle('hidden', !(on && have)); });
+    // the acoustic test/diagnostics + capture live behind the „Дебъг" sub-switch
+    if ($('netDiagBtn')) $('netDiagBtn').classList.toggle('hidden', !(on && have && settings.acousticDebug));
   }
   var xfer = null, xferFSK = null;
   function xferStage(s) { $('xferStage').textContent = s; }

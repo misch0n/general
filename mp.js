@@ -735,7 +735,7 @@
   // and control. Per-phase defaults: handshake/transfer are fast & close-range,
   // gameplay is slow/robust/long-range (tiny human-paced messages hide the slowness).
   var PROFILES = [
-    { id: 0, name: 'anchor',   f0: 1700, f1: 2100, baud: 24, volume: 0.5,  ecc: 3 },  // floor: loud, mid-band, heavy ECC
+    { id: 0, name: 'anchor',   f0: 1700, f1: 2100, baud: 12, volume: 0.5,  ecc: 3 },  // floor: loud, mid-band, SLOW so a throttled mobile timer still gets ~8 reads/bit
     { id: 1, name: 'gameplay', f0: 5200, f1: 6200, baud: 40, volume: 0.46, ecc: 2 },  // upper-audible, robust, long range
     { id: 2, name: 'setup',    f0: 6000, f1: 7000, baud: 70, volume: 0.42, ecc: 1 },  // faster, close range
     { id: 3, name: 'transfer', f0: 6200, f1: 7200, baud: 96, volume: 0.42, ecc: 0 },  // fast, one-time, close
@@ -844,7 +844,7 @@
     packMove: packMove, unpackMove: unpackMove, packStateDelta: packStateDelta, packStateSnapshot: packStateSnapshot, unpackState: unpackState,
     Session: Session,
   };
-  if (typeof window !== 'undefined') api.AudioFSK = makeAudioFSK();   // browser-only L0
+  api.AudioFSK = makeAudioFSK();   // L0 (start() is browser-only, but the constructor + codec are testable anywhere)
   return api;
 
   // ============================================================ L0: audio FSK
@@ -864,13 +864,15 @@
       this.baud = opts.baud || BAUD;
       this.f0 = opts.f0 || F0; this.f1 = opts.f1 || F1; this.fsync = opts.fsync || FSYNC;
       this.volume = opts.volume || 0.4;
-      this.os = opts.os || 6;            // RX ticks sampled per transmitted bit (symbol timing)
+      this.os = opts.os || 8;            // target RX ticks per bit (poll rate = baud*os); robust margin vs timer throttling
       this.floor = opts.floor || 3e-4;   // absolute power floor below which a tick is silence
       this.snr = opts.snr || 2.2;        // a tone must beat the next-loudest by this ratio to count
       this.ctx = null; this.stream = null; this._cb = null; this._meterCb = null; this._monCb = null; this._rxTimer = null;
-      this._sending = false; this._forceListen = false;
+      this._sending = false; this._forceListen = false; this.role = opts.role || '?';
       this.stats = { ticks: 0, heard: 0, framesOk: 0, crcFail: 0, junk: 0, lastRxMs: 0, lastType: -1, tx: 0 };
+      this._capOn = false; this._capTicks = null; this._capFrames = null; this._capT0 = 0; this.CAP_MAX = 6000;
     }
+    function _now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
     // §2 adopt a profile (band / baud / volume); the receiver retunes its detector too
     AudioFSK.prototype.setProfile = function (p) {
       if (!p) return; this.f0 = p.f0; this.f1 = p.f1; this.baud = p.baud; if (p.volume) this.volume = p.volume;
@@ -925,6 +927,7 @@
       var bits = []; for (var i = 0; i < full.length; i++) for (var b = 7; b >= 0; b--) bits.push((full[i] >> b) & 1);
       var t = this.ctx.currentTime + 0.05, dt = 1 / this.baud, self = this;
       this._sending = true; this.stats.tx++;
+      if (this._capOn && this._capFrames) this._capFrames.push({ t: Math.round(_now() - this._capT0), dir: 'tx', n: full.length, type: payload.length ? payload[0] : -1, bits: bits.length });
       function tone(freq, start, dur) {
         var o = self.ctx.createOscillator(), g = self.ctx.createGain();
         o.frequency.value = freq; o.connect(g); g.connect(self.ctx.destination);
@@ -933,7 +936,7 @@
         g.gain.setValueAtTime(self.volume, start + dur - 0.004); g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
         o.start(start); o.stop(start + dur);
       }
-      tone(this.fsync, t, dt * 6); t += dt * 6;                      // preamble
+      tone(this.fsync, t, dt * 10); t += dt * 10;                    // preamble (long, so the RX has time to lock)
       for (var k = 0; k < bits.length; k++) { tone(bits[k] ? this.f1 : this.f0, t, dt); t += dt; }
       var done = t - this.ctx.currentTime;
       return new Promise(function (res) { setTimeout(function () { self._sending = false; res(); }, done * 1000 + 30); });
@@ -951,56 +954,87 @@
       this._reset();
       this._rxTimer = setInterval(function () {
         if (!self._an) return;
-        if (self._sending && !self._forceListen) return;    // half-duplex: don't decode our own TX
+        var now = _now();
+        if (self._sending && !self._forceListen) { if (self._capOn) self._cap(now, 0, 0, 0, -1, false, true); return; }  // half-duplex
         var n = self._buf.length, win = Math.min(n, Math.max(256, Math.round(self.ctx.sampleRate / self.baud)));
         self._an.getFloatTimeDomainData(self._buf);
         var off = n - win;                                   // analyse the most recent ~1 bit of audio
         var ps = self._goertzel(self._buf, self.fsync, off, win), p0 = self._goertzel(self._buf, self.f0, off, win), p1 = self._goertzel(self._buf, self.f1, off, win);
         self.stats.ticks++;
-        // which tone (if any) is clearly present: dominant must beat the 2nd-loudest by snr×
         var a = [ps, p0, p1], dom = Math.max(ps, p0, p1), domIdx = ps === dom ? 0 : (p0 === dom ? 1 : 2);
         var second = a[0] + a[1] + a[2] - dom - Math.min(ps, p0, p1);
         var clear = dom > self.floor && dom > self.snr * (second || 1e-12);
         if (clear) self.stats.heard++;
+        // the reading reflects audio centred ~half a window in the past — align bit timing to that
+        var audioT = now - 1000 * win / 2 / self.ctx.sampleRate;
         if (self._monCb) try { self._monCb({ ps: ps, p0: p0, p1: p1, dom: dom, domIdx: domIdx, clear: clear, sending: self._sending }); } catch (e) {}
-        if (!self._sending) self._decode(ps, p0, p1, domIdx, clear);
+        if (self._capOn) self._cap(now, ps, p0, p1, domIdx, clear, false);
+        self._decode(ps, p0, p1, domIdx, clear, audioT);
       }, 1000 / (this.baud * this.os));
     };
-    AudioFSK.prototype._reset = function () { this._d = { phase: 'idle', pre: 0, gap: 0, bits: [], a0: 0, a1: 0, tib: 0, len: null }; };
-    // proper symbol-timed decoder: lock the preamble (fsync), align to the preamble→data
-    // edge, then integrate each bit over `os` ticks and slice it once per bit period.
-    AudioFSK.prototype._decode = function (ps, p0, p1, domIdx, clear) {
-      var st = this._d || (this._d = { phase: 'idle', pre: 0 });
+    AudioFSK.prototype._cap = function (now, ps, p0, p1, domIdx, clear, sending) {
+      if (!this._capTicks || this._capTicks.length >= this.CAP_MAX) return;
+      var ph = !this._d ? 0 : (this._d.phase === 'idle' ? 0 : this._d.phase === 'pre' ? 1 : 2);
+      this._capTicks.push([Math.round(now - this._capT0), +ps.toPrecision(3), +p0.toPrecision(3), +p1.toPrecision(3),
+        domIdx, clear ? 1 : 0, sending ? 1 : 0, ph, this._d && this._d.bits ? this._d.bits.length : 0]);
+    };
+    AudioFSK.prototype._reset = function () { this._d = { phase: 'idle', pre: 0, gap: 0, bits: [], len: null }; };
+    // timestamp-driven symbol decoder: lock the preamble (fsync), mark the preamble→data
+    // edge time t0, then slice bits by REAL elapsed time (robust to setInterval jitter,
+    // which is what was breaking decoding on phones — ticks/bit drift with timer throttling).
+    AudioFSK.prototype._decode = function (ps, p0, p1, domIdx, clear, t) {
+      var st = this._d, bitMs = 1000 / this.baud;
       if (st.phase === 'idle') {
-        if (clear && domIdx === 0) { if (++st.pre >= Math.round(this.os * 2.5)) { st.phase = 'pre'; st.gap = 0; } }
-        else if (!clear) { st.pre = 0; }
+        if (clear && domIdx === 0) { if (++st.pre >= Math.max(5, Math.round(this.os * 2))) { st.phase = 'pre'; st.gap = 0; } }
+        else if (!clear) { st.pre = Math.max(0, st.pre - 1); }
         return;
       }
-      if (st.phase === 'pre') {                               // locked on preamble; wait for the data tones
-        if (clear && domIdx >= 1) { st.phase = 'data'; st.bits = []; st.a0 = p0; st.a1 = p1; st.tib = 1; st.len = null; st.gap = 0; }
-        else if (clear && domIdx === 0) { /* still preamble */ }
-        else if (++st.gap > this.os * 2) { this._reset(); }
+      if (st.phase === 'pre') {                               // on the preamble; wait for the first data tone
+        if (clear && domIdx >= 1) { st.phase = 'data'; st.bits = []; st.len = null; st.gap = 0; st.t0 = t; st.cur = 0; st.a0 = p0; st.a1 = p1; st.nAcc = 1; }
+        else if (clear && domIdx === 0) { st.gap = 0; }
+        else if (++st.gap > this.os * 3) { this._reset(); }
         return;
       }
-      // data: accumulate this tick's tone energy into the current bit
-      if (clear) { st.a0 += p0; st.a1 += p1; st.gap = 0; } else { st.gap++; }
-      if (++st.tib >= this.os) {                              // one bit elapsed → slice it
-        st.bits.push(st.a1 > st.a0 ? 1 : 0); st.a0 = 0; st.a1 = 0; st.tib = 0;
-        if (st.bits.length === 8 && st.len == null) st.len = bitsToByte(st.bits, 0);
-        if (st.len != null && st.bits.length >= (1 + st.len + 2) * 8) { this._finish(st); return; }
+      // data: which bit index does this reading fall in (by elapsed time)?
+      var bi = Math.floor((t - st.t0) / bitMs);
+      if (bi < st.cur) bi = st.cur;
+      if (bi === st.cur) { if (clear) { st.a0 += p0; st.a1 += p1; st.nAcc++; } }
+      else {                                                  // crossed ≥1 bit boundary → slice the completed bit(s)
+        while (st.cur < bi) {
+          var bit = st.nAcc > 0 ? (st.a1 > st.a0 ? 1 : 0) : (p1 > p0 ? 1 : 0);
+          st.bits.push(bit); st.cur++; st.a0 = 0; st.a1 = 0; st.nAcc = 0;
+          if (st.bits.length === 8 && st.len == null) st.len = bitsToByte(st.bits, 0);
+          if (st.len != null && st.bits.length >= (1 + st.len + 2) * 8) { this._finish(st); return; }
+        }
+        if (clear) { st.a0 = p0; st.a1 = p1; st.nAcc = 1; }   // start accumulating the new current bit
       }
-      if (st.gap > this.os * 2) { if (st.bits.length >= 24) this._finish(st); else this._reset(); }  // signal lost
+      if (clear) st.gap = 0; else st.gap++;
+      if (st.gap > this.os * 3) { if (st.len != null && st.bits.length >= (1 + st.len + 2) * 8) this._finish(st); else this._reset(); }  // signal lost
     };
     AudioFSK.prototype._finish = function (st) {
       this._reset();
-      var nbytes = Math.floor(st.bits.length / 8); if (nbytes < 3) { this.stats.junk++; this._meter(false); return; }
+      var nbytes = Math.floor(st.bits.length / 8); if (nbytes < 3) { this.stats.junk++; this._capFrame('junk', null); this._meter(false); return; }
       var bytes = new Uint8Array(nbytes); for (var i = 0; i < nbytes; i++) bytes[i] = bitsToByte(st.bits, i * 8);
-      var len = bytes[0]; if (len + 3 > bytes.length) { this.stats.junk++; this._meter(false); return; }
+      var len = bytes[0]; if (len + 3 > bytes.length) { this.stats.junk++; this._capFrame('junk', bytes); this._meter(false); return; }
       var payload = bytes.slice(1, 1 + len), got = (bytes[1 + len] << 8) | bytes[1 + len + 1];
-      if (crc16(payload) !== got) { this.stats.crcFail++; this._meter(false); return; }   // failed CRC ⇒ drop + meter
+      if (crc16(payload) !== got) { this.stats.crcFail++; this._capFrame('crc', bytes); this._meter(false); return; }
       this.stats.framesOk++; this.stats.lastRxMs = Date.now(); this.stats.lastType = payload.length ? payload[0] : -1;
-      this._meter(true);
+      this._capFrame('ok', bytes); this._meter(true);
       if (this._cb) try { this._cb(payload); } catch (e) {}
+    };
+    AudioFSK.prototype._capFrame = function (result, bytes) {
+      if (!this._capOn || !this._capFrames) return;
+      var hex = bytes ? Array.prototype.map.call(bytes.slice(0, 12), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('') : '';
+      this._capFrames.push({ t: Math.round(_now() - this._capT0), dir: 'rx', result: result, n: bytes ? bytes.length : 0, hex: hex });
+    };
+    AudioFSK.prototype.setRole = function (r) { this.role = r; };
+    AudioFSK.prototype.startCapture = function () { this._capTicks = []; this._capFrames = []; this._capT0 = _now(); this._capOn = true; };
+    AudioFSK.prototype.stopCapture = function () { this._capOn = false; };
+    AudioFSK.prototype.getCapture = function () {
+      return { v: 1, role: this.role, t: Date.now(),
+        meta: { f0: this.f0, f1: this.f1, fsync: this.fsync, baud: this.baud, os: this.os, floor: this.floor, snr: this.snr, sr: this.ctx ? this.ctx.sampleRate : 0 },
+        stats: this.stats, cols: ['ms', 'sync', 'f0', 'f1', 'dom', 'clear', 'send', 'phase', 'bits'],
+        ticks: this._capTicks || [], frames: this._capFrames || [] };
     };
     AudioFSK.prototype._meter = function (ok) { if (this._meterCb) try { this._meterCb({ ok: ok }); } catch (e) {} };
     function bitsToByte(bits, off) { var v = 0; for (var i = 0; i < 8; i++) v = (v << 1) | (bits[off + i] || 0); return v; }
