@@ -165,7 +165,10 @@
     this._ct = opts.clearTimeout || function (id) { clearTimeout(id); };
     this.rand = opts.rand || Math.random;
     this.p = {};
-    var dflt = { beacon: 1500, joinRetry: 2500, moveTimeout: 15000, retransmit: 4 };
+    // intervals are LONG: each acoustic frame takes ~1-3 s and the link is half-duplex,
+    // so re-sends must be spaced past a frame's airtime or transmits just pile up and
+    // the device never opens a listening window.
+    var dflt = { beacon: 3500, joinRetry: 4500, moveTimeout: 20000, retransmit: 4 };
     for (var k in dflt) this.p[k] = (opts.params && opts.params[k] != null) ? opts.params[k] : dflt[k];
 
     this.seq = 0;
@@ -735,7 +738,7 @@
   // and control. Per-phase defaults: handshake/transfer are fast & close-range,
   // gameplay is slow/robust/long-range (tiny human-paced messages hide the slowness).
   var PROFILES = [
-    { id: 0, name: 'anchor',   f0: 1700, f1: 2100, baud: 12, volume: 0.5,  ecc: 3 },  // floor: loud, mid-band, SLOW so a throttled mobile timer still gets ~8 reads/bit
+    { id: 0, name: 'anchor',   f0: 1700, f1: 2100, baud: 24, volume: 0.5,  ecc: 3 },  // floor: loud, mid-band; ~1 s short frames so half-duplex talk/listen can alternate
     { id: 1, name: 'gameplay', f0: 5200, f1: 6200, baud: 40, volume: 0.46, ecc: 2 },  // upper-audible, robust, long range
     { id: 2, name: 'setup',    f0: 6000, f1: 7000, baud: 70, volume: 0.42, ecc: 1 },  // faster, close range
     { id: 3, name: 'transfer', f0: 6200, f1: 7200, baud: 96, volume: 0.42, ecc: 0 },  // fast, one-time, close
@@ -913,11 +916,14 @@
         // Sample from the AUDIO THREAD (ScriptProcessor), NOT setInterval — mobile throttles
         // setInterval (we measured ~30 ms, far below the symbol rate), which desynced the
         // bit clock. The audio callback fires at a fixed sample cadence regardless.
-        var bufSize = 512;   // ~10.7 ms at 48 kHz → plenty of reads/bit, immune to timer throttling
+        var bufSize = 256;   // ~5.3 ms at 48 kHz → ~8 reads/bit even at baud 24, immune to timer throttling
         var mk = self.ctx.createScriptProcessor || self.ctx.createJavaScriptNode;
         var sp = mk.call(self.ctx, bufSize, 1, 1); self._sp = sp;
         self._ringSize = 16384; self._ring = new Float32Array(self._ringSize); self._ringPos = 0; self._samples = 0;
-        sp.onaudioprocess = function (e) { self._onAudio(e.inputBuffer.getChannelData(0)); };
+        sp.onaudioprocess = function (e) {
+          self._onAudio(e.inputBuffer.getChannelData(0));
+          var out = e.outputBuffer.getChannelData(0); for (var i = 0; i < out.length; i++) out[i] = 0;   // never echo mic→speaker
+        };
         src.connect(sp); sp.connect(self.ctx.destination);   // must be connected to fire; output stays silent
         self._reset();
         return true;
@@ -949,10 +955,23 @@
       return (s1 * s1 + s2 * s2 - c * s1 * s2) / win;   // normalise by window so the floor is comparable across bauds
     };
     AudioFSK.prototype.onReceive = function (cb) { this._cb = cb; };
-    // —— TX: emit a length-prefixed, CRC-16'd, FSK-encoded frame ——
+    // —— TX: queue frames and emit ONE at a time. Two devices both trying to talk over a
+    // half-duplex acoustic link will collide; serialising + a listen-gap after each frame
+    // guarantees a window where the device is actually listening for the other side. ——
     AudioFSK.prototype.send = function (bytes) {
       if (!this.ctx) return Promise.resolve();
       var payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      this._txq = this._txq || [];
+      this._txq.push(payload);
+      if (this._txq.length > 4) this._txq.splice(0, this._txq.length - 4);   // bound the backlog (drop the stalest)
+      this._txPump();
+      return Promise.resolve();
+    };
+    AudioFSK.prototype._txPump = function () {
+      if (this._sending || !this.ctx || !this._txq || !this._txq.length) return;
+      this._emit(this._txq.shift());
+    };
+    AudioFSK.prototype._emit = function (payload) {
       var crc = crc16(payload);
       var full = new Uint8Array(1 + payload.length + 2);
       full[0] = payload.length; full.set(payload, 1); full[full.length - 2] = (crc >> 8) & 255; full[full.length - 1] = crc & 255;
@@ -971,7 +990,11 @@
       tone(this.fsync, t, dt * 10); t += dt * 10;                    // preamble (long, so the RX has time to lock)
       for (var k = 0; k < bits.length; k++) { tone(bits[k] ? this.f1 : this.f0, t, dt); t += dt; }
       var done = t - this.ctx.currentTime;
-      return new Promise(function (res) { setTimeout(function () { self._sending = false; res(); }, done * 1000 + 30); });
+      setTimeout(function () {
+        self._sending = false;
+        // a mandatory listen gap before the next queued frame, so the other device gets the floor
+        setTimeout(function () { self._txPump(); }, self.txGap || 700);
+      }, done * 1000 + 30);
     };
     // —— RX: Goertzel power at the three tones; detect preamble, then sample bits ——
     AudioFSK.prototype._goertzel = function (buf, freq, off, win) {
