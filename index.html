@@ -440,9 +440,17 @@ body.modal-open{ overflow:hidden; }
 .winbadges{ display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-bottom:12px; }
 .winbadges:empty{ display:none; }
 .wbadge{ display:inline-flex; flex-direction:column; align-items:center; line-height:1.15; font-family:var(--gen-font-display);
-  padding:3px 8px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--c); box-shadow:inset 0 0 10px -7px var(--c); }
+  padding:3px 8px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--c); box-shadow:inset 0 0 10px -7px var(--c);
+  cursor:pointer; -webkit-appearance:none; appearance:none; color:inherit; }
+.wbadge::after{ content:'?'; position:absolute; top:-5px; right:-5px; width:13px; height:13px; display:grid; place-items:center; border-radius:50%;
+  font-family:var(--gen-font-body); font-weight:700; font-size:8px; color:var(--gen-ink); background:var(--gen-brass); }
+.wbadge{ position:relative; }
 .wbadge .wb-role{ font-weight:700; font-size:8px; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-muted); }
 .wbadge .wb-name{ font-weight:700; font-size:11px; letter-spacing:.2px; text-transform:uppercase; color:var(--c); }
+/* medal explainer bubble (tap a badge) — top level so it shows over the summary overlay */
+.medaltip{ position:fixed; z-index:70; max-width:240px; padding:9px 11px; border-radius:10px; background:var(--gen-ink);
+  border:1.5px solid var(--gen-brass-stroke); color:var(--gen-text); font-size:11.5px; line-height:1.45; box-shadow:0 8px 22px rgba(0,0,0,.5); cursor:pointer; }
+.medaltip b{ color:var(--gen-brass-bright); }
 /* §1.5 category board — in-game scoreboard layout, each cell tinted by the record holder */
 .catboard{ margin-bottom:12px; }
 .catboard .cb-legend{ font-size:10px; color:var(--gen-muted); text-align:center; margin-bottom:8px; }
@@ -979,6 +987,7 @@ body.modal-open{ overflow:hidden; }
 <!-- colour picker popover — MUST live at top level (used on the setup screen + lobby,
      where #game is display:none, so it can't be nested inside it) -->
 <div id="colorPop" class="colorpop hidden"></div>
+<div id="medalTip" class="medaltip hidden"></div>
 
 <!-- peek -->
 <div id="peekModal" class="overlay hidden">
@@ -2785,8 +2794,8 @@ body.modal-open{ overflow:hidden; }
       + 'Така отделяме <b style="' + cLuck + '">късмета</b> (какво ти дадоха заровете) от <b style="' + cSkill + '">уменията</b> (какво направи с тях).</p></div>'
       + '<p class="ht"><b>Горе:</b> кой спечели и с колко, плюс <b>присъда</b> — '
       + '<b style="' + cLuck + '">тотална</b> / <b style="' + cNum + '">заслужена</b> / <b style="' + cBad + '">късметлийска</b> '
-      + '(сравнява победителя с най-добрия по умение). Малките значки са акценти: '
-      + '🥇 Победител (точки) · 🎯 Тактик (умение) · 🍀 Късметлия (заровете) · 📋 Майстор на категориите (най-много рекорди).</p>'
+      + '(сравнява победителя с най-добрия по умение). Малките значки са акценти (докосни всяка за обяснение): '
+      + '🎯 Тактик (умение) · 🍀 Късметлия (заровете) · 📋 Майстор на категориите (най-много рекорди).</p>'
       + '<p class="ht"><b>Разделите (горе):</b> <b style="' + cNum + '">Класиране</b> по точки · '
       + '<b style="' + cSkill + '">Умение</b> по оптимална игра · <b style="' + cLuck + '">Късмет</b> с графика ход-по-ход и '
       + 'резултат „без късмет“ · <b style="' + cNum + '">Категории</b> — таблото, всяка клетка с % вкарали и рекорда, в цвета на рекордьора. '
@@ -3462,17 +3471,36 @@ body.modal-open{ overflow:hidden; }
 
   // §1.3 WD-04 badges (small accents): Победител (points) · Тактик (skill) ·
   // Късметлия (luckiest) · Майстор на категориите (most category records)
+  // tap any medal for how it's earned. The Победител medal is dropped — it's already
+  // obvious who won from the headline.
+  var MEDAL_EXPL = {
+    tac: '<b>🎯 Тактик</b> — на играча, чиито решения струваха <b>най-малко изпуснати точки</b> (умение). Брои се цената на грешките, не просто колко хода са оптимални.',
+    luck: '<b>🍀 Късметлия</b> — на когото <b>заровете услужиха най-много</b>: най-висок сбор късмет спрямо очакваното.',
+    mas: '<b>📋 Майстор на категориите</b> — който държи <b>най-високия резултат в най-много категории</b> на дъската.'
+  };
   function renderWinBadges() {
     var m = summary.meta, players = game.players, b = [];
-    function badge(cls, c, icon, role, name, tail) {
-      b.push('<span class="wbadge ' + cls + '" style="--c:' + c + '"><span class="wb-role">' + icon + ' ' + role + '</span><span class="wb-name">' + esc(name) + (tail || '') + '</span></span>');
+    function badge(cls, c, icon, role, name, medal, tail) {
+      b.push('<button type="button" class="wbadge ' + cls + '" style="--c:' + c + '" data-medal="' + medal + '" aria-label="' + role + ' — как се присъжда">'
+        + '<span class="wb-role">' + icon + ' ' + role + '</span><span class="wb-name">' + esc(name) + (tail || '') + '</span></button>');
     }
-    badge('b-win', players[m.winIdx].color, '🥇', 'Победител', players[m.winIdx].name);
-    if (m.skillIdx >= 0) badge('b-tac', players[m.skillIdx].color, '🎯', 'Тактик', players[m.skillIdx].name);
-    if (m.luckIdx >= 0 && players.length > 1) badge('b-luck', players[m.luckIdx].color, '🍀', 'Късметлия', players[m.luckIdx].name);
-    if (m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2) badge('b-mas', players[m.masterIdx].color, '📋', 'Майстор', players[m.masterIdx].name, ' ×' + m.recCount[m.masterIdx]);
+    if (m.skillIdx >= 0) badge('b-tac', players[m.skillIdx].color, '🎯', 'Тактик', players[m.skillIdx].name, 'tac');
+    if (m.luckIdx >= 0 && players.length > 1) badge('b-luck', players[m.luckIdx].color, '🍀', 'Късметлия', players[m.luckIdx].name, 'luck');
+    if (m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2) badge('b-mas', players[m.masterIdx].color, '📋', 'Майстор', players[m.masterIdx].name, 'mas', ' ×' + m.recCount[m.masterIdx]);
     $('winBadges').innerHTML = b.join('');
+    $('winBadges').querySelectorAll('.wbadge').forEach(function (el) {
+      el.onclick = function (e) { e.stopPropagation(); showMedalTip(el, MEDAL_EXPL[el.getAttribute('data-medal')]); };
+    });
   }
+  function showMedalTip(anchor, html) {
+    var g = $('medalTip'); if (!g.classList.contains('hidden') && g._for === anchor) { g.classList.add('hidden'); return; }
+    g._for = anchor; g.innerHTML = html; g.classList.remove('hidden');
+    var r = anchor.getBoundingClientRect();
+    g.style.left = Math.min(Math.max(8, r.left + r.width / 2 - g.offsetWidth / 2), window.innerWidth - g.offsetWidth - 8) + 'px';
+    var below = r.bottom + 8;
+    g.style.top = (below + g.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - g.offsetHeight - 8)) + 'px';
+  }
+  $('medalTip').onclick = function () { $('medalTip').classList.add('hidden'); };
 
   function renderSummary() {
     var n = game.players.length, m = summary.meta, tab = summary.tab, ana = summary.ana, idx = function (p) { return game.players.indexOf(p); };
@@ -4137,9 +4165,16 @@ body.modal-open{ overflow:hidden; }
     if (t && t.closest && (t.closest('.cbtn') || t.closest('#netMeColor'))) return;  // a colour button — its handler toggles
     hideColorPop();
   });
+  // tap outside a medal badge / its bubble closes the medal explainer
+  document.addEventListener('click', function (e) {
+    var g = $('medalTip'); if (g.classList.contains('hidden')) return;
+    var t = e.target;
+    if (g.contains(t) || (t && t.closest && t.closest('.wbadge'))) return;
+    g.classList.add('hidden');
+  });
   // changing focus away from the window dismisses transient popovers/explainers
   function dismissTransients() {
-    ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu'].forEach(function (id) {
+    ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu', 'medalTip'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.classList.add('hidden');
     });
   }
