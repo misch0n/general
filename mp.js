@@ -15,6 +15,7 @@
   var T = {
     BEACON: 1, JOIN_REQ: 2, JOIN_ACK: 3, ROSTER: 4, START: 5,
     GRANT: 6, MOVE: 7, STATE: 8, RESYNC_REQ: 9, PING: 10, PONG: 11, END: 12,
+    XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
   };
   var HOST_ID = 0, UNASSIGNED = 15;          // SENDER nibble: host is 0, pre-join client is 15
   var GENDERS = ['m', 'n', 'f'];
@@ -369,8 +370,169 @@
     if (this.cb.onMove) this.cb.onMove({ playerId: s.playerId, category: s.category, score: s.score });
   };
 
+  function crc16(bytes) { var c = 0xffff; for (var i = 0; i < bytes.length; i++) { c ^= bytes[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
+
+  // ---- [GAME-SPECIFIC] compact game-record codec (for acoustic transfer) ----
+  // Sends per turn only the FINAL dice + category (manual-style), so a transferred
+  // game stays small; the board mask is reconstructed from the category order on
+  // the receiving end. The wire is a fixed schema of primitives — no structure,
+  // names, or anything executable can ride along.
+  function packRecord(rec, catKeys) {
+    var idx = {}; catKeys.forEach(function (k, i) { idx[k] = i; });
+    var w = new Writer().u8(1);
+    var secs = Math.floor((rec.ts || Date.now()) / 1000);
+    w.u16((secs >>> 16) & 0xffff).u16(secs & 0xffff);
+    w.u8((rec.manualMode ? 1 : 0) | (rec.ownerSkipped ? 2 : 0));
+    w.u8(rec.players.length);
+    rec.players.forEach(function (p, pi) {
+      w.u8((p.owner ? 1 : 0) | (p.isAI ? 2 : 0));
+      w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.str(p.name, 28); w.u16(Math.max(0, Math.min(65535, (p.bonus | 0))));
+      var mask = 0; catKeys.forEach(function (k, i) { if (typeof (p.scores || {})[k] === 'number') mask |= (1 << i); });
+      w.u16(mask);
+      catKeys.forEach(function (k, i) { if (mask & (1 << i)) w.u16(Math.max(0, Math.min(65535, p.scores[k] | 0))); });
+      var log = (rec.moveLog && rec.moveLog[pi]) || [];
+      log = log.slice(0, catKeys.length); w.u8(log.length);
+      log.forEach(function (t) {
+        var fd = t.dice || (t.rolls && t.rolls[t.rolls.length - 1]) || [0, 0, 0, 0, 0];
+        for (var j = 0; j < 5; j++) w.u8(Math.max(0, Math.min(6, fd[j] | 0)));
+        w.u8(idx[t.category] == null ? 0 : idx[t.category]);
+      });
+    });
+    return w.out();
+  }
+  function unpackRecord(bytes, catKeys) {
+    var r = new Reader(bytes); r.u8();                       // version
+    var secs = (r.u16() << 16) | r.u16(), flags = r.u8(), n = r.u8(), players = [], moveLog = [];
+    for (var pi = 0; pi < n; pi++) {
+      var pf = r.u8(), rgb = r.bytes(3), g = r.u8(), name = r.str(), bonus = r.u16();
+      var mask = r.u16(), scores = {};
+      for (var i = 0; i < catKeys.length; i++) if (mask & (1 << i)) scores[catKeys[i]] = r.u16();
+      players.push({ owner: !!(pf & 1), isAI: !!(pf & 2), color: rgbHex(rgb), gender: GENDERS[g] || 'm', name: name, bonus: bonus, scores: scores });
+      var nt = r.u8(), turns = [], built = 0;
+      for (var ti = 0; ti < nt; ti++) {
+        var dice = []; for (var j = 0; j < 5; j++) dice.push(r.u8());
+        var ci = r.u8(), key = catKeys[ci] || catKeys[0];
+        turns.push({ mask: built, dice: dice, category: key });   // mask = board before this turn
+        built |= (1 << ci);
+      }
+      moveLog.push(turns);
+    }
+    // transferred games analyse manual-style (final dice + pick); fits unpacked moveLog
+    return { ts: secs * 1000, manualMode: true, ownerSkipped: !!(flags & 2), acoustic: true, players: players, moveLog: moveLog };
+  }
+
+  // ---- SANITISE: turn any received/parsed record into a clean, whitelisted,
+  // clamped plain object (or null). Received bytes are DATA only — this guarantees
+  // no unknown fields, no non-primitive values, no prototype keys survive. ----
+  function sanitizeRecord(obj, catKeys) {
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.players) || obj.players.length < 1 || obj.players.length > 8) return null;
+    var keySet = Object.create(null); catKeys.forEach(function (k) { keySet[k] = 1; });   // null-proto: no __proto__ bypass
+    function validKey(k) { return keySet[k] === 1; }
+    function clampInt(v, lo, hi, d) { v = Math.round(+v); if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); }
+    function hex(c) { return (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c)) ? c.toLowerCase() : '#888888'; }
+    function gen(g) { return (g === 'm' || g === 'n' || g === 'f') ? g : 'm'; }
+    function str(s) { return (typeof s === 'string' ? s : '').slice(0, 40) || 'Боец'; }
+    function d5(a) { a = Array.isArray(a) ? a : []; var o = []; for (var j = 0; j < 5; j++) o.push(clampInt(a[j], 0, 6, 0)); return o; }
+    var players = obj.players.map(function (p) {
+      p = p || {}; var scores = {};
+      if (p.scores && typeof p.scores === 'object') catKeys.forEach(function (k) { if (typeof p.scores[k] === 'number' && isFinite(p.scores[k])) scores[k] = clampInt(p.scores[k], 0, 1000, 0); });
+      return { name: str(p.name), color: hex(p.color), gender: gen(p.gender), isAI: !!p.isAI, owner: !!p.owner,
+               bonus: clampInt(p.bonus, 0, 999, 0), scores: scores,
+               ribbons: Array.isArray(p.ribbons) ? p.ribbons.filter(function (x) { return typeof x === 'string' && /^#?[0-9a-fA-F]{3,8}$/.test(x); }).slice(0, 8) : [] };
+    });
+    var moveLog = [];
+    for (var i = 0; i < players.length; i++) {
+      var ml = (Array.isArray(obj.moveLog) && Array.isArray(obj.moveLog[i])) ? obj.moveLog[i] : [];
+      moveLog.push(ml.slice(0, catKeys.length).map(function (t) {
+        t = t || {};
+        var clean = { mask: clampInt(t.mask, 0, 0xffff, 0), category: validKey(t.category) ? t.category : catKeys[0] };
+        if (Array.isArray(t.rolls)) { clean.rolls = t.rolls.slice(0, 3).map(d5); clean.keeps = (Array.isArray(t.keeps) ? t.keeps.slice(0, 2) : []).map(function (k) { k = Array.isArray(k) ? k : []; var o = []; for (var j = 0; j < 5; j++) o.push(!!k[j]); return o; }); }
+        if (Array.isArray(t.dice)) clean.dice = d5(t.dice);
+        return clean;
+      }));
+    }
+    return { ts: clampInt(obj.ts, 0, 1e15, Date.now()) || Date.now(), manualMode: !!obj.manualMode, ownerSkipped: !!obj.ownerSkipped, players: players, moveLog: moveLog };
+  }
+
+  // ============================================================ acoustic record transfer
+  // Stop-and-wait chunked transfer over the same channel/framing. SENDER advertises
+  // (XOFFER), RECEIVER wants (XWANT); once paired by a 1-byte tag they ping-pong
+  // XDATA/XACK (one talker at a time fits the medium), then XDONE with a whole-blob
+  // CRC-16. The blob is a packRecord() payload, so what arrives is pure data.
+  function Transfer(opts) {
+    this.tp = opts.transport;
+    this.mode = opts.mode;                 // 'send' | 'recv'
+    this.cb = opts.callbacks || {};
+    this._st = opts.setTimeout || function (f, ms) { return setTimeout(f, ms); };
+    this._ct = opts.clearTimeout || function (id) { clearTimeout(id); };
+    this.rand = opts.rand || Math.random;
+    this.p = { advert: 1300, ack: 4000, retransmit: 10 };
+    if (opts.params) for (var k in opts.params) this.p[k] = opts.params[k];
+    this.chunkSize = Math.max(8, Math.min(40, (this.tp.maxPayload || 48) - 8));
+    this.seq = 0; this.tag = 0; this.state = 'HANDSHAKE'; this._timers = {};
+    if (this.mode === 'send') {
+      this.blob = opts.data instanceof Uint8Array ? opts.data : new Uint8Array(opts.data || []);
+      this.chunks = []; for (var i = 0; i < this.blob.length; i += this.chunkSize) this.chunks.push(this.blob.slice(i, i + this.chunkSize));
+      if (!this.chunks.length) this.chunks.push(new Uint8Array(0));
+      this.tag = 1 + Math.floor(this.rand() * 254); this.cur = 0;
+      this.crc = crc16(this.blob);
+    } else { this.recv = {}; this.total = null; }
+    var self = this; this.tp.onReceive(function (b) { self._rx(b); });
+  }
+  Transfer.prototype._send = function (type, payload) { var pkt = frame(type, this.mode === 'send' ? 0 : UNASSIGNED, this.seq, payload); this.seq = (this.seq + 1) & 0xff; try { this.tp.send(pkt); } catch (e) {} };
+  Transfer.prototype._status = function (s) { if (this.cb.onStatus) this.cb.onStatus(s); };
+  Transfer.prototype.dispose = function () { for (var k in this._timers) this._ct(this._timers[k]); this._timers = {}; this.state = 'DONE'; };
+  Transfer.prototype.start = function () {
+    var self = this;
+    if (this.mode === 'send') { this._status('🔊 Предлагам игра…'); (function ad() { if (self.state !== 'HANDSHAKE') return; self._send(T.XOFFER, new Writer().u8(self.tag).u8(self.chunks.length).out()); self._timers.ad = self._st(ad, self.p.advert); })(); }
+    else { this._status('🎧 Търся изпращач…'); (function ad() { if (self.state !== 'HANDSHAKE') return; self._send(T.XWANT, new Writer().u8(self.tag).out()); self._timers.ad = self._st(ad, self.p.advert); })(); }
+  };
+  Transfer.prototype._sendChunk = function () {
+    var self = this; this._ct(this._timers.chunk);
+    if (this.cur >= this.chunks.length) { this._finishSend(); return; }
+    var c = this.chunks[this.cur];
+    var w = new Writer().u8(this.tag).u8(this.cur).u8(this.chunks.length).bytes(c);
+    var tries = 0;
+    (function go() { if (self.state !== 'SENDING') return; self._send(T.XDATA, w.out()); if (self.cb.onProgress) self.cb.onProgress(self.cur, self.chunks.length); if (++tries <= self.p.retransmit) self._timers.chunk = self._st(go, self.p.ack); })();
+  };
+  Transfer.prototype._finishSend = function () {
+    var self = this; this._ct(this._timers.chunk); this.state = 'FIN';
+    var tries = 0;
+    (function go() { self._send(T.XDONE, new Writer().u8(self.tag).u16(self.crc).out()); if (++tries <= 4) self._timers.fin = self._st(go, self.p.ack); else { self.state = 'DONE'; if (self.cb.onSent) self.cb.onSent(); } })();
+  };
+  Transfer.prototype._rx = function (bytes) {
+    var pkt = unframe(bytes); if (!pkt) return;
+    var r = new Reader(pkt.payload);
+    if (this.mode === 'send') {
+      if (pkt.type === T.XWANT && this.state === 'HANDSHAKE') { if (r.u8() === this.tag) { this._ct(this._timers.ad); this.state = 'SENDING'; this._status('🔊 Изпращам…'); this._sendChunk(); } }
+      else if (pkt.type === T.XACK && this.state === 'SENDING') { if (r.u8() === this.tag) { var idx = r.u8(); if (idx === this.cur) { this.cur++; this._sendChunk(); } } }
+      else if (pkt.type === T.XACK && this.state === 'FIN') { /* receiver confirms done */ this._ct(this._timers.fin); this.state = 'DONE'; if (this.cb.onSent) this.cb.onSent(); }
+    } else {
+      if (pkt.type === T.XOFFER && this.state === 'HANDSHAKE') { this.tag = r.u8(); this.total = r.u8(); this._ct(this._timers.ad); this.state = 'RECEIVING'; this._status('🔊 Приемам…'); this._send(T.XWANT, new Writer().u8(this.tag).out()); }
+      else if (pkt.type === T.XDATA && this.state === 'RECEIVING') {
+        var tag = r.u8(), idx = r.u8(), total = r.u8(); this.total = total;
+        if (tag !== this.tag) return;
+        var chunk = pkt.payload.slice(3);
+        this.recv[idx] = chunk;                              // store (idempotent)
+        this._send(T.XACK, new Writer().u8(this.tag).u8(idx).out());
+        if (this.cb.onProgress) this.cb.onProgress(Object.keys(this.recv).length, total);
+      } else if (pkt.type === T.XDONE && (this.state === 'RECEIVING' || this.state === 'DONE')) {
+        if (r.u8() !== this.tag) return; var crc = r.u16();
+        this._send(T.XACK, new Writer().u8(this.tag).u8(0xff).out());   // confirm to sender
+        if (this.state === 'DONE') return;
+        var ok = true; for (var i = 0; i < this.total; i++) if (!this.recv[i]) ok = false;
+        if (!ok) { this._status('Липсват части — изчакай…'); return; }
+        var parts = []; var len = 0; for (i = 0; i < this.total; i++) { parts.push(this.recv[i]); len += this.recv[i].length; }
+        var blob = new Uint8Array(len), off = 0; parts.forEach(function (c) { blob.set(c, off); off += c.length; });
+        if (crc16(blob) !== crc) { this._status('Грешка в данните — опитай пак.'); if (this.cb.onError) this.cb.onError('crc'); return; }
+        this.state = 'DONE'; if (this.cb.onComplete) this.cb.onComplete(blob);
+      }
+    }
+  };
+
   var api = {
-    T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, utf8: utf8, utf8d: utf8d,
+    T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, crc16: crc16, utf8: utf8, utf8d: utf8d,
+    packRecord: packRecord, unpackRecord: unpackRecord, sanitizeRecord: sanitizeRecord, Transfer: Transfer,
     Writer: Writer, Reader: Reader, frame: frame, unframe: unframe,
     hexRGB: hexRGB, rgbHex: rgbHex,
     packBeacon: packBeacon, unpackBeacon: unpackBeacon, packJoinReq: packJoinReq, unpackJoinReq: unpackJoinReq,
