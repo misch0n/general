@@ -463,16 +463,19 @@ body.modal-open{ overflow:hidden; }
 .cc-help summary.cc-q{ display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; cursor:pointer; list-style:none;
   font-family:var(--gen-font-body); font-weight:700; font-size:10px; color:var(--gen-ink); background:var(--gen-brass); vertical-align:1px; }
 .cc-help summary::-webkit-details-marker{ display:none; }
-/* collapsible career category fold */
-.catfold{ margin-top:6px; }
-.catfold-sum{ display:flex; align-items:center; gap:7px; cursor:pointer; list-style:none; margin:12px 0 7px; }
-.catfold-sum::-webkit-details-marker{ display:none; }
-.catfold-sum > span:first-child{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:11px; color:var(--gen-brass); }
-.cc-qbtn{ flex:none; display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; cursor:pointer; border:none;
-  font-family:var(--gen-font-body); font-weight:700; font-size:10px; color:var(--gen-ink); background:var(--gen-brass); }
-.catfold-sum .cf-caret{ margin-left:auto; }
-.catfold[open] .cf-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
-.catfold .cc-tips{ margin-bottom:8px; }
+/* collapsible career category fold — a bordered bar that reads as expandable */
+.catfold{ margin-top:12px; }
+.catfold-bar{ display:flex; align-items:center; gap:8px; cursor:pointer; padding:9px 12px; border:1px solid var(--gen-pill-line);
+  border-radius:9px; background:rgba(255,255,255,.03); }
+.catfold-bar .cf-lab{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:11px; color:var(--gen-brass); }
+.cc-qbtn{ flex:none; display:grid; place-items:center; width:16px; height:16px; line-height:1; padding:0; border-radius:50%; cursor:pointer; border:none;
+  font-family:var(--gen-font-body); font-weight:700; font-size:11px; color:var(--gen-ink); background:var(--gen-brass); }
+.cc-qbtn:hover{ background:var(--gen-brass-bright); }
+.cf-caret{ margin-left:auto; flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted);
+  transform:rotate(45deg); transition:transform .15s; }
+.catfold.open .cf-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
+.catfold .cc-tips{ margin-top:8px; }
+.catgrid-wrap{ margin-top:8px; }
 .cc-tips{ margin-top:6px; padding:8px 10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line);
   font-size:10.5px; color:var(--gen-label); font-weight:400; text-transform:none; letter-spacing:0; line-height:1.5; }
 .cc-tips > div{ padding:1px 0; }
@@ -680,7 +683,7 @@ body.modal-open{ overflow:hidden; }
 .hg-pct{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:9px; background:rgba(255,255,255,.08); color:var(--gen-label); }
 .hg-pct.hi{ background:rgba(75,140,60,.25); color:#9bd17e; } .hg-pct.lo{ background:rgba(178,58,46,.22); color:#e88; }
 /* recent battles row: most recent LEFT. <10 → left-aligned; exactly 10 → spread evenly */
-.histform{ display:flex; justify-content:flex-start; gap:6px; margin-top:6px; }
+.histform{ display:flex; justify-content:flex-start; gap:6px; margin:6px 0 12px; }
 .histform.full{ justify-content:space-between; gap:4px; }
 .histform i{ width:18px; height:18px; display:grid; place-items:center; border-radius:4px; font-size:10px; font-weight:700; font-style:normal; }
 .histform i.w{ background:rgba(75,140,60,.3); color:#9bd17e; } .histform i.l{ background:rgba(178,58,46,.25); color:#e88; }
@@ -3840,7 +3843,7 @@ body.modal-open{ overflow:hidden; }
 
     // deep luck deconstruction + nerves + bailout (need the roll sequence)
     if (!fa.manual) {
-      html += statRows('Късмет под лупа', RC.luck, [
+      html += statRows('Късмет', RC.luck, [
         'първо хвърляне ' + nSigned(fa.luckFirst, 0),
         'прехвърляния ' + nSigned(fa.luckRerolls, 0),
         'в решителния край ' + nSigned(fa.clutch, 0) ]);
@@ -4214,6 +4217,10 @@ body.modal-open{ overflow:hidden; }
     var bl = {};
     data.forEach(function (d) { var b = d.ana.blunder; if (b && b.cost < -0.5) { var k = b.chosenKey || b.turnCategory; if (k) bl[k] = (bl[k] || 0) + 1; } });
     var favBl = null, favN = 0; Object.keys(bl).forEach(function (k) { if (bl[k] > favN) { favN = bl[k]; favBl = k; } });
+    // достижения: outstanding optimal calls (biggest-EV-margin moves) counted by category
+    var gm = {};
+    data.forEach(function (d) { (d.ana.topMoves || []).forEach(function (mv) { var k = mv.chosenKey || mv.turnCategory; if (k) gm[k] = (gm[k] || 0) + 1; }); });
+    var topGood = Object.keys(gm).map(function (k) { return { key: k, n: gm[k] }; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 3);
     // name: the settings battle-name, else „Старшина“ (no random game name, no ★ token)
     var name = (settings.useOwnerName && settings.ownerName.trim()) || 'Старшина';
     var rank = G.rankForAccuracy(c.avgAcc);
@@ -4231,18 +4238,18 @@ body.modal-open{ overflow:hidden; }
       + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     // analysis-category breakdown (colour-coded labels) sits between the name and recent battles
-    h += careerAverages(c.report);
+    h += careerAverages(c.report, { biggest: favBl ? { key: favBl, n: favN } : null, achievements: topGood });
     h += '<div class="histline">Последни битки:</div><div class="histform' + (recent.length >= 10 ? ' full' : '') + '">' + (form || '—') + '</div>';
     // career stat lines — each starts with a colour-coded term, its parts split onto their own rows
     h += statRows('Чин', RC.skill, ['по средно умение <b>' + esc(rank) + '</b>', 'процент победи <b>' + Math.round(100 * c.wins / n) + '%</b>', 'средно място <b>' + c.avgPlace.toFixed(1) + '</b>']);
     h += statRows('Личен рекорд', RC.upper, ['<b>' + c.best + '</b> т.', 'среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'].concat(c.avgLuck != null ? ['среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>'] : []));
-    h += statRows('Генерали', RC.gen, ['<b>' + c.generals + '</b> от ' + n + ' битки'].concat(favBl ? ['любима издънка <b>' + esc(CAT_LABEL[favBl] || favBl) + '</b> (×' + favN + ')'] : []));
+    h += stat('Генерали', RC.gen, '<b>' + c.generals + '</b> от ' + n + ' битки');   // single line, no blunder here
     var consTag = c.scoreSd < 18 ? 'стабилен' : c.scoreSd > 32 ? 'нестабилен' : 'умерен';
     h += statRows('Постоянство', RC.stage, ['резултат <b>±' + Math.round(c.scoreSd) + ' т.</b>', 'точност <b>±' + Math.round(c.accSd) + '%</b>', '<span class="hmuted">' + consTag + '</span>']);
     if (c.accSlope != null) {
       var arrow = c.accSlope > 0.3 ? '↗' : c.accSlope < -0.3 ? '↘' : '→';
       var word = c.accSlope > 0.3 ? 'качваш се' : c.accSlope < -0.3 ? 'спадаш' : 'стабилно';
-      h += statRows('Развитие', RC.nerves, ['<b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b>', '<span class="hmuted">' + word + '</span>']);
+      h += stat('Развитие', RC.nerves, '<b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b> <span class="hmuted">(' + word + ')</span>');   // single line
     }
     var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
     if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎖 За повишение наблегни на <b>' + esc(worst.label) + '</b> — там пробивът ти в строя е най-голям (средно −' + worst.avgLeak.toFixed(1) + ' т. на игра). Категорията, която да тренираш.</div>';
@@ -4274,19 +4281,26 @@ body.modal-open{ overflow:hidden; }
       + '<div><b>−EV</b> — среден теч: колко точки изпускаш на ход</div>'
       + '<div>цвят: <b class="cc-g">зелено</b> играеш я чисто · <b class="cc-n">сиво</b> средно · <b class="cc-r">червено</b> теч</div>'
       + '</div>';
-    return '<details class="catfold"><summary class="ho-sechd catfold-sum"><span>Категории</span>'
-      + '<button type="button" class="cc-q cc-qbtn" title="Как се чете?">?</button>'
-      + '<span class="ho-caret cf-caret"></span></summary>' + tips
-      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div></details>';
+    // a bordered bar that reads as expandable: label · ? button · down-arrow on the right.
+    // the ? toggles the read-tips on its own (works whether or not the board is open).
+    return '<div class="catfold">'
+      + '<div class="catfold-bar"><span class="cf-lab">Категории</span>'
+      + '<button type="button" class="cc-qbtn" aria-label="Как се чете?" title="Как се чете?">?</button>'
+      + '<span class="cf-caret"></span></div>' + tips
+      + '<div class="catgrid-wrap hidden"><div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div></div></div>';
   }
   // career averages of the per-player report stats (mirrors renderReport's stat lines)
-  function careerAverages(r) {
+  function careerAverages(r, extra) {
+    extra = extra || {};
     var h = '';
     if (r.luck != null) h += '<div class="evline" style="font-size:13px"><span class="luck">' + signed(Math.round(r.luck)) + ' късмет</span> <span class="skill">' + signed(Math.round(r.skill)) + ' решения</span> · загуба ' + nBad(r.lostPerTurn, 1) + ' т./ход</div>';
     if (r.leakKeep != null) h += statRows('Изтичане', RC.leak, ['задържания ' + nBad(r.leakKeep, 1) + ' т.', 'категории ' + nBad(r.leakCat, 1) + ' т.']);
     else if (r.leakCat != null) h += stat('Изтичане', RC.leak, 'категории ' + nBad(r.leakCat, 1) + ' т.');
     h += statRows('Издънки', RC.sev, [nNeut(r.sevMinor.toFixed(1)) + ' дребни', nNeut(r.sevMajor.toFixed(1)) + ' сериозни', '<b class="nn">' + r.sevFatal.toFixed(1) + '</b> фатални']);
-    if (r.luckFirst != null) h += statRows('Късмет под лупа', RC.luck, ['първо хвърляне ' + nSigned(r.luckFirst, 1), 'прехвърляния ' + nSigned(r.luckRerolls, 1), 'в решителния край ' + nSigned(r.clutch, 1)]);
+    if (extra.biggest) h += stat('Най-голяма издънка', RC.sev, '<b>' + esc(CAT_LABEL[extra.biggest.key] || extra.biggest.key) + '</b> · ×' + extra.biggest.n);
+    // Постижения: where your sharpest (biggest-EV) moves land — top categories by COUNT
+    if (extra.achievements && extra.achievements.length) h += statRows('Постижения', RC.upper, extra.achievements.map(function (a) { return esc(CAT_LABEL[a.key] || a.key) + ' <b>×' + a.n + '</b>'; }));
+    if (r.luckFirst != null) h += statRows('Късмет', RC.luck, ['първо хвърляне ' + nSigned(r.luckFirst, 1), 'прехвърляния ' + nSigned(r.luckRerolls, 1), 'в решителния край ' + nSigned(r.clutch, 1)]);
     if (r.zeroTotal != null) h += statRows('Нули', RC.zero, [nNeut(r.zeroTotal.toFixed(1)) + ' общо', nNeut(r.zeroForced.toFixed(1)) + ' принудени', '<b class="nn">' + r.zeroUnforced.toFixed(1) + '</b> от твоята игра']);
     h += statRows('По етапи', RC.stage, ['начало <b class="nn">' + r.stageEarly.toFixed(1) + '</b> т./ход', 'среда <b class="nn">' + r.stageMid.toFixed(1) + '</b> т./ход', 'край <b class="nn">' + r.stageLate.toFixed(1) + '</b> т./ход']);
     return h;
@@ -4302,9 +4316,13 @@ body.modal-open{ overflow:hidden; }
   function renderHistory() {
     var games = loadHistory().slice().reverse(); // newest first
     $('historyOverview').innerHTML = ownerOverview();
-    // the ? toggles the read-tips inline without opening/closing the category fold
-    var q = $('historyOverview').querySelector('.cc-qbtn');
-    if (q) q.onclick = function (e) { e.preventDefault(); e.stopPropagation(); var t = q.closest('.catfold').querySelector('.cc-tips'); if (t) t.classList.toggle('hidden'); };
+    // the bar opens/closes the board; the ? toggles the read-tips on its own (no fold needed)
+    var fold = $('historyOverview').querySelector('.catfold');
+    if (fold) {
+      var bar = fold.querySelector('.catfold-bar'), grid = fold.querySelector('.catgrid-wrap'), q = fold.querySelector('.cc-qbtn'), tips = fold.querySelector('.cc-tips');
+      bar.onclick = function () { fold.classList.toggle('open'); if (grid) grid.classList.toggle('hidden'); };
+      if (q) q.onclick = function (e) { e.preventDefault(); e.stopPropagation(); if (tips) tips.classList.toggle('hidden'); };
+    }
     if (!games.length) {
       $('historyList').innerHTML = '<div class="noowner">Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.</div>';
       return;
