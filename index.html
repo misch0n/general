@@ -974,9 +974,11 @@ body.modal-open{ overflow:hidden; }
   <div id="comboTip" class="combotip hidden"></div>
   <div id="fxBubble" class="fxbubble hidden"></div>
   <div id="guideTip" class="guidetip hidden"></div>
-  <div id="colorPop" class="colorpop hidden"></div>
   <div id="youLose" class="youlose hidden"><span>ГУБИШ!</span></div>
 </div>
+<!-- colour picker popover — MUST live at top level (used on the setup screen + lobby,
+     where #game is display:none, so it can't be nested inside it) -->
+<div id="colorPop" class="colorpop hidden"></div>
 
 <!-- peek -->
 <div id="peekModal" class="overlay hidden">
