@@ -183,7 +183,7 @@ sum *exactly* to the visible margin.
 
 - **A progress chart first.** A collapsible SVG line chart (open by default) sits
   **above** the player list, because it's the general overview. `renderProgressChart()`:
-  - On the **Класиране** (standings) tab it plots each player's **running total**
+  - On the **Точки** (standings) tab it plots each player's **running total**
     over the rounds (`progressSeries`).
   - On the **По умение** (skill) tab it plots each player's **running
     optimal-play %** over the turns (`optimalSeries`), with a percentage axis.
@@ -201,7 +201,7 @@ sum *exactly* to the visible margin.
   player's full report **inline, between the rows** (reachable from any tab); tap
   again to collapse. Nothing is expanded by default.
 - **Four tabs**, each keeping the rows and swapping the top visual + the row value:
-  **Класиране** (points, points chart), **Умение** (re-orders by accuracy, optimal
+  **Точки** (points, points chart), **Умение** (re-orders by accuracy, optimal
   % + optimal-play chart), **Късмет** (a cumulative-luck-over-turns chart with a
   zero baseline; rows sort by luck and show *резултат · късмет · без късмет* =
   score − luck; hidden in manual), and **Категории** (`renderCatBoard`) — the
@@ -443,7 +443,8 @@ or the whole archive **cleared from settings** (with a confirm).
 
 Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
 **owner block** (battle name + „Използвай моето име“ with a `?` helper + a
-**default gender** for the старшина's seat), then
+**default gender** and **default colour** for the старшина's seat — colours and
+names are kept **unique across the roster** (locally and over the network)), then
 positive toggles: **КАЗАРМА**, **Титли** (with its nested **Бонус точки**
 sub-toggle, shown only while Титли is on), **Съвети**, **Глупости**, and
 **Акустика** (off by default — reveals every data-over-sound feature, hidden
@@ -453,8 +454,9 @@ you can also clear the archive here.
 - **Глупости toggle** (profanity) — **on by default** (this is an adult party
   game): rude, NSFW-flagged words are in play. Turn it **off** to censor to the
   SFW set only (`setCensor(!glupost)` — the flag drives off the words' `nsfw`
-  markers); names already on the muster screen are re-cohered so nothing crude
-  slips through.
+  markers). Flipping it **swaps** each muster name between a cached SFW and NSFW
+  version (deterministic — flipping back restores the original) rather than
+  rerolling fresh each time.
 - **Secret dev editor.** Each settings row hides a tiny clickable box on its right
   edge. A **rolling tap-sequence matcher** (`devBoxClick` against `devKey()`)
   unlocks **developer mode** when the recent taps hit the escalating key — box 0

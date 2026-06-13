@@ -550,6 +550,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ownertok.sm{ width:14px; height:14px; font-size:9px; }
 /* owner settings block */
 .ownerbox{ margin:0 0 12px; padding:11px; border:1px solid var(--gen-pill-line); border-radius:10px; background:rgba(0,0,0,.2); }
+.ownercolors{ display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+.oswatch{ width:20px; height:20px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; }
+.oswatch.on{ border-color:var(--gen-text); box-shadow:0 0 0 2px var(--gen-brass); }
 .ownersub{ display:flex; align-items:center; gap:6px; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px;
   font-size:12px; color:var(--gen-label); margin-bottom:8px; }
 .qmark{ width:18px; height:18px; flex:none; display:grid; place-items:center; border-radius:50%; font-family:var(--gen-font-body);
@@ -902,7 +905,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="winHeadline" class="winhead"></div>
     <div id="winBadges" class="winbadges"></div>
     <div class="tabs tabs4">
-      <button id="tabStand" class="tab on">Класиране</button>
+      <button id="tabStand" class="tab on">Точки</button>
       <button id="tabSkill" class="tab">Умение</button>
       <button id="tabLuck" class="tab">Късмет</button>
       <button id="tabCats" class="tab">Категории</button>
@@ -954,6 +957,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
           <button class="glabel g-n" data-g="n">то</button>
           <button class="glabel g-f" data-g="f">женско</button>
         </div>
+      </div>
+      <div class="ownertog setrow" style="cursor:default">
+        <span>Цвят по подразбиране</span>
+        <div class="ownercolors" id="ownerColors"></div>
       </div>
       <div id="ownerBubble" class="ownerbubble hidden"></div>
     </div>
@@ -1142,7 +1149,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
   // глупости (profanity) ON by default = NSFW words allowed; OFF = censored to the SFW set
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false, ownerGender: 'm' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#c8a64b' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1155,14 +1162,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, acoustic: settings.acoustic, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender };
+              barracks: settings.barracks, acoustic: settings.acoustic, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'ownerName', 'useOwnerName', 'ownerGender'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -1232,6 +1239,35 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     return '<span class="ghostq">' + s + '</span>';
   }
   var PRESET_COLORS = ['#c8a64b', '#b23a2e', '#3f6b3a', '#2f4a6b', '#9a6b2f', '#7a4632', '#5f7a3a', '#a23a6b'];
+  // pick a preset colour not used by anyone (except `except`); fall back to prefer/first
+  function pickFreeColor(except, prefer) {
+    var used = setupPlayers.filter(function (p) { return p !== except; }).map(function (p) { return (p.color || '').toLowerCase(); });
+    if (prefer && used.indexOf(prefer.toLowerCase()) < 0) return prefer;
+    for (var i = 0; i < PRESET_COLORS.length; i++) if (used.indexOf(PRESET_COLORS[i].toLowerCase()) < 0) return PRESET_COLORS[i];
+    return prefer || PRESET_COLORS[0];
+  }
+  // no two seats share a colour; the owner's colour is protected (others bump)
+  function dedupeColors() {
+    var owner = setupPlayers.length ? ownerOf(setupPlayers) : null, used = {};
+    if (owner) used[(owner.color || '').toLowerCase()] = 1;
+    setupPlayers.forEach(function (p) {
+      if (p === owner) return;
+      var c = (p.color || '').toLowerCase();
+      if (used[c]) { p.color = pickFreeColor(p); c = p.color.toLowerCase(); }
+      used[c] = 1;
+    });
+  }
+  // no two seats share a name; regenerate generated dupes, suffix typed ones
+  function dedupeNames() {
+    var seen = {};
+    setupPlayers.forEach(function (p) {
+      if (seen[(p.name || '').toLowerCase()]) {
+        if (!p.typed) for (var g = 0; g < 25 && seen[(p.name || '').toLowerCase()]; g++) regenName(p);
+        if (seen[(p.name || '').toLowerCase()]) { var base = p.name, i = 2; while (seen[(base + ' ' + i).toLowerCase()]) i++; p.name = base + ' ' + i; }
+      }
+      seen[(p.name || '').toLowerCase()] = 1;
+    });
+  }
   var RIBBON_COLORS = ['#b23a2e', '#2f4a6b', '#c8a64b', '#3f6b3a', '#7a4632', '#c8a64b'];
   var AI_DELAY = 680, END_DELAY = 620, AI_VIEW_DELAY = 1500, ROLLS = G.MAX_ROLLS; // 1 auto roll + (ROLLS-1) rerolls
 
@@ -1295,6 +1331,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function regenName(p) {
     var r = G.randomNameRarity(p.isAI ? 'ai' : 'human', p.gender);
     p.name = r.name; p.pct = r.pct; p.tier = r.tier; p.bonus = r.bonus; p.parts = r.parts; p.bubbleDismissed = false; p.typed = false;
+    // a freshly rolled name resets the per-censor cache; record which censor state it belongs to
+    p._nameCache = {}; p._nameState = settings.glupost ? 'nsfw' : 'sfw';
+  }
+  // flipping Глупости swaps between a cached SFW and NSFW name (deterministic — flipping
+  // back returns the original) instead of rerolling a brand-new name each time
+  function swapCensorName(p) {
+    if (p.typed) return;                                  // typed/owner names aren't touched
+    var newKey = settings.glupost ? 'nsfw' : 'sfw', oldKey = p._nameState || (newKey === 'nsfw' ? 'sfw' : 'nsfw');
+    if (!p._nameCache) p._nameCache = {};
+    if (oldKey !== newKey) p._nameCache[oldKey] = { name: p.name, pct: p.pct, tier: p.tier, bonus: p.bonus, parts: p.parts };
+    var c = p._nameCache[newKey];
+    if (c) { p.name = c.name; p.pct = c.pct; p.tier = c.tier; p.bonus = c.bonus; p.parts = c.parts; p.bubbleDismissed = true; p._nameState = newKey; }
+    else { var keep = p._nameCache; regenName(p); p._nameCache = keep; p._nameCache[newKey] = { name: p.name, pct: p.pct, tier: p.tier, bonus: p.bonus, parts: p.parts }; }
   }
   // §1 switching gender keeps the SAME name/rarity, only re-cohering grammatically
   // (the noun morphs in place when it can, else swaps for a same-rarity sibling).
@@ -1330,15 +1379,18 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function addSetupPlayer(isAI) {
     var n = setupPlayers.length;
-    // the owner seat (#1, human) starts at the старшина's default gender
-    var g = (n === 0 && !isAI) ? (settings.ownerGender || 'm') : G.randomGender();
-    var p = { isAI: !!isAI, gender: g, color: PRESET_COLORS[n % PRESET_COLORS.length], bet: G.randomBet() };
+    // the owner seat (#1, human) starts at the старшина's default gender + colour
+    var isOwnerSeat = n === 0 && !isAI;
+    var g = isOwnerSeat ? (settings.ownerGender || 'm') : G.randomGender();
+    var col = isOwnerSeat ? (settings.ownerColor || PRESET_COLORS[0]) : pickFreeColor(null);
+    var p = { isAI: !!isAI, gender: g, color: col, bet: G.randomBet() };
     regenName(p);
     setupPlayers.push(p);
     renderSetup();
   }
   function renderSetup() {
     applyOwnerName(); // seat #1 carries the owner's name when the toggle is on
+    dedupeColors(); dedupeNames();   // keep colours + names unique across the roster
     var list = $('playerList'); list.innerHTML = '';
     setupPlayers.forEach(function (p, i) {
       var card = document.createElement('div'); card.className = 'pcard';
@@ -1391,6 +1443,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var row = document.createElement('div'); row.className = 'prow2';
       var color = document.createElement('input'); color.type = 'color'; color.value = p.color;
       color.oninput = function () { p.color = color.value; };
+      color.onchange = function () { p.color = color.value; renderSetup(); };   // dedupe against the others on commit
 
       // gender switch (мъжко / то / женско) — changes the name + callouts
       var gsw = document.createElement('div'); gsw.className = 'gender';
@@ -2566,8 +2619,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // Глупости — ON = profanity (NSFW words allowed); OFF = censored to the SFW set
     { key: 'glupost', label: 'Глупости', onChange: function () {
         G.setCensor(!settings.glupost);
-        // re-cohere existing setup names so they gain/lose NSFW words to match
-        setupPlayers.forEach(regenName);
+        // swap to the cached name for the new state (don't reroll — flipping back reverts)
+        setupPlayers.forEach(swapCensorName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
     // Акустика — reveals every data-over-sound feature (network play + sound transfer)
@@ -2803,7 +2856,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
-    syncOwnerGender();
+    syncOwnerGender(); syncOwnerColor();
     $('clearConfirm').classList.add('hidden'); $('ownerBubble').classList.add('hidden');
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
@@ -3238,13 +3291,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var log = moveLog[pi] || [], sc = game.players[pi].scores || {};
       for (var r = 0; r < log.length; r++) {
         var cat = log[r].category, v = (typeof sc[cat] === 'number' ? sc[cat] : 0), td = a && a.turns ? a.turns[r] : null;
-        if (cat === 'general' && v > 0) out.push({ round: r + 1, label: '★ +' + v, good: true });
+        if (cat === 'general' && v > 0) out.push({ round: r + 1, label: '+' + v, good: true });
         else if (v >= 28) out.push({ round: r + 1, label: '+' + v, good: true });
         else if (v === 0 && td && td.skill <= -8) out.push({ round: r + 1, label: 'пропусна', good: false });  // costly forfeit
       }
     } else if (tab === 'skill' && a && a.turns) {
       a.turns.forEach(function (td) { if (td.skill <= -3) out.push({ round: td.turn + 1, label: '−' + (-td.skill).toFixed(1), good: false }); });   // blunder
-      if (a.sharpest && a.sharpest.turn != null) out.push({ round: a.sharpest.turn + 1, label: '★ върхов', good: true });                          // top move
+      if (a.sharpest && a.sharpest.turn != null) out.push({ round: a.sharpest.turn + 1, label: 'върхов', good: true });                            // top move
     } else if (tab === 'luck' && a && a.turns && !a.manual) {
       a.turns.forEach(function (td) {
         if (td.luck >= 6) out.push({ round: td.turn + 1, label: '+' + Math.round(td.luck), good: true });
@@ -3326,7 +3379,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // x-axis turn ticks (1,2,3…) when there's room, else thinned out
     var ticks = '', per = iw / maxR, step = per >= 13 ? 1 : Math.ceil(13 / per);
     for (var tk = step; tk <= maxR; tk += step) ticks += '<text x="' + x(tk) + '" y="' + (H - 6) + '" class="pc-tick" text-anchor="middle">' + tk + '</text>';
-    var xlab = ticks + '<text x="' + (W - padR) + '" y="' + (H - 6) + '" class="pc-axis" text-anchor="end">ход</text>';
+    var xlab = ticks + '<text x="2" y="' + (H - 6) + '" class="pc-axis" text-anchor="start">ход</text>';
     var title = luckTab ? 'Късмет по ходове' : skillTab ? 'Оптимална игра' : 'Ход на битката';
     var open = !summary || summary.chartOpen !== false;
     el.innerHTML = '<details class="pc-details"' + (open ? ' open' : '') + '><summary class="pc-title">' + title + '</summary>'
@@ -4124,6 +4177,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       renderSetup();
     }
   };
+  // default colour for the старшина (swatches; applied to the owner seat, others bump)
+  (function () {
+    $('ownerColors').innerHTML = PRESET_COLORS.map(function (c) { return '<button class="oswatch" data-c="' + c + '" style="background:' + c + '"></button>'; }).join('');
+    $('ownerColors').querySelectorAll('.oswatch').forEach(function (b) {
+      b.onclick = function () {
+        settings.ownerColor = b.getAttribute('data-c'); syncOwnerColor(); saveSettings();
+        if (setupPlayers.length) { ownerOf(setupPlayers).color = settings.ownerColor; dedupeColors(); if (!$('setup').classList.contains('hidden')) renderSetup(); }
+      };
+    });
+  })();
+  function syncOwnerColor() { $('ownerColors').querySelectorAll('.oswatch').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-c') || '').toLowerCase() === (settings.ownerColor || '').toLowerCase()); }); }
   // default gender for the старшина (applied to the owner seat)
   function syncOwnerGender() { $('ownerGender').querySelectorAll('.glabel').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-g') === settings.ownerGender); }); }
   $('ownerGender').querySelectorAll('.glabel').forEach(function (b) {

@@ -367,7 +367,8 @@
       if (!existing) {
         if (this.roster.length >= this.maxPlayers) return;
         var id = this._nextId();
-        var p = { id: id, eph: jr.eph, name: jr.meta.name, color: jr.meta.color, gender: jr.meta.gender };
+        // colours and names must be unique across devices too
+        var p = { id: id, eph: jr.eph, name: this._uniqueName(jr.meta.name), color: this._uniqueColor(jr.meta.color), gender: jr.meta.gender };
         this.roster.push(p);
         if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
         existing = p;
@@ -388,6 +389,18 @@
     }
   };
   Session.prototype._nextId = function () { var used = {}; this.roster.forEach(function (p) { used[p.id] = 1; }); var i = 1; while (used[i]) i++; return i; };
+  var PALETTE = ['#c8a64b', '#b23a2e', '#3f6b3a', '#2f4a6b', '#9a6b2f', '#7a4632', '#5f7a3a', '#a23a6b'];
+  Session.prototype._uniqueColor = function (c) {
+    var used = this.roster.map(function (p) { return (p.color || '').toLowerCase(); });
+    if (used.indexOf((c || '').toLowerCase()) < 0) return c;
+    for (var i = 0; i < PALETTE.length; i++) if (used.indexOf(PALETTE[i].toLowerCase()) < 0) return PALETTE[i];
+    return c;
+  };
+  Session.prototype._uniqueName = function (n) {
+    var used = {}; this.roster.forEach(function (p) { used[(p.name || '').toLowerCase()] = 1; });
+    if (!used[(n || '').toLowerCase()]) return n || 'Боец';
+    var base = n || 'Боец', i = 2; while (used[(base + ' ' + i).toLowerCase()]) i++; return base + ' ' + i;
+  };
   Session.prototype._rxClient = function (pkt) {
     if (pkt.type === T.BEACON) {
       this.sessionId = unpackBeacon(pkt.payload).sessionId;

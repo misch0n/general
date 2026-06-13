@@ -359,3 +359,18 @@ test('GOSSIP: a peer ahead makes a behind client resync from the host', function
   c._rx(MP.frame(MP.T.GOSSIP, 1, 1, MP.packGossip(5, 0xabcd)));
   assert.ok(sent.some(function (p) { return p && p.type === MP.T.RESYNC_REQ; }), 'detected divergence → resync from host');
 });
+
+test('host dedupes colliding colours and names across joining devices', function () {
+  var bus = new Bus();
+  function mk(isHost, me) { return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} }); }
+  var host = mk(true, { name: 'Иван', color: '#c8a64b', gender: 'm' });
+  var c1 = mk(false, { name: 'Иван', color: '#c8a64b', gender: 'm' });   // same name + colour as host
+  var c2 = mk(false, { name: 'Иван', color: '#c8a64b', gender: 'f' });   // same again
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  var names = host.roster.map(function (p) { return p.name; });
+  var cols = host.roster.map(function (p) { return p.color.toLowerCase(); });
+  assert.strictEqual(new Set(names).size, 3, 'all names unique after dedupe');
+  assert.strictEqual(new Set(cols).size, 3, 'all colours unique after dedupe');
+  assert.strictEqual(host.roster[0].name, 'Иван');   // host keeps its own
+  assert.strictEqual(host.roster[0].color.toLowerCase(), '#c8a64b');
+});
