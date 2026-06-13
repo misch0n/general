@@ -200,6 +200,7 @@
     this.tp.onReceive(function (bytes) { self._rx(bytes); });
     if (this.tp.onMeter) this.tp.onMeter(function (ev) { self.meter.record(ev); self._linkTick(); });  // richer events from L0 (ecc/snr/fail)
     if (this.tp.setProfile) this.tp.setProfile(this.profile);
+    if (this.tp.setRole) this.tp.setRole(this.isHost ? 'host' : 'client');   // carrier-sense priority for the orchestrator
     this.settingsBits = 0;             // host's enabled pre-game settings (summary shown to clients)
     this.takeover = {};                // host: id → true when that seat is AI-driven mid-game
     if (this.isHost) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender, ready: true, isAI: false });
@@ -872,8 +873,13 @@
       this.snr = opts.snr || 2.2;        // a tone must beat the next-loudest by this ratio to count
       this.ctx = null; this.stream = null; this._cb = null; this._meterCb = null; this._monCb = null; this._rxTimer = null;
       this._sending = false; this._forceListen = false; this.role = opts.role || '?';
-      this.stats = { ticks: 0, heard: 0, framesOk: 0, crcFail: 0, junk: 0, lastRxMs: 0, lastType: -1, tx: 0 };
+      this.stats = { ticks: 0, heard: 0, framesOk: 0, crcFail: 0, junk: 0, lastRxMs: 0, lastType: -1, tx: 0, deferred: 0 };
       this._capOn = false; this._capTicks = null; this._capFrames = null; this._capT0 = 0; this.CAP_MAX = 6000;
+      // carrier-sense MAC: don't transmit while a tone is on the air (the other device is talking)
+      this._lastHeardMs = 0; this.busyMs = opts.busyMs || 350; this.txGap = opts.txGap || 700;
+      this._st = opts.setTimeout || function (f, ms) { return setTimeout(f, ms); };
+      this._ct = opts.clearTimeout || function (id) { clearTimeout(id); };
+      this.rand = opts.rand || Math.random;
     }
     function _now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
     // §2 adopt a profile (band / baud / volume); the receiver retunes its detector too
@@ -943,7 +949,7 @@
       var dom = Math.max(ps, p0, p1), domIdx = ps === dom ? 0 : (p0 === dom ? 1 : 2);
       var second = ps + p0 + p1 - dom - Math.min(ps, p0, p1);
       var clear = dom > this.floor && dom > this.snr * (second || 1e-12);
-      if (clear) this.stats.heard++;
+      if (clear) { this.stats.heard++; this._lastHeardMs = _now(); }   // carrier sense: someone is on the air
       if (this._monCb) try { this._monCb({ ps: ps, p0: p0, p1: p1, dom: dom, domIdx: domIdx, clear: clear, sending: this._sending }); } catch (e) {}
       if (this._capOn) this._cap(t, ps, p0, p1, domIdx, clear, false);
       this._decode(ps, p0, p1, domIdx, clear, t);
@@ -967,8 +973,19 @@
       this._txPump();
       return Promise.resolve();
     };
+    // is another device transmitting right now? (a tone was heard within the busy window)
+    AudioFSK.prototype.channelBusy = function () { return (_now() - this._lastHeardMs) < this.busyMs; };
     AudioFSK.prototype._txPump = function () {
       if (this._sending || !this.ctx || !this._txq || !this._txq.length) return;
+      var self = this;
+      this._ct(this._txTimer);
+      if (this.channelBusy()) {                       // CSMA: defer while the air is occupied
+        this.stats.deferred++;
+        // host gets the floor sooner; clients wait longer + random so they don't re-collide
+        var lo = this.role === 'host' ? 80 : 260, span = this.role === 'host' ? 140 : 520;
+        this._txTimer = this._st(function () { self._txPump(); }, lo + this.rand() * span);
+        return;
+      }
       this._emit(this._txq.shift());
     };
     AudioFSK.prototype._emit = function (payload) {
@@ -990,10 +1007,10 @@
       tone(this.fsync, t, dt * 10); t += dt * 10;                    // preamble (long, so the RX has time to lock)
       for (var k = 0; k < bits.length; k++) { tone(bits[k] ? this.f1 : this.f0, t, dt); t += dt; }
       var done = t - this.ctx.currentTime;
-      setTimeout(function () {
+      this._st(function () {
         self._sending = false;
         // a mandatory listen gap before the next queued frame, so the other device gets the floor
-        setTimeout(function () { self._txPump(); }, self.txGap || 700);
+        self._st(function () { self._txPump(); }, self.txGap);
       }, done * 1000 + 30);
     };
     // —— RX: Goertzel power at the three tones; detect preamble, then sample bits ——

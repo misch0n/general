@@ -535,3 +535,33 @@ test('AudioFSK decodes a frame from synthesized audio buffers (full DSP pipeline
   assert.deepStrictEqual(got, payload, 'frame recovered from real audio through the FSK pipeline');
   assert.strictEqual(fsk.stats.framesOk, 1);
 });
+
+// ---- carrier-sense MAC: don't transmit over another device; host has floor priority ----
+test('AudioFSK carrier sense defers a transmit while the air is busy, then emits when idle', function () {
+  var timers = [];
+  function fakeCtx() { return { currentTime: 0, destination: {},
+    createOscillator: function () { return { frequency: {}, connect: function () {}, start: function () {}, stop: function () {} }; },
+    createGain: function () { return { gain: { setValueAtTime: function () {}, exponentialRampToValueAtTime: function () {} }, connect: function () {} }; } }; }
+  var fsk = new MP.AudioFSK({ role: 'client', busyMs: 350, rand: function () { return 0.5; },
+    setTimeout: function (f, ms) { timers.push({ f: f, ms: ms }); return timers.length; }, clearTimeout: function () {} });
+  fsk.ctx = fakeCtx();
+  fsk._lastHeardMs = performance.now();           // a tone just heard → channel busy
+  assert.ok(fsk.channelBusy());
+  fsk.send(new Uint8Array([1, 2, 3]));
+  assert.strictEqual(fsk.stats.tx, 0, 'did not talk over the busy channel');
+  assert.strictEqual(fsk.stats.deferred, 1, 'deferred the transmit');
+  fsk._lastHeardMs = performance.now() - 5000;     // channel now idle
+  timers[timers.length - 1].f();                   // run the backoff retry
+  assert.strictEqual(fsk.stats.tx, 1, 'transmitted once the air cleared');
+});
+
+test('AudioFSK backoff: host re-checks the channel sooner than a client (floor priority)', function () {
+  function mk(role) {
+    var timers = [];
+    var fsk = new MP.AudioFSK({ role: role, rand: function () { return 0.5; },
+      setTimeout: function (f, ms) { timers.push(ms); return timers.length; }, clearTimeout: function () {} });
+    fsk.ctx = { currentTime: 0 }; fsk._lastHeardMs = performance.now();   // busy
+    fsk.send(new Uint8Array([1])); return timers[timers.length - 1];
+  }
+  assert.ok(mk('host') < mk('client'), 'host backs off less than a client');
+});
