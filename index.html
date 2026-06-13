@@ -681,7 +681,7 @@ body.modal-open{ overflow:hidden; }
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); }
 /* §2.4 percentile tag on archive rows */
 .hg-pct{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:9px; background:rgba(255,255,255,.08); color:var(--gen-label); }
-.hg-pct.hi{ background:rgba(75,140,60,.25); color:#9bd17e; } .hg-pct.lo{ background:rgba(178,58,46,.22); color:#e88; }
+.hg-pct.hi{ background:rgba(75,140,60,.25); color:#9bd17e; }   /* top-tier games only (5/10/15%) */
 /* recent battles row: most recent LEFT. <10 → left-aligned; exactly 10 → spread evenly */
 .histform{ display:flex; justify-content:flex-start; gap:6px; margin:6px 0 12px; }
 .histform.full{ justify-content:space-between; gap:4px; }
@@ -4347,8 +4347,11 @@ body.modal-open{ overflow:hidden; }
       var ptsPlayer = skipped ? top : rec.players[oi];
       var oTotal = recTotal(ptsPlayer), winR = !skipped && recPlacement(rec, oi) === 1;
       var pct = !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
-      var pctTag = pct != null
-        ? ' <span class="hg-pct' + (pct >= 80 ? ' hi' : pct <= 20 ? ' lo' : '') + '" title="по-добра от ' + pct + '% от игрите ти">топ ' + (100 - pct) + '%</span>' : '';
+      // only flag genuinely standout games: top 5 / 10 / 15 % (bucketed); nothing below that
+      var topPct = pct == null ? null : 100 - pct;
+      var tier = topPct == null ? null : topPct <= 5 ? 5 : topPct <= 10 ? 10 : topPct <= 15 ? 15 : null;
+      var pctTag = tier != null
+        ? ' <span class="hg-pct hi" title="по-добра от ' + pct + '% от игрите ти">топ ' + tier + '%</span>' : '';
       html += '<div class="histgame" data-id="' + esc(rec.id) + '">'
         + '<span class="hg-count" title="' + rec.players.length + ' бойци">' + rec.players.length + '</span>'
         + '<span class="hg-main"><span class="hg-top">' + esc(fmtDate(rec.ts))
