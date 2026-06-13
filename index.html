@@ -183,6 +183,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-actions{ display:flex; gap:10px; margin-top:4px; }
 .btn{ flex:1; font-family:var(--gen-font-display); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; font-size:14px;
   border:2px solid var(--gen-ink-line); border-radius:8px; padding:12px; background:var(--gen-pill); color:var(--gen-text); }
+/* CSS-drawn theme icons (currentColor) — import/export arrows, text/sound methods */
+.ic{ display:inline-block; position:relative; width:13px; height:13px; vertical-align:-2px; margin-right:6px; }
+.ic.solo{ margin:0; vertical-align:middle; }
+.ic-up::after{ content:''; position:absolute; left:1.5px; top:2px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-bottom:5px solid currentColor; }
+.ic-up::before{ content:''; position:absolute; left:4.5px; top:5px; width:3px; height:7px; background:currentColor; }
+.ic-down::after{ content:''; position:absolute; left:1.5px; bottom:1px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid currentColor; }
+.ic-down::before{ content:''; position:absolute; left:4.5px; top:1px; width:3px; height:7px; background:currentColor; }
+.ic-text::before{ content:''; position:absolute; left:2px; top:2px; width:9px; height:2px; background:currentColor; box-shadow:0 3px 0 currentColor, 0 6px 0 currentColor; }
+.ic-sound::before{ content:''; position:absolute; left:1px; top:4px; width:4px; height:4px; border-radius:1px; background:currentColor; }
+.ic-sound::after{ content:''; position:absolute; left:5px; top:0; width:8px; height:12px; border:2px solid currentColor; border-left-color:transparent; border-radius:50%; }
 .btn.primary{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-ink-line); box-shadow:0 4px 0 var(--gen-brass-dark); }
 .btn.primary:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-brass-dark); }
 .err{ color:var(--gen-alert); font-size:12px; min-height:16px; font-family:var(--gen-font-display); letter-spacing:.5px; }
@@ -612,7 +622,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .histgame .hg-sub{ font-size:10px; color:var(--gen-muted); margin-top:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
-.histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; font-size:12px; }
+.histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-brass); display:grid; place-items:center; }
 .histgame .hg-exp:hover{ border-color:var(--gen-brass); }
 .importarea{ width:100%; min-height:120px; resize:vertical; font-family:monospace; font-size:11px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:8px; padding:8px 10px; }
@@ -631,6 +641,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .progchart .pc-grid{ stroke:var(--gen-pill-line); stroke-width:1; }
 .progchart .pc-grid.zero{ stroke:var(--gen-muted); stroke-width:1.2; }
 .progchart .pc-axis{ fill:var(--gen-muted); font-size:8px; font-family:var(--gen-font-body); }
+.progchart .pc-tick{ fill:var(--gen-disabled); font-size:7.5px; font-variant-numeric:tabular-nums; font-family:var(--gen-font-body); }
 .progchart .pc-legend{ display:flex; flex-wrap:wrap; gap:5px 10px; margin-top:6px; justify-content:center; }
 .progchart .pc-leg{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; color:var(--gen-text); }
 .progchart .pc-sw{ width:10px; height:10px; border-radius:50%; flex:none; }
@@ -896,12 +907,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       <button id="tabCats" class="tab">Категории</button>
     </div>
     <div id="progressChart" class="progchart"></div>
-    <div id="ranks"></div>
     <div id="catBoard" class="catboard hidden"></div>
+    <div id="ranks"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
       <button id="shareCard" class="btn">📤 Сподели</button>
-      <button id="overExport" class="btn hidden">📤 Експорт</button>
+      <button id="overExport" class="btn hidden"><span class="ic ic-up"></span>Експорт</button>
       <button id="overBack" class="btn hidden">← Архив</button>
       <button id="overUndo" class="btn hidden">ОПА!</button>
       <button id="playAgain" class="btn primary">↻ Нов набор</button>
@@ -961,8 +972,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <div id="historyOverview"></div>
     <div id="historyList"></div>
     <div class="setup-actions">
-      <button id="importBtn" class="btn">📥 Импортирай игра</button>
-      <button id="importAcoustic" class="btn netfeature hidden">🔊 Приеми по звук</button>
+      <button id="importBtn" class="btn"><span class="ic ic-down"></span>Импортирай игра</button>
     </div>
   </div>
 </div>
@@ -976,9 +986,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <textarea id="exportText" class="importarea" readonly></textarea>
     <div class="setup-actions">
       <button id="exportCopy" class="btn primary">📋 Копирай</button>
-      <button id="exportAcoustic" class="btn netfeature hidden">📡 Изпрати по звук</button>
     </div>
     <div id="exportCopied" class="exportcopied hidden">✓ Копирано в клипборда</div>
+  </div>
+</div>
+
+<!-- choose transfer method: text (clipboard) vs sound (acoustic) -->
+<div id="methodModal" class="overlay hidden">
+  <div class="modal" style="max-width:280px;text-align:center">
+    <button class="x-close" id="methodClose">✕</button>
+    <h2 id="methodTitle">Метод</h2>
+    <div class="setup-actions" style="flex-direction:column">
+      <button id="methodText" class="btn primary"><span class="ic ic-text"></span>Текст</button>
+      <button id="methodSound" class="btn"><span class="ic ic-sound"></span>Звук</button>
+    </div>
   </div>
 </div>
 
@@ -2991,7 +3012,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     lines.slice(0, 3).forEach(function (l, i) { ctx.fillText(l, cx, y + i * lh); });
   }
   $('shareCard').onclick = shareSelected;
-  $('overExport').onclick = function () { if (currentHistRec) exportGame(currentHistRec); };
+  $('overExport').onclick = function () { if (currentHistRec) chooseMethod('Изнеси играта', function () { exportGame(currentHistRec); }, function () { acousticSend(currentHistRec); }); };
 
   $('tabStand').onclick = function () { if (summary) { summary.tab = 'stand'; renderSummary(); } };
   $('tabSkill').onclick = function () { if (summary) { summary.tab = 'skill'; renderSummary(); } };
@@ -3193,13 +3214,27 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     for (var r = 0; r < log.length; r++) { var v = sc[log[r].category]; run += (typeof v === 'number' ? v : 0); pts.push(run); }
     return pts;
   }
-  // §1.6 RT-07 — a turn's "swings": a Генерал, or a big single-turn placement
-  function swingsFor(pi) {
-    var log = moveLog[pi] || [], sc = game.players[pi].scores || {}, out = [];
-    for (var r = 0; r < log.length; r++) {
-      var cat = log[r].category, v = (typeof sc[cat] === 'number' ? sc[cat] : 0);
-      if (cat === 'general' && v > 0) out.push({ round: r + 1, delta: v, gen: true });
-      else if (v >= 25) out.push({ round: r + 1, delta: v, gen: false });
+  // §1.6 milestones for the highlighted player — tab-aware, good AND bad events
+  // (points: big gains / Генерал / costly misses; skill: top move / blunders;
+  // luck: lucky / unlucky turns). Only drawn when a single player is expanded.
+  function milestonesFor(pi) {
+    var a = summary.ana[pi], tab = summary.tab, out = [];
+    if (tab === 'stand') {
+      var log = moveLog[pi] || [], sc = game.players[pi].scores || {};
+      for (var r = 0; r < log.length; r++) {
+        var cat = log[r].category, v = (typeof sc[cat] === 'number' ? sc[cat] : 0), td = a && a.turns ? a.turns[r] : null;
+        if (cat === 'general' && v > 0) out.push({ round: r + 1, label: '★ +' + v, good: true });
+        else if (v >= 28) out.push({ round: r + 1, label: '+' + v, good: true });
+        else if (v === 0 && td && td.skill <= -8) out.push({ round: r + 1, label: 'пропусна', good: false });  // costly forfeit
+      }
+    } else if (tab === 'skill' && a && a.turns) {
+      a.turns.forEach(function (td) { if (td.skill <= -3) out.push({ round: td.turn + 1, label: '−' + (-td.skill).toFixed(1), good: false }); });   // blunder
+      if (a.sharpest && a.sharpest.turn != null) out.push({ round: a.sharpest.turn + 1, label: '★ върхов', good: true });                          // top move
+    } else if (tab === 'luck' && a && a.turns && !a.manual) {
+      a.turns.forEach(function (td) {
+        if (td.luck >= 6) out.push({ round: td.turn + 1, label: '+' + Math.round(td.luck), good: true });
+        else if (td.luck <= -6) out.push({ round: td.turn + 1, label: '' + Math.round(td.luck), good: false });
+      });
     }
     return out;
   }
@@ -3249,11 +3284,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var dots = muted ? '' : s.pts.map(function (v, r) { return '<circle cx="' + x(r) + '" cy="' + y(v) + '" r="2" fill="' + s.p.color + '"/>'; }).join('');
       return '<polyline points="' + poly + '" fill="none" stroke="' + s.p.color + '" stroke-width="' + (muted ? 1.8 : 2.4) + '" stroke-opacity="' + (muted ? 0.45 : 1) + '" stroke-linejoin="round" stroke-linecap="round"/>' + dots;
     }).join('');
-    // §1.6 swing annotations (points chart only): lead-change rings + big-jump dots,
-    // with a "+X т." label on the highlighted player's swings
-    var overlay = '';
+    // §1.6 overlay: lead-change rings (points tab) + per-player milestones (good & bad)
+    // for the highlighted player, tab-aware
+    var overlay = '', byI = {}; series.forEach(function (s) { byI[s.i] = s; });
     if (!skillTab && !luckTab) {
-      var byI = {}; series.forEach(function (s) { byI[s.i] = s; });
       var prevLeader = -1;
       for (var r = 1; r <= maxR; r++) {
         var leader = -1, best = -Infinity;
@@ -3264,18 +3298,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         }
         prevLeader = leader;
       }
-      game.players.forEach(function (p, i) {
-        if (hl >= 0 && i !== hl) return;
-        var sp = byI[i].pts;
-        swingsFor(i).forEach(function (sw) {
-          if (sw.round >= sp.length) return;
-          var cx = x(sw.round), cy = y(sp[sw.round]);
-          overlay += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (sw.gen ? 3.6 : 2.8) + '" fill="' + p.color + '" stroke="#16160e" stroke-width="0.7"/>';
-          if (hl === i) overlay += '<text x="' + cx + '" y="' + (cy - 5) + '" class="pc-swing" text-anchor="middle" fill="' + p.color + '">' + (sw.gen ? '★ ' : '') + '+' + sw.delta + '</text>';
-        });
+    }
+    if (hl >= 0 && byI[hl]) {
+      var hp = byI[hl].pts;
+      milestonesFor(hl).forEach(function (ms) {
+        if (ms.round >= hp.length) return;
+        var cx = x(ms.round), cy = y(hp[ms.round]), col = ms.good ? '#9bd17e' : '#e8807a', dy = ms.good ? -5 : 12;
+        overlay += '<circle cx="' + cx + '" cy="' + cy + '" r="3.2" fill="' + col + '" stroke="#16160e" stroke-width="0.7"/>'
+          + '<text x="' + cx + '" y="' + (cy + dy) + '" class="pc-swing" text-anchor="middle" fill="' + col + '">' + esc(ms.label) + '</text>';
       });
     }
-    var xlab = '<text x="' + (padL + iw / 2) + '" y="' + (H - 4) + '" class="pc-axis" text-anchor="middle">' + (skillTab || luckTab ? 'ходове →' : 'рундове →') + '</text>';
+    // x-axis turn ticks (1,2,3…) when there's room, else thinned out
+    var ticks = '', per = iw / maxR, step = per >= 13 ? 1 : Math.ceil(13 / per);
+    for (var tk = step; tk <= maxR; tk += step) ticks += '<text x="' + x(tk) + '" y="' + (H - 6) + '" class="pc-tick" text-anchor="middle">' + tk + '</text>';
+    var xlab = ticks + '<text x="' + (W - padR) + '" y="' + (H - 6) + '" class="pc-axis" text-anchor="end">ход</text>';
     var title = luckTab ? 'Късмет по ходове' : skillTab ? 'Оптимална игра' : 'Ход на битката';
     var open = !summary || summary.chartOpen !== false;
     el.innerHTML = '<details class="pc-details"' + (open ? ' open' : '') + '><summary class="pc-title">' + title + '</summary>'
@@ -3843,7 +3879,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         + '<span class="hg-sub">' + esc(fmtTime(rec.ts)) + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
-        + '<button class="hg-exp" title="Експорт (JSON)">📤</button>'
+        + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
     });
     $('historyList').innerHTML = html;
@@ -3852,7 +3888,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var find = function () { return loadHistory().filter(function (r) { return r.id === id; })[0]; };
       row.onclick = function () { var rec = find(); if (rec) openHistoryGame(rec); };
       row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
-      row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) exportGame(rec); };
+      row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) chooseMethod('Изнеси играта', function () { exportGame(rec); }, function () { acousticSend(rec); }); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
     });
   }
@@ -3936,7 +3972,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     $('importModal').classList.add('hidden');
     openHistory();
   }
-  $('importBtn').onclick = openImport;
+  $('importBtn').onclick = function () { chooseMethod('Внеси игра', openImport, acousticReceive); };
   $('importDo').onclick = importStep;
   $('importCancel').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
   $('importClose').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
@@ -3974,10 +4010,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     xferStage('🎙 Включвам микрофон…');
     xferFSK.start().then(then).catch(function () { xferStage('Няма достъп до микрофона.'); });
   }
-  $('exportAcoustic').onclick = function () {
-    if (!currentExportRec) return;
-    $('exportModal').classList.add('hidden');
-    openXfer('📡 Изпращане на игра');
+  function acousticSend(rec) {
+    currentExportRec = rec || currentExportRec; if (!currentExportRec) return;
+    $('exportModal').classList.add('hidden'); $('historyModal').classList.add('hidden');
+    openXfer('Изпращане на игра');
     xferTransport(function () {
       xferStage('Търся приемник…'); setFlavour($('xferStatus'), 'xSendSearch');
       var blob = MP.packRecord(currentExportRec, CAT_KEYS);
@@ -3987,10 +4023,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       } });
       xfer.start();
     });
-  };
-  $('importAcoustic').onclick = function () {
+  }
+  function acousticReceive() {
     $('historyModal').classList.add('hidden');
-    openXfer('🔊 Приемане на игра');
+    openXfer('Приемане на игра');
     xferTransport(function () {
       xferStage('Търся изпращач…'); setFlavour($('xferStatus'), 'xRecvSearch');
       xfer = new MP.Transfer({ transport: xferFSK, mode: 'recv', callbacks: {
@@ -4006,7 +4042,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       } });
       xfer.start();
     });
-  };
+  }
+  // expose Текст / Звук when triggering an export/import; with sound off, go straight to text
+  function chooseMethod(title, onText, onSound) {
+    if (!settings.acoustic) { onText(); return; }
+    $('methodTitle').textContent = title;
+    $('methodText').onclick = function () { $('methodModal').classList.add('hidden'); onText(); };
+    $('methodSound').onclick = function () { $('methodModal').classList.add('hidden'); onSound(); };
+    $('methodModal').classList.remove('hidden');
+  }
+  $('methodClose').onclick = function () { $('methodModal').classList.add('hidden'); };
+  $('methodModal').onclick = function (e) { if (e.target === $('methodModal')) $('methodModal').classList.add('hidden'); };
   function openHistory() {
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
