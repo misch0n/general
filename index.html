@@ -458,6 +458,16 @@ body.modal-open{ overflow:hidden; }
 .cc-help summary.cc-q{ display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; cursor:pointer; list-style:none;
   font-family:var(--gen-font-body); font-weight:700; font-size:10px; color:var(--gen-ink); background:var(--gen-brass); vertical-align:1px; }
 .cc-help summary::-webkit-details-marker{ display:none; }
+/* collapsible career category fold */
+.catfold{ margin-top:6px; }
+.catfold-sum{ display:flex; align-items:center; gap:7px; cursor:pointer; list-style:none; margin:12px 0 7px; }
+.catfold-sum::-webkit-details-marker{ display:none; }
+.catfold-sum > span:first-child{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:11px; color:var(--gen-brass); }
+.cc-qbtn{ flex:none; display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; cursor:pointer; border:none;
+  font-family:var(--gen-font-body); font-weight:700; font-size:10px; color:var(--gen-ink); background:var(--gen-brass); }
+.catfold-sum .cf-caret{ margin-left:auto; }
+.catfold[open] .cf-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
+.catfold .cc-tips{ margin-bottom:8px; }
 .cc-tips{ margin-top:6px; padding:8px 10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line);
   font-size:10.5px; color:var(--gen-label); font-weight:400; text-transform:none; letter-spacing:0; line-height:1.5; }
 .cc-tips > div{ padding:1px 0; }
@@ -751,8 +761,14 @@ body.modal-open{ overflow:hidden; }
   border-radius:var(--gen-r-die); box-shadow:inset 0 0 0 2px rgba(255,255,255,.22); transition:transform .12s; }
 .rpdie .face{ width:30px; height:30px; }
 .rpdie.rr{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
-.rplabel{ text-align:center; font-size:12px; color:var(--gen-label); min-height:16px; margin-bottom:8px; }
+.rpdie.kept{ border-color:#5a8f3a; box-shadow:0 0 0 2px #7bb85a,inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
+.rplabel{ display:flex; align-items:center; justify-content:center; gap:6px; text-align:center; font-size:12px; color:var(--gen-label); min-height:16px; margin-bottom:8px; }
 .rplabel b{ color:var(--gen-brass-bright); }
+.rpdiceq{ flex:none; width:17px; height:17px; display:grid; place-items:center; border-radius:50%; cursor:pointer;
+  font-family:var(--gen-font-body); font-weight:700; font-size:11px; color:var(--gen-ink); background:var(--gen-brass); border:none; }
+.rphelp{ font-size:11px; line-height:1.4; color:var(--gen-label); background:rgba(0,0,0,.28); border:1px solid var(--gen-pill-line);
+  border-radius:8px; padding:7px 9px; margin:-2px 0 8px; }
+.rphelp b{ color:var(--gen-brass-bright); }
 .rpslider{ width:100%; margin:4px 0 12px; accent-color:var(--gen-brass); }
 .rpctrls{ display:flex; align-items:center; justify-content:center; gap:8px; }
 /* equal-size control buttons; glyphs drawn in CSS (no emoji), centred */
@@ -1140,6 +1156,7 @@ body.modal-open{ overflow:hidden; }
     <div id="replayBoard" class="rpboard"></div>
     <div id="replayDice" class="rpdice"></div>
     <div id="rpLabel" class="rplabel"></div>
+    <div id="rpDiceHelp" class="rphelp hidden"></div>
     <input id="rpSlider" class="rpslider" type="range" min="0" max="0" value="0" />
     <div class="rpctrls">
       <button id="rpRestart" class="rpbtn ic-restart" title="Отначало"><span class="gl"></span></button>
@@ -3957,11 +3974,12 @@ body.modal-open{ overflow:hidden; }
         } else {
           var rolls = log.rolls || [];
           for (var i = 0; i < rolls.length; i++) {
-            // mark the dice that get RE-ROLLED after this throw (= not kept), to match
-            // the in-game flow where you select the dice you're about to re-throw
+            // remember BOTH the kept set and the re-thrown set for this throw; renderReplay
+            // highlights whichever matches the game's dice-selection flavour (keep vs throw)
             var last = i === rolls.length - 1;
-            var reroll = (!last && log.keeps[i]) ? log.keeps[i].map(function (k) { return !k; }) : null;
-            actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], reroll: reroll, rollNo: i + 1, rolls: rolls.length });
+            var keep = (!last && log.keeps[i]) ? log.keeps[i].slice() : null;
+            var reroll = keep ? keep.map(function (k) { return !k; }) : null;
+            actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], reroll: reroll, keep: keep, rollNo: i + 1, rolls: rolls.length });
           }
           actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: rolls.length ? rolls[rolls.length - 1] : [] });
         }
@@ -3989,10 +4007,24 @@ body.modal-open{ overflow:hidden; }
     var run = 0; G.CATEGORIES.forEach(function (c) { if (typeof sc[a.p][c.key] === 'number') run += sc[a.p][c.key]; });
     $('rpName').innerHTML = (pl.owner ? ownerTokenHTML(true) : '') + esc(pl.name);
     $('replayBoard').innerHTML = replayBoardHTML(sc[a.p], a.type === 'commit' ? a.category : null);
-    // marked dice = the ones being re-rolled after this throw
-    $('replayDice').innerHTML = (a.dice || []).map(function (v, i) { return '<div class="rpdie' + (a.reroll && a.reroll[i] ? ' rr' : '') + '">' + pipFace(v) + '</div>'; }).join('');
-    // a static one-liner where the narration used to be: Х{ход}/14 · точки
-    $('rpLabel').innerHTML = '<b>Х' + (a.r + 1) + '/' + G.CATEGORIES.length + '</b> · ' + (run + (pl.bonus || 0)) + ' т.';
+    // highlight the dice this game's flavour marks: keep-mode → held; throw-mode → re-thrown
+    var keepMode = !!rec.selectKeep, hlMask = keepMode ? a.keep : a.reroll;
+    $('replayDice').innerHTML = (a.dice || []).map(function (v, i) {
+      return '<div class="rpdie' + (hlMask && hlMask[i] ? (keepMode ? ' kept' : ' rr') : '') + '">' + pipFace(v) + '</div>';
+    }).join('');
+    // Х{ход}/14 · {етап} · точки — with a ? that explains the highlight
+    var stage = a.type === 'commit' ? 'записване'
+      : a.rollNo === 1 ? 'начално хвърляне' : a.rollNo === 2 ? 'второ хвърляне' : a.rollNo === 3 ? 'трето хвърляне' : 'хвърляне ' + a.rollNo;
+    $('rpLabel').innerHTML = '<button id="rpDiceQ" class="rpdiceq" title="Какво означават маркираните зарове?">?</button>'
+      + '<b>Х' + (a.r + 1) + '/' + G.CATEGORIES.length + '</b> · ' + stage + ' · ' + (run + (pl.bonus || 0)) + ' т.';
+    $('rpDiceQ').onclick = function (e) {
+      e.stopPropagation();
+      var help = $('rpDiceHelp');
+      help.innerHTML = keepMode
+        ? '🎲 <b>Маркираните</b> зарове са тези, които играчът <b>задържа</b> (избор „кои да държиш“). Останалите се хвърлят наново.'
+        : '🎲 <b>Маркираните</b> зарове са тези, които играчът <b>хвърля наново</b> (избор „кои да хвърлиш“). Останалите се пазят.';
+      help.classList.toggle('hidden');
+    };
     $('rpSlider').value = String(replay.idx);
   }
   // speed gears: a modifier over the 1 s/move base; click cycles to the next gear
@@ -4212,14 +4244,18 @@ body.modal-open{ overflow:hidden; }
     }
     var up = G.CATEGORIES.filter(function (cc) { return cc.group === 'upper'; }).map(tile).join('');
     var low = G.CATEGORIES.filter(function (cc) { return cc.group === 'lower'; }).map(tile).join('');
-    var help = '<details class="cc-help"><summary class="cc-q" title="Как се чете?">?</summary><div class="cc-tips">'
+    // the whole board folds away (collapsed by default — it's a screen-hog); the ? sits
+    // inline next to the label and toggles the read-tips WITHOUT opening/closing the fold
+    var tips = '<div class="cc-tips hidden">'
       + '<div><b>%</b> — колко често вкарваш категорията</div>'
       + '<div><b>число</b> — твоят личен рекорд</div>'
       + '<div><b>−EV</b> — среден теч: колко точки изпускаш на ход</div>'
       + '<div>цвят: <b class="cc-g">зелено</b> играеш я чисто · <b class="cc-n">сиво</b> средно · <b class="cc-r">червено</b> теч</div>'
-      + '</div></details>';
-    return '<div class="ho-sechd">Категории ' + help + '</div>'
-      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>';
+      + '</div>';
+    return '<details class="catfold"><summary class="ho-sechd catfold-sum"><span>Категории</span>'
+      + '<button type="button" class="cc-q cc-qbtn" title="Как се чете?">?</button>'
+      + '<span class="ho-caret cf-caret"></span></summary>' + tips
+      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div></details>';
   }
   // career averages of the per-player report stats (mirrors renderReport's stat lines)
   function careerAverages(r) {
@@ -4244,6 +4280,9 @@ body.modal-open{ overflow:hidden; }
   function renderHistory() {
     var games = loadHistory().slice().reverse(); // newest first
     $('historyOverview').innerHTML = ownerOverview();
+    // the ? toggles the read-tips inline without opening/closing the category fold
+    var q = $('historyOverview').querySelector('.cc-qbtn');
+    if (q) q.onclick = function (e) { e.preventDefault(); e.stopPropagation(); var t = q.closest('.catfold').querySelector('.cc-tips'); if (t) t.classList.toggle('hidden'); };
     if (!games.length) {
       $('historyList').innerHTML = '<div class="noowner">Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.</div>';
       return;
