@@ -943,7 +943,7 @@
   // None of them ever forfeits at random — only when nothing scores.
   var PERSONAS = [
     { id: 'mushica',  name: 'Каскадьор',  flavor: 'Хвърля наслуки и се надява.',     policy: { type: 'random' },                  strength: 0.25 },
-    { id: 'komar',    name: 'Комарджия',  flavor: 'Допамина му гърми когато види шестици, трябва да си бърше устата през хвърляне.', policy: { type: 'greedy' }, strength: 0.64 },
+    { id: 'komar',    name: 'Комарджия',  flavor: 'Одървя се на шестици.', policy: { type: 'greedy' }, strength: 0.64 },
     { id: 'lelia',    name: 'Леля ти',    flavor: 'Играе на семейни вечери.',        policy: { type: 'epsilon', epsilon: 0.2 },   strength: 0.77 },
     { id: 'lyubitel', name: 'Кибик',      flavor: 'Бива го, бутка кокала.',          policy: { type: 'softmax', tau: 0.8 },       strength: 0.85 },
     { id: 'gospod',   name: 'Господ бог', flavor: 'Вижда всичко. Не прощава.',       policy: { type: 'optimal', tau: 0 },         strength: 1.0 },
