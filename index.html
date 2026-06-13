@@ -381,6 +381,22 @@ body.modal-open{ overflow:hidden; }
 .acwarn .acw-ic{ flex:none; font-size:16px; }
 .acwarn b{ color:#f3d9d3; }
 .netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
+/* acoustic diagnostics panel */
+.netdiag{ text-align:left; }
+.nd-band{ font-size:11px; color:var(--gen-muted); text-align:center; margin-bottom:8px; }
+.nd-band b{ color:var(--gen-brass-bright); font-family:var(--gen-font-body); }
+.nd-meters{ display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+.nd-m{ display:flex; align-items:center; gap:8px; }
+.nd-m > span{ flex:none; width:54px; font-size:10px; color:var(--gen-muted); text-transform:uppercase; letter-spacing:.5px; }
+.nd-bar{ flex:1; height:12px; border-radius:6px; background:rgba(255,255,255,.07); overflow:hidden; }
+.nd-bar i{ display:block; height:100%; width:0; background:var(--gen-brass); transition:width .08s linear; }
+#ndBarS{ background:#6fa8e8; }
+.nd-heard{ text-align:center; font-size:12px; font-weight:700; color:var(--gen-muted); margin-bottom:8px; }
+.nd-heard.on{ color:#9bd17e; }
+.nd-stats{ font-size:11px; color:var(--gen-label); text-align:center; line-height:1.7; margin-bottom:8px; }
+.nd-stats b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+.nd-hint{ font-size:10.5px; color:var(--gen-muted); line-height:1.5; margin:6px 0; }
+.nd-hint b{ color:var(--gen-label); }
 /* link-quality signal bars + warnings */
 .netbars{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:var(--gen-muted); min-height:16px; margin:6px 0; }
 .netbars:empty{ display:none; }
@@ -1229,6 +1245,27 @@ body.modal-open{ overflow:hidden; }
       <div class="setup-actions">
         <button id="netJoin" class="btn">🎧 Влез в игра</button>
       </div>
+      <div class="setup-actions">
+        <button id="netDiagBtn" class="btn small">🔧 Тест на звука (диагностика)</button>
+      </div>
+    </div>
+    <!-- acoustic diagnostics: live tone meters + test tones, to debug the link on real devices -->
+    <div id="netDiag" class="netdiag hidden">
+      <div class="nd-band">Лента: <b id="ndBand">—</b></div>
+      <div class="nd-meters">
+        <div class="nd-m"><span>f0 (0)</span><div class="nd-bar"><i id="ndBar0"></i></div></div>
+        <div class="nd-m"><span>f1 (1)</span><div class="nd-bar"><i id="ndBar1"></i></div></div>
+        <div class="nd-m"><span>синх</span><div class="nd-bar"><i id="ndBarS"></i></div></div>
+      </div>
+      <div id="ndHeard" class="nd-heard">тихо…</div>
+      <div id="ndStats" class="nd-stats"></div>
+      <div class="setup-actions">
+        <button id="ndTone0" class="btn small">🔊 тон f0</button>
+        <button id="ndTone1" class="btn small">🔊 тон f1</button>
+        <button id="ndToneFrame" class="btn small">📦 тестов пакет</button>
+      </div>
+      <div class="nd-hint">Отвори това на <b>двете</b> устройства. Пусни тон на едното — на другото съответната лента трябва да <b>светне</b> (значи се чуват). „тестов пакет" праща истинска рамка: ако другото устройство я декодира, броячът <b>OK</b> се вдига.</div>
+      <div class="setup-actions"><button id="ndClose" class="btn primary">Затвори</button></div>
     </div>
     <div id="netLobby" class="hidden">
       <!-- scan phase: the roster fills as devices join -->
@@ -1818,6 +1855,7 @@ body.modal-open{ overflow:hidden; }
   // ---------- lobby preparation UI ----------
   function netShow(phase) {
     netPhase = phase;
+    $('netDiag').classList.add('hidden'); clearInterval(ndStatsTimer);   // leaving diagnostics
     $('netChoose').classList.toggle('hidden', phase !== 'choose');
     $('netLobby').classList.toggle('hidden', phase === 'choose');
     $('netScan').classList.toggle('hidden', phase !== 'scan');
@@ -1890,11 +1928,55 @@ body.modal-open{ overflow:hidden; }
     else { $('netReady').classList.toggle('on', netMyReady); $('netReady').textContent = netMyReady ? 'Готов ✔' : 'Готов съм'; }
   }
   function netStartTransport(then) {
+    if (netFSK && netFSK.ctx) { then(); return; }   // reuse an already-open mic (e.g. diagnostics)
     if (!window.MP || !MP.AudioFSK) { netSay('Звукът не е наличен на това устройство.'); return; }
     netFSK = new MP.AudioFSK();
     netSay('🎙 Включвам микрофон/говорител…');
     netFSK.start().then(function () { then(); }).catch(function () { netSay('Няма достъп до микрофона. Разреши го и опитай пак.'); });
   }
+  // ---------- acoustic diagnostics (live tone meters + test tones) ----------
+  var ndLast = null, ndMax = 1e-9, ndRaf = 0, ndStatsTimer = null;
+  function ndUpdateBars() {
+    if ($('netDiag').classList.contains('hidden')) { ndRaf = 0; return; }
+    if (ndLast) {
+      ndMax = Math.max(ndMax * 0.96, ndLast.p0, ndLast.p1, ndLast.ps, 1e-9);
+      var sc = ndMax || 1;
+      $('ndBar0').style.width = Math.min(100, 100 * ndLast.p0 / sc) + '%';
+      $('ndBar1').style.width = Math.min(100, 100 * ndLast.p1 / sc) + '%';
+      $('ndBarS').style.width = Math.min(100, 100 * ndLast.ps / sc) + '%';
+      var heard = $('ndHeard'); heard.classList.toggle('on', !!ndLast.clear);
+      heard.textContent = ndLast.clear ? ('ЧУВАМ ' + (ndLast.domIdx === 0 ? 'синх' : ndLast.domIdx === 1 ? 'f0' : 'f1') + ' тон') : 'тихо…';
+    }
+    ndRaf = window.requestAnimationFrame(ndUpdateBars);
+  }
+  function ndUpdateStats() {
+    if (!netFSK || !netFSK.stats) return;
+    var s = netFSK.stats, ago = s.lastRxMs ? Math.round((Date.now() - s.lastRxMs) / 1000) + 'с назад' : '—';
+    $('ndStats').innerHTML = 'декодирани <b>' + s.framesOk + '</b> · CRC-грешки <b>' + s.crcFail + '</b> · шум <b>' + s.junk + '</b><br>'
+      + 'пратени <b>' + s.tx + '</b> · чути тонове <b>' + s.heard + '</b> · последна рамка <b>' + ago + '</b>';
+  }
+  function openNetDiag() {
+    function go() {
+      if (netFSK.setProfile && !net) netFSK.setProfile(MP.ANCHOR);   // diag uses the real gameplay band
+      netFSK.onMonitor(function (m) { ndLast = m; });
+      $('ndBand').textContent = Math.round(netFSK.f0) + ' / ' + Math.round(netFSK.f1) + ' / синх ' + Math.round(netFSK.fsync) + ' Hz · ' + netFSK.baud + ' baud';
+      $('netChoose').classList.add('hidden'); $('netDiag').classList.remove('hidden');
+      if (!ndRaf) ndRaf = window.requestAnimationFrame(ndUpdateBars);
+      clearInterval(ndStatsTimer); ndStatsTimer = setInterval(ndUpdateStats, 500); ndUpdateStats();
+    }
+    if (netFSK && netFSK.ctx) go(); else netStartTransport(go);
+  }
+  function closeNetDiag() {
+    $('netDiag').classList.add('hidden'); clearInterval(ndStatsTimer); ndStatsTimer = null;
+    if (netFSK && netFSK.onMonitor) netFSK.onMonitor(null);
+    if (!net && netFSK && netFSK.stop) { netFSK.stop(); netFSK = null; }   // diag opened the mic standalone → release it
+    $('netChoose').classList.remove('hidden');
+  }
+  $('netDiagBtn').onclick = openNetDiag;
+  $('ndClose').onclick = closeNetDiag;
+  $('ndTone0').onclick = function () { if (netFSK) netFSK.playTone(netFSK.f0, 800); };
+  $('ndTone1').onclick = function () { if (netFSK) netFSK.playTone(netFSK.f1, 800); };
+  $('ndToneFrame').onclick = function () { if (netFSK) netFSK.send(new Uint8Array([MP.T.PING, 0, 0])); };  // a real frame — the other device's „декодирани" rises if it reads it
   function newSession(isHost) {
     return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
   }
@@ -1941,11 +2023,11 @@ body.modal-open{ overflow:hidden; }
     net.calibrate(function () { net.startGame(); });
   };
   function leaveNet() {
-    stopFlavour(); clearTimeout(netMetaTimer);
+    stopFlavour(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop();
     net = null; netFSK = null; netMode = false; localPid = null;
     netPhase = 'choose'; netMe = null; netMyReady = false; netAiActiveId = null; netSettCtx = false;
-    $('netBars').innerHTML = ''; $('netLink').classList.add('hidden');
+    $('netBars').innerHTML = ''; $('netLink').classList.add('hidden'); $('netDiag').classList.add('hidden');
     $('netModal').classList.add('hidden');
   }
   $('netLeave').onclick = leaveNet;

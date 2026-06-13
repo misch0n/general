@@ -185,7 +185,11 @@
     this._acked = false;
     // adaptive link state (§4-6)
     this.meter = new LinkMeter();
-    this.profile = this.isHost ? phaseProfile('gameplay') : ANCHOR;   // host runs gameplay; clients start on the safe floor
+    // EVERYONE stays on the robust ANCHOR band — host AND clients. Putting the host on
+    // a different (faster) band than the clients meant each device transmitted in a band
+    // the other wasn't listening on, so they never heard each other. No mid-session band
+    // hops either (they desync the modem); the messages are tiny and human-paced anyway.
+    this.profile = ANCHOR;
     this.ctrl = this.isHost ? new AdaptiveController() : null;
     this.clientQ = {};                 // host: client id → its reported link quality
     this._linkN = 0;
@@ -231,7 +235,7 @@
   Session.prototype.calibrate = function (done) {
     var self = this;
     if (!this.isHost) { if (done) done(this.profile); return; }
-    if (!this.tp.measureProbe) { this._applyProfile(phaseProfile('gameplay')); if (done) done(this.profile); return; }
+    if (!this.tp.measureProbe) { if (done) done(this.profile); return; }   // no probe → just stay on ANCHOR
     var ladder = CAL_LADDER, reports = {}, i = 0;
     (function step() {
       if (i >= ladder.length) { var chosen = pickProfile(reports, { threshold: 0.05, margin: 0.5 }); self.switchProfile(chosen.id); if (done) done(chosen); return; }
@@ -860,8 +864,12 @@
       this.baud = opts.baud || BAUD;
       this.f0 = opts.f0 || F0; this.f1 = opts.f1 || F1; this.fsync = opts.fsync || FSYNC;
       this.volume = opts.volume || 0.4;
-      this.ctx = null; this.stream = null; this._cb = null; this._meterCb = null; this._rxTimer = null;
-      this._sending = false;
+      this.os = opts.os || 6;            // RX ticks sampled per transmitted bit (symbol timing)
+      this.floor = opts.floor || 3e-4;   // absolute power floor below which a tick is silence
+      this.snr = opts.snr || 2.2;        // a tone must beat the next-loudest by this ratio to count
+      this.ctx = null; this.stream = null; this._cb = null; this._meterCb = null; this._monCb = null; this._rxTimer = null;
+      this._sending = false; this._forceListen = false;
+      this.stats = { ticks: 0, heard: 0, framesOk: 0, crcFail: 0, junk: 0, lastRxMs: 0, lastType: -1, tx: 0 };
     }
     // §2 adopt a profile (band / baud / volume); the receiver retunes its detector too
     AudioFSK.prototype.setProfile = function (p) {
@@ -869,6 +877,26 @@
       this.fsync = Math.max(800, p.f0 - 400);   // keep the preamble just below the data band
     };
     AudioFSK.prototype.onMeter = function (cb) { this._meterCb = cb; };   // §4 per-decode quality events
+    AudioFSK.prototype.onMonitor = function (cb) { this._monCb = cb; };   // live per-tick tone powers (diagnostics)
+    // live-tunable knobs so a real two-device setup can be calibrated from the debug panel
+    AudioFSK.prototype.setParams = function (p) {
+      if (!p) return;
+      if (p.f0 != null) this.f0 = p.f0; if (p.f1 != null) this.f1 = p.f1; if (p.fsync != null) this.fsync = p.fsync;
+      if (p.baud != null) this.baud = p.baud; if (p.volume != null) this.volume = p.volume;
+      if (p.floor != null) this.floor = p.floor; if (p.snr != null) this.snr = p.snr; if (p.os != null) this.os = p.os;
+      if (this._rxTimer) { this._restartListen(); }
+    };
+    // emit a bare tone (no data) — lets one device "ping" so the other can SEE it on the
+    // monitor bars, isolating "can these two devices hear each other" from framing/decoding
+    AudioFSK.prototype.playTone = function (freq, ms) {
+      if (!this.ctx) return; var dur = (ms || 800) / 1000, t = this.ctx.currentTime + 0.03, self = this;
+      var o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.frequency.value = freq || this.f1; o.connect(g); g.connect(this.ctx.destination);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(this.volume, t + 0.01);
+      g.gain.setValueAtTime(this.volume, t + dur - 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur);
+      this._sending = true; setTimeout(function () { self._sending = false; }, (0.03 + dur) * 1000 + 30);
+    };
     AudioFSK.prototype.start = function () {
       var self = this;
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -880,7 +908,7 @@
       }).then(function (stream) {
         self.stream = stream;
         var src = self.ctx.createMediaStreamSource(stream);
-        var an = self.ctx.createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0;
+        var an = self.ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0;   // ≥1 bit window even at 96 kHz
         src.connect(an); self._an = an; self._buf = new Float32Array(an.fftSize);
         self._listen();
         return true;
@@ -896,7 +924,7 @@
       full[0] = payload.length; full.set(payload, 1); full[full.length - 2] = (crc >> 8) & 255; full[full.length - 1] = crc & 255;
       var bits = []; for (var i = 0; i < full.length; i++) for (var b = 7; b >= 0; b--) bits.push((full[i] >> b) & 1);
       var t = this.ctx.currentTime + 0.05, dt = 1 / this.baud, self = this;
-      this._sending = true;
+      this._sending = true; this.stats.tx++;
       function tone(freq, start, dur) {
         var o = self.ctx.createOscillator(), g = self.ctx.createGain();
         o.frequency.value = freq; o.connect(g); g.connect(self.ctx.destination);
@@ -911,41 +939,66 @@
       return new Promise(function (res) { setTimeout(function () { self._sending = false; res(); }, done * 1000 + 30); });
     };
     // —— RX: Goertzel power at the three tones; detect preamble, then sample bits ——
-    AudioFSK.prototype._goertzel = function (buf, freq) {
+    AudioFSK.prototype._goertzel = function (buf, freq, off, win) {
+      off = off || 0; win = win || buf.length;
       var sr = this.ctx.sampleRate, w = 2 * Math.PI * freq / sr, c = 2 * Math.cos(w), s0 = 0, s1 = 0, s2 = 0;
-      for (var i = 0; i < buf.length; i++) { s0 = buf[i] + c * s1 - s2; s2 = s1; s1 = s0; }
-      return s1 * s1 + s2 * s2 - c * s1 * s2;
+      for (var i = 0; i < win; i++) { s0 = buf[off + i] + c * s1 - s2; s2 = s1; s1 = s0; }
+      return (s1 * s1 + s2 * s2 - c * s1 * s2) / win;   // normalise by window so the floor is comparable across bauds
     };
+    AudioFSK.prototype._restartListen = function () { if (this._rxTimer) clearInterval(this._rxTimer); this._listen(); };
     AudioFSK.prototype._listen = function () {
       var self = this;
+      this._reset();
       this._rxTimer = setInterval(function () {
-        if (!self._an || self._sending) return;          // half-duplex: don't listen while talking
+        if (!self._an) return;
+        if (self._sending && !self._forceListen) return;    // half-duplex: don't decode our own TX
+        var n = self._buf.length, win = Math.min(n, Math.max(256, Math.round(self.ctx.sampleRate / self.baud)));
         self._an.getFloatTimeDomainData(self._buf);
-        // (sampling/decoding loop intentionally simple; tune per device)
-        var ps = self._goertzel(self._buf, self.fsync), p0 = self._goertzel(self._buf, self.f0), p1 = self._goertzel(self._buf, self.f1);
-        self._decode(ps, p0, p1);
-      }, 1000 / (this.baud * 4));
+        var off = n - win;                                   // analyse the most recent ~1 bit of audio
+        var ps = self._goertzel(self._buf, self.fsync, off, win), p0 = self._goertzel(self._buf, self.f0, off, win), p1 = self._goertzel(self._buf, self.f1, off, win);
+        self.stats.ticks++;
+        // which tone (if any) is clearly present: dominant must beat the 2nd-loudest by snr×
+        var a = [ps, p0, p1], dom = Math.max(ps, p0, p1), domIdx = ps === dom ? 0 : (p0 === dom ? 1 : 2);
+        var second = a[0] + a[1] + a[2] - dom - Math.min(ps, p0, p1);
+        var clear = dom > self.floor && dom > self.snr * (second || 1e-12);
+        if (clear) self.stats.heard++;
+        if (self._monCb) try { self._monCb({ ps: ps, p0: p0, p1: p1, dom: dom, domIdx: domIdx, clear: clear, sending: self._sending }); } catch (e) {}
+        if (!self._sending) self._decode(ps, p0, p1, domIdx, clear);
+      }, 1000 / (this.baud * this.os));
     };
-    // A pragmatic bit-clock decoder: lock on preamble energy, then read bytes.
-    AudioFSK.prototype._decode = function (ps, p0, p1) {
-      var st = this._d || (this._d = { phase: 'idle', bits: [], hi: 0 });
-      var loud = Math.max(ps, p0, p1), thresh = 1e-4;
-      if (st.phase === 'idle') { if (ps > thresh && ps > p0 && ps > p1) { st.phase = 'data'; st.bits = []; st.q = 0; } return; }
-      if (loud < thresh) { if (++st.q > 8) this._finish(st); return; }
-      st.q = 0; st.bits.push(p1 > p0 ? 1 : 0);
-      if (st.bits.length >= 8 && st.bits.length % 8 === 0) {
-        // peek length once we have the first byte
-        if (st.len == null && st.bits.length >= 8) { st.len = bitsToByte(st.bits, 0); }
-        if (st.len != null && st.bits.length >= (1 + st.len + 2) * 8) this._finish(st);
+    AudioFSK.prototype._reset = function () { this._d = { phase: 'idle', pre: 0, gap: 0, bits: [], a0: 0, a1: 0, tib: 0, len: null }; };
+    // proper symbol-timed decoder: lock the preamble (fsync), align to the preamble→data
+    // edge, then integrate each bit over `os` ticks and slice it once per bit period.
+    AudioFSK.prototype._decode = function (ps, p0, p1, domIdx, clear) {
+      var st = this._d || (this._d = { phase: 'idle', pre: 0 });
+      if (st.phase === 'idle') {
+        if (clear && domIdx === 0) { if (++st.pre >= Math.round(this.os * 2.5)) { st.phase = 'pre'; st.gap = 0; } }
+        else if (!clear) { st.pre = 0; }
+        return;
       }
+      if (st.phase === 'pre') {                               // locked on preamble; wait for the data tones
+        if (clear && domIdx >= 1) { st.phase = 'data'; st.bits = []; st.a0 = p0; st.a1 = p1; st.tib = 1; st.len = null; st.gap = 0; }
+        else if (clear && domIdx === 0) { /* still preamble */ }
+        else if (++st.gap > this.os * 2) { this._reset(); }
+        return;
+      }
+      // data: accumulate this tick's tone energy into the current bit
+      if (clear) { st.a0 += p0; st.a1 += p1; st.gap = 0; } else { st.gap++; }
+      if (++st.tib >= this.os) {                              // one bit elapsed → slice it
+        st.bits.push(st.a1 > st.a0 ? 1 : 0); st.a0 = 0; st.a1 = 0; st.tib = 0;
+        if (st.bits.length === 8 && st.len == null) st.len = bitsToByte(st.bits, 0);
+        if (st.len != null && st.bits.length >= (1 + st.len + 2) * 8) { this._finish(st); return; }
+      }
+      if (st.gap > this.os * 2) { if (st.bits.length >= 24) this._finish(st); else this._reset(); }  // signal lost
     };
     AudioFSK.prototype._finish = function (st) {
-      this._d = null;
-      var nbytes = Math.floor(st.bits.length / 8); if (nbytes < 3) { this._meter(false); return; }
+      this._reset();
+      var nbytes = Math.floor(st.bits.length / 8); if (nbytes < 3) { this.stats.junk++; this._meter(false); return; }
       var bytes = new Uint8Array(nbytes); for (var i = 0; i < nbytes; i++) bytes[i] = bitsToByte(st.bits, i * 8);
-      var len = bytes[0]; if (len + 3 > bytes.length) { this._meter(false); return; }
+      var len = bytes[0]; if (len + 3 > bytes.length) { this.stats.junk++; this._meter(false); return; }
       var payload = bytes.slice(1, 1 + len), got = (bytes[1 + len] << 8) | bytes[1 + len + 1];
-      if (crc16(payload) !== got) { this._meter(false); return; }   // failed CRC ⇒ drop + meter
+      if (crc16(payload) !== got) { this.stats.crcFail++; this._meter(false); return; }   // failed CRC ⇒ drop + meter
+      this.stats.framesOk++; this.stats.lastRxMs = Date.now(); this.stats.lastType = payload.length ? payload[0] : -1;
       this._meter(true);
       if (this._cb) try { this._cb(payload); } catch (e) {}
     };
