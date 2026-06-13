@@ -415,6 +415,7 @@ body.modal-open{ overflow:hidden; }
 .catgrid .cgtile{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 3px; border-radius:5px;
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); text-align:center; min-width:0; }
 .catgrid .cgtile.none{ opacity:.45; }
+.catgrid .cgtile.dim{ opacity:.4; }   /* a player is expanded → mute the other record-holders' colours */
 .catgrid .cgtile.good{ background:rgba(123,184,90,.16); border-color:rgba(123,184,90,.5); }
 .catgrid .cgtile.bad{ background:rgba(224,85,69,.18); border-color:rgba(224,85,69,.55); }
 .catgrid .cg-lab{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:.2px;
@@ -671,7 +672,20 @@ body.modal-open{ overflow:hidden; }
 .progchart{ margin:10px 0 4px; padding:10px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--gen-pill-line); }
 .progchart:empty{ display:none; }
 .progchart .pc-title{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.8px; color:var(--gen-brass); font-size:11px; margin-bottom:4px; }
-.progchart .pc-svg{ width:100%; height:auto; display:block; }
+.progchart .pc-svg{ width:100%; height:auto; display:block; touch-action:pan-y; }
+/* drag-to-scrub: a vertical reader that reports every player's tally at a turn */
+.progchart .pc-wrap{ position:relative; }
+.progchart .pc-scrubline{ stroke:var(--gen-text); stroke-width:1; stroke-dasharray:3 3; opacity:.6; }
+.progchart .pc-readout{ position:absolute; top:6px; right:6px; pointer-events:none; background:rgba(8,10,5,.94);
+  border:1px solid var(--gen-brass-stroke); border-radius:8px; padding:6px 8px; font-size:10px; min-width:80px;
+  box-shadow:0 6px 16px rgba(0,0,0,.5); z-index:2; }
+.progchart .pc-readout.left{ right:auto; left:6px; }
+.progchart .pc-rd-hd{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; letter-spacing:.5px;
+  text-transform:uppercase; color:var(--gen-muted); margin-bottom:3px; }
+.progchart .pc-rd-row{ display:flex; align-items:center; gap:5px; line-height:1.55; }
+.progchart .pc-rd-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+.progchart .pc-rd-nm{ flex:1; color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:86px; }
+.progchart .pc-rd-v{ font-variant-numeric:tabular-nums; font-weight:700; color:var(--gen-text); }
 .progchart .pc-grid{ stroke:var(--gen-pill-line); stroke-width:1; }
 .progchart .pc-grid.zero{ stroke:var(--gen-muted); stroke-width:1.2; }
 .progchart .pc-axis{ fill:var(--gen-muted); font-size:8px; font-family:var(--gen-font-body); }
@@ -3289,12 +3303,14 @@ body.modal-open{ overflow:hidden; }
   // and is tinted in the colour of the player who holds that record.
   function renderCatBoard() {
     var m = summary.meta, players = game.players, byKey = {};
+    var hl = summary && summary.sel >= 0 ? summary.sel : -1;   // expanded player → mute the rest, like the chart
     m.board.forEach(function (b) { byKey[b.key] = b; });
     function tile(c) {
       var b = byKey[c.key], holder = b.recPi >= 0 ? players[b.recPi] : null;
       var pct = Math.round(100 * b.hit / b.n), hi = b.recVal >= 0 ? b.recVal : '–';
-      var style = holder ? ' style="background:' + rgba(holder.color, 0.26) + ';border-color:' + holder.color + '"' : '';
-      return '<div class="cgtile' + (holder ? '' : ' none') + '"' + style + '>'
+      var muted = holder && hl >= 0 && b.recPi !== hl;
+      var style = holder && !muted ? ' style="background:' + rgba(holder.color, 0.26) + ';border-color:' + holder.color + '"' : '';
+      return '<div class="cgtile' + (holder ? '' : ' none') + (muted ? ' dim' : '') + '"' + style + '>'
         + '<span class="cg-lab">' + esc(c.label) + '</span>'
         + '<span class="cg-pct">' + pct + '%</span>'
         + '<span class="cg-rec">' + hi + '</span></div>';
@@ -3416,8 +3432,39 @@ body.modal-open{ overflow:hidden; }
     var title = luckTab ? 'Късмет по ходове' : skillTab ? 'Оптимална игра' : 'Ход на битката';
     var open = !summary || summary.chartOpen !== false;
     el.innerHTML = '<details class="pc-details"' + (open ? ' open' : '') + '><summary class="pc-title">' + title + '</summary>'
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">' + grid + lines + overlay + xlab + '</svg></details>';
+      + '<div class="pc-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">'
+      + grid + lines + overlay + '<g class="pc-scrub"></g>' + xlab + '</svg><div class="pc-readout hidden"></div></div></details>';
     var dt = el.querySelector('details'); if (dt) dt.addEventListener('toggle', function () { if (summary) summary.chartOpen = dt.open; });
+    // drag-to-scrub: a vertical reader stepping turn by turn. Shows every player's
+    // tally at that turn — or just the expanded player's when one is selected.
+    var svg = el.querySelector('.pc-svg'), scrubG = el.querySelector('.pc-scrub'), readout = el.querySelector('.pc-readout');
+    var vis = series.filter(function (s) { return hl < 0 || s.i === hl; });
+    function turnAt(clientX) {
+      var rc = svg.getBoundingClientRect(), sc = Math.min(rc.width / W, rc.height / H) || 1, ox = (rc.width - W * sc) / 2;
+      var vbx = (clientX - rc.left - ox) / sc, rr = Math.round((vbx - padL) / iw * maxR);
+      return Math.max(0, Math.min(maxR, rr));
+    }
+    function showScrub(clientX) {
+      var rr = turnAt(clientX), sx = x(rr);
+      var marks = '<line x1="' + sx + '" y1="' + padT + '" x2="' + sx + '" y2="' + (padT + ih) + '" class="pc-scrubline"/>';
+      var rows = vis.map(function (s) { return { s: s, v: s.pts[Math.min(rr, s.pts.length - 1)] }; });
+      rows.forEach(function (o) { marks += '<circle cx="' + sx + '" cy="' + y(o.v) + '" r="3.2" fill="' + o.s.p.color + '" stroke="#16160e" stroke-width="0.8"/>'; });
+      scrubG.innerHTML = marks;
+      readout.innerHTML = '<div class="pc-rd-hd">ход ' + rr + '</div>'
+        + rows.sort(function (a, b) { return b.v - a.v; }).map(function (o) {
+          return '<div class="pc-rd-row"><span class="pc-rd-dot" style="background:' + o.s.p.color + '"></span>'
+            + '<span class="pc-rd-nm">' + esc(o.s.p.name) + '</span>'
+            + '<span class="pc-rd-v">' + (luckTab && o.v > 0 ? '+' : '') + Math.round(o.v) + suffix + '</span></div>';
+        }).join('');
+      readout.classList.toggle('left', sx > W / 2);   // keep the panel clear of the cursor
+      readout.classList.remove('hidden');
+    }
+    function hideScrub() { scrubG.innerHTML = ''; readout.classList.add('hidden'); }
+    var scrubbing = false;
+    svg.addEventListener('pointerdown', function (e) { scrubbing = true; try { svg.setPointerCapture(e.pointerId); } catch (x) {} showScrub(e.clientX); });
+    svg.addEventListener('pointermove', function (e) { if (scrubbing) showScrub(e.clientX); });
+    svg.addEventListener('pointerup', function () { scrubbing = false; hideScrub(); });
+    svg.addEventListener('pointercancel', function () { scrubbing = false; hideScrub(); });
   }
 
   function signed(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 0 : d); }
