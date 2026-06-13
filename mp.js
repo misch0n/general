@@ -577,7 +577,7 @@
     var w = new Writer().u8(1);
     var secs = Math.floor((rec.ts || Date.now()) / 1000);
     w.u16((secs >>> 16) & 0xffff).u16(secs & 0xffff);
-    w.u8((rec.manualMode ? 1 : 0) | (rec.ownerSkipped ? 2 : 0));
+    w.u8((rec.manualMode ? 1 : 0) | (rec.ownerSkipped ? 2 : 0) | (rec.selectKeep ? 4 : 0));
     w.u8(rec.players.length);
     rec.players.forEach(function (p, pi) {
       w.u8((p.owner ? 1 : 0) | (p.isAI ? 2 : 0));
@@ -613,7 +613,7 @@
       moveLog.push(turns);
     }
     // transferred games analyse manual-style (final dice + pick); fits unpacked moveLog
-    return { ts: secs * 1000, manualMode: true, ownerSkipped: !!(flags & 2), acoustic: true, players: players, moveLog: moveLog };
+    return { ts: secs * 1000, manualMode: true, ownerSkipped: !!(flags & 2), selectKeep: !!(flags & 4), acoustic: true, players: players, moveLog: moveLog };
   }
 
   // ---- SANITISE: turn any received/parsed record into a clean, whitelisted,
@@ -646,7 +646,7 @@
         return clean;
       }));
     }
-    return { ts: clampInt(obj.ts, 0, 1e15, Date.now()) || Date.now(), manualMode: !!obj.manualMode, ownerSkipped: !!obj.ownerSkipped, players: players, moveLog: moveLog };
+    return { ts: clampInt(obj.ts, 0, 1e15, Date.now()) || Date.now(), manualMode: !!obj.manualMode, ownerSkipped: !!obj.ownerSkipped, selectKeep: !!obj.selectKeep, players: players, moveLog: moveLog };
   }
 
   // ============================================================ acoustic record transfer

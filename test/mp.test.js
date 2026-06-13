@@ -196,6 +196,16 @@ test('packRecord/unpackRecord round-trips scores, meta, ts and final dice', func
   assert.strictEqual(out.manualMode, true);  // transferred games analyse manual-style
 });
 
+test('selectKeep (dice-selection flavour) survives packRecord + sanitizeRecord', function () {
+  var rec = { ts: 1700000000000, manualMode: false, ownerSkipped: false, selectKeep: true,
+    players: [{ name: 'A', color: '#ee0055', gender: 'm', owner: true, bonus: 0, scores: { ones: 3 } },
+              { name: 'B', color: '#00aa55', gender: 'f', owner: false, bonus: 0, scores: { ones: 2 } }],
+    moveLog: [[{ dice: [1, 1, 1, 4, 5], category: 'ones' }], [{ dice: [2, 2, 4, 5, 6], category: 'ones' }]] };
+  assert.strictEqual(MP.unpackRecord(MP.packRecord(rec, CATS), CATS).selectKeep, true, 'acoustic round-trip');
+  assert.strictEqual(MP.sanitizeRecord(rec, CATS).selectKeep, true, 'import sanitise keeps it');
+  assert.strictEqual(MP.sanitizeRecord({ players: rec.players, moveLog: rec.moveLog }, CATS).selectKeep, false, 'defaults off when absent');
+});
+
 // ---- sanitisation: data only, nothing executable or unknown survives ----
 test('sanitizeRecord whitelists, clamps, and drops junk', function () {
   var dirty = {
