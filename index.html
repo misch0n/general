@@ -345,6 +345,33 @@ body.modal-open{ overflow:hidden; }
   font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:13px; }
 .netp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
 .netp b{ color:var(--gen-brass-bright); }
+/* lobby preparation */
+.netprep-hd{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; font-size:11px; color:var(--gen-brass); margin:4px 0 8px; }
+.netmecard{ padding:11px; border-radius:10px; border:1px solid var(--gen-brass-stroke); background:rgba(0,0,0,.22); margin-bottom:10px; }
+.netmecard .nm-row{ display:flex; align-items:center; gap:8px; }
+.netmecard .nm-name{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
+  background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
+.netmecard .nm-name:focus{ outline:none; border-color:var(--gen-brass); }
+.netmecard .gender{ margin-top:9px; }
+.netproster{ display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+.netpp{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line); font-size:12.5px; }
+.netpp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
+.netpp .pp-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.netpp .pp-tag{ font-size:9px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); flex:none; }
+.netpp .pp-rdy{ flex:none; font-size:12px; }
+.netpp .pp-rdy.on{ color:#7bb85a; } .netpp .pp-rdy.off{ color:var(--gen-muted); }
+.netpp .pp-kick{ flex:none; width:22px; height:22px; border-radius:6px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:13px; line-height:1; }
+.netsett{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-bottom:10px; }
+.netsett .sc{ font-size:10px; letter-spacing:.3px; padding:3px 8px; border-radius:999px; background:rgba(201,166,75,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
+.netsett .sc.none{ background:transparent; border-color:var(--gen-pill-line); color:var(--gen-muted); }
+.netprep-tools{ margin-bottom:6px; }
+.btn.small{ padding:8px 10px; font-size:11px; }
+/* in-game AI-takeover roster (host menu) */
+.aitk{ margin:4px 0 10px; }
+.aitk-hd{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.6px; font-size:10px; text-transform:uppercase; color:var(--gen-muted); margin-bottom:6px; }
+.aitk-row{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:5px; font-size:12.5px; }
+.aitk-row .netdot{ width:11px; height:11px; border-radius:50%; flex:none; }
+.aitk-row .ai-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
 /* link-quality signal bars + warnings */
 .netbars{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:var(--gen-muted); min-height:16px; margin:6px 0; }
@@ -973,6 +1000,7 @@ body.modal-open{ overflow:hidden; }
 <div id="menuModal" class="overlay hidden">
   <div class="modal" style="max-width:300px">
     <h2 style="text-align:center">Щаб</h2>
+    <div id="menuAiTk" class="aitk hidden"></div>
     <div class="setup-actions" style="flex-direction:column">
       <button id="menuHowto" class="btn">📖 Правила</button>
       <button id="menuCombos" class="btn">📋 Комбинации</button>
@@ -1134,11 +1162,31 @@ body.modal-open{ overflow:hidden; }
       </div>
     </div>
     <div id="netLobby" class="hidden">
-      <div id="netRoster" class="netroster"></div>
+      <!-- scan phase: the roster fills as devices join -->
+      <div id="netScan">
+        <div id="netRoster" class="netroster"></div>
+        <div class="setup-actions">
+          <button id="netToPrep" class="btn primary hidden">✔ Всички са тук — към лобито</button>
+        </div>
+      </div>
+      <!-- preparation phase: edit your own boец, ready up, host tweaks settings/AI -->
+      <div id="netPrep" class="hidden">
+        <div class="netprep-hd">ПОДГОТОВКА</div>
+        <div id="netMeCard" class="netmecard"></div>
+        <div id="netPrepRoster" class="netproster"></div>
+        <div id="netSettSummary" class="netsett"></div>
+        <div class="setup-actions netprep-tools" id="netHostTools">
+          <button id="netAddAI" class="btn small">🤖 + AI боец</button>
+          <button id="netPrepSettings" class="btn small">⚙ Настройки</button>
+        </div>
+        <div class="setup-actions">
+          <button id="netReady" class="btn">Готов съм ✔</button>
+          <button id="netStart" class="btn primary hidden">⚔ Започни битката</button>
+        </div>
+      </div>
       <div id="netBars" class="netbars"></div>
       <div id="netStatus" class="netstatus netflavour"></div>
       <div class="setup-actions">
-        <button id="netStart" class="btn primary hidden">⚔ Започни битката</button>
         <button id="netLeave" class="btn">Откажи</button>
       </div>
     </div>
@@ -1628,6 +1676,7 @@ body.modal-open{ overflow:hidden; }
     clientSearch: ['Чувам ли някого?', 'Подушвам игра наблизо…', 'Хост, къде си?', 'Ало-ало?'],
     clientSaw: ['А, видях те!', 'Искам!', 'ГЕНЕРАЛ!', 'Пусни ме вътре!'],
     lobbyWait: ['Кога ще започваме?', 'Готов съм, командире.', 'Заровете тръпнат…', 'Хайде де, мързеливци!'],
+    clientReady: ['Нагласи се и натисни „Готов".', 'Избери си цвят и име, войнико.', 'Старшината чака всички да са готови.'],
     xSendSearch: ['Ало, ще ти пратя една битка…', 'Подай ухо, идва игра по звук.', 'Дръж телефона близо!', 'Чуваш ли ме?'],
     xRecvSearch: ['Слушам внимателно…', 'Подавай, готов съм.', 'Ушите ми са отворени.', 'Къде си, изпращачо?'],
     xMove: ['Бип-бууп… пренасям…', 'Не мърдай телефона!', 'Звукът работи, търпение…', 'Почти стигнахме…'],
@@ -1678,17 +1727,93 @@ body.modal-open{ overflow:hidden; }
     return {
       onStatus: function () {},                               // app drives all user-facing text (flavour/stage)
       onRoster: function () {
+        if (netPhase === 'prep') { renderNetPrep(); return; }
         renderNetRoster();
-        if (net.isHost) { if (net.roster.length >= net.minPlayers) $('netStart').classList.remove('hidden'); setFlavour($('netStatus'), net.roster.length > 1 ? 'lobbyWait' : 'hostSearch'); }
+        if (net.isHost && net.roster.length >= net.minPlayers) { $('netToPrep').classList.remove('hidden'); setFlavour($('netStatus'), 'lobbyWait'); }
+        else if (net.isHost) setFlavour($('netStatus'), 'hostSearch');
       },
       onJoined: function (id) { localPid = id; renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait'); },
       onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
+      onPrep: function () { enterNetPrep(); },
       onStart: function (roster, order) { stopFlavour(); startNetGame(roster, order); },
       onTurn: function (activeId) { netSetTurn(activeId); },
       onMove: function (mv) { netApplyRemote(mv); },
+      onTakeover: function () { if (netMode) { renderAiTakeover(); renderAll && game && renderAll(); } },
       onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
     };
+  }
+  // ---------- lobby preparation UI ----------
+  function netShow(phase) {
+    netPhase = phase;
+    $('netChoose').classList.toggle('hidden', phase !== 'choose');
+    $('netLobby').classList.toggle('hidden', phase === 'choose');
+    $('netScan').classList.toggle('hidden', phase !== 'scan');
+    $('netPrep').classList.toggle('hidden', phase !== 'prep');
+  }
+  // bitmask of enabled pre-game settings (shown to clients as a read-only summary)
+  var SETT_BITS = [['barracks', 'КАЗАРМА'], ['titles', 'Титли'], ['titlePoints', 'Бонус точки'], ['advice', 'Съвети'], ['glupost', 'Глупости']];
+  function settingsBits() { var b = 0; SETT_BITS.forEach(function (s, i) { if (settings[s[0]]) b |= (1 << i); }); return b; }
+  function renderSettSummary(bits) {
+    var on = SETT_BITS.filter(function (s, i) { return bits & (1 << i); });
+    $('netSettSummary').innerHTML = on.length
+      ? on.map(function (s) { return '<span class="sc">' + s[1] + '</span>'; }).join('')
+      : '<span class="sc none">стандартни правила</span>';
+  }
+  function netMyEntry() { return net ? net.roster.filter(function (m) { return m.id === localPid; })[0] : null; }
+  // host opens prep; clients are pulled in by the PREP message
+  function enterNetPrep() {
+    var me = netMyEntry() || {};
+    netMe = { name: me.name || localMeta().name, color: me.color || '#d4a02e', gender: me.gender || 'm' };
+    netMyReady = !!me.ready;
+    netShow('prep');
+    renderSettSummary(net.settingsBits);
+    $('netHostTools').classList.toggle('hidden', !net.isHost);
+    $('netReady').classList.toggle('hidden', net.isHost);   // host has no ready button — it starts
+    $('netStart').classList.toggle('hidden', !net.isHost);
+    renderNetMeCard(); renderNetPrep();
+    setFlavour($('netStatus'), net.isHost ? 'lobbyWait' : 'clientReady');
+  }
+  function renderNetMeCard() {
+    var card = $('netMeCard');
+    card.innerHTML = '<div class="nm-row"><button type="button" class="cbtn" id="netMeColor" title="Цвят" style="background:' + netMe.color + '"></button>'
+      + '<input class="nm-name" id="netMeNameInput" maxlength="28" value="' + esc(netMe.name) + '"></div>'
+      + '<div class="gender" id="netMeGender">'
+      + [['m', 'мъжко'], ['n', 'то'], ['f', 'женско']].map(function (g) { return '<button class="glabel g-' + g[0] + (netMe.gender === g[0] ? ' on' : '') + '" data-g="' + g[0] + '">' + g[1] + '</button>'; }).join('')
+      + '</div>';
+    $('netMeColor').onclick = function (e) {
+      e.stopPropagation();
+      openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); });
+    };
+    $('netMeNameInput').oninput = function () { netMe.name = $('netMeNameInput').value; pushMyMeta(false); };  // debounced
+    $('netMeGender').querySelectorAll('.glabel').forEach(function (gb) {
+      gb.onclick = function () { netMe.gender = gb.getAttribute('data-g'); renderNetMeCard(); pushMyMeta(true); };
+    });
+  }
+  // send my edited meta to the host; debounce typing, fire colour/gender at once
+  function pushMyMeta(immediate) {
+    clearTimeout(netMetaTimer);
+    var send = function () { if (net) net.setMyMeta({ name: (netMe.name || 'Боец').trim() || 'Боец', color: netMe.color, gender: netMe.gender }); };
+    if (immediate) send(); else netMetaTimer = setTimeout(send, 550);
+  }
+  function renderNetPrep() {
+    if (!net) return;
+    $('netPrepRoster').innerHTML = net.roster.map(function (m) {
+      var tags = (m.id === MP.HOST_ID ? '<span class="pp-tag">старшина</span>' : '') + (m.isAI ? '<span class="pp-tag">🤖 AI</span>' : '');
+      var rdy = m.id === MP.HOST_ID || m.isAI ? '' : '<span class="pp-rdy ' + (m.ready ? 'on">✔' : 'off">…') + '</span>';
+      var kick = (net.isHost && m.isAI) ? '<button class="pp-kick" data-id="' + m.id + '">✕</button>' : '';
+      return '<div class="netpp"><span class="netdot" style="background:' + m.color + '"></span><span class="pp-nm">' + esc(m.name)
+        + (m.id === localPid ? ' (ти)' : '') + '</span>' + tags + rdy + kick + '</div>';
+    }).join('');
+    $('netPrepRoster').querySelectorAll('.pp-kick').forEach(function (b) {
+      b.onclick = function () { net.removeAI(+b.getAttribute('data-id')); };
+    });
+    // keep my own name input in sync if the host renamed me on a collision (don't fight the cursor)
+    var mine = netMyEntry(), inp = $('netMeNameInput');
+    if (mine && inp && document.activeElement !== inp && mine.name !== netMe.name) { netMe.name = mine.name; inp.value = mine.name; }
+    if (mine && mine.color && mine.color.toLowerCase() !== (netMe.color || '').toLowerCase()) { netMe.color = mine.color; if ($('netMeColor')) $('netMeColor').style.background = mine.color; }
+    if (net.isHost) { $('netStart').disabled = !net.allReady(); $('netStart').classList.toggle('hidden', false); }
+    else { $('netReady').classList.toggle('on', netMyReady); $('netReady').textContent = netMyReady ? 'Готов ✔' : 'Готов съм'; }
   }
   function netStartTransport(then) {
     if (!window.MP || !MP.AudioFSK) { netSay('Звукът не е наличен на това устройство.'); return; }
@@ -1701,34 +1826,51 @@ body.modal-open{ overflow:hidden; }
   }
   $('netBtn').onclick = function () {
     $('netMeName').textContent = localMeta().name;
-    $('netChoose').classList.remove('hidden'); $('netLobby').classList.add('hidden');
-    $('netStart').classList.add('hidden'); netSay('');
+    netShow('choose'); $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay('');
     $('netModal').classList.remove('hidden');
   };
   $('netHost').onclick = function () {
     netStartTransport(function () {
       net = newSession(true); localPid = MP.HOST_ID;
-      $('netChoose').classList.add('hidden'); $('netLobby').classList.remove('hidden');
+      netShow('scan'); $('netToPrep').classList.add('hidden');
       net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
     });
   };
   $('netJoin').onclick = function () {
     netStartTransport(function () {
       net = newSession(false);
-      $('netChoose').classList.add('hidden'); $('netLobby').classList.remove('hidden');
+      netShow('scan'); $('netToPrep').classList.add('hidden');
       net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
     });
   };
+  // host closes the scan and moves everyone into preparation
+  $('netToPrep').onclick = function () { if (net && net.isHost) net.startPrep(settingsBits()); };
+  // host adds an AI seat (generated boец); clients can't
+  $('netAddAI').onclick = function () {
+    if (!net || !net.isHost) return;
+    var g = ['m', 'n', 'f'][Math.floor(Math.random() * 3)], r = G.randomNameRarity('ai', g);
+    net.addAI({ name: r.name, color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)], gender: g });
+  };
+  // host edits pre-game settings in the lobby (broadcast as a summary)
+  $('netPrepSettings').onclick = function () { if (net && net.isHost) { netSettCtx = true; openSettings(); } };
+  var netSettCtx = false;
+  // client ready toggle
+  $('netReady').onclick = function () {
+    if (!net || net.isHost) return;
+    netMyReady = !netMyReady; net.setReady(netMyReady); renderNetPrep();
+  };
   $('netStart').onclick = function () {
     if (!net || !net.isHost) return;
+    if (!net.allReady()) { setFlavour($('netStatus'), 'lobbyWait'); return; }
     // §3 calibrate (best-effort — picks the gameplay profile if the modem can't measure)
     $('netStart').disabled = true; setFlavour($('netStatus'), 'lobbyWait'); $('netBars').innerHTML = 'Калибрирам… 🔊';
-    net.calibrate(function () { $('netStart').disabled = false; net.startGame(); });
+    net.calibrate(function () { net.startGame(); });
   };
   function leaveNet() {
-    stopFlavour();
+    stopFlavour(); clearTimeout(netMetaTimer);
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop();
     net = null; netFSK = null; netMode = false; localPid = null;
+    netPhase = 'choose'; netMe = null; netMyReady = false; netAiActiveId = null; netSettCtx = false;
     $('netBars').innerHTML = ''; $('netLink').classList.add('hidden');
     $('netModal').classList.add('hidden');
   }
@@ -1739,7 +1881,7 @@ body.modal-open{ overflow:hidden; }
     clearAllPenalties();
     netOrder = order.slice();
     var players = roster.map(function (m) {
-      var pl = G.createPlayer(m.name, m.color, false);          // every seat is a human on their own device
+      var pl = G.createPlayer(m.name, m.color, !!m.isAI);       // humans play on their own device; AI seats are host-driven
       pl.gender = m.gender; pl.bet = ''; pl.bonus = 0; pl.netId = m.id;
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       pl.owner = (m.id === localPid);                           // ★ each device owns ITS OWN player (history attribution)
@@ -1760,7 +1902,27 @@ body.modal-open{ overflow:hidden; }
     if (!netMode || !game) return;
     var seat = netOrder.indexOf(activeId); if (seat < 0) return;
     game.current = seat; netMyTurn = (activeId === localPid);
+    // the host plays any seat it controls (lobby AI or a live takeover) locally
+    if (net.isHost && net.isAIControlled(activeId)) { runNetAiTurn(seat, activeId); return; }
     beginTurn();
+  }
+  // pick a bot strength matching the (dropped) player's optimal-decision rate so far
+  function netAiPolicy(seat) {
+    var acc = null;
+    if (evReady && moveLog[seat] && moveLog[seat].length) { try { var a = EV.analyzeGame(moveLog[seat]); acc = a && a.accuracy; } catch (e) {} }
+    return EV.botPolicyForAccuracy(acc);
+  }
+  // host drives a controlled seat: roll locally, let the matched bot play, inject the move
+  function runNetAiTurn(seat, activeId) {
+    var p = game.players[seat];
+    p.persona = { name: 'AI', policy: netAiPolicy(seat) };     // synthetic persona feeding aiKeepMask/aiCategory
+    netAiActiveId = activeId;
+    netMyTurn = false; awaitingRoll = false; locked = false;
+    throwsLeft = ROLLS - 1; selected = [false, false, false, false, false];
+    dice = G.rollAll(); sortDice();
+    curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+    renderAll(); shakeDice(); showOrder(p);
+    runAiTurn();
   }
   function netApplyRemote(mv) {
     if (!netMode || !game) return;
@@ -1769,6 +1931,23 @@ body.modal-open{ overflow:hidden; }
     var pl = game.players[seat], key = G.CATEGORIES[mv.category].key;
     if (!G.isCategoryFilled(pl, key)) pl.scores[key] = mv.score; // mirror the remote score (no local dice for them)
     renderAll();
+  }
+  // host-only in-game control: flip a (dropped) player to AI play, or hand it back
+  function renderAiTakeover() {
+    var box = $('menuAiTk');
+    if (!netMode || !net || !net.isHost) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    var others = net.roster.filter(function (m) { return m.id !== localPid; });
+    if (!others.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+    box.innerHTML = '<div class="aitk-hd">Замести с AI при отпадане</div>' + others.map(function (m) {
+      var ctl = m.isAI
+        ? '<span class="pp-tag">🤖 винаги AI</span>'
+        : '<button class="toggle' + (net.takeover[m.id] ? ' on' : '') + '" data-id="' + m.id + '"><span class="switch"></span><span>AI</span></button>';
+      return '<div class="aitk-row"><span class="netdot" style="background:' + m.color + '"></span><span class="ai-nm">' + esc(m.name) + '</span>' + ctl + '</div>';
+    }).join('');
+    box.querySelectorAll('.toggle[data-id]').forEach(function (t) {
+      t.onclick = function () { var id = +t.getAttribute('data-id'); net.setTakeover(id, !net.takeover[id]); renderAiTakeover(); };
+    });
   }
 
   loadSettings();   // restore censor + owner name/toggle before the first muster
@@ -1786,6 +1965,7 @@ body.modal-open{ overflow:hidden; }
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
   var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
+  var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
@@ -2246,8 +2426,9 @@ body.modal-open{ overflow:hidden; }
     if (netMode) {
       // broadcast my completed turn; the host's STATE + next GRANT drive the rest
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
-      net.submitMove({ category: CAT_INDEX[key], score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] });
-      netSay('🔊 Изпращам хода…');
+      var mv = { category: CAT_INDEX[key], score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
+      if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, AI_VIEW_DELAY); }  // host injects the AI seat's move (after a beat to read the board)
+      else { net.submitMove(mv); netSay('🔊 Изпращам хода…'); }
       return;
     }
     if (manualMode) {
@@ -2632,6 +2813,7 @@ body.modal-open{ overflow:hidden; }
     // bring the menu above any floating bubbles (tooltips/penalties/roasts)
     ['comboTip', 'fxBubble', 'guideTip'].forEach(function (id) { $(id).classList.add('hidden'); });
     clearRoast();
+    renderAiTakeover();   // host: per-player AI-takeover controls (network game only)
     $('menuModal').classList.remove('hidden');
   };
   $('menuClose').onclick = function () { $('menuModal').classList.add('hidden'); };
@@ -2911,8 +3093,13 @@ body.modal-open{ overflow:hidden; }
   }
   $('settingsBtn').onclick = openSettings;
   $('menuSettings').onclick = function () { $('menuModal').classList.add('hidden'); openSettings(); };
-  $('settingsClose').onclick = function () { $('settingsModal').classList.add('hidden'); };
-  $('settingsModal').onclick = function (e) { if (e.target === $('settingsModal')) $('settingsModal').classList.add('hidden'); };
+  function closeSettings() {
+    $('settingsModal').classList.add('hidden');
+    // host edited pre-game settings from the lobby → publish the new summary
+    if (netSettCtx) { netSettCtx = false; if (net && net.isHost && netPhase === 'prep') { net.setSettings(settingsBits()); renderSettSummary(settingsBits()); } }
+  }
+  $('settingsClose').onclick = closeSettings;
+  $('settingsModal').onclick = function (e) { if (e.target === $('settingsModal')) closeSettings(); };
 
   // ---------- peek (mini scoreboard, like the in-game one) ----------
   function miniBoard(p) {
@@ -4277,34 +4464,36 @@ body.modal-open{ overflow:hidden; }
   $('ownerInfo').onclick = function () { $('ownerInfo').classList.add('hidden'); };
   // shared 14-swatch colour popover for the setup cards (replaces the system <input type=color>)
   function hideColorPop() { $('colorPop').classList.add('hidden'); }
-  function showColorPop(anchor, p) {
+  // generic 14-swatch popover: anchor + current colour + a pick callback
+  function openColorPop(anchor, curColor, token, onPick) {
     var b = $('colorPop');
-    if (!b.classList.contains('hidden') && b._for === p) { hideColorPop(); return; }
-    b._for = p;
-    var cur = (p.color || '').toLowerCase();
+    if (!b.classList.contains('hidden') && b._for === token) { hideColorPop(); return; }
+    b._for = token;
+    var cur = (curColor || '').toLowerCase();
     b.innerHTML = PRESET_COLORS.map(function (c) {
       return '<button type="button" class="pswatch' + (c.toLowerCase() === cur ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>';
     }).join('');
     b.querySelectorAll('.pswatch').forEach(function (sw) {
-      sw.onclick = function (e) {
-        e.stopPropagation();
-        var c = sw.getAttribute('data-c'), owner = setupPlayers.length ? ownerOf(setupPlayers) : null;
-        hideColorPop();
-        if (owner && p !== owner && (owner.color || '').toLowerCase() === c.toLowerCase()) {
-          p.color = pickFreeColor(p, c);   // owner keeps its colour; picker takes the nearest free one
-        } else {
-          p.color = c;                      // honour the pick — bump any OTHER seat that held it
-          setupPlayers.forEach(function (q) { if (q !== p && q !== owner && (q.color || '').toLowerCase() === c.toLowerCase()) q.color = pickFreeColor(q); });
-        }
-        dedupeColors();   // final safety (owner reserved first)
-        renderSetup();
-      };
+      sw.onclick = function (e) { e.stopPropagation(); hideColorPop(); onPick(sw.getAttribute('data-c')); };
     });
     b.classList.remove('hidden');
     var r = anchor.getBoundingClientRect();
     b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
     var below = r.bottom + 8;
     b.style.top = (below + b.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - b.offsetHeight - 8)) + 'px';
+  }
+  function showColorPop(anchor, p) {
+    openColorPop(anchor, p.color, p, function (c) {
+      var owner = setupPlayers.length ? ownerOf(setupPlayers) : null;
+      if (owner && p !== owner && (owner.color || '').toLowerCase() === c.toLowerCase()) {
+        p.color = pickFreeColor(p, c);   // owner keeps its colour; picker takes the nearest free one
+      } else {
+        p.color = c;                      // honour the pick — bump any OTHER seat that held it
+        setupPlayers.forEach(function (q) { if (q !== p && q !== owner && (q.color || '').toLowerCase() === c.toLowerCase()) q.color = pickFreeColor(q); });
+      }
+      dedupeColors();   // final safety (owner reserved first)
+      renderSetup();
+    });
   }
   $('ownerName').oninput = function () {
     settings.ownerName = $('ownerName').value; saveSettings();
