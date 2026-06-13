@@ -1816,7 +1816,9 @@ body.modal-open{ overflow:hidden; }
       + '</div>';
     $('netMeColor').onclick = function (e) {
       e.stopPropagation();
-      openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); });
+      // offer only colours no other device is using (the host dedupes anyway, but show free ones)
+      var used = net.roster.filter(function (m) { return m.id !== localPid; }).map(function (m) { return (m.color || '').toLowerCase(); });
+      openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); }, freeSwatches(netMe.color, used));
     };
     $('netMeNameInput').oninput = function () { netMe.name = $('netMeNameInput').value; pushMyMeta(false); };  // debounced
     $('netMeGender').querySelectorAll('.glabel').forEach(function (gb) {
@@ -4543,13 +4545,21 @@ body.modal-open{ overflow:hidden; }
   $('ownerInfo').onclick = function () { $('ownerInfo').classList.add('hidden'); };
   // shared 14-swatch colour popover for the setup cards (replaces the system <input type=color>)
   function hideColorPop() { $('colorPop').classList.add('hidden'); }
-  // generic 14-swatch popover: anchor + current colour + a pick callback
-  function openColorPop(anchor, curColor, token, onPick) {
+  // the swatches to offer: only colours nobody else is using (plus the current pick),
+  // so the picker can't create a collision in the first place
+  function freeSwatches(curColor, usedLower) {
+    var cur = (curColor || '').toLowerCase();
+    var out = PRESET_COLORS.filter(function (c) { var lc = c.toLowerCase(); return lc === cur || usedLower.indexOf(lc) < 0; });
+    if (cur && out.map(function (c) { return c.toLowerCase(); }).indexOf(cur) < 0) out = [curColor].concat(out);   // keep a legacy colour visible
+    return out;
+  }
+  // generic swatch popover: anchor + current colour + a pick callback + the colours to show
+  function openColorPop(anchor, curColor, token, onPick, colors) {
     var b = $('colorPop');
     if (!b.classList.contains('hidden') && b._for === token) { hideColorPop(); return; }
     b._for = token;
     var cur = (curColor || '').toLowerCase();
-    b.innerHTML = PRESET_COLORS.map(function (c) {
+    b.innerHTML = (colors || PRESET_COLORS).map(function (c) {
       return '<button type="button" class="pswatch' + (c.toLowerCase() === cur ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>';
     }).join('');
     b.querySelectorAll('.pswatch').forEach(function (sw) {
@@ -4562,17 +4572,9 @@ body.modal-open{ overflow:hidden; }
     b.style.top = (below + b.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - b.offsetHeight - 8)) + 'px';
   }
   function showColorPop(anchor, p) {
-    openColorPop(anchor, p.color, p, function (c) {
-      var owner = setupPlayers.length ? ownerOf(setupPlayers) : null;
-      if (owner && p !== owner && (owner.color || '').toLowerCase() === c.toLowerCase()) {
-        p.color = pickFreeColor(p, c);   // owner keeps its colour; picker takes the nearest free one
-      } else {
-        p.color = c;                      // honour the pick — bump any OTHER seat that held it
-        setupPlayers.forEach(function (q) { if (q !== p && q !== owner && (q.color || '').toLowerCase() === c.toLowerCase()) q.color = pickFreeColor(q); });
-      }
-      dedupeColors();   // final safety (owner reserved first)
-      renderSetup();
-    });
+    // free = every colour not held by the OTHER seats (owner included) — picking can't collide
+    var used = setupPlayers.filter(function (q) { return q !== p; }).map(function (q) { return (q.color || '').toLowerCase(); });
+    openColorPop(anchor, p.color, p, function (c) { p.color = c; dedupeColors(); renderSetup(); }, freeSwatches(p.color, used));
   }
   $('ownerName').oninput = function () {
     settings.ownerName = $('ownerName').value; saveSettings();
