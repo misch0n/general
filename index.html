@@ -3375,13 +3375,16 @@ body.modal-open{ overflow:hidden; }
   function computeSummaryMeta() {
     var players = game.players, ana = summary.ana, pts = players.map(function (p) { return total(p); });
     var winIdx = 0; for (var i = 1; i < players.length; i++) if (pts[i] > pts[winIdx]) winIdx = i;
-    // skill leader: highest accuracy among analysed; tie → lower avg EV loss
+    // skill leader = fewest POINTS lost to suboptimal decisions (EV-skill, higher = better),
+    // ties broken by optimal-decision %. This is the SAME quantity the margin split (умение)
+    // uses, so the 🎯 badge, the verdict and the headline can never disagree (mistakes are
+    // weighed by how costly they were, not just how often — a rare but huge blunder counts).
     var skillIdx = -1;
     players.forEach(function (p, i) {
       if (!ana[i]) return;
       if (skillIdx < 0) { skillIdx = i; return; }
       var a = ana[i], b = ana[skillIdx];
-      if (a.accuracy > b.accuracy + 1e-9 || (Math.abs(a.accuracy - b.accuracy) < 1e-9 && a.avgLostPerTurn < b.avgLostPerTurn)) skillIdx = i;
+      if (a.skill > b.skill + 1e-9 || (Math.abs(a.skill - b.skill) < 1e-9 && a.accuracy > b.accuracy)) skillIdx = i;
     });
     // luck champ: highest luck among dice-mode analysed
     var luckIdx = -1;
@@ -4116,8 +4119,15 @@ body.modal-open{ overflow:hidden; }
   })();
   $('rpFilterBtn').onclick = function (e) { e.stopPropagation(); buildFilterMenu(); $('rpFilterMenu').classList.toggle('hidden'); };
   document.addEventListener('click', function (e) { if (!$('rpFilterMenu').classList.contains('hidden') && !$('replayInfo').contains(e.target)) $('rpFilterMenu').classList.add('hidden'); });
-  // click anywhere outside the colour popover closes it (swatches + the card button stopPropagation)
-  document.addEventListener('click', function () { if (!$('colorPop').classList.contains('hidden')) hideColorPop(); });
+  // click OUTSIDE the colour popover (and not on a colour button) closes it — target-aware
+  // so the very tap that opens it can't also close it on devices where stopPropagation slips
+  document.addEventListener('click', function (e) {
+    var pop = $('colorPop'); if (pop.classList.contains('hidden')) return;
+    var t = e.target;
+    if (pop.contains(t)) return;                                   // a swatch — its own handler picks
+    if (t && t.closest && (t.closest('.cbtn') || t.closest('#netMeColor'))) return;  // a colour button — its handler toggles
+    hideColorPop();
+  });
   // changing focus away from the window dismisses transient popovers/explainers
   function dismissTransients() {
     ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu'].forEach(function (id) {
