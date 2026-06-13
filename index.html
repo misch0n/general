@@ -333,6 +333,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .netp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
 .netp b{ color:var(--gen-brass-bright); }
 .netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
+.xferbar{ height:10px; border-radius:6px; background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); overflow:hidden; margin:12px 0 4px; }
+.xferfill{ height:100%; width:0; background:var(--gen-brass); transition:width .2s; }
 .reorder{ display:flex; flex-direction:column; gap:2px; }
 .reorder button{ width:24px; height:18px; border-radius:5px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:10px; line-height:1; }
 .reorder button:hover:not(:disabled){ color:var(--gen-brass); }
@@ -771,7 +773,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     </div>
     <p class="modehint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
     <div class="setup-actions">
-      <button id="netBtn" class="btn">🔊 Мрежова игра</button>
+      <button id="netBtn" class="btn netfeature hidden">🔊 Мрежова игра</button>
     </div>
     <div class="setup-actions">
       <button id="howtoBtn" class="btn">📖 Правила</button>
@@ -945,7 +947,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <h2>📜 Военен архив</h2>
     <div id="historyOverview"></div>
     <div id="historyList"></div>
-    <div class="setup-actions"><button id="importBtn" class="btn">📥 Импортирай игра</button></div>
+    <div class="setup-actions">
+      <button id="importBtn" class="btn">📥 Импортирай игра</button>
+      <button id="importAcoustic" class="btn netfeature hidden">🔊 Приеми по звук</button>
+    </div>
   </div>
 </div>
 
@@ -958,8 +963,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <textarea id="exportText" class="importarea" readonly></textarea>
     <div class="setup-actions">
       <button id="exportCopy" class="btn primary">📋 Копирай</button>
+      <button id="exportAcoustic" class="btn netfeature hidden">📡 Изпрати по звук</button>
     </div>
     <div id="exportCopied" class="exportcopied hidden">✓ Копирано в клипборда</div>
+  </div>
+</div>
+
+<!-- acoustic record transfer progress -->
+<div id="xferModal" class="overlay hidden">
+  <div class="modal" style="max-width:320px;text-align:center">
+    <button class="x-close" id="xferClose">✕</button>
+    <h2 id="xferTitle">🔊 Пренос по звук</h2>
+    <p class="ht">Дръж телефоните близо (~1 м), със звук нагоре.</p>
+    <div class="xferbar"><div id="xferFill" class="xferfill"></div></div>
+    <div id="xferStatus" class="netstatus"></div>
+    <div class="setup-actions"><button id="xferCancel" class="btn">Откажи</button></div>
   </div>
 </div>
 
@@ -1077,7 +1095,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var $ = function (id) { return document.getElementById(id); };
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
-  var settings = { titles: false, titlePoints: false, advice: false, censor: false, barracks: false, ownerName: '', useOwnerName: false };
+  var settings = { titles: false, titlePoints: false, advice: false, censor: false, barracks: false, acoustic: false, ownerName: '', useOwnerName: false };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1090,14 +1108,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, censor: settings.censor,
-              barracks: settings.barracks, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
+              barracks: settings.barracks, acoustic: settings.acoustic, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'censor', 'barracks', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'censor', 'barracks', 'acoustic', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped: the
       // rare-name system is now its own opt-in switch, so it starts off)
     } catch (e) {}
@@ -1557,6 +1575,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   paintCamo($('setup'));
   addSetupPlayer(false); addSetupPlayer(false);
   maybeOfferResume();   // offer to continue an unfinished battle from a prior session
+  syncAcousticUI();     // hide every data-over-sound feature unless Акустика is on
 
   // ===================================================== GAME STATE
   var game = null, dice = [], selected = [false,false,false,false,false], throwsLeft = 0;
@@ -1567,7 +1586,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
   var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
-  var CAT_INDEX = {}; G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
+  var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
   var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face (the 5-dice entry)
@@ -2450,6 +2469,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         setupPlayers.forEach(regenName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
+    // Акустика — reveals every data-over-sound feature (network play + sound transfer)
+    { key: 'acoustic', label: 'Акустика', onChange: function () { syncAcousticUI(); } },
   ];
   var devTaps = [];
   function buildSettingsRows(inGame) {
@@ -3774,7 +3795,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     renderHistory();
   }
   // ---- export / import a game (share local history across devices) ----
+  var currentExportRec = null;
   function exportGame(rec) {
+    currentExportRec = rec;
     $('exportText').value = JSON.stringify(rec, null, 2);
     $('exportCopied').classList.add('hidden');
     $('exportModal').classList.remove('hidden');
@@ -3802,28 +3825,40 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var importParsed = null;   // the validated record awaiting an owner choice
   function openImport() {
     importParsed = null;
-    $('importText').value = '';
+    $('importText').value = ''; $('importText').classList.remove('hidden');
     $('importOwner').innerHTML = ''; $('importOwner').classList.add('hidden');
     $('importErr').classList.add('hidden'); $('importErr').textContent = '';
-    $('importDo').textContent = 'Провери';
+    $('importDo').textContent = 'Провери'; $('importDo').classList.remove('hidden');
     $('historyModal').classList.add('hidden');
     $('importModal').classList.remove('hidden');
   }
   function importError(msg) { $('importErr').textContent = '⚠ ' + msg; $('importErr').classList.remove('hidden'); }
+  // step 2 of any import: show the owner picker for an already-sanitised record
+  function showImportOwner(rec) {
+    importParsed = rec;
+    $('importText').classList.add('hidden');
+    $('importOwner').innerHTML = '<div class="iolbl">Кой играч си ти (старшината)?</div>'
+      + rec.players.map(function (p, i) { return '<label class="iorow"><input type="radio" name="impown" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + esc(p.name) + '</label>'; }).join('')
+      + '<label class="iorow"><input type="radio" name="impown" value="-1"> Никой (само в архива)</label>';
+    $('importOwner').classList.remove('hidden');
+    $('importDo').textContent = 'Импортирай';
+    $('importDo').classList.remove('hidden');
+    $('importModal').classList.remove('hidden');
+  }
   function importStep() {
     $('importErr').classList.add('hidden');
-    if (!importParsed) {                         // step 1: parse + validate, then ask for the owner
+    if (!importParsed) {                         // step 1: parse + validate + SANITISE
       var obj; try { obj = JSON.parse($('importText').value); } catch (e) { importError('JSON не може да се прочете.'); return; }
       var err = validateGameJSON(obj); if (err) { importError(err); return; }
-      importParsed = obj;
-      $('importOwner').innerHTML = '<div class="iolbl">Кой играч си ти (старшината)?</div>'
-        + obj.players.map(function (p, i) { return '<label class="iorow"><input type="radio" name="impown" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + esc(p.name) + '</label>'; }).join('')
-        + '<label class="iorow"><input type="radio" name="impown" value="-1"> Никой (само в архива)</label>';
-      $('importOwner').classList.remove('hidden');
-      $('importDo').textContent = 'Импортирай';
+      var clean = MP.sanitizeRecord(obj, CAT_KEYS);          // never trust the input — whitelist it
+      if (!clean) { importError('Данните са невалидни.'); return; }
+      showImportOwner(clean);
       return;
     }
-    // step 2: assign the chosen owner and file it
+    fileImportedRecord();
+  }
+  // step 3: assign the chosen owner and file the (already sanitised) record
+  function fileImportedRecord() {
     var sel = $('importOwner').querySelector('input[name="impown"]:checked');
     var owner = sel ? +sel.value : -1, rec = importParsed;
     rec.players.forEach(function (p, i) { p.owner = (i === owner); });
@@ -3840,6 +3875,63 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('importCancel').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
   $('importClose').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
   $('importModal').onclick = function (e) { if (e.target === $('importModal')) { $('importModal').classList.add('hidden'); openHistory(); } };
+
+  // ---- acoustic record transfer (gated behind the Акустика setting) ----
+  function syncAcousticUI() {
+    var on = !!settings.acoustic;
+    var have = !!(window.MP && MP.AudioFSK);
+    document.querySelectorAll('.netfeature').forEach(function (el) { el.classList.toggle('hidden', !(on && have)); });
+  }
+  var xfer = null, xferFSK = null;
+  function xferSay(s) { $('xferStatus').innerHTML = s; }
+  function xferProgress(done, total) { $('xferFill').style.width = (total ? Math.round(100 * done / total) : 0) + '%'; }
+  function openXfer(title) {
+    $('xferTitle').textContent = title; xferSay(''); xferProgress(0, 1);
+    $('xferModal').classList.remove('hidden');
+  }
+  function closeXfer() {
+    if (xfer) { try { xfer.dispose(); } catch (e) {} }
+    if (xferFSK && xferFSK.stop) { try { xferFSK.stop(); } catch (e) {} }
+    xfer = null; xferFSK = null; $('xferModal').classList.add('hidden');
+  }
+  $('xferCancel').onclick = closeXfer; $('xferClose').onclick = closeXfer;
+  function xferTransport(then) {
+    if (!(window.MP && MP.AudioFSK)) { xferSay('Звукът не е наличен.'); return; }
+    xferFSK = new MP.AudioFSK();
+    xferSay('🎙 Включвам микрофон/говорител…');
+    xferFSK.start().then(then).catch(function () { xferSay('Няма достъп до микрофона.'); });
+  }
+  $('exportAcoustic').onclick = function () {
+    if (!currentExportRec) return;
+    $('exportModal').classList.add('hidden');
+    openXfer('📡 Изпращам по звук');
+    xferTransport(function () {
+      var blob = MP.packRecord(currentExportRec, CAT_KEYS);
+      xfer = new MP.Transfer({ transport: xferFSK, mode: 'send', data: blob, callbacks: {
+        onStatus: xferSay, onProgress: xferProgress,
+        onSent: function () { xferProgress(1, 1); xferSay('✓ Изпратено.'); },
+      } });
+      xfer.start();
+    });
+  };
+  $('importAcoustic').onclick = function () {
+    $('historyModal').classList.add('hidden');
+    openXfer('🔊 Приемам по звук');
+    xferTransport(function () {
+      xfer = new MP.Transfer({ transport: xferFSK, mode: 'recv', callbacks: {
+        onStatus: xferSay, onProgress: xferProgress,
+        onError: function () { xferSay('Грешка при приемане.'); },
+        onComplete: function (blob) {
+          xferProgress(1, 1); xferSay('✓ Получено.');
+          var rec; try { rec = MP.sanitizeRecord(MP.unpackRecord(blob, CAT_KEYS), CAT_KEYS); } catch (e) { rec = null; }
+          closeXfer();
+          if (!rec) { openImport(); importError('Получените данни са невалидни.'); return; }
+          openImport(); showImportOwner(rec);   // funnel into the same owner-pick + filing flow
+        },
+      } });
+      xfer.start();
+    });
+  };
   function openHistory() {
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
