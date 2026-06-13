@@ -343,10 +343,29 @@ own player** — that seat is flagged the owner locally (the ★ on your own nam
 the archived game and your dossier attribute *your* performance. The local player
 keeps a full move log; remote players are mirrored score-only.
 
+**Acoustic export / import.** The same channel also transfers a single game
+between devices. Export offers **📡 Изпрати по звук**, the archive offers
+**🔊 Приеми по звук**: the sender advertises (`XOFFER`), the receiver wants
+(`XWANT`), they handshake on a tag and ping-pong a stop-and-wait, CRC-16'd
+chunked transfer of a **compact record** (`packRecord` — final dice + category
+per turn, the board mask reconstructed on the far end), shown with a progress
+bar. The received blob is decoded and run through **`sanitizeRecord`** before it
+touches anything — a hard whitelist that **clamps every value and drops unknown
+fields, non-primitives, functions and `__proto__` keys** (the key set is
+null-proto, so a `__proto__` category can't bypass it). The JSON paste import
+sanitises through the same gate, so **every imported record is pure data** — it
+can never carry anything executable. The receiver then picks which player is
+*them* (owner attribution) and files it.
+
+**The `Акустика` switch.** Every data-over-sound feature — network play and the
+sound transfer — lives behind a single settings toggle, **off by default**; when
+off they're hidden entirely.
+
 The pure protocol logic is covered by `test/mp.test.js` — framing/CRC, every
-schema, a full **3-device game converging to identical state**, idempotency and
-gap→snapshot resync. The acoustic L0 itself needs real two-device tuning (range,
-volume, room noise) and is best-effort.
+schema, a full **3-device game converging to identical state**, idempotency,
+gap→snapshot resync, the record codec, the **sanitiser** (junk/`__proto__`
+stripping), and a full chunked **blob transfer**. The acoustic L0 itself needs
+real two-device tuning (range, volume, room noise) and is best-effort.
 
 ## Военен архив — history & replay
 
@@ -395,9 +414,10 @@ or the whole archive **cleared from settings** (with a confirm).
 Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
 **owner block** (battle name + „Използвай моето име“ with a `?` helper), then
 positive toggles: **КАЗАРМА**, **Титли** (with its nested **Бонус точки**
-sub-toggle, shown only while Титли is on), **Съвети**, **Цензура**. The two
-pre-game-only rows (Титли, Съвети) hide once a battle is on; you can also clear
-the archive here.
+sub-toggle, shown only while Титли is on), **Съвети**, **Цензура**, and
+**Акустика** (off by default — reveals every data-over-sound feature, hidden
+otherwise). The two pre-game-only rows (Титли, Съвети) hide once a battle is on;
+you can also clear the archive here.
 
 - **Censor toggle** — *Цензура, само прилични имена* — is **off by default** (this
   is an adult party game). On, it drops every NSFW-flagged word and regenerates
