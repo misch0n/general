@@ -517,3 +517,21 @@ test('AudioFSK packet capture records ticks + frame outcomes', function () {
   assert.strictEqual(cap.frames[0].result, 'ok');
   assert.ok(/^[0-9a-f]+$/.test(cap.frames[0].hex));
 });
+
+// ---- L0 end-to-end: synthesize a frame as AUDIO and decode it through the real
+// ring-buffer + Goertzel + symbol-timer path (sample-accurate, immune to setInterval throttling) ----
+test('AudioFSK decodes a frame from synthesized audio buffers (full DSP pipeline)', function () {
+  var sr = 48000, fsk = new MP.AudioFSK({}); fsk.ctx = { sampleRate: sr }; fsk.baud = 12;
+  fsk._ringSize = 16384; fsk._ring = new Float32Array(fsk._ringSize); fsk._ringPos = 0; fsk._samples = 0; fsk._reset();
+  var got = null; fsk.onReceive(function (p) { got = Array.from(p); });
+  function crc16(b) { var c = 0xffff; for (var i = 0; i < b.length; i++) { c ^= b[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
+  var payload = [10, 20, 30, 200, 7], crc = crc16(payload), full = [payload.length].concat(payload, [(crc >> 8) & 255, crc & 255]);
+  var bits = []; full.forEach(function (B) { for (var b = 7; b >= 0; b--) bits.push((B >> b) & 1); });
+  var spb = Math.round(sr / fsk.baud), sig = [], ph = 0;
+  function tone(freq, nsamp) { var w = 2 * Math.PI * freq / sr; for (var i = 0; i < nsamp; i++) { sig.push(0.4 * Math.sin(ph)); ph += w; } }
+  function sil(nsamp) { for (var i = 0; i < nsamp; i++) sig.push(0); }
+  sil(spb); tone(fsk.fsync, spb * 10); bits.forEach(function (bit) { tone(bit ? fsk.f1 : fsk.f0, spb); }); sil(spb * 2);
+  for (var p = 0; p < sig.length; p += 512) fsk._onAudio(new Float32Array(sig.slice(p, p + 512)));   // audio-thread buffers
+  assert.deepStrictEqual(got, payload, 'frame recovered from real audio through the FSK pipeline');
+  assert.strictEqual(fsk.stats.framesOk, 1);
+});

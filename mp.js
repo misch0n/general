@@ -909,12 +909,44 @@
         return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
       }).then(function (stream) {
         self.stream = stream;
-        var src = self.ctx.createMediaStreamSource(stream);
-        var an = self.ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0;   // ≥1 bit window even at 96 kHz
-        src.connect(an); self._an = an; self._buf = new Float32Array(an.fftSize);
-        self._listen();
+        var src = self.ctx.createMediaStreamSource(stream); self._src = src;
+        // Sample from the AUDIO THREAD (ScriptProcessor), NOT setInterval — mobile throttles
+        // setInterval (we measured ~30 ms, far below the symbol rate), which desynced the
+        // bit clock. The audio callback fires at a fixed sample cadence regardless.
+        var bufSize = 512;   // ~10.7 ms at 48 kHz → plenty of reads/bit, immune to timer throttling
+        var mk = self.ctx.createScriptProcessor || self.ctx.createJavaScriptNode;
+        var sp = mk.call(self.ctx, bufSize, 1, 1); self._sp = sp;
+        self._ringSize = 16384; self._ring = new Float32Array(self._ringSize); self._ringPos = 0; self._samples = 0;
+        sp.onaudioprocess = function (e) { self._onAudio(e.inputBuffer.getChannelData(0)); };
+        src.connect(sp); sp.connect(self.ctx.destination);   // must be connected to fire; output stays silent
+        self._reset();
         return true;
       });
+    };
+    // process one audio buffer: append to the ring, run Goertzel over the last ~1 bit,
+    // and drive the decoder with a SAMPLE-ACCURATE timestamp
+    AudioFSK.prototype._onAudio = function (input) {
+      var n = input.length, ring = this._ring, rs = this._ringSize, pos = this._ringPos;
+      for (var i = 0; i < n; i++) { ring[pos] = input[i]; pos = pos + 1 === rs ? 0 : pos + 1; }
+      this._ringPos = pos; this._samples += n;
+      var sr = this.ctx.sampleRate, t = this._samples / sr * 1000;   // exact time of the buffer end
+      this.stats.ticks++;
+      if (this._sending && !this._forceListen) { if (this._capOn) this._cap(t, 0, 0, 0, -1, false, true); return; }
+      var win = Math.min(rs, Math.max(256, Math.round(sr / this.baud)));
+      var ps = this._goertzelRing(this.fsync, win), p0 = this._goertzelRing(this.f0, win), p1 = this._goertzelRing(this.f1, win);
+      var dom = Math.max(ps, p0, p1), domIdx = ps === dom ? 0 : (p0 === dom ? 1 : 2);
+      var second = ps + p0 + p1 - dom - Math.min(ps, p0, p1);
+      var clear = dom > this.floor && dom > this.snr * (second || 1e-12);
+      if (clear) this.stats.heard++;
+      if (this._monCb) try { this._monCb({ ps: ps, p0: p0, p1: p1, dom: dom, domIdx: domIdx, clear: clear, sending: this._sending }); } catch (e) {}
+      if (this._capOn) this._cap(t, ps, p0, p1, domIdx, clear, false);
+      this._decode(ps, p0, p1, domIdx, clear, t);
+    };
+    AudioFSK.prototype._goertzelRing = function (freq, win) {
+      var sr = this.ctx.sampleRate, w = 2 * Math.PI * freq / sr, c = 2 * Math.cos(w), s1 = 0, s2 = 0, s0;
+      var ring = this._ring, rs = this._ringSize, idx = (this._ringPos - win + rs) % rs;
+      for (var i = 0; i < win; i++) { s0 = ring[idx] + c * s1 - s2; s2 = s1; s1 = s0; idx = idx + 1 === rs ? 0 : idx + 1; }
+      return (s1 * s1 + s2 * s2 - c * s1 * s2) / win;   // normalise by window so the floor is comparable across bauds
     };
     AudioFSK.prototype.onReceive = function (cb) { this._cb = cb; };
     // —— TX: emit a length-prefixed, CRC-16'd, FSK-encoded frame ——
@@ -948,30 +980,7 @@
       for (var i = 0; i < win; i++) { s0 = buf[off + i] + c * s1 - s2; s2 = s1; s1 = s0; }
       return (s1 * s1 + s2 * s2 - c * s1 * s2) / win;   // normalise by window so the floor is comparable across bauds
     };
-    AudioFSK.prototype._restartListen = function () { if (this._rxTimer) clearInterval(this._rxTimer); this._listen(); };
-    AudioFSK.prototype._listen = function () {
-      var self = this;
-      this._reset();
-      this._rxTimer = setInterval(function () {
-        if (!self._an) return;
-        var now = _now();
-        if (self._sending && !self._forceListen) { if (self._capOn) self._cap(now, 0, 0, 0, -1, false, true); return; }  // half-duplex
-        var n = self._buf.length, win = Math.min(n, Math.max(256, Math.round(self.ctx.sampleRate / self.baud)));
-        self._an.getFloatTimeDomainData(self._buf);
-        var off = n - win;                                   // analyse the most recent ~1 bit of audio
-        var ps = self._goertzel(self._buf, self.fsync, off, win), p0 = self._goertzel(self._buf, self.f0, off, win), p1 = self._goertzel(self._buf, self.f1, off, win);
-        self.stats.ticks++;
-        var a = [ps, p0, p1], dom = Math.max(ps, p0, p1), domIdx = ps === dom ? 0 : (p0 === dom ? 1 : 2);
-        var second = a[0] + a[1] + a[2] - dom - Math.min(ps, p0, p1);
-        var clear = dom > self.floor && dom > self.snr * (second || 1e-12);
-        if (clear) self.stats.heard++;
-        // the reading reflects audio centred ~half a window in the past — align bit timing to that
-        var audioT = now - 1000 * win / 2 / self.ctx.sampleRate;
-        if (self._monCb) try { self._monCb({ ps: ps, p0: p0, p1: p1, dom: dom, domIdx: domIdx, clear: clear, sending: self._sending }); } catch (e) {}
-        if (self._capOn) self._cap(now, ps, p0, p1, domIdx, clear, false);
-        self._decode(ps, p0, p1, domIdx, clear, audioT);
-      }, 1000 / (this.baud * this.os));
-    };
+    AudioFSK.prototype._restartListen = function () { this._reset(); };   // params take effect live; just resync the decoder
     AudioFSK.prototype._cap = function (now, ps, p0, p1, domIdx, clear, sending) {
       if (!this._capTicks || this._capTicks.length >= this.CAP_MAX) return;
       var ph = !this._d ? 0 : (this._d.phase === 'idle' ? 0 : this._d.phase === 'pre' ? 1 : 2);
@@ -1040,6 +1049,8 @@
     function bitsToByte(bits, off) { var v = 0; for (var i = 0; i < 8; i++) v = (v << 1) | (bits[off + i] || 0); return v; }
     AudioFSK.prototype.stop = function () {
       if (this._rxTimer) clearInterval(this._rxTimer);
+      if (this._sp) { try { this._sp.disconnect(); } catch (e) {} this._sp.onaudioprocess = null; this._sp = null; }
+      if (this._src) { try { this._src.disconnect(); } catch (e) {} this._src = null; }
       if (this.stream) this.stream.getTracks().forEach(function (t) { t.stop(); });
       if (this.ctx && this.ctx.close) this.ctx.close();
       this.ctx = null;
