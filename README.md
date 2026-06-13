@@ -367,11 +367,31 @@ can never carry anything executable. The receiver then picks which player is
 sound transfer — lives behind a single settings toggle, **off by default**; when
 off they're hidden entirely.
 
+**Adaptive link (companion spec).** The channel varies hugely with distance, room
+and noise, so the transport is **parameterised by profiles** (band / baud / ecc /
+volume) — an `anchor` floor plus `gameplay` (upper-audible, robust, long-range),
+`setup`, `transfer` and a near-ultrasonic `stealth` — and the phase that needs
+range (gameplay) carries the least data, so it spends the whole budget on
+robustness. The lobby runs a **calibration** step (probe the ladder → `pickProfile`
+the fastest comfortably-below-threshold profile → `switchProfile`). A **`LinkMeter`**
+turns decode outcomes into **signal bars + a GOOD/DEGRADING/CRITICAL state** (ECC
+correction load is the *early-warning* signal — bars drop before failures), shown
+live in the lobby, in-game (a corner badge) and during transfers, with **actionable
+warnings** tied to the levers (*приближи се · намали шума · усили звука*). An
+**`AdaptiveController`** with hysteresis steps the broadcast down to a robuster
+profile (or recalibrates) when the worst client degrades, announced via
+`PROFILE_SWITCH` on the anchor with client acks. Optional **safe peer roles** keep
+the host the only truth: a **`RELAY`** re-broadcasts the host's authoritative
+snapshot (stale versions ignored), **`GOSSIP`** only *detects* divergence so the
+behind device resyncs from the host — never peer-to-peer consensus.
+
 The pure protocol logic is covered by `test/mp.test.js` — framing/CRC, every
 schema, a full **3-device game converging to identical state**, idempotency,
 gap→snapshot resync, the record codec, the **sanitiser** (junk/`__proto__`
-stripping), and a full chunked **blob transfer**. The acoustic L0 itself needs
-real two-device tuning (range, volume, room noise) and is best-effort.
+stripping), a full chunked **blob transfer**, and the **adaptive layer** (profile
+selection, the meter's bars/state + ECC early-warning, controller hysteresis,
+`PROFILE_SWITCH`, calibration, and the relay/gossip guards). The acoustic L0 itself
+needs real two-device tuning (range, volume, room noise) and is best-effort.
 
 ## Военен архив — history & replay
 

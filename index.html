@@ -333,6 +333,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .netp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
 .netp b{ color:var(--gen-brass-bright); }
 .netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
+/* link-quality signal bars + warnings */
+.netbars{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:var(--gen-muted); min-height:16px; margin:6px 0; }
+.netbars:empty{ display:none; }
+.signal{ display:inline-flex; align-items:flex-end; gap:2px; height:14px; }
+.signal .bar{ width:4px; background:var(--gen-disabled); border-radius:1px; }
+.signal .bar:nth-child(1){ height:5px; } .signal .bar:nth-child(2){ height:8px; } .signal .bar:nth-child(3){ height:11px; } .signal .bar:nth-child(4){ height:14px; }
+.signal.s-good .bar.on{ background:#9bd17e; } .signal.s-degrading .bar.on{ background:var(--gen-brass-bright); } .signal.s-critical .bar.on{ background:#e8807a; }
+.netwarn{ color:#e8807a; font-weight:600; }
+.netlink{ position:absolute; top:8px; right:10px; z-index:6; display:flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px;
+  background:rgba(0,0,0,.45); border:1px solid var(--gen-pill-line); font-size:10px; }
 .xferbar{ height:10px; border-radius:6px; background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); overflow:hidden; margin:12px 0 4px; }
 .xferfill{ height:100%; width:0; background:var(--gen-brass); transition:width .2s; }
 .xferstage{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; color:var(--gen-brass-bright); font-size:14px; margin-top:6px; }
@@ -791,6 +801,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 <!-- ============ GAME ============ -->
 <div id="game" class="board hidden">
   <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО</div>
+  <div id="netLink" class="netlink hidden"></div>
 
   <div class="hd">
     <button id="menuBtn" class="rank menubtn" title="Меню" aria-label="Меню"><span class="burger"></span></button>
@@ -979,6 +990,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     <p class="ht">Дръж телефоните близо (~1 м), със звук нагоре.</p>
     <div id="xferStage" class="xferstage">Свързване…</div>
     <div class="xferbar"><div id="xferFill" class="xferfill"></div></div>
+    <div id="xferBars" class="netbars"></div>
     <div id="xferStatus" class="netstatus xferflavour"></div>
     <div class="setup-actions"><button id="xferCancel" class="btn">Откажи</button></div>
   </div>
@@ -1041,6 +1053,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     </div>
     <div id="netLobby" class="hidden">
       <div id="netRoster" class="netroster"></div>
+      <div id="netBars" class="netbars"></div>
       <div id="netStatus" class="netstatus netflavour"></div>
       <div class="setup-actions">
         <button id="netStart" class="btn primary hidden">⚔ Започни битката</button>
@@ -1495,6 +1508,25 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function stopFlavour() { if (flavTimer) clearInterval(flavTimer); flavTimer = null; flavEl = null; flavKey = null; }
 
+  // §4 link-quality signal bars + actionable warnings (tied to the §1 levers)
+  function barsHTML(bars, state) {
+    var cls = 's-' + String(state || 'good').toLowerCase(), b = '';
+    for (var i = 0; i < 4; i++) b += '<span class="bar' + (i < bars ? ' on' : '') + '"></span>';
+    return '<span class="signal ' + cls + '">' + b + '</span>';
+  }
+  function linkWarn(state) {
+    if (state === 'CRITICAL') return '<span class="netwarn">⚠️ Много слаба връзка — приближи телефоните, намали шума, усили звука.</span>';
+    if (state === 'DEGRADING') return '<span class="netwarn">⚠️ Връзката отслабва — приближи се или усили звука.</span>';
+    return '';
+  }
+  function updateNetLink(link) {
+    if (!link) return;
+    var st = link.worst || link.state, html = barsHTML(link.bars, st) + ' ' + (linkWarn(st) || 'Връзка');
+    if ($('netBars')) $('netBars').innerHTML = html;
+    var nl = $('netLink');
+    if (nl) { nl.innerHTML = barsHTML(link.bars, st) + (st !== 'GOOD' ? ' <span class="netwarn">слаба връзка</span>' : ''); nl.classList.toggle('hidden', !netMode); }
+  }
+
   function netSay(s) { var el = $('netStatus'); if (el) el.innerHTML = s; }
   function localMeta() {
     applyOwnerName();
@@ -1520,6 +1552,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       onStart: function (roster, order) { stopFlavour(); startNetGame(roster, order); },
       onTurn: function (activeId) { netSetTurn(activeId); },
       onMove: function (mv) { netApplyRemote(mv); },
+      onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
     };
   }
@@ -1552,11 +1585,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
     });
   };
-  $('netStart').onclick = function () { if (net && net.isHost) net.startGame(); };
+  $('netStart').onclick = function () {
+    if (!net || !net.isHost) return;
+    // §3 calibrate (best-effort — picks the gameplay profile if the modem can't measure)
+    $('netStart').disabled = true; setFlavour($('netStatus'), 'lobbyWait'); $('netBars').innerHTML = 'Калибрирам… 🔊';
+    net.calibrate(function () { $('netStart').disabled = false; net.startGame(); });
+  };
   function leaveNet() {
     stopFlavour();
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop();
     net = null; netFSK = null; netMode = false; localPid = null;
+    $('netBars').innerHTML = ''; $('netLink').classList.add('hidden');
     $('netModal').classList.add('hidden');
   }
   $('netLeave').onclick = leaveNet;
@@ -3922,12 +3961,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     stopFlavour();
     if (xfer) { try { xfer.dispose(); } catch (e) {} }
     if (xferFSK && xferFSK.stop) { try { xferFSK.stop(); } catch (e) {} }
-    xfer = null; xferFSK = null; $('xferModal').classList.add('hidden');
+    xfer = null; xferFSK = null; $('xferBars').innerHTML = ''; $('xferModal').classList.add('hidden');
   }
   $('xferCancel').onclick = closeXfer; $('xferClose').onclick = closeXfer;
+  var xferMeter = null;
   function xferTransport(then) {
     if (!(window.MP && MP.AudioFSK)) { xferStage('Звукът не е наличен.'); return; }
     xferFSK = new MP.AudioFSK();
+    if (xferFSK.setProfile) xferFSK.setProfile(MP.getProfile(3));     // fast, close-range transfer profile
+    xferMeter = new MP.LinkMeter();
+    if (xferFSK.onMeter) xferFSK.onMeter(function (ev) { xferMeter.record(ev); var st = xferMeter.state(); $('xferBars').innerHTML = barsHTML(xferMeter.bars(), st) + ' ' + (linkWarn(st) || ''); });
     xferStage('🎙 Включвам микрофон…');
     xferFSK.start().then(then).catch(function () { xferStage('Няма достъп до микрофона.'); });
   }
@@ -4034,6 +4077,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (net) { try { net.dispose(); } catch (e) {} }
     if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} }
     net = null; netFSK = null; netMode = false; localPid = null; netMyTurn = false;
+    $('netLink').classList.add('hidden'); $('netLink').innerHTML = '';
   }
 
 })();
