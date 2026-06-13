@@ -120,10 +120,10 @@ and implemented as `EV.botKeep` / `EV.botCategory`:
 
 | Persona | Tier | Policy | Strength |
 | --- | --- | --- | --- |
-| Мушица | `random` | 1–2 blind rethrows of the whole hand, then the best immediate placement | ~25% |
-| Комар | `greedy` | no table lookup — pure immediate-gain heuristics (`game.js`) | ~64% |
+| Каскадьор | `random` | 1–2 blind rethrows of the whole hand, then the best immediate placement | ~25% |
+| Комарджия | `greedy` | no table lookup — pure immediate-gain heuristics (`game.js`) | ~64% |
 | Леля ти | `epsilon` | ε-greedy (ε = 0.2) over the optimal table | ~77% |
-| Кварталния любител | `softmax` | softmax (τ = 0.8) over the optimal table | ~85% |
+| Кибик | `softmax` | softmax (τ = 0.8) over the optimal table | ~85% |
 | Господ бог | `optimal` | always the EV-maximising move | 100% |
 
 None of them ever scratches at random — a forfeit happens only when nothing
@@ -442,7 +442,8 @@ or the whole archive **cleared from settings** (with a confirm).
 ## Settings & the secret dev editor
 
 Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
-**owner block** (battle name + „Използвай моето име“ with a `?` helper), then
+**owner block** (battle name + „Използвай моето име“ with a `?` helper + a
+**default gender** for the старшина's seat), then
 positive toggles: **КАЗАРМА**, **Титли** (with its nested **Бонус точки**
 sub-toggle, shown only while Титли is on), **Съвети**, **Глупости**, and
 **Акустика** (off by default — reveals every data-over-sound feature, hidden
@@ -566,11 +567,11 @@ own copy.
 
 ## The greedy heuristic (`game.js`)
 
-The no-lookup brain used by the **Комар** (Easy) and **Мушица** (Random) personas,
-in pure functions (`aiChooseHolds`, `aiChooseCategory`):
+The no-lookup brain used by the **Комарджия** (Easy) and **Каскадьор** (Random)
+personas, in pure functions (`aiChooseHolds`, `aiChooseCategory`):
 
 - **Holds** the largest matching group of dice (chasing x-of-a-kind / general);
-  with no pair, it keeps the high dice (5s and 6s). (Мушица skips even this and
+  with no pair, it keeps the high dice (5s and 6s). (Каскадьор skips even this and
   rethrows blindly.)
 - **Scores** the highest-value open category; if nothing scores, it sacrifices in
   a fixed order (hardest combos first) — never a random forfeit.

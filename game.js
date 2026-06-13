@@ -935,18 +935,18 @@
   // name — AI players keep their generated Title+Adjective+Noun name). Name→
   // strength is a FIXED binding; strengths from tools/calibrate-bots.js.
   // The five-tier ladder:
-  //   Мушица   = RANDOM  — rethrows blindly 1–2 times, then banks the best it can
-  //   Комар    = EASY    — no lookup; always grabs the biggest immediate score
-  //   Леля ти  = MEDIUM  — epsilon-greedy over the optimal table
-  //   Кварталния = HARD  — softmax over the optimal table
-  //   Господ бог = GOD   — always the optimal move
+  //   Каскадьор  = RANDOM  — rethrows blindly 1–2 times, then banks the best it can
+  //   Комарджия  = EASY    — no lookup; always grabs the biggest immediate score
+  //   Леля ти    = MEDIUM  — epsilon-greedy over the optimal table
+  //   Кибик      = HARD    — softmax over the optimal table
+  //   Господ бог = GOD     — always the optimal move
   // None of them ever forfeits at random — only when nothing scores.
   var PERSONAS = [
-    { id: 'mushica',  name: 'Мушица',             flavor: 'Хвърля наслуки и се надява.',     policy: { type: 'random' },                  strength: 0.25 },
-    { id: 'komar',    name: 'Комар',              flavor: 'Комарджия — граби каквото е на масата.', policy: { type: 'greedy' },           strength: 0.64 },
-    { id: 'lelia',    name: 'Леля ти',            flavor: 'Играе на семейни вечери.',        policy: { type: 'epsilon', epsilon: 0.2 },   strength: 0.77 },
-    { id: 'lyubitel', name: 'Кварталния любител', flavor: 'Бива го, бутка кокала.',          policy: { type: 'softmax', tau: 0.8 },       strength: 0.85 },
-    { id: 'gospod',   name: 'Господ бог',         flavor: 'Вижда всичко. Не прощава.',       policy: { type: 'optimal', tau: 0 },         strength: 1.0 },
+    { id: 'mushica',  name: 'Каскадьор',  flavor: 'Хвърля наслуки и се надява.',     policy: { type: 'random' },                  strength: 0.25 },
+    { id: 'komar',    name: 'Комарджия',  flavor: 'Допамина му гърми когато види шестици, трябва да си бърше устата през хвърляне.', policy: { type: 'greedy' }, strength: 0.64 },
+    { id: 'lelia',    name: 'Леля ти',    flavor: 'Играе на семейни вечери.',        policy: { type: 'epsilon', epsilon: 0.2 },   strength: 0.77 },
+    { id: 'lyubitel', name: 'Кибик',      flavor: 'Бива го, бутка кокала.',          policy: { type: 'softmax', tau: 0.8 },       strength: 0.85 },
+    { id: 'gospod',   name: 'Господ бог', flavor: 'Вижда всичко. Не прощава.',       policy: { type: 'optimal', tau: 0 },         strength: 1.0 },
   ];
   function personaById(id) {
     for (var i = 0; i < PERSONAS.length; i++) if (PERSONAS[i].id === id) return PERSONAS[i];

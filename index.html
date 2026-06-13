@@ -947,6 +947,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
         <span>Използвай моето име за боец №1</span>
         <button id="ownerToggle" class="toggle"><span class="switch"></span></button>
       </label>
+      <div class="ownertog setrow" style="cursor:default">
+        <span>Пол по подразбиране</span>
+        <div class="gender" id="ownerGender">
+          <button class="glabel g-m" data-g="m">мъжко</button>
+          <button class="glabel g-n" data-g="n">то</button>
+          <button class="glabel g-f" data-g="f">женско</button>
+        </div>
+      </div>
       <div id="ownerBubble" class="ownerbubble hidden"></div>
     </div>
     <div id="settingsRows"></div>
@@ -1134,7 +1142,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
   // глупости (profanity) ON by default = NSFW words allowed; OFF = censored to the SFW set
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false, ownerGender: 'm' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1147,14 +1155,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, acoustic: settings.acoustic, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
+              barracks: settings.barracks, acoustic: settings.acoustic, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'ownerName', 'useOwnerName', 'ownerGender'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -1203,7 +1211,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     if (!setupPlayers.length) return;
     if (settings.useOwnerName && settings.ownerName.trim()) {
       var p = ownerOf(setupPlayers);
-      p.name = settings.ownerName.trim(); p.pct = null; p.tier = 0; p.bonus = 0; p.parts = null; p.typed = true; p.bubbleDismissed = true;
+      p.name = settings.ownerName.trim(); p.gender = settings.ownerGender || p.gender;   // custom name carries the chosen gender
+      p.pct = null; p.tier = 0; p.bonus = 0; p.parts = null; p.typed = true; p.bubbleDismissed = true;
     }
   }
 
@@ -1321,7 +1330,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   }
   function addSetupPlayer(isAI) {
     var n = setupPlayers.length;
-    var p = { isAI: !!isAI, gender: G.randomGender(), color: PRESET_COLORS[n % PRESET_COLORS.length], bet: G.randomBet() };
+    // the owner seat (#1, human) starts at the старшина's default gender
+    var g = (n === 0 && !isAI) ? (settings.ownerGender || 'm') : G.randomGender();
+    var p = { isAI: !!isAI, gender: g, color: PRESET_COLORS[n % PRESET_COLORS.length], bet: G.randomBet() };
     regenName(p);
     setupPlayers.push(p);
     renderSetup();
@@ -2792,6 +2803,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
+    syncOwnerGender();
     $('clearConfirm').classList.add('hidden'); $('ownerBubble').classList.add('hidden');
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
@@ -4112,6 +4124,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       renderSetup();
     }
   };
+  // default gender for the старшина (applied to the owner seat)
+  function syncOwnerGender() { $('ownerGender').querySelectorAll('.glabel').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-g') === settings.ownerGender); }); }
+  $('ownerGender').querySelectorAll('.glabel').forEach(function (b) {
+    b.onclick = function () {
+      settings.ownerGender = b.getAttribute('data-g'); syncOwnerGender(); saveSettings();
+      if (setupPlayers.length) {
+        var o = ownerOf(setupPlayers);
+        if (settings.useOwnerName) { o.gender = settings.ownerGender; applyOwnerName(); }
+        else setGender(o, settings.ownerGender);   // re-cohere a random owner name to the new gender
+        if (!$('setup').classList.contains('hidden')) renderSetup();
+      }
+    };
+  });
   $('clearHistory').onclick = function () { $('clearConfirm').classList.remove('hidden'); };
   $('clearNo').onclick = function () { $('clearConfirm').classList.add('hidden'); };
   $('clearYes').onclick = function () {

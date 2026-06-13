@@ -280,8 +280,8 @@ test('softmax with τ=0 is argmax; bots return legal actions', function () {
 // ---- §3.4 personas + §6 ranks (game.js) ----
 
 test('persona ladder: random < greedy < epsilon < softmax < optimal', function () {
-  // the five-tier split: Мушица random, Комар greedy (no lookup), Леля ти
-  // epsilon-greedy, Кварталния softmax, Господ бог optimal
+  // the five-tier split: Каскадьор random, Комарджия greedy (no lookup), Леля ти
+  // epsilon-greedy, Кибик softmax, Господ бог optimal
   assert.strictEqual(General.personaById('mushica').policy.type, 'random');
   assert.strictEqual(General.personaById('komar').policy.type, 'greedy');
   assert.strictEqual(General.personaById('lelia').policy.type, 'epsilon');
