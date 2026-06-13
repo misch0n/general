@@ -790,7 +790,7 @@ body.modal-open{ overflow:hidden; }
 .ic-restart .gl::before{ inset:0; clip-path:polygon(100% 0,100% 100%,22% 50%); }
 .ic-restart .gl::after{ display:block; left:0; top:0; bottom:0; width:3px; }
 .rpspeed{ width:40px; height:38px; flex:none; display:grid; place-items:center; background:transparent; border:none; cursor:pointer;
-  font-family:var(--gen-font-display); font-weight:700; font-size:16px; letter-spacing:.3px; color:#fff; }
+  font-family:var(--gen-font-display); font-weight:700; font-size:16px; letter-spacing:.3px; color:#fff; touch-action:none; }
 
 /* rare-name brag bubble (setup) — colour-coded by rarity tier */
 .rarebubble{ margin-top:10px; display:flex; align-items:flex-start; gap:8px; background:var(--gen-brass-bright); color:var(--gen-ink);
@@ -1163,7 +1163,7 @@ body.modal-open{ overflow:hidden; }
       <button id="rpStepB" class="rpbtn ic-prev" title="Назад"><span class="gl"></span></button>
       <button id="rpPlay" class="rpbtn play ic-play" title="Пусни / пауза"><span class="gl"></span></button>
       <button id="rpStepF" class="rpbtn ic-next" title="Напред"><span class="gl"></span></button>
-      <button id="rpSpeed" class="rpspeed" title="Темпо (клик = следваща скорост)">x1</button>
+      <button id="rpSpeed" class="rpspeed" title="Темпо · клик = следваща · плъзни ← по-бавно / по-бързо →">x1</button>
     </div>
   </div>
 </div>
@@ -4088,7 +4088,19 @@ body.modal-open{ overflow:hidden; }
   $('rpStepF').onclick = function () { rpPause(); if (replay.idx < rpLast()) { replay.idx++; renderReplay(); } };
   $('rpStepB').onclick = function () { rpPause(); if (replay.idx > 0) { replay.idx--; renderReplay(); } };
   $('rpSlider').oninput = function () { rpPause(); replay.idx = +$('rpSlider').value; renderReplay(); };
-  $('rpSpeed').onclick = function () { replay.gear = (replay.gear + 1) % RP_GEARS.length; syncSpeedBtn(); if (replay.playing) rpSchedule(); };
+  // speed control: tap cycles to the next gear; swipe right = faster, left = slower (clamped)
+  (function () {
+    var b = $('rpSpeed'), sx = null;
+    b.addEventListener('pointerdown', function (e) { sx = e.clientX; try { b.setPointerCapture(e.pointerId); } catch (x) {} });
+    b.addEventListener('pointerup', function (e) {
+      if (!replay) { sx = null; return; }
+      var dx = sx == null ? 0 : e.clientX - sx, n = RP_GEARS.length; sx = null;
+      if (Math.abs(dx) > 18) replay.gear = Math.max(0, Math.min(n - 1, replay.gear + (dx > 0 ? 1 : -1)));  // swipe → step one gear
+      else replay.gear = (replay.gear + 1) % n;                                                            // tap → cycle
+      syncSpeedBtn(); if (replay.playing) rpSchedule();
+    });
+    b.addEventListener('pointercancel', function () { sx = null; });
+  })();
   $('rpFilterBtn').onclick = function (e) { e.stopPropagation(); buildFilterMenu(); $('rpFilterMenu').classList.toggle('hidden'); };
   document.addEventListener('click', function (e) { if (!$('rpFilterMenu').classList.contains('hidden') && !$('replayInfo').contains(e.target)) $('rpFilterMenu').classList.add('hidden'); });
   // click anywhere outside the colour popover closes it (swatches + the card button stopPropagation)
