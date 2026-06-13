@@ -550,6 +550,20 @@
     return softmaxPick(ranked, function (a) { return a.ev; }, policy.type === 'optimal' ? 0 : policy.tau, rng).keep;
   }
 
+  // §3.1 takeover policy — pick a bot strength that MATCHES a (dropped) player's
+  // play so far. `acc` is their optimal-decision fraction in the game up to now
+  // (1 = flawless). Stronger play → a sharper policy; weaker → noisier/greedier.
+  // No "difficulty" knob: the level is read off the human's own track record.
+  function botPolicyForAccuracy(acc) {
+    if (acc == null || !isFinite(acc)) return { type: 'softmax', tau: 0.7 };  // unknown → solid club player
+    if (acc >= 0.93) return { type: 'optimal' };
+    if (acc >= 0.82) return { type: 'softmax', tau: 0.5 };
+    if (acc >= 0.70) return { type: 'softmax', tau: 1.1 };
+    if (acc >= 0.55) return { type: 'epsilon', epsilon: 0.28 };
+    if (acc >= 0.40) return { type: 'epsilon', epsilon: 0.45 };
+    return { type: 'greedy' };
+  }
+
   return {
     CATS: CATS, NCAT: NCAT, NMS: NMS, FULL_MASK: FULL_MASK,
     MULTISETS: MULTISETS, ROLL_PROB: ROLL_PROB, idxOfDice: idxOfDice,
@@ -559,6 +573,6 @@
     maskOfScores: maskOfScores, evaluate: evaluate, evaluateMask: evaluateMask, catBit: catBit,
     nodeValue: nodeValue, keepValue: keepValue, keepPositions: keepPositions,
     analyzeTurn: analyzeTurn, analyzeGame: analyzeGame, analyzeManualGame: analyzeManualGame, marginSplit: marginSplit, bestTarget: bestTarget,
-    softmaxPick: softmaxPick, botCategory: botCategory, botKeep: botKeep,
+    softmaxPick: softmaxPick, botCategory: botCategory, botKeep: botKeep, botPolicyForAccuracy: botPolicyForAccuracy,
   };
 });

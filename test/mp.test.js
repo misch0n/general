@@ -374,3 +374,106 @@ test('host dedupes colliding colours and names across joining devices', function
   assert.strictEqual(host.roster[0].name, 'Иван');   // host keeps its own
   assert.strictEqual(host.roster[0].color.toLowerCase(), '#c8a64b');
 });
+
+// ---- lobby preparation (scan → prep → ready → start) ----
+test('lobby prep: host freezes joins, publishes settings, clients enter prep', function () {
+  var bus = new Bus();
+  function mk(isHost, me, cb) { return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: cb || {} }); }
+  var prepC1 = null;
+  var host = mk(true, { name: 'Хост', color: '#d4a02e', gender: 'm' });
+  var c1 = mk(false, { name: 'Боян', color: '#e07a2e', gender: 'm' }, { onPrep: function (bits, isHost) { prepC1 = { bits: bits, isHost: isHost }; } });
+  host.openLobby(); c1.requestJoin(); bus.drain();
+  assert.strictEqual(host.roster.length, 2, 'client joined during scan');
+  host.startPrep(0b10101); bus.drain();
+  assert.strictEqual(host.state, 'PREP');
+  assert.strictEqual(c1.state, 'IN_PREP');
+  assert.deepStrictEqual(prepC1, { bits: 0b10101, isHost: false }, 'client got settings summary');
+  // a late join is ignored now that the scan is closed
+  var c2 = mk(false, { name: 'Late', color: '#2f86c8', gender: 'm' });
+  c2.requestJoin(); bus.drain();
+  assert.strictEqual(host.roster.length, 2, 'joins frozen in prep');
+});
+
+test('lobby prep: a client edits only its own meta (host dedupes), readies up, host can start', function () {
+  var bus = new Bus();
+  function mk(isHost, me) { return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} }); }
+  var host = mk(true, { name: 'Хост', color: '#d4a02e', gender: 'm' });
+  var c1 = mk(false, { name: 'Боян', color: '#e07a2e', gender: 'm' });
+  host.openLobby(); c1.requestJoin(); bus.drain();
+  host.startPrep(0); bus.drain();
+  // client recolours to the host's colour → host bumps it to a free one
+  c1.setMyMeta({ color: '#d4a02e', gender: 'f', name: 'Боян' }); bus.drain();
+  var cl = host.roster[1];
+  assert.notStrictEqual(cl.color.toLowerCase(), '#d4a02e', 'collision bumped away from host colour');
+  assert.strictEqual(cl.gender, 'f', 'gender applied');
+  assert.strictEqual(host.allReady(), false, 'not ready yet');
+  c1.setReady(true); bus.drain();
+  assert.strictEqual(host.roster[1].ready, true, 'host saw the ready');
+  assert.strictEqual(host.allReady(), true, 'quorum readied → host may start');
+  assert.strictEqual(host.startGame(), true); bus.drain();
+  assert.strictEqual(c1.state, 'IN_GAME');
+});
+
+test('lobby prep: host adds and removes AI seats (AI is auto-ready, names/colours unique)', function () {
+  var bus = new Bus();
+  function mk(isHost, me) { return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} }); }
+  var host = mk(true, { name: 'Хост', color: '#d4a02e', gender: 'm' });
+  var c1 = mk(false, { name: 'Боян', color: '#e07a2e', gender: 'm' });
+  host.openLobby(); c1.requestJoin(); bus.drain(); host.startPrep(0); bus.drain();
+  var ai = host.addAI({ name: 'Леля ти', color: '#d4a02e', gender: 'f' }); bus.drain();
+  assert.ok(ai && ai.isAI && ai.ready, 'AI seat is auto-ready');
+  assert.strictEqual(host.roster.length, 3);
+  assert.notStrictEqual(ai.color.toLowerCase(), '#d4a02e', 'AI colour deduped from host');
+  assert.strictEqual(c1.roster.length, 3, 'client sees the AI in the roster');
+  assert.ok(c1.roster.some(function (p) { return p.isAI; }), 'client roster flags the AI seat');
+  host.removeAI(ai.id); bus.drain();
+  assert.strictEqual(host.roster.length, 2);
+  assert.strictEqual(c1.roster.length, 2, 'client saw the removal');
+});
+
+// ---- AI takeover of a dropped player ----
+test('takeover: host plays a stalled seat authoritatively and advances the turn', function () {
+  var bus = new Bus();
+  var moves = [];
+  function mk(isHost, me, cb) { return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, rounds: 1, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: cb || {} }); }
+  var host = mk(true, { name: 'Хост', color: '#d4a02e', gender: 'm' }, { onMove: function (mv) { moves.push(mv); } });
+  var takeNotice = null;
+  var c1 = mk(false, { name: 'Боян', color: '#e07a2e', gender: 'm' }, { onTakeover: function (id, on) { takeNotice = { id: id, on: on }; } });
+  host.openLobby(); c1.requestJoin(); bus.drain(); host.startPrep(0); bus.drain();
+  c1.setReady(true); bus.drain();
+  host.startGame(); bus.drain();
+  // turn 1 is the host's own seat; host plays it to hand the token to the client
+  host.submitMove({ category: 0, score: 3 }); bus.drain();
+  assert.strictEqual(host.activeId, c1.myId, 'token is on the client now');
+  // client drops; host takes the seat over
+  host.setTakeover(c1.myId, true); bus.drain();
+  assert.strictEqual(host.isAIControlled(c1.myId), true);
+  assert.deepStrictEqual(takeNotice, { id: c1.myId, on: true }, 'client notified of AI control');
+  assert.strictEqual(host.submitMoveFor(c1.myId, { category: 1, score: 9 }), true, 'host injected the AI move');
+  assert.strictEqual(host.scores[c1.myId][1], 9, 'AI score recorded');
+  assert.ok(host.state === 'GAME_OVER', 'rounds=1 → game ends after both seats filled');
+});
+
+test('takeover: lobby AI seats are host-controlled from the first grant', function () {
+  var bus = new Bus();
+  function mk(isHost, me) { return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, rounds: 1, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} }); }
+  var host = mk(true, { name: 'Хост', color: '#d4a02e', gender: 'm' });
+  var c1 = mk(false, { name: 'Боян', color: '#e07a2e', gender: 'm' });
+  host.openLobby(); c1.requestJoin(); bus.drain(); host.startPrep(0); bus.drain();
+  c1.setReady(true); bus.drain();
+  var ai = host.addAI({ name: 'Бот', color: '#2aa0a0', gender: 'm' }); bus.drain();
+  host.startGame(); bus.drain();
+  assert.strictEqual(host.isAIControlled(ai.id), true, 'AI seat is host-controlled');
+  assert.strictEqual(host.isAIControlled(c1.myId), false, 'a live human seat is not');
+});
+
+// ---- performance-matched takeover policy ----
+test('botPolicyForAccuracy ladders strength to measured accuracy', function () {
+  var EV = require('../engine.js');
+  assert.strictEqual(EV.botPolicyForAccuracy(1.0).type, 'optimal');
+  assert.strictEqual(EV.botPolicyForAccuracy(0.85).type, 'softmax');
+  assert.strictEqual(EV.botPolicyForAccuracy(0.6).type, 'epsilon');
+  assert.strictEqual(EV.botPolicyForAccuracy(0.2).type, 'greedy');
+  assert.strictEqual(EV.botPolicyForAccuracy(null).type, 'softmax');   // unknown → solid default
+  assert.ok(EV.botPolicyForAccuracy(0.85).tau < EV.botPolicyForAccuracy(0.72).tau, 'higher accuracy → sharper softmax');
+});

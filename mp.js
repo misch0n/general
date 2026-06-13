@@ -15,6 +15,7 @@
   var T = {
     BEACON: 1, JOIN_REQ: 2, JOIN_ACK: 3, ROSTER: 4, START: 5,
     GRANT: 6, MOVE: 7, STATE: 8, RESYNC_REQ: 9, PING: 10, PONG: 11, END: 12,
+    META: 13, READY: 14, PREP: 15, AICTRL: 16,              // lobby preparation + AI takeover
     XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
     // adaptive link & resilience (reserved 30-39)
     CAL_PROBE: 30, CAL_REPORT: 31, CAL_SELECT: 32, CAL_CONFIRM: 33, PROFILE_SWITCH: 34, QUALITY: 35, RELAY: 36, GOSSIP: 37,
@@ -93,8 +94,17 @@
   function hexRGB(hex) { var h = String(hex || '#888888').replace('#', ''); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; var n = parseInt(h, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
   function rgbHex(rgb) { function p(x) { return (x < 16 ? '0' : '') + (x & 255).toString(16); } return '#' + p(rgb[0]) + p(rgb[1]) + p(rgb[2]); }
   function genIx(g) { var i = GENDERS.indexOf(g); return i < 0 ? 0 : i; }
-  function writeMeta(w, p) { w.u8(p.id || 0); w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.str(p.name, 28); }
-  function readMeta(r) { var id = r.u8(), rgb = r.bytes(3), g = r.u8(), name = r.str(); return { id: id, color: rgbHex(rgb), gender: GENDERS[g] || 'm', name: name }; }
+  function writeMeta(w, p) { w.u8(p.id || 0); w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.u8((p.ready ? 1 : 0) | (p.isAI ? 2 : 0)); w.str(p.name, 28); }
+  function readMeta(r) { var id = r.u8(), rgb = r.bytes(3), g = r.u8(), fl = r.u8(), name = r.str(); return { id: id, color: rgbHex(rgb), gender: GENDERS[g] || 'm', ready: !!(fl & 1), isAI: !!(fl & 2), name: name }; }
+  // a player's self-edit in the lobby (sender identifies the player; can't edit others)
+  function packMetaUpd(meta) { var w = new Writer(); w.bytes(hexRGB(meta.color)); w.u8(genIx(meta.gender)); w.str(meta.name, 28); return w.out(); }
+  function unpackMetaUpd(p) { var r = new Reader(p); return { color: rgbHex(r.bytes(3)), gender: GENDERS[r.u8()] || 'm', name: r.str() }; }
+  function packReady(ready) { return new Writer().u8(ready ? 1 : 0).out(); }
+  function unpackReady(p) { return !!(new Reader(p).u8() & 1); }
+  function packPrep(settingsBits) { return new Writer().u8(settingsBits & 0xff).out(); }       // host → all: enter lobby prep + enabled-settings summary
+  function unpackPrep(p) { return new Reader(p).u8(); }
+  function packAICtrl(id, on) { return new Writer().u8(id).u8(on ? 1 : 0).out(); }              // host → all: a seat is now AI-driven (display)
+  function unpackAICtrl(p) { var r = new Reader(p); return { id: r.u8(), on: !!r.u8() }; }
 
   // ---- [GAME-SPECIFIC] payload schemas ----
   function packBeacon(sessionId, slotsFree) { return new Writer().u8(sessionId).u8(slotsFree).out(); }
@@ -183,7 +193,9 @@
     this.tp.onReceive(function (bytes) { self._rx(bytes); });
     if (this.tp.onMeter) this.tp.onMeter(function (ev) { self.meter.record(ev); self._linkTick(); });  // richer events from L0 (ecc/snr/fail)
     if (this.tp.setProfile) this.tp.setProfile(this.profile);
-    if (this.isHost) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender });
+    this.settingsBits = 0;             // host's enabled pre-game settings (summary shown to clients)
+    this.takeover = {};                // host: id → true when that seat is AI-driven mid-game
+    if (this.isHost) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender, ready: true, isAI: false });
   }
   Session.prototype._applyProfile = function (p) { this.profile = p; if (this.tp.setProfile) this.tp.setProfile(p); if (this.cb.onProfile) this.cb.onProfile(p); };
   // §5 host announces a profile change on the ANCHOR (so a degraded client still
@@ -264,6 +276,72 @@
     var self = this;
     this._timers.beacon = this._st(function () { self._beacon(); }, this.p.beacon);
   };
+  // ---------- host: lobby preparation (scan → prep → start) ----------
+  // §lobby host closes the scan and moves everyone into preparation: joins are
+  // frozen, the enabled-settings summary is published, and players ready up.
+  Session.prototype.startPrep = function (settingsBits) {
+    if (!this.isHost) return false;
+    this._ct(this._timers.beacon);
+    this.state = 'PREP';
+    this.settingsBits = settingsBits & 0xff;
+    this._send(T.PREP, packPrep(this.settingsBits));
+    this._send(T.ROSTER, packRoster(this.roster));
+    if (this.cb.onPrep) this.cb.onPrep(this.settingsBits, true);
+    if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+    return true;
+  };
+  // host republishes the settings summary when it changes a pre-game toggle
+  Session.prototype.setSettings = function (settingsBits) {
+    if (!this.isHost || this.state !== 'PREP') return;
+    this.settingsBits = settingsBits & 0xff;
+    this._send(T.PREP, packPrep(this.settingsBits));
+    if (this.cb.onPrep) this.cb.onPrep(this.settingsBits, true);
+  };
+  // a player edits their OWN name/colour/gender (host applies + dedupes + rebroadcasts)
+  Session.prototype.setMyMeta = function (meta) {
+    if (this.isHost) {
+      var me = this._byId(HOST_ID); if (!me) return;
+      this._applyMeta(me, meta);
+      this._send(T.ROSTER, packRoster(this.roster));
+      if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+    } else {
+      this._send(T.META, packMetaUpd(meta));
+    }
+  };
+  // ready toggle (host implicitly ready; clients send READY)
+  Session.prototype.setReady = function (ready) {
+    if (this.isHost) return;            // the host starts the game; it has no ready button
+    this._send(T.READY, packReady(ready));
+  };
+  // host adds an AI seat (only the host can; AI is always "ready")
+  Session.prototype.addAI = function (meta) {
+    if (!this.isHost || this.roster.length >= this.maxPlayers) return null;
+    var p = { id: this._nextId(), name: this._uniqueName(meta.name), color: this._uniqueColor(meta.color), gender: meta.gender || 'm', ready: true, isAI: true };
+    this.roster.push(p);
+    this._send(T.ROSTER, packRoster(this.roster));
+    if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+    return p;
+  };
+  Session.prototype.removeAI = function (id) {
+    if (!this.isHost) return;
+    var before = this.roster.length;
+    this.roster = this.roster.filter(function (p) { return !(p.id === id && p.isAI); });
+    if (this.roster.length !== before) { this._send(T.ROSTER, packRoster(this.roster)); if (this.cb.onRoster) this.cb.onRoster(this.roster.slice()); }
+  };
+  Session.prototype._byId = function (id) { for (var i = 0; i < this.roster.length; i++) if (this.roster[i].id === id) return this.roster[i]; return null; };
+  Session.prototype._applyMeta = function (entry, meta) {
+    var self = this;
+    function freeColor(c) { var used = self.roster.filter(function (p) { return p !== entry; }).map(function (p) { return (p.color || '').toLowerCase(); }); if (used.indexOf((c || '').toLowerCase()) < 0) return c; for (var i = 0; i < PALETTE.length; i++) if (used.indexOf(PALETTE[i].toLowerCase()) < 0) return PALETTE[i]; return c; }
+    function freeName(n) { var used = {}; self.roster.forEach(function (p) { if (p !== entry) used[(p.name || '').toLowerCase()] = 1; }); if (!used[(n || '').toLowerCase()]) return n || 'Боец'; var base = n || 'Боец', i = 2; while (used[(base + ' ' + i).toLowerCase()]) i++; return base + ' ' + i; }
+    if (meta.color != null) entry.color = freeColor(meta.color);
+    if (meta.gender != null) entry.gender = meta.gender;
+    if (meta.name != null) entry.name = freeName(meta.name);
+  };
+  // host: every joined human (not host, not AI) has readied — and we have a quorum
+  Session.prototype.allReady = function () {
+    if (this.roster.length < this.minPlayers) return false;
+    return this.roster.every(function (p) { return p.id === HOST_ID || p.isAI || p.ready; });
+  };
   Session.prototype.startGame = function () {
     if (!this.isHost || this.roster.length < this.minPlayers) return false;
     this._ct(this._timers.beacon);
@@ -285,6 +363,7 @@
   Session.prototype._armMoveTimeout = function () {
     var self = this; this._ct(this._timers.move); this._tries = 0;
     if (this.activeId === this.myId) return;     // it's my own turn; no wire wait
+    if (this.isAIControlled(this.activeId)) return;  // host drives this seat locally; nothing to wait for
     (function arm() {
       self._timers.move = self._st(function () {
         if (self.state !== 'IN_GAME') return;
@@ -326,6 +405,24 @@
       if (++tries <= self.p.retransmit) self._timers.mymove = self._st(go, self.p.moveTimeout);
     };
     go();
+  };
+  // ---------- host: AI takeover of a (dropped) player ----------
+  // The host runs an AI turn locally for a seat it controls and injects the move
+  // authoritatively. A seat is host-controlled if it's a lobby AI or a live takeover.
+  Session.prototype.isAIControlled = function (id) { var e = this._byId(id); return !!(this.isHost && ((e && e.isAI) || this.takeover[id])); };
+  Session.prototype.setTakeover = function (id, on) {
+    if (!this.isHost || id === this.myId) return;
+    if (on) this.takeover[id] = true; else delete this.takeover[id];
+    this._send(T.AICTRL, packAICtrl(id, on));
+    if (this.cb.onTakeover) this.cb.onTakeover(id, !!on);
+    // resuming on a stalled seat: re-grant so the AI gets prompted immediately
+    if (on && this.state === 'IN_GAME' && this.activeId === id) { if (this.cb.onTurn) this.cb.onTurn(id, false); }
+  };
+  Session.prototype.submitMoveFor = function (playerId, mv) {
+    if (!this.isHost || this.state !== 'IN_GAME' || playerId !== this.activeId) return false;
+    mv.playerId = playerId; mv.ackVersion = this.version;
+    if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); this._advance(); return true; }
+    return false;
   };
   Session.prototype._advance = function () {
     if (this._allDone()) { this.state = 'GAME_OVER'; this._send(T.END, new Uint8Array(0)); if (this.cb.onEnd) this.cb.onEnd(); return; }
@@ -382,6 +479,12 @@
       } else {
         this._send(T.STATE, packStateDelta(this.version, { playerId: mv.playerId, category: mv.category, score: (this.scores[mv.playerId] || {})[mv.category] || 0 }));
       }
+    } else if (pkt.type === T.META && this.state === 'PREP') {
+      var entry = this._byId(pkt.sender);                  // a client edits ONLY its own seat
+      if (entry && entry.id !== HOST_ID && !entry.isAI) { this._applyMeta(entry, unpackMetaUpd(pkt.payload)); this._send(T.ROSTER, packRoster(this.roster)); if (this.cb.onRoster) this.cb.onRoster(this.roster.slice()); }
+    } else if (pkt.type === T.READY && this.state === 'PREP') {
+      var re = this._byId(pkt.sender);
+      if (re && re.id !== HOST_ID) { re.ready = unpackReady(pkt.payload); this._send(T.ROSTER, packRoster(this.roster)); if (this.cb.onRoster) this.cb.onRoster(this.roster.slice()); }
     } else if (pkt.type === T.RESYNC_REQ) {
       this._send(T.STATE, packStateSnapshot(this.version, this.scores));
     } else if (pkt.type === T.PONG) {
@@ -413,6 +516,14 @@
     } else if (pkt.type === T.ROSTER) {
       this.roster = unpackRoster(pkt.payload);
       if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+    } else if (pkt.type === T.PREP) {
+      this.settingsBits = unpackPrep(pkt.payload);
+      this.state = 'IN_PREP';
+      if (this.cb.onPrep) this.cb.onPrep(this.settingsBits, false);
+    } else if (pkt.type === T.AICTRL) {
+      var ac = unpackAICtrl(pkt.payload);
+      if (ac.on) this.takeover[ac.id] = true; else delete this.takeover[ac.id];
+      if (this.cb.onTakeover) this.cb.onTakeover(ac.id, ac.on);
     } else if (pkt.type === T.START) {
       var st = unpackStart(pkt.payload);
       this.roster = st.players; this.version = st.version; this.order = st.players.map(function (p) { return p.id; });
@@ -724,6 +835,8 @@
     packBeacon: packBeacon, unpackBeacon: unpackBeacon, packJoinReq: packJoinReq, unpackJoinReq: unpackJoinReq,
     packJoinAck: packJoinAck, unpackJoinAck: unpackJoinAck, packRoster: packRoster, unpackRoster: unpackRoster,
     packStart: packStart, unpackStart: unpackStart, packGrant: packGrant, unpackGrant: unpackGrant,
+    packMetaUpd: packMetaUpd, unpackMetaUpd: unpackMetaUpd, packReady: packReady, unpackReady: unpackReady,
+    packPrep: packPrep, unpackPrep: unpackPrep, packAICtrl: packAICtrl, unpackAICtrl: unpackAICtrl,
     packMove: packMove, unpackMove: unpackMove, packStateDelta: packStateDelta, packStateSnapshot: packStateSnapshot, unpackState: unpackState,
     Session: Session,
   };
