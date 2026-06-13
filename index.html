@@ -3530,11 +3530,9 @@ body.modal-open{ overflow:hidden; }
         badge = G.rankForPlacement(summary.ordered.indexOf(p), n);
         if (tab === 'luck') {
           var lk = a && typeof a.luck === 'number' && !a.manual ? Math.round(a.luck) : null;
-          val = lk != null ? (total(p) - lk) : total(p);    // „без късмет“ = резултат − късмет
-          if (lk != null) sub = '<div class="persub">резултат ' + total(p) + ' · късмет <b class="' + (lk >= 0 ? 'np' : 'nn') + '">' + signed(lk) + '</b></div>';
+          val = lk != null ? '<b class="' + (lk >= 0 ? 'np' : 'nn') + '">' + signed(lk) + '</b>' : '–';   // luck points only
         } else if (tab === 'cats') {
-          val = m.recCount[pi];
-          sub = '<div class="persub">' + (m.recCount[pi] === 1 ? 'рекорд' : 'рекорди') + '</div>';
+          val = m.recCount[pi];                              // record count — no second line
         } else { // stand
           var bonusTag = p.bonus ? ' · +' + p.bonus + ' аванс' : '';
           var subStand = (p.isAI && p.persona ? '⚙ ' + esc(p.persona.name) : '') + bonusTag;
@@ -3590,8 +3588,19 @@ body.modal-open{ overflow:hidden; }
     var low = G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).map(tile).join('');
     var master = m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2
       ? '<div class="cb-master">📋 Майстор на категориите: <b style="color:' + players[m.masterIdx].color + '">' + esc(players[m.masterIdx].name) + '</b> · ' + m.recCount[m.masterIdx] + ' рекорда</div>' : '';
-    $('catBoard').innerHTML = '<div class="cb-legend">всяка клетка: <b>% вкарали</b> · <b>най-висок резултат</b> · цвят = рекордьорът</div>'
-      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>' + master;
+    var open = !summary || summary.catOpen !== false;   // collapsible; open by default
+    $('catBoard').innerHTML = '<div class="catfold' + (open ? ' open' : '') + '">'
+      + '<div class="catfold-bar"><span class="cf-lab">Категории</span><span class="cf-caret"></span></div>'
+      + '<div class="catgrid-wrap' + (open ? '' : ' hidden') + '">'
+      + '<div class="cb-legend">всяка клетка: <b>% вкарали</b> · <b>най-висок резултат</b> · цвят = рекордьорът</div>'
+      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>' + master
+      + '</div></div>';
+    var fold = $('catBoard').querySelector('.catfold');
+    fold.querySelector('.catfold-bar').onclick = function () {
+      if (summary) summary.catOpen = !(summary.catOpen !== false);
+      var o = summary.catOpen;
+      fold.classList.toggle('open', o); fold.querySelector('.catgrid-wrap').classList.toggle('hidden', !o);
+    };
   }
 
   // (the luck lens is now folded into the rows + the "Късмет по ходове" chart)
@@ -3617,7 +3626,8 @@ body.modal-open{ overflow:hidden; }
       }
     } else if (tab === 'skill' && a && a.turns) {
       a.turns.forEach(function (td) { if (td.skill <= -3) out.push({ round: td.turn + 1, label: '−' + (-td.skill).toFixed(1), good: false }); });   // blunder
-      if (a.sharpest && a.sharpest.turn != null) out.push({ round: a.sharpest.turn + 1, label: 'върхов', good: true });                            // top move
+      // (no „върхов" marker — a single sharp DECISION doesn't map onto the running optimal-%
+      //  line, so it landed at confusing spots; the chart now flags only the costly slips)
     } else if (tab === 'luck' && a && a.turns && !a.manual) {
       a.turns.forEach(function (td) {
         if (td.luck >= 6) out.push({ round: td.turn + 1, label: '+' + Math.round(td.luck), good: true });
@@ -3700,7 +3710,7 @@ body.modal-open{ overflow:hidden; }
     var ticks = '', per = iw / maxR, step = per >= 13 ? 1 : Math.ceil(13 / per);
     for (var tk = step; tk <= maxR; tk += step) ticks += '<text x="' + x(tk) + '" y="' + (H - 6) + '" class="pc-tick" text-anchor="middle">' + tk + '</text>';
     var xlab = ticks + '<text x="2" y="' + (H - 6) + '" class="pc-axis" text-anchor="start">ход</text>';
-    var title = luckTab ? 'Късмет по ходове' : skillTab ? 'Оптимална игра' : 'Ход на битката';
+    var title = luckTab ? 'Късмет по ходове' : skillTab ? 'Умение по ходове' : 'Точки по ходове';
     var open = !summary || summary.chartOpen !== false;
     el.innerHTML = '<details class="pc-details"' + (open ? ' open' : '') + '><summary class="pc-title">' + title + '</summary>'
       + '<div class="pc-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg" preserveAspectRatio="xMidYMid meet">'
