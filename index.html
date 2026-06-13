@@ -547,7 +547,6 @@ body.modal-open{ overflow:hidden; }
 .mtile .mlab{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
 .mtile.low .mlab{ font-size:9px; }
 .mtile .mval{ font-family:var(--gen-font-display); font-weight:700; font-size:13px; font-variant-numeric:tabular-nums; }
-.mtile.rec{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.06); }   /* record cell: let the player tint read */
 /* forfeited (0) cell on the Дъска board: greyed out entirely — not red (too loud) */
 .mtile.forfeit{ background:rgba(150,150,138,.18); color:var(--gen-muted); border-color:var(--gen-ink-line); box-shadow:inset 0 0 0 2px rgba(255,255,255,.05); }
 .mtile.forfeit .mval, .mtile.forfeit .mlab{ color:var(--gen-muted); }
@@ -4222,7 +4221,8 @@ body.modal-open{ overflow:hidden; }
       var ff = f && scores[c.key] === 0 ? ' forfeit' : '';   // a sacrificed (0) cell is greyed out
       var isRec = f && recKeys && recKeys[c.key];             // this player holds the highest result here
       // slightly tint the whole cell in the player's colour (not just the number)
-      var mstyle = isRec && myCol ? ' style="background:' + rgba(myCol, 0.22) + ';border-color:' + myCol + '"' : '';
+      // keep the cell as-is, just a slight player-colour accent on the border (not a fill)
+      var mstyle = isRec && myCol ? ' style="border-color:' + myCol + ';box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 0 0 1.5px ' + rgba(myCol, 0.5) + '"' : '';
       return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + ff + (isRec ? ' rec' : '') + '"' + mstyle + '><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] + 'т.' : '–') + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
