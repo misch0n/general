@@ -198,9 +198,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .err{ color:var(--gen-alert); font-size:12px; min-height:16px; font-family:var(--gen-font-display); letter-spacing:.5px; }
 
 /* ===== overlays ===== */
-.overlay{ position:fixed; inset:0; background:rgba(8,10,5,.78); backdrop-filter:blur(3px); display:grid; place-items:center; padding:18px; z-index:40; }
+.overlay{ position:fixed; inset:0; background:rgba(8,10,5,.78); backdrop-filter:blur(3px); display:grid; place-items:center; padding:18px; z-index:40; overscroll-behavior:contain; }
 #menuModal{ z-index:60; } /* always above floating bubbles/penalties */
-.modal{ width:340px; max-width:100%; max-height:88vh; overflow:auto; background:var(--gen-ink); border:2px solid var(--gen-brass); border-radius:14px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); }
+.modal{ width:340px; max-width:100%; max-height:88vh; overflow:auto; overscroll-behavior:contain; background:var(--gen-ink); border:2px solid var(--gen-brass); border-radius:14px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); }
+/* lock the page behind any open overlay so only the panel scrolls */
+body.modal-open{ overflow:hidden; }
 .modal h2{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.5px; color:var(--gen-brass); font-size:18px; margin:0 0 12px; }
 .modal .sub{ color:var(--gen-label); font-size:12px; margin:0 0 14px; }
 .rankrow{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:7px; }
@@ -585,6 +587,14 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   font-weight:700; font-size:11px; letter-spacing:.3px; color:var(--gen-ink); background:rgba(0,0,0,.18); border:1.5px solid var(--gen-brass-stroke); }
 .ownerinfo .oi-skip.on{ background:var(--gen-ink); color:var(--gen-brass-bright); }
 .ownerstar.skipped{ opacity:.4; }
+/* card colour button + shared swatch popover (custom — no system colour dialog) */
+.cbtn{ width:30px; height:30px; flex:none; border-radius:8px; padding:0; cursor:pointer; border:2px solid var(--gen-ink-line);
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.28); }
+.cbtn:focus-visible{ outline:none; border-color:var(--gen-brass); }
+.colorpop{ position:fixed; z-index:60; padding:10px; border-radius:11px; background:var(--gen-ink); border:2px solid var(--gen-brass-stroke);
+  box-shadow:0 10px 26px rgba(0,0,0,.55); display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+.colorpop .pswatch{ width:24px; height:24px; border-radius:50%; padding:0; cursor:pointer; border:2px solid transparent; }
+.colorpop .pswatch.on{ border-color:var(--gen-text); box-shadow:0 0 0 2px var(--gen-brass); }
 .ownername{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
 .ownername:focus{ outline:none; border-color:var(--gen-brass); }
@@ -893,6 +903,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   <div id="comboTip" class="combotip hidden"></div>
   <div id="fxBubble" class="fxbubble hidden"></div>
   <div id="guideTip" class="guidetip hidden"></div>
+  <div id="colorPop" class="colorpop hidden"></div>
   <div id="youLose" class="youlose hidden"><span>ГУБИШ!</span></div>
 </div>
 
@@ -1169,7 +1180,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
   // глупости (profanity) ON by default = NSFW words allowed; OFF = censored to the SFW set
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#c8a64b' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1258,7 +1269,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     for (var i = 0; i < QMARK.length; i++) s += '<span class="' + (QMARK[i] ? 'on' : '') + '"></span>';
     return '<span class="ghostq">' + s + '</span>';
   }
-  var PRESET_COLORS = ['#c8a64b', '#b23a2e', '#3f6b3a', '#2f4a6b', '#9a6b2f', '#7a4632', '#5f7a3a', '#a23a6b'];
+  // 14 distinct, well-spaced colours (custom picker — no system colour dialog)
+  var PRESET_COLORS = ['#d4a02e', '#e07a2e', '#cf4f2e', '#c0392b', '#c2407a', '#9b3fb0', '#6a52c0',
+                       '#3f5fc0', '#2f86c8', '#2aa0a0', '#2e9e5b', '#6aa83a', '#a39a2e', '#9a6b3a'];
   // pick a preset colour not used by anyone (except `except`); fall back to prefer/first
   function pickFreeColor(except, prefer) {
     var used = setupPlayers.filter(function (p) { return p !== except; }).map(function (p) { return (p.color || '').toLowerCase(); });
@@ -1461,9 +1474,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       card.appendChild(top);
 
       var row = document.createElement('div'); row.className = 'prow2';
-      var color = document.createElement('input'); color.type = 'color'; color.value = p.color;
-      color.oninput = function () { p.color = color.value; };
-      color.onchange = function () { p.color = color.value; renderSetup(); };   // dedupe against the others on commit
+      var color = document.createElement('button'); color.type = 'button'; color.className = 'cbtn';
+      color.style.background = p.color; color.title = 'Избери цвят'; color.setAttribute('aria-label', 'Избери цвят');
+      color.onclick = function (e) { e.stopPropagation(); showColorPop(color, p); };   // custom swatch popover — no system dialog
 
       // gender switch (мъжко / то / женско) — changes the name + callouts
       var gsw = document.createElement('div'); gsw.className = 'gender';
@@ -3792,6 +3805,23 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   $('rpSpeed').onclick = function () { replay.gear = (replay.gear + 1) % RP_GEARS.length; syncSpeedBtn(); if (replay.playing) rpSchedule(); };
   $('rpFilterBtn').onclick = function (e) { e.stopPropagation(); buildFilterMenu(); $('rpFilterMenu').classList.toggle('hidden'); };
   document.addEventListener('click', function (e) { if (!$('rpFilterMenu').classList.contains('hidden') && !$('replayInfo').contains(e.target)) $('rpFilterMenu').classList.add('hidden'); });
+  // click anywhere outside the colour popover closes it (swatches + the card button stopPropagation)
+  document.addEventListener('click', function () { if (!$('colorPop').classList.contains('hidden')) hideColorPop(); });
+  // changing focus away from the window dismisses transient popovers/explainers
+  function dismissTransients() {
+    ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu'].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.classList.add('hidden');
+    });
+  }
+  window.addEventListener('blur', dismissTransients);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) dismissTransients(); });
+  // lock the page behind any open overlay so only the panel itself scrolls
+  (function () {
+    function syncModalLock() { document.body.classList.toggle('modal-open', !!document.querySelector('.overlay:not(.hidden)')); }
+    var mo = new MutationObserver(syncModalLock);
+    document.querySelectorAll('.overlay').forEach(function (o) { mo.observe(o, { attributes: true, attributeFilter: ['class'] }); });
+    syncModalLock();
+  })();
   function closeReplay() { if (replay) rpPause(); $('replayModal').classList.add('hidden'); openHistory(); }
   $('replayClose').onclick = closeReplay;
   $('replayModal').onclick = function (e) { if (e.target === $('replayModal')) closeReplay(); };
@@ -4198,6 +4228,37 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     b.style.top = (below + b.offsetHeight < window.innerHeight - 8 ? below : r.top - b.offsetHeight - 8) + 'px';
   }
   $('ownerInfo').onclick = function () { $('ownerInfo').classList.add('hidden'); };
+  // shared 14-swatch colour popover for the setup cards (replaces the system <input type=color>)
+  function hideColorPop() { $('colorPop').classList.add('hidden'); }
+  function showColorPop(anchor, p) {
+    var b = $('colorPop');
+    if (!b.classList.contains('hidden') && b._for === p) { hideColorPop(); return; }
+    b._for = p;
+    var cur = (p.color || '').toLowerCase();
+    b.innerHTML = PRESET_COLORS.map(function (c) {
+      return '<button type="button" class="pswatch' + (c.toLowerCase() === cur ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>';
+    }).join('');
+    b.querySelectorAll('.pswatch').forEach(function (sw) {
+      sw.onclick = function (e) {
+        e.stopPropagation();
+        var c = sw.getAttribute('data-c'), owner = setupPlayers.length ? ownerOf(setupPlayers) : null;
+        hideColorPop();
+        if (owner && p !== owner && (owner.color || '').toLowerCase() === c.toLowerCase()) {
+          p.color = pickFreeColor(p, c);   // owner keeps its colour; picker takes the nearest free one
+        } else {
+          p.color = c;                      // honour the pick — bump any OTHER seat that held it
+          setupPlayers.forEach(function (q) { if (q !== p && q !== owner && (q.color || '').toLowerCase() === c.toLowerCase()) q.color = pickFreeColor(q); });
+        }
+        dedupeColors();   // final safety (owner reserved first)
+        renderSetup();
+      };
+    });
+    b.classList.remove('hidden');
+    var r = anchor.getBoundingClientRect();
+    b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
+    var below = r.bottom + 8;
+    b.style.top = (below + b.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - b.offsetHeight - 8)) + 'px';
+  }
   $('ownerName').oninput = function () {
     settings.ownerName = $('ownerName').value; saveSettings();
     if (settings.useOwnerName && !$('setup').classList.contains('hidden')) renderSetup();

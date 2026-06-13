@@ -389,7 +389,8 @@
     }
   };
   Session.prototype._nextId = function () { var used = {}; this.roster.forEach(function (p) { used[p.id] = 1; }); var i = 1; while (used[i]) i++; return i; };
-  var PALETTE = ['#c8a64b', '#b23a2e', '#3f6b3a', '#2f4a6b', '#9a6b2f', '#7a4632', '#5f7a3a', '#a23a6b'];
+  var PALETTE = ['#d4a02e', '#e07a2e', '#cf4f2e', '#c0392b', '#c2407a', '#9b3fb0', '#6a52c0',
+    '#3f5fc0', '#2f86c8', '#2aa0a0', '#2e9e5b', '#6aa83a', '#a39a2e', '#9a6b3a'];
   Session.prototype._uniqueColor = function (c) {
     var used = this.roster.map(function (p) { return (p.color || '').toLowerCase(); });
     if (used.indexOf((c || '').toLowerCase()) < 0) return c;
