@@ -661,11 +661,13 @@ body.modal-open{ overflow:hidden; }
 /* §2.4 percentile tag on archive rows */
 .hg-pct{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:9px; background:rgba(255,255,255,.08); color:var(--gen-label); }
 .hg-pct.hi{ background:rgba(75,140,60,.25); color:#9bd17e; } .hg-pct.lo{ background:rgba(178,58,46,.22); color:#e88; }
-.histform{ display:flex; justify-content:space-between; gap:4px; margin-top:6px; }
+/* recent battles row: most recent LEFT. <10 → left-aligned; exactly 10 → spread evenly */
+.histform{ display:flex; justify-content:flex-start; gap:6px; margin-top:6px; }
+.histform.full{ justify-content:space-between; gap:4px; }
 .histform i{ width:18px; height:18px; display:grid; place-items:center; border-radius:4px; font-size:10px; font-weight:700; font-style:normal; }
 .histform i.w{ background:rgba(75,140,60,.3); color:#9bd17e; } .histform i.l{ background:rgba(178,58,46,.25); color:#e88; }
-/* last-battles placement chips, medal-coded */
-.histform .rk{ width:22px; height:22px; border-radius:50%; font-size:11px; font-variant-numeric:tabular-nums; }
+/* last-battles placement chips, medal-coded — squares */
+.histform .rk{ width:22px; height:22px; border-radius:5px; font-size:11px; font-variant-numeric:tabular-nums; }
 .histform .rk.r1{ background:#c8a64b; color:#1a1a12; }
 .histform .rk.r2{ background:#c0c4cc; color:#1a1a12; }
 .histform .rk.r3{ background:#b87333; color:#fff; }
@@ -3494,7 +3496,7 @@ body.modal-open{ overflow:hidden; }
     m.board.forEach(function (b) { byKey[b.key] = b; });
     function tile(c) {
       var b = byKey[c.key], holder = b.recPi >= 0 ? players[b.recPi] : null;
-      var pct = Math.round(100 * b.hit / b.n), hi = b.recVal >= 0 ? b.recVal : '–';
+      var pct = Math.round(100 * b.hit / b.n), hi = b.recVal >= 0 ? b.recVal + 'т.' : '–';
       var muted = holder && hl >= 0 && b.recPi !== hl;
       var style = holder && !muted ? ' style="background:' + rgba(holder.color, 0.26) + ';border-color:' + holder.color + '"' : '';
       return '<div class="cgtile' + (holder ? '' : ' none') + (muted ? ' dim' : '') + '"' + style + '>'
@@ -4143,8 +4145,9 @@ body.modal-open{ overflow:hidden; }
     // name: the settings battle-name, else „Старшина“ (no random game name, no ★ token)
     var name = (settings.useOwnerName && settings.ownerName.trim()) || 'Старшина';
     var rank = G.rankForAccuracy(c.avgAcc);
-    // last 10 battles, the placement number colour-coded (gold/silver/bronze/grey)
-    var form = data.slice(-10).map(function (d) {
+    // last 10 battles, MOST RECENT LEFT, placement colour-coded (gold/silver/bronze/grey)
+    var recent = data.slice(-10).reverse();
+    var form = recent.map(function (d) {
       var cls = d.place === 1 ? 'r1' : d.place === 2 ? 'r2' : d.place === 3 ? 'r3' : 'r4';
       return '<i class="rk ' + cls + '">' + d.place + '</i>';
     }).join('');
@@ -4157,18 +4160,17 @@ body.modal-open{ overflow:hidden; }
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     // analysis-category breakdown (colour-coded labels) sits between the name and recent battles
     h += careerAverages(c.report);
-    h += '<div class="histline">Последни битки:</div><div class="histform">' + (form || '—') + '</div>';
-    h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * c.wins / n) + '%</b> · средно място <b>' + c.avgPlace.toFixed(1) + '</b></div>';
-    h += '<div class="histline">Личен рекорд: <b>' + c.best + '</b> т. · среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'
-      + (c.avgLuck != null ? ' · среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>' : '') + '</div>';
-    h += '<div class="histline">Хвърлени генерали: <b>' + c.generals + '</b> от ' + n + ' битки'
-      + (favBl ? ' · любима издънка: <b>' + esc(CAT_LABEL[favBl] || favBl) + '</b> (×' + favN + ')' : '') + '</div>';
+    h += '<div class="histline">Последни битки:</div><div class="histform' + (recent.length >= 10 ? ' full' : '') + '">' + (form || '—') + '</div>';
+    // career stat lines — each starts with a colour-coded term, its parts split onto their own rows
+    h += statRows('Чин', RC.skill, ['по средно умение <b>' + esc(rank) + '</b>', 'процент победи <b>' + Math.round(100 * c.wins / n) + '%</b>', 'средно място <b>' + c.avgPlace.toFixed(1) + '</b>']);
+    h += statRows('Личен рекорд', RC.upper, ['<b>' + c.best + '</b> т.', 'среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'].concat(c.avgLuck != null ? ['среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>'] : []));
+    h += statRows('Генерали', RC.gen, ['<b>' + c.generals + '</b> от ' + n + ' битки'].concat(favBl ? ['любима издънка <b>' + esc(CAT_LABEL[favBl] || favBl) + '</b> (×' + favN + ')'] : []));
     var consTag = c.scoreSd < 18 ? 'стабилен' : c.scoreSd > 32 ? 'нестабилен' : 'умерен';
-    h += '<div class="histline">Постоянство: <b>±' + Math.round(c.scoreSd) + ' т.</b> резултат · <b>±' + Math.round(c.accSd) + '%</b> точност <span class="hmuted">(' + consTag + ')</span></div>';
+    h += statRows('Постоянство', RC.stage, ['резултат <b>±' + Math.round(c.scoreSd) + ' т.</b>', 'точност <b>±' + Math.round(c.accSd) + '%</b>', '<span class="hmuted">' + consTag + '</span>']);
     if (c.accSlope != null) {
       var arrow = c.accSlope > 0.3 ? '↗' : c.accSlope < -0.3 ? '↘' : '→';
       var word = c.accSlope > 0.3 ? 'качваш се' : c.accSlope < -0.3 ? 'спадаш' : 'стабилно';
-      h += '<div class="histline">Развитие: <b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b> <span class="hmuted">(' + word + ')</span></div>';
+      h += statRows('Развитие', RC.nerves, ['<b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b>', '<span class="hmuted">' + word + '</span>']);
     }
     var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
     if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎖 За повишение наблегни на <b>' + esc(worst.label) + '</b> — там пробивът ти в строя е най-голям (средно −' + worst.avgLeak.toFixed(1) + ' т. на игра). Категорията, която да тренираш.</div>';
@@ -4187,7 +4189,7 @@ body.modal-open{ overflow:hidden; }
       var leak = x.avgLeak, cls = leak <= 0.3 ? ' good' : leak > 1 ? ' bad' : '';   // green / grey / red
       return '<div class="cgtile' + cls + '"><span class="cg-lab">' + esc(cat.label) + '</span>'
         + '<span class="cg-pct">' + Math.round(x.hitRate * 100) + '%</span>'
-        + '<span class="cg-rec">' + (x.rec || '—') + '</span>'
+        + '<span class="cg-rec">' + (x.rec ? x.rec + 'т.' : '—') + '</span>'
         + '<span class="cg-leak">−' + leak.toFixed(1) + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (cc) { return cc.group === 'upper'; }).map(tile).join('');
