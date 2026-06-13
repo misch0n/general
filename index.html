@@ -740,8 +740,15 @@ body.modal-open{ overflow:hidden; }
 .histform .rk.r4{ background:rgba(255,255,255,.12); color:var(--gen-muted); }
 .noowner{ text-align:center; padding:16px 12px; color:var(--gen-muted); font-size:12.5px; line-height:1.5; }
 .noowner .nohd{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:14px; margin-bottom:6px; }
-.histgame{ display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
+.histgame{ position:relative; display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:6px; color:var(--gen-text); }
+/* inline delete confirmation over a history row */
+.hg-confirm{ position:absolute; inset:0; display:flex; align-items:center; gap:7px; padding:0 11px; border-radius:9px;
+  background:rgba(24,18,12,.96); border:1px solid var(--gen-alert-line); }
+.hg-confirm > span{ flex:1; font-size:12px; color:#e8b0a8; }
+.hg-confirm button{ flex:none; padding:6px 12px; border-radius:7px; font-family:var(--gen-font-display); font-weight:700; font-size:11px; letter-spacing:.3px; cursor:pointer; }
+.hgc-yes{ color:#fff; background:rgba(178,58,46,.55); border:1px solid var(--gen-alert-line); }
+.hgc-no{ color:var(--gen-text); background:var(--gen-pill); border:1px solid var(--gen-pill-line); }
 .histgame:hover{ border-color:var(--gen-brass); }
 .histgame .hg-count{ min-width:32px; height:30px; flex:none; padding:0 5px; display:grid; place-items:center; border-radius:6px; font-family:var(--gen-font-display);
   font-weight:700; font-size:14px; background:var(--gen-pill); color:var(--gen-text); border:1px solid var(--gen-pill-line); font-variant-numeric:tabular-nums; }
@@ -758,8 +765,17 @@ body.modal-open{ overflow:hidden; }
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:8px; padding:8px 10px; }
 .importarea:focus{ outline:none; border-color:var(--gen-brass); }
 .importowner{ margin-top:10px; }
-.importowner .iolbl{ font-family:var(--gen-font-display); font-weight:700; font-size:12px; color:var(--gen-brass); margin-bottom:5px; }
-.importowner .iorow{ display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:13px; color:var(--gen-text); cursor:pointer; }
+.importowner .iolbl{ font-family:var(--gen-font-display); font-weight:700; font-size:12px; color:var(--gen-brass); margin-bottom:5px; text-align:center; }
+.importowner .iogrid{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:8px 0; }
+/* owner-pick chips — themed like the summary medals, but they select (one at a time) */
+.iochip{ display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border-radius:10px; cursor:pointer; -webkit-appearance:none; appearance:none;
+  background:rgba(255,255,255,.04); border:1.5px solid var(--c); box-shadow:inset 0 0 12px -8px var(--c);
+  font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.2px; color:var(--c); }
+.iochip .iodot{ width:12px; height:12px; border-radius:50%; background:var(--c); flex:none; }
+.iochip.on{ background:var(--c); color:var(--gen-ink); box-shadow:0 0 0 2px var(--c); }
+.iochip.on .iodot{ background:var(--gen-ink); }
+.iochip.io-none{ color:var(--gen-muted); border-color:var(--gen-pill-line); }
+.iochip.io-none.on{ background:var(--gen-muted); color:var(--gen-ink); box-shadow:0 0 0 2px var(--gen-muted); }
 .importerr{ margin-top:9px; padding:8px 10px; border-radius:8px; font-size:12px; color:#e8807a; background:rgba(178,58,46,.16); border:1px solid var(--gen-alert-line); }
 .exportcopied{ margin-top:8px; text-align:center; font-size:12px; font-weight:700; color:#9bd17e; }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
@@ -4531,8 +4547,17 @@ body.modal-open{ overflow:hidden; }
       row.onclick = function () { var rec = find(); if (rec) openHistoryGame(rec); };
       row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
       row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) chooseMethod('Изнеси играта', function () { exportGame(rec); }, function () { acousticSend(rec); }); };
-      row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
+      row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); confirmDeleteGame(row, id); };
     });
+  }
+  function confirmDeleteGame(row, id) {
+    if (row.querySelector('.hg-confirm')) return;
+    var c = document.createElement('div'); c.className = 'hg-confirm';
+    c.innerHTML = '<span>Изтрий тази битка?</span><button class="hgc-no">Не</button><button class="hgc-yes">🔥 Да</button>';
+    c.onclick = function (e) { e.stopPropagation(); };
+    c.querySelector('.hgc-yes').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
+    c.querySelector('.hgc-no').onclick = function (e) { e.stopPropagation(); c.remove(); };
+    row.appendChild(c);
   }
   function deleteGame(id) {
     persistHistory(loadHistory().filter(function (r) { return r.id !== id; }));
@@ -4581,9 +4606,13 @@ body.modal-open{ overflow:hidden; }
   function showImportOwner(rec) {
     importParsed = rec;
     $('importText').classList.add('hidden');
-    $('importOwner').innerHTML = '<div class="iolbl">Кой играч си ти (старшината)?</div>'
-      + rec.players.map(function (p, i) { return '<label class="iorow"><input type="radio" name="impown" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + esc(p.name) + '</label>'; }).join('')
-      + '<label class="iorow"><input type="radio" name="impown" value="-1"> Никой (само в архива)</label>';
+    var chips = rec.players.map(function (p, i) {
+      return '<button type="button" class="iochip' + (i === 0 ? ' on' : '') + '" data-val="' + i + '" style="--c:' + p.color + '"><span class="iodot"></span>' + esc(p.name) + '</button>';
+    }).join('') + '<button type="button" class="iochip io-none" data-val="-1"><span class="iodot"></span>Никой (само в архива)</button>';
+    $('importOwner').innerHTML = '<div class="iolbl">Кой играч си ти (старшината)?</div><div class="iogrid">' + chips + '</div>';
+    $('importOwner').querySelectorAll('.iochip').forEach(function (b) {
+      b.onclick = function () { $('importOwner').querySelectorAll('.iochip').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); };
+    });
     $('importOwner').classList.remove('hidden');
     $('importDo').textContent = 'Импортирай';
     $('importDo').classList.remove('hidden');
@@ -4603,8 +4632,8 @@ body.modal-open{ overflow:hidden; }
   }
   // step 3: assign the chosen owner and file the (already sanitised) record
   function fileImportedRecord() {
-    var sel = $('importOwner').querySelector('input[name="impown"]:checked');
-    var owner = sel ? +sel.value : -1, rec = importParsed;
+    var sel = $('importOwner').querySelector('.iochip.on');
+    var owner = sel ? +sel.getAttribute('data-val') : -1, rec = importParsed;
     rec.players.forEach(function (p, i) { p.owner = (i === owner); });
     rec.ownerSkipped = owner < 0;
     rec.id = 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4);
