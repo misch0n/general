@@ -413,10 +413,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .catgrid .cgtile{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 3px; border-radius:5px;
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); text-align:center; min-width:0; }
 .catgrid .cgtile.none{ opacity:.45; }
+.catgrid .cgtile.good{ background:rgba(123,184,90,.16); border-color:rgba(123,184,90,.5); }
+.catgrid .cgtile.bad{ background:rgba(224,85,69,.18); border-color:rgba(224,85,69,.55); }
 .catgrid .cg-lab{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:.2px;
   color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 .catgrid .cg-pct{ font-size:9px; color:var(--gen-muted); font-variant-numeric:tabular-nums; line-height:1.3; }
-.catgrid .cg-rec{ font-family:var(--gen-font-display); font-weight:800; font-size:15px; color:var(--gen-text); font-variant-numeric:tabular-nums; line-height:1.1; }
+.catgrid .cg-rec{ font-family:var(--gen-font-display); font-weight:800; font-size:15px; color:var(--gen-text); font-variant-numeric:tabular-nums; line-height:1.05; }
+.catgrid .cg-leak{ font-size:8.5px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+/* career category read-tips, hidden behind a ? */
+.cc-help{ display:inline-block; }
+.cc-help summary.cc-q{ display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; cursor:pointer; list-style:none;
+  font-family:var(--gen-font-body); font-weight:700; font-size:10px; color:var(--gen-ink); background:var(--gen-brass); vertical-align:1px; }
+.cc-help summary::-webkit-details-marker{ display:none; }
+.cc-tips{ margin-top:6px; padding:8px 10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line);
+  font-size:10.5px; color:var(--gen-label); font-weight:400; text-transform:none; letter-spacing:0; line-height:1.5; }
+.cc-tips > div{ padding:1px 0; }
+.cc-tips b{ color:var(--gen-text); } .cc-g{ color:#9bd17e !important; } .cc-n{ color:var(--gen-muted) !important; } .cc-r{ color:#e8807a !important; }
 .catboard .cb-master{ margin-top:10px; text-align:center; font-size:12px; color:var(--gen-label); }
 /* §1.7 luck panel */
 /* §1.6 chart swing label */
@@ -455,6 +467,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .mtile .mlab{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
 .mtile.low .mlab{ font-size:9px; }
 .mtile .mval{ font-family:var(--gen-font-display); font-weight:700; font-size:13px; font-variant-numeric:tabular-nums; }
+.mtile.forfeit{ border-color:rgba(224,85,69,.6); box-shadow:inset 0 0 0 2px rgba(224,85,69,.35); }
+.mtile.forfeit .mval{ color:#c23a2e; }
 .mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
 
 /* unrolled placeholder dice (tap to make the first throw) */
@@ -609,9 +623,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* §2.4 percentile tag on archive rows */
 .hg-pct{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:9px; background:rgba(255,255,255,.08); color:var(--gen-label); }
 .hg-pct.hi{ background:rgba(75,140,60,.25); color:#9bd17e; } .hg-pct.lo{ background:rgba(178,58,46,.22); color:#e88; }
-.histform{ display:flex; gap:4px; margin-top:6px; }
+.histform{ display:flex; justify-content:space-between; gap:4px; margin-top:6px; }
 .histform i{ width:18px; height:18px; display:grid; place-items:center; border-radius:4px; font-size:10px; font-weight:700; font-style:normal; }
 .histform i.w{ background:rgba(75,140,60,.3); color:#9bd17e; } .histform i.l{ background:rgba(178,58,46,.25); color:#e88; }
+/* last-battles placement chips, medal-coded */
+.histform .rk{ width:22px; height:22px; border-radius:50%; font-size:11px; font-variant-numeric:tabular-nums; }
+.histform .rk.r1{ background:#c8a64b; color:#1a1a12; }
+.histform .rk.r2{ background:#c0c4cc; color:#1a1a12; }
+.histform .rk.r3{ background:#b87333; color:#fff; }
+.histform .rk.r4{ background:rgba(255,255,255,.12); color:var(--gen-muted); }
 .noowner{ text-align:center; padding:16px 12px; color:var(--gen-muted); font-size:12.5px; line-height:1.5; }
 .noowner .nohd{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:14px; margin-bottom:6px; }
 .histgame{ display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
@@ -3560,7 +3580,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       'край' + rng(1 + e.n + mid.n, lt.n) + ' — <b class="nn">' + stageLoss(lt) + '</b> т./ход' ]);
 
     // player's end-game scorecard (collapsed by default) — exact board at a glance
-    html += '<details class="evboard"><summary>Таблото</summary>' + replayBoardHTML(fp.scores) + '</details>';
+    html += '<details class="evboard"><summary>Дъска</summary>' + replayBoardHTML(fp.scores) + '</details>';
 
     // §7 turn-by-turn breakdown. Row: [Хn][combo] | [points][luck/decision EV][quality thumb]
     html += '<details class="evturns"><summary>Ход по ход</summary>';
@@ -3690,7 +3710,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function replayBoardHTML(scores, hlKey) {
     function tile(c, up) {
       var f = typeof scores[c.key] === 'number', hl = c.key === hlKey ? ' hl' : '';
-      return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + '"><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] : '–') + '</span></div>';
+      var ff = f && scores[c.key] === 0 ? ' forfeit' : '';   // a sacrificed (0) cell reads red
+      return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + ff + '"><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] : '–') + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
     var low = G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).map(function (c) { return tile(c, false); }).join('');
@@ -3858,13 +3879,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     // name: the settings battle-name, else „Старшина“ (no random game name, no ★ token)
     var name = (settings.useOwnerName && settings.ownerName.trim()) || 'Старшина';
     var rank = G.rankForAccuracy(c.avgAcc);
-    var form = data.slice(-7).map(function (d) { return d.place === 1 ? '<i class="w">П</i>' : '<i class="l">' + d.place + '</i>'; }).join('');
+    // last 10 battles, the placement number colour-coded (gold/silver/bronze/grey)
+    var form = data.slice(-10).map(function (d) {
+      var cls = d.place === 1 ? 'r1' : d.place === 2 ? 'r2' : d.place === 3 ? 'r3' : 'r4';
+      return '<i class="rk ' + cls + '">' + d.place + '</i>';
+    }).join('');
 
-    // collapsed: just the headline trio; everything else lives in the expandable body
+    // collapsed: just the headline trio; everything else lives in the expandable body.
+    // the owner name carries the старшина's default colour.
     var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
-      + '<span class="oname">' + esc(name) + '</span>'
+      + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">' + esc(name) + '</span>'
       + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
+    // analysis-category breakdown (colour-coded labels) sits between the name and recent battles
+    h += careerAverages(c.report);
+    h += '<div class="histline">Последни битки:</div><div class="histform">' + (form || '—') + '</div>';
     h += '<div class="histline">Чин по средно умение: <b>' + esc(rank) + '</b> · процент победи <b>' + Math.round(100 * c.wins / n) + '%</b> · средно място <b>' + c.avgPlace.toFixed(1) + '</b></div>';
     h += '<div class="histline">Личен рекорд: <b>' + c.best + '</b> т. · среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'
       + (c.avgLuck != null ? ' · среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>' : '') + '</div>';
@@ -3877,30 +3906,35 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       var word = c.accSlope > 0.3 ? 'качваш се' : c.accSlope < -0.3 ? 'спадаш' : 'стабилно';
       h += '<div class="histline">Развитие: <b>' + (c.accSlope >= 0 ? '+' : '') + c.accSlope.toFixed(1) + '%/битка ' + arrow + '</b> <span class="hmuted">(' + word + ')</span></div>';
     }
-    h += '<div class="histline">Последна форма:</div><div class="histform">' + (form || '—') + '</div>';
     var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
-    if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎯 Кариерата ти изпуска най-много в <b>' + esc(worst.label) + '</b> — средно −' + worst.avgLeak.toFixed(1) + ' т. на игра. Това е боксът за трениране.</div>';
+    if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎖 За повишение наблегни на <b>' + esc(worst.label) + '</b> — там пробивът ти в строя е най-голям (средно −' + worst.avgLeak.toFixed(1) + ' т. на игра). Категорията, която да тренираш.</div>';
     // category board (same layout as the end-game Категории)
-    h += '<div class="ho-sechd">Категории</div>' + careerCatBoard(c);
-    // averages of every per-player report stat
-    h += '<div class="ho-sechd">Средно от рапорта (за игра)</div>' + careerAverages(c.report);
+    h += careerCatBoard(c);
     h += '</div></details>';
     return h;
   }
-  // career category board — end-game Категории layout; tile = hit% + personal record, tinted red by EV-leak
+  // career category board — tile = hit% + record + avg EV-leak, tinted green/grey/red
+  // by how cleanly you play it. The read tips hide behind a ? to save space.
   function careerCatBoard(c) {
     var byKey = {}; c.catList.forEach(function (x) { byKey[x.key] = x; });
     function tile(cat) {
       var x = byKey[cat.key];
-      if (!x) return '<div class="cgtile none"><span class="cg-lab">' + esc(cat.label) + '</span><span class="cg-pct">—</span><span class="cg-rec">—</span></div>';
-      var leak = x.avgLeak, a = Math.min(0.4, leak * 0.13);
-      var style = leak > 0.4 ? ' style="background:rgba(224,85,69,' + a.toFixed(2) + ');border-color:rgba(224,85,69,.55)"' : '';
-      return '<div class="cgtile"' + style + '><span class="cg-lab">' + esc(cat.label) + '</span>'
-        + '<span class="cg-pct">' + Math.round(x.hitRate * 100) + '%</span><span class="cg-rec">' + (x.rec || '—') + '</span></div>';
+      if (!x) return '<div class="cgtile none"><span class="cg-lab">' + esc(cat.label) + '</span><span class="cg-pct">—</span><span class="cg-rec">—</span><span class="cg-leak">—</span></div>';
+      var leak = x.avgLeak, cls = leak <= 0.3 ? ' good' : leak > 1 ? ' bad' : '';   // green / grey / red
+      return '<div class="cgtile' + cls + '"><span class="cg-lab">' + esc(cat.label) + '</span>'
+        + '<span class="cg-pct">' + Math.round(x.hitRate * 100) + '%</span>'
+        + '<span class="cg-rec">' + (x.rec || '—') + '</span>'
+        + '<span class="cg-leak">−' + leak.toFixed(1) + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (cc) { return cc.group === 'upper'; }).map(tile).join('');
     var low = G.CATEGORIES.filter(function (cc) { return cc.group === 'lower'; }).map(tile).join('');
-    return '<div class="cb-legend">всяка клетка: <b>% вкарвания</b> · <b>твоят рекорд</b> · червено = теч на EV</div>'
+    var help = '<details class="cc-help"><summary class="cc-q" title="Как се чете?">?</summary><div class="cc-tips">'
+      + '<div><b>%</b> — колко често вкарваш категорията</div>'
+      + '<div><b>число</b> — твоят личен рекорд</div>'
+      + '<div><b>−EV</b> — среден теч: колко точки изпускаш на ход</div>'
+      + '<div>цвят: <b class="cc-g">зелено</b> играеш я чисто · <b class="cc-n">сиво</b> средно · <b class="cc-r">червено</b> теч</div>'
+      + '</div></details>';
+    return '<div class="ho-sechd">Категории ' + help + '</div>'
       + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>';
   }
   // career averages of the per-player report stats (mirrors renderReport's stat lines)
