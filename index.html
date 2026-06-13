@@ -660,6 +660,25 @@ body.modal-open{ overflow:hidden; }
 .ownertog{ border-bottom:none !important; padding:10px 0 0 !important; }
 .clearconfirm{ margin-top:8px; padding:10px; border:1px solid var(--gen-alert-line); border-radius:8px; background:rgba(178,58,46,.12); }
 .clearconfirm span{ display:block; font-size:12px; color:#e8b0a8; margin-bottom:8px; }
+/* localStorage fullness gauge */
+.storeinfo{ font-size:11px; color:var(--gen-muted); text-align:center; }
+.storeinfo b{ color:var(--gen-label); }
+.storeinfo .sbar{ display:block; height:6px; border-radius:4px; background:rgba(255,255,255,.08); margin-top:5px; overflow:hidden; }
+.storeinfo .sbar i{ display:block; height:100%; background:var(--gen-brass); transition:width .2s; }
+.storeinfo .sbar i.hi{ background:#e0a05a; } .storeinfo .sbar i.crit{ background:#e05545; }
+/* bulk-clear game picker */
+.clearpanel{ margin-top:8px; padding:10px; border:1px solid var(--gen-pill-line); border-radius:10px; background:rgba(0,0,0,.2); }
+.clearpanel .cp-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:12px; color:var(--gen-label); }
+.cp-selbtns{ display:flex; gap:5px; flex:none; }
+.cp-list{ max-height:210px; overflow:auto; display:flex; flex-direction:column; gap:4px; margin-bottom:8px; overscroll-behavior:contain; }
+.cp-row{ display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:7px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); font-size:12px; cursor:pointer; }
+.cp-row input{ flex:none; width:16px; height:16px; accent-color:var(--gen-brass); }
+.cp-row .cp-when{ flex:1; min-width:0; color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cp-row .cp-meta{ flex:none; color:var(--gen-muted); }
+.cp-row .cp-pts{ flex:none; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass-bright); }
+.cp-confirm{ margin-bottom:8px; padding:8px 10px; border-radius:7px; background:rgba(178,58,46,.14); border:1px solid var(--gen-alert-line); }
+.cp-confirm span{ display:block; font-size:12px; color:#e8b0a8; margin-bottom:7px; }
+.cp-empty{ text-align:center; font-size:12px; color:var(--gen-muted); padding:10px; }
 /* archive (history) */
 .histover{ padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); margin-bottom:12px; }
 .histover .oname{ display:flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px;
@@ -1080,15 +1099,19 @@ body.modal-open{ overflow:hidden; }
       <div id="ownerBubble" class="ownerbubble hidden"></div>
     </div>
     <div id="settingsRows"></div>
-    <div id="clearArchiveRow" class="setup-actions" style="margin-top:8px">
-      <button id="clearHistory" class="btn">🗑 Изчисти архива</button>
+    <div id="clearArchiveRow" style="margin-top:8px">
+      <div id="storeInfo" class="storeinfo"></div>
+      <div class="setup-actions" style="margin-top:6px"><button id="clearHistory" class="btn">🗑 Изчисти архива…</button></div>
     </div>
-    <div id="clearConfirm" class="clearconfirm hidden">
-      <span>Сигурен ли си, командире? Архивът изгаря завинаги.</span>
-      <div class="setup-actions">
-        <button id="clearYes" class="btn">🔥 Да, изгори го</button>
-        <button id="clearNo" class="btn primary">Отмяна</button>
+    <div id="clearPanel" class="clearpanel hidden">
+      <div class="cp-head"><span>Избери кои игри да изтриеш</span>
+        <div class="cp-selbtns"><button id="cpSelAll" class="btn small">Всички</button><button id="cpSelNone" class="btn small">Никоя</button></div>
       </div>
+      <div id="cpList" class="cp-list"></div>
+      <div id="cpConfirm" class="cp-confirm hidden"><span id="cpConfirmTxt"></span>
+        <div class="setup-actions"><button id="cpConfirmYes" class="btn">🔥 Изгори</button><button id="cpConfirmNo" class="btn">Назад</button></div>
+      </div>
+      <div class="setup-actions"><button id="cpDelete" class="btn">🔥 Изтрий избраните</button><button id="cpCancel" class="btn primary">Отказ</button></div>
     </div>
     <div id="devPanel" class="devpanel hidden"></div>
     <div class="setup-actions"><button id="settingsClose" class="btn primary">Готово</button></div>
@@ -3148,7 +3171,7 @@ body.modal-open{ overflow:hidden; }
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
     syncOwnerGender(); syncOwnerColor();
-    $('clearConfirm').classList.add('hidden'); $('ownerBubble').classList.add('hidden');
+    $('clearPanel').classList.add('hidden'); $('ownerBubble').classList.add('hidden'); updateStorageInfo();
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
     $('settingsModal').classList.remove('hidden');
@@ -4700,10 +4723,59 @@ body.modal-open{ overflow:hidden; }
       }
     };
   });
-  $('clearHistory').onclick = function () { $('clearConfirm').classList.remove('hidden'); };
-  $('clearNo').onclick = function () { $('clearConfirm').classList.add('hidden'); };
-  $('clearYes').onclick = function () {
-    lsDel(HISTORY_KEY); $('clearConfirm').classList.add('hidden');
+  // ---- localStorage fullness gauge (next to the clear-archive control) ----
+  var LS_QUOTA = 5 * 1024 * 1024;   // typical per-origin localStorage cap (~5 MB)
+  function lsBytes() {
+    var t = 0;
+    try { for (var i = 0; i < window.localStorage.length; i++) { var k = window.localStorage.key(i); var v = window.localStorage.getItem(k); t += k.length + (v ? v.length : 0); } } catch (e) {}
+    return t * 2;   // UTF-16 ≈ 2 bytes/char
+  }
+  function updateStorageInfo() {
+    if (!$('storeInfo')) return;
+    var used = lsBytes(), pct = Math.min(100, Math.round(100 * used / LS_QUOTA)), kb = Math.max(1, Math.round(used / 1024));
+    var games = loadHistory().length, cls = pct >= 85 ? 'crit' : pct >= 60 ? 'hi' : '';
+    $('storeInfo').innerHTML = 'Памет: <b>' + pct + '%</b> · ' + kb + ' KB · <b>' + games + '</b> ' + (games === 1 ? 'игра' : 'игри')
+      + '<span class="sbar"><i class="' + cls + '" style="width:' + pct + '%"></i></span>';
+  }
+  // ---- bulk-clear: pick which saved games to delete (all preselected) ----
+  var cpSel = {};
+  function openClearPanel() {
+    cpSel = {}; loadHistory().forEach(function (g) { cpSel[g.id] = 1; });   // all preselected
+    $('cpConfirm').classList.add('hidden');
+    renderClearList();
+    $('clearPanel').classList.remove('hidden');
+  }
+  function renderClearList() {
+    var games = loadHistory().slice().reverse();   // newest first
+    if (!games.length) { $('cpList').innerHTML = '<div class="cp-empty">Архивът е празен.</div>'; }
+    else $('cpList').innerHTML = games.map(function (g) {
+      var top = g.players && g.players.length ? Math.max.apply(null, g.players.map(function (p) { return recTotal(p); })) : 0;
+      return '<label class="cp-row"><input type="checkbox" data-id="' + esc(g.id) + '"' + (cpSel[g.id] ? ' checked' : '') + '>'
+        + '<span class="cp-when">' + esc(fmtDate(g.ts)) + ' · ' + esc(fmtTime(g.ts)) + '</span>'
+        + '<span class="cp-meta">' + (g.players ? g.players.length : '?') + ' бойци</span>'
+        + '<span class="cp-pts">' + top + '</span></label>';
+    }).join('');
+    $('cpList').querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+      cb.onchange = function () { var id = cb.getAttribute('data-id'); if (cb.checked) cpSel[id] = 1; else delete cpSel[id]; syncDeleteBtn(); };
+    });
+    syncDeleteBtn();
+  }
+  function syncDeleteBtn() { var n = Object.keys(cpSel).length; $('cpDelete').disabled = n === 0; $('cpDelete').textContent = '🔥 Изтрий избраните (' + n + ')'; }
+  $('clearHistory').onclick = openClearPanel;
+  $('cpCancel').onclick = function () { $('clearPanel').classList.add('hidden'); };
+  $('cpSelAll').onclick = function () { loadHistory().forEach(function (g) { cpSel[g.id] = 1; }); renderClearList(); };
+  $('cpSelNone').onclick = function () { cpSel = {}; renderClearList(); };
+  $('cpDelete').onclick = function () {
+    var n = Object.keys(cpSel).length; if (!n) return;
+    $('cpConfirmTxt').textContent = n + (n === 1 ? ' игра ще изгори завинаги.' : ' игри ще изгорят завинаги.') + ' Сигурен ли си, командире?';
+    $('cpConfirm').classList.remove('hidden');
+  };
+  $('cpConfirmNo').onclick = function () { $('cpConfirm').classList.add('hidden'); };
+  $('cpConfirmYes').onclick = function () {
+    var keep = loadHistory().filter(function (g) { return !cpSel[g.id]; });
+    if (keep.length) persistHistory(keep); else lsDel(HISTORY_KEY);
+    cpSel = {}; $('cpConfirm').classList.add('hidden');
+    updateStorageInfo(); renderClearList();
     if (!$('historyModal').classList.contains('hidden')) renderHistory();
   };
 
