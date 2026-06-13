@@ -3882,8 +3882,11 @@ body.modal-open{ overflow:hidden; }
       'среда' + rng(1 + e.n, mid.n) + ' — <b class="nn">' + stageLoss(mid) + '</b> т./ход',
       'край' + rng(1 + e.n + mid.n, lt.n) + ' — <b class="nn">' + stageLoss(lt) + '</b> т./ход' ]);
 
-    // player's end-game scorecard (collapsed by default) — exact board at a glance
-    html += '<details class="evboard"><summary>Дъска</summary>' + replayBoardHTML(fp.scores) + '</details>';
+    // player's end-game scorecard (collapsed by default) — exact board at a glance.
+    // categories where THIS player holds the highest result show the points in their colour.
+    var recKeys = {};
+    if (summary.meta && summary.meta.board) summary.meta.board.forEach(function (b) { if (b.recPi === pi && b.recVal > 0) recKeys[b.key] = 1; });
+    html += '<details class="evboard"><summary>Дъска</summary>' + replayBoardHTML(fp.scores, null, { color: fp.color, recordKeys: recKeys }) + '</details>';
 
     // §7 turn-by-turn breakdown. Row: [Хn][combo] | [points][luck/decision EV][quality thumb]
     html += '<details class="evturns"><summary>Ход по ход</summary>';
@@ -4011,11 +4014,14 @@ body.modal-open{ overflow:hidden; }
     for (var k = 0; k <= idx; k++) { var a = replay.actions[k]; if (a.type === 'commit') sc[a.p][a.category] = a.score; }
     return sc;
   }
-  function replayBoardHTML(scores, hlKey) {
+  function replayBoardHTML(scores, hlKey, opts) {
+    var recKeys = (opts && opts.recordKeys) || null, myCol = opts && opts.color;
     function tile(c, up) {
       var f = typeof scores[c.key] === 'number', hl = c.key === hlKey ? ' hl' : '';
       var ff = f && scores[c.key] === 0 ? ' forfeit' : '';   // a sacrificed (0) cell is greyed out
-      return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + ff + '"><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] : '–') + '</span></div>';
+      var isRec = f && recKeys && recKeys[c.key];             // this player holds the highest result here
+      var vstyle = isRec && myCol ? ' style="color:' + myCol + '"' : '';
+      return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + ff + (isRec ? ' rec' : '') + '"><span class="mlab">' + c.label + '</span><span class="mval"' + vstyle + '>' + (f ? scores[c.key] + 'т.' : '–') + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
     var low = G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).map(function (c) { return tile(c, false); }).join('');
