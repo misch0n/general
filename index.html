@@ -298,12 +298,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .stylechip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px;
   font-size:11px; color:var(--gen-ink); border-radius:5px; padding:2px 7px; margin-right:4px; }
 /* turn-by-turn breakdown (collapsed by default) */
-.evturns{ margin-top:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.18); }
-.evturns summary{ cursor:pointer; padding:7px 10px; font-family:var(--gen-font-display); font-weight:700; font-size:12px;
+.evturns, .evboard{ margin-top:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.18); }
+.evturns summary, .evboard summary{ cursor:pointer; padding:7px 10px; font-family:var(--gen-font-display); font-weight:700; font-size:12px;
   letter-spacing:.5px; color:var(--gen-brass); list-style:none; }
-.evturns summary::-webkit-details-marker{ display:none; }
-.evturns summary::before{ content:'▸ '; }
-.evturns[open] summary::before{ content:'▾ '; }
+.evturns summary::-webkit-details-marker, .evboard summary::-webkit-details-marker{ display:none; }
+.evturns summary::before, .evboard summary::before{ content:'▸ '; }
+.evturns[open] summary::before, .evboard[open] summary::before{ content:'▾ '; }
+.evboard .miniboard{ padding:0 10px 10px; }
 /* left: [Хn][combo] · right: [points][luck/decision EV][quality thumb] — uniform columns so rows line up */
 .evtrow{ display:grid; grid-template-columns:26px minmax(0,1fr) 40px 64px 22px; align-items:center; column-gap:6px; padding:4px 10px; font-size:11px;
   color:var(--gen-label); border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; }
@@ -1132,7 +1133,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   var $ = function (id) { return document.getElementById(id); };
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
-  var settings = { titles: false, titlePoints: false, advice: false, censor: false, barracks: false, acoustic: false, ownerName: '', useOwnerName: false };
+  // глупости (profanity) ON by default = NSFW words allowed; OFF = censored to the SFW set
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, ownerName: '', useOwnerName: false };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1144,7 +1146,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
 
   function saveSettings() {
-    var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, censor: settings.censor,
+    var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
               barracks: settings.barracks, acoustic: settings.acoustic, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
@@ -1152,11 +1154,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'censor', 'barracks', 'acoustic', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
-      // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped: the
-      // rare-name system is now its own opt-in switch, so it starts off)
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'ownerName', 'useOwnerName'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
+      // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
-    G.setCensor(settings.censor);
+    G.setCensor(!settings.glupost);   // глупости on ⇒ don't censor
   }
 
   function loadHistory() { var raw = lsGet(HISTORY_KEY); if (!raw) return []; try { var a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
@@ -2550,9 +2552,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       sub: { key: 'titlePoints', label: 'Бонус точки', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
       onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
     { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
-    { key: 'censor', label: 'Цензура', onChange: function () {
-        G.setCensor(settings.censor);
-        // re-cohere existing setup names so none keep an NSFW word (or regain one)
+    // Глупости — ON = profanity (NSFW words allowed); OFF = censored to the SFW set
+    { key: 'glupost', label: 'Глупости', onChange: function () {
+        G.setCensor(!settings.glupost);
+        // re-cohere existing setup names so they gain/lose NSFW words to match
         setupPlayers.forEach(regenName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
@@ -3490,6 +3493,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
       'начало' + rng(1, e.n) + ' — <b class="nn">' + stageLoss(e) + '</b> т./ход',
       'среда' + rng(1 + e.n, mid.n) + ' — <b class="nn">' + stageLoss(mid) + '</b> т./ход',
       'край' + rng(1 + e.n + mid.n, lt.n) + ' — <b class="nn">' + stageLoss(lt) + '</b> т./ход' ]);
+
+    // player's end-game scorecard (collapsed by default) — exact board at a glance
+    html += '<details class="evboard"><summary>Таблото</summary>' + replayBoardHTML(fp.scores) + '</details>';
 
     // §7 turn-by-turn breakdown. Row: [Хn][combo] | [points][luck/decision EV][quality thumb]
     html += '<details class="evturns"><summary>Ход по ход</summary>';

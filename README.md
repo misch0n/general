@@ -190,8 +190,10 @@ sum *exactly* to the visible margin.
   - Every player is drawn in **their own colour**; when you expand a player below,
     the other lines **dim to 45%** so their trajectory stands out. No legend — the
     colours are read straight off the results.
-  - **Swing annotations** (`swingsFor`): lead-change rings and big-jump / Генерал
-    dots; when a player is highlighted, their swings get a **`+X т.`** label.
+  - **Milestones** (`milestonesFor`): lead-change rings, plus — for the expanded
+    player — tab-aware **good and bad** events marked green/red: points (big gains
+    / Генерал / costly misses), skill (top move / blunders), luck (lucky / unlucky
+    turns). **Turn ticks** (1, 2, 3…) sit on the x-axis when there's room.
   - The collapse state survives re-renders via `summary.chartOpen`.
 - **Player rows in every tab.** Each row is a coloured **rank title** (the rank is
   tinted in the player's colour — that *is* their colour key, so there's no
@@ -236,6 +238,8 @@ shows a gap), then dissects it. Highlights:
   rating), **Нули** (forced vs self-inflicted), and — **last** — **По етапи**,
   the early/mid/late EV-loss-per-turn each labelled with **its turn range**
   (*начало (ход 1–5) — …*).
+- A collapsed **Таблото** scorecard (the player's exact end-game board, laid out
+  like the in-game board) for at-a-glance reference, just above the turn log.
 - A collapsed **Ход по ход** panel. Each turn row reads
   `[Хn] [combo]` on the left and `[points] [luck EV] [decision EV] [quality]` on
   the right, in uniform columns:
@@ -440,15 +444,16 @@ or the whole archive **cleared from settings** (with a confirm).
 Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
 **owner block** (battle name + „Използвай моето име“ with a `?` helper), then
 positive toggles: **КАЗАРМА**, **Титли** (with its nested **Бонус точки**
-sub-toggle, shown only while Титли is on), **Съвети**, **Цензура**, and
+sub-toggle, shown only while Титли is on), **Съвети**, **Глупости**, and
 **Акустика** (off by default — reveals every data-over-sound feature, hidden
 otherwise). The two pre-game-only rows (Титли, Съвети) hide once a battle is on;
 you can also clear the archive here.
 
-- **Censor toggle** — *Цензура, само прилични имена* — is **off by default** (this
-  is an adult party game). On, it drops every NSFW-flagged word and regenerates
-  from the SFW set only (`setCensor`); names already on the muster screen are
-  re-cohered so nothing crude slips through.
+- **Глупости toggle** (profanity) — **on by default** (this is an adult party
+  game): rude, NSFW-flagged words are in play. Turn it **off** to censor to the
+  SFW set only (`setCensor(!glupost)` — the flag drives off the words' `nsfw`
+  markers); names already on the muster screen are re-cohered so nothing crude
+  slips through.
 - **Secret dev editor.** Each settings row hides a tiny clickable box on its right
   edge. A **rolling tap-sequence matcher** (`devBoxClick` against `devKey()`)
   unlocks **developer mode** when the recent taps hit the escalating key — box 0
