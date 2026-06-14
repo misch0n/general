@@ -873,6 +873,21 @@ body.modal-open{ overflow:hidden; }
 .progchart .pc-legend{ display:flex; flex-wrap:wrap; gap:5px 10px; margin-top:6px; justify-content:center; }
 .progchart .pc-leg{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; color:var(--gen-text); }
 .progchart .pc-sw{ width:10px; height:10px; border-radius:50%; flex:none; }
+/* per-battle career charts (owner dossier): points / skill / luck across recent games */
+.ocard{ margin:10px 0 4px; padding:9px 10px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
+.oc-title{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.7px; color:var(--gen-brass); font-size:10.5px; margin-bottom:4px; }
+.oc-wrap{ position:relative; }
+.oc-svg{ width:100%; height:auto; display:block; touch-action:none; }   /* none → vertical wobble never cancels the scrub */
+.oc-grid{ stroke:var(--gen-pill-line); stroke-width:1; }
+.oc-grid.zero{ stroke:var(--gen-muted); stroke-width:1.2; }
+.oc-axis{ fill:var(--gen-muted); font-size:8px; font-family:var(--gen-font-body); }
+.oc-scrubline{ stroke:var(--gen-text); stroke-width:1; stroke-dasharray:3 3; opacity:.6; }
+.oc-readout{ position:absolute; top:5px; right:5px; pointer-events:none; background:rgba(8,10,5,.94); border:1px solid var(--gen-pill-line);
+  border-radius:7px; padding:4px 8px; min-width:74px; }
+.oc-readout.left{ right:auto; left:5px; }
+.oc-rd-hd{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; letter-spacing:.4px; color:var(--gen-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+.oc-rd-v{ font-variant-numeric:tabular-nums; font-weight:700; font-size:14px; color:var(--gen-text); }
 .histgame .hg-play{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; display:grid; place-items:center; }
 .histgame .hg-play .gl{ position:relative; width:10px; height:10px; display:block; }
 .histgame .hg-play .gl::before{ content:''; position:absolute; inset:0; background:var(--gen-brass); clip-path:polygon(0 0,0 100%,100% 50%); }
@@ -4606,9 +4621,109 @@ body.modal-open{ overflow:hidden; }
     };
   }
 
+  // ----- §2.7 per-battle career charts (points / skill / luck over recent games) -----
+  // Each game contributes one point. Games that don't record a stat (e.g. luck in a
+  // manual game) draw a dashed grey HOLD at the previous value; colour resumes from
+  // that held value when the next recording game arrives. Line colour = owner colour.
+  var ownerCharts = null;          // { points:{…}, skill:{…}, luck:{…} } meta for the scrubber
+  var OC_N = 20;                   // last N battles per chart
+  function ownerChartSeries(data, kind) {
+    return data.slice(-OC_N).map(function (d) {
+      var v = kind === 'points' ? d.total
+            : kind === 'skill' ? d.ana.accuracy * 100
+            : (d.manual ? null : d.ana.luck);                  // luck is dice-only
+      return { ts: d.rec.ts, name: d.rec.name, val: (typeof v === 'number' && isFinite(v)) ? v : null };
+    });
+  }
+  function makeOwnerChart(kind, games, color) {
+    var n = games.length, firstRel = -1;
+    for (var i = 0; i < n; i++) if (games[i].val != null) { firstRel = i; break; }
+    if (firstRel < 0 || n < 2) return null;                    // nothing meaningful to plot
+    var luck = kind === 'luck', suffix = kind === 'skill' ? '%' : '';
+    // carry the last recorded value forward across gaps (and back over a leading gap)
+    var yv = new Array(n), last = games[firstRel].val;
+    for (var j = 0; j < n; j++) { if (games[j].val != null) last = games[j].val; yv[j] = last; }
+    var yMin = Infinity, yMax = -Infinity;
+    yv.forEach(function (v) { if (v < yMin) yMin = v; if (v > yMax) yMax = v; });
+    if (luck) { yMin = Math.min(0, yMin); yMax = Math.max(0, yMax); }
+    if (kind === 'skill') { yMax = 100; yMin = Math.max(0, Math.min(yMin, 99)); }
+    if (yMin === yMax) yMax = yMin + 1;
+    var W = 300, H = 120, padL = 30, padR = 8, padT = 10, padB = 18, iw = W - padL - padR, ih = H - padT - padB, range = yMax - yMin || 1;
+    var xfn = function (i) { return padL + (n > 1 ? i / (n - 1) * iw : iw / 2); };
+    var yfn = function (v) { return padT + ih - (v - yMin) / range * ih; };
+    var gvals = luck ? [yMax, 0, yMin] : [yMax, (yMin + yMax) / 2, yMin];
+    var grid = gvals.map(function (gv) {
+      var yy = yfn(gv);
+      return '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" class="oc-grid' + (luck && gv === 0 ? ' zero' : '') + '"/>'
+        + '<text x="' + (padL - 4) + '" y="' + (yy + 3) + '" class="oc-axis" text-anchor="end">' + (luck && gv > 0 ? '+' : '') + Math.round(gv) + suffix + '</text>';
+    }).join('');
+    var segs = '';
+    for (var k = 1; k < n; k++) {
+      var rel = games[k].val != null;
+      segs += '<line x1="' + xfn(k - 1) + '" y1="' + yfn(yv[k - 1]) + '" x2="' + xfn(k) + '" y2="' + yfn(yv[k]) + '" '
+        + 'stroke="' + (rel ? color : 'var(--gen-muted)') + '" stroke-width="' + (rel ? 2.2 : 1.6) + '" stroke-opacity="' + (rel ? 1 : 0.55) + '"'
+        + (rel ? '' : ' stroke-dasharray="3 3"') + ' stroke-linecap="round" stroke-linejoin="round"/>';
+    }
+    var dots = '';
+    for (var m = 0; m < n; m++) {
+      var r2 = games[m].val != null;
+      dots += '<circle cx="' + xfn(m) + '" cy="' + yfn(yv[m]) + '" r="' + (r2 ? 2.4 : 1.6) + '" fill="' + (r2 ? color : 'var(--gen-muted)') + '"/>';
+    }
+    return { kind: kind, games: games, yv: yv, color: color, suffix: suffix, luck: luck,
+             W: W, H: H, padL: padL, padT: padT, iw: iw, ih: ih, n: n, xfn: xfn, yfn: yfn,
+             svg: grid + segs + dots + '<g class="oc-scrub"></g>' };
+  }
+  function buildOwnerCharts(c) {
+    ownerCharts = null;
+    if (!c || c.data.length < 2) return '';
+    var color = settings.ownerColor || '#d4a02e';
+    var defs = [['points', 'Точки по битки'], ['skill', 'Точност по битки'], ['luck', 'Късмет по битки']];
+    var charts = {}, html = '';
+    defs.forEach(function (d) {
+      var ch = makeOwnerChart(d[0], ownerChartSeries(c.data, d[0]), color);
+      if (!ch) return;
+      charts[d[0]] = ch;
+      html += '<div class="ocard"><div class="oc-title">' + d[1] + '</div>'
+        + '<div class="oc-wrap"><svg viewBox="0 0 ' + ch.W + ' ' + ch.H + '" class="oc-svg" data-kind="' + d[0] + '" preserveAspectRatio="xMidYMid meet">'
+        + ch.svg + '</svg><div class="oc-readout hidden"></div></div></div>';
+    });
+    ownerCharts = charts;
+    return html ? ('<div class="ho-sechd">Форма по битки</div>' + html) : '';
+  }
+  // attach the drag-to-scrub reader to each career chart (after its SVG is in the DOM)
+  function wireOwnerCharts() {
+    if (!ownerCharts) return;
+    Object.keys(ownerCharts).forEach(function (kind) {
+      var ch = ownerCharts[kind];
+      var svg = $('historyOverview').querySelector('.oc-svg[data-kind="' + kind + '"]'); if (!svg) return;
+      var scrubG = svg.querySelector('.oc-scrub'), readout = svg.parentNode.querySelector('.oc-readout');
+      function gameAt(clientX) {
+        var rc = svg.getBoundingClientRect(), sc = Math.min(rc.width / ch.W, rc.height / ch.H) || 1, ox = (rc.width - ch.W * sc) / 2;
+        var i = Math.round(((clientX - rc.left - ox) / sc - ch.padL) / (ch.iw || 1) * (ch.n - 1));
+        return Math.max(0, Math.min(ch.n - 1, i));
+      }
+      function show(clientX) {
+        var i = gameAt(clientX), sx = ch.xfn(i), g = ch.games[i], rel = g.val != null;
+        scrubG.innerHTML = '<line x1="' + sx + '" y1="' + ch.padT + '" x2="' + sx + '" y2="' + (ch.padT + ch.ih) + '" class="oc-scrubline"/>'
+          + '<circle cx="' + sx + '" cy="' + ch.yfn(ch.yv[i]) + '" r="3.1" fill="' + (rel ? ch.color : 'var(--gen-muted)') + '" stroke="#16160e" stroke-width="0.8"/>';
+        var valTxt = rel ? ((ch.luck && g.val > 0 ? '+' : '') + Math.round(g.val) + ch.suffix) : '—';
+        readout.innerHTML = '<div class="oc-rd-hd">' + esc(g.name ? g.name : fmtDate(g.ts)) + '</div><div class="oc-rd-v">' + valTxt + '</div>';
+        readout.classList.toggle('left', sx > ch.W / 2);
+        readout.classList.remove('hidden');
+      }
+      function hide() { scrubG.innerHTML = ''; readout.classList.add('hidden'); }
+      var on = false;
+      svg.addEventListener('pointerdown', function (e) { on = true; try { svg.setPointerCapture(e.pointerId); } catch (x) {} show(e.clientX); });
+      svg.addEventListener('pointermove', function (e) { if (on) show(e.clientX); });
+      svg.addEventListener('pointerup', function () { on = false; hide(); });
+      svg.addEventListener('pointercancel', function () { on = false; hide(); });
+    });
+  }
+
   function ownerOverview() {
     var c = computeOwnerCareer();
     if (!c) {
+      ownerCharts = null;
       return '<div class="histover"><div class="noowner"><div class="nohd">🤷 Няма досие на стопанина</div>'
         + 'Щабът не намира нито една битка с теб на боец №1. За да следим бойната ти форма, '
         + '<b title="В настройките включи „Използвай моето име“, или просто играй като боец №1 (★) — без да го пускаш AI.">влез в боя сам</b> '
@@ -4654,6 +4769,8 @@ body.modal-open{ overflow:hidden; }
     }
     var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
     if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎖 За повишение наблегни на <b>' + esc(worst.label) + '</b> — там пробивът ти в строя е най-голям (средно −' + worst.avgLeak.toFixed(1) + ' т. на игра). Категорията, която да тренираш.</div>';
+    // §2.7 per-battle form charts: points / skill / luck across recent games
+    h += buildOwnerCharts(c);
     // category board (same layout as the end-game Категории)
     h += careerCatBoard(c);
     h += '</div></details>';
@@ -4717,6 +4834,7 @@ body.modal-open{ overflow:hidden; }
   function renderHistory() {
     var games = loadHistory().slice().reverse(); // newest first
     $('historyOverview').innerHTML = ownerOverview();
+    wireOwnerCharts();   // attach the scrub readers to the per-battle career charts
     // the bar opens/closes the board; the ? toggles the read-tips on its own (no fold needed)
     var fold = $('historyOverview').querySelector('.catfold');
     if (fold) {
