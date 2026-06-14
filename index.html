@@ -50,9 +50,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* ===== header ===== */
 .hd{ display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
 /* running points: a plain stacked number above the medals separator (no box), styled like the turn marker */
-.dockhead{ position:relative; display:flex; justify-content:center; padding:2px 16px 4px; }
+.dockhead{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 16px; }
 .pointsbox{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; }
-.pointsbox .ptotal{ font-size:34px; }   /* the points number — bigger; ТОЧКИ caption stays small */
+.pointsbox .ptotal{ font-size:46px; }   /* the points number — big; ТОЧКИ caption stays small */
 /* the advice popup OVERLAYS the points (grows upward over the board) — never pushes the dice */
 .dockhead .hintline{ position:absolute; left:12px; right:12px; bottom:-2px; z-index:9;
   background:rgba(9,11,6,.97); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 6px 18px rgba(0,0,0,.55); }
