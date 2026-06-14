@@ -664,3 +664,56 @@ test('a full solo game fills every category exactly once', function () {
   });
   assert.strictEqual(G.isGameOver(game), true);
 });
+
+// ---------------------------------------- experimental ruleset (Генерал deviation)
+test('experimental upper cells score as a deviation from three-of-a-face', function () {
+  assert.strictEqual(G.scoreForExp('fours', [4, 4, 4, 2, 1]), 0);    // exactly three fours
+  assert.strictEqual(G.scoreForExp('fours', [4, 4, 4, 4, 1]), 4);    // four fours → +4
+  assert.strictEqual(G.scoreForExp('sixes', [6, 6, 6, 6, 6]), 12);   // five sixes → +2·6
+  assert.strictEqual(G.scoreForExp('fours', [4, 2, 1, 3, 5]), -8);   // one four → (1-3)·4
+  assert.strictEqual(G.scoreForExp('sixes', [1, 2, 3, 4, 5]), -18);  // no sixes → (0-3)·6
+});
+
+test('experimental два чифта = sum of the two highest distinct pairs', function () {
+  assert.strictEqual(G.scoreForExp('twoPair', [6, 6, 3, 3, 1]), 18);   // 2·(6+3)
+  assert.strictEqual(G.scoreForExp('twoPair', [6, 6, 6, 3, 3]), 18);   // triple gives a pair too
+  assert.strictEqual(G.scoreForExp('twoPair', [6, 6, 6, 6, 1]), 0);    // only one distinct pair
+  assert.strictEqual(G.scoreForExp('twoPair', [5, 5, 2, 2, 2]), 14);   // 2·(5+2)
+  assert.strictEqual(G.scoreForExp('twoPair', [1, 2, 3, 4, 5]), 0);    // no pairs
+});
+
+test('experimental lower combos still score like standard', function () {
+  assert.strictEqual(G.scoreForExp('twoKind', [6, 6, 1, 2, 3]), 12);
+  assert.strictEqual(G.scoreForExp('threeKind', [5, 5, 5, 1, 2]), 15);
+  assert.strictEqual(G.scoreForExp('fourKind', [3, 3, 3, 3, 1]), 12);
+  assert.strictEqual(G.scoreForExp('fullHouse', [4, 4, 6, 6, 6]), 26);
+  assert.strictEqual(G.scoreForExp('smallStraight', [1, 2, 3, 4, 5]), 15);
+  assert.strictEqual(G.scoreForExp('largeStraight', [2, 3, 4, 5, 6]), 20);
+  assert.strictEqual(G.scoreForExp('general', [6, 6, 6, 6, 6]), 80);
+  assert.strictEqual(G.scoreForExp('chance', [6, 5, 4, 3, 2]), 20);
+});
+
+test('experimental total: number part nets and only penalises when complete', function () {
+  // a negative number part that ISN'T complete is just its running sum (no penalty yet)
+  var p1 = { scores: { ones: -2, twos: -4 } };
+  assert.strictEqual(G.upperStateExp(p1).penalised, false);
+  assert.strictEqual(G.playerTotalExp(p1), -6);
+  // all six upper filled and net negative → recorded as a flat −50
+  var neg = { scores: { ones: -2, twos: -4, threes: -3, fours: 0, fives: -5, sixes: -6, chance: 20 } };
+  var st = G.upperStateExp(neg);
+  assert.strictEqual(st.complete, true);
+  assert.strictEqual(st.penalised, true);
+  assert.strictEqual(st.contribution, -50);
+  assert.strictEqual(G.playerTotalExp(neg), -30);   // 20 (chance) − 50
+  // a non-negative complete number part keeps its subtotal
+  var pos = { scores: { ones: 0, twos: 0, threes: 3, fours: 4, fives: 0, sixes: 0, general: 80 } };
+  assert.strictEqual(G.upperStateExp(pos).contribution, 7);
+  assert.strictEqual(G.playerTotalExp(pos), 87);
+});
+
+test('ruleset registry exposes both rulesets with the right shapes', function () {
+  assert.strictEqual(G.ruleset('standard').categories.length, 14);
+  assert.strictEqual(G.ruleset('experimental').categories.length, 15);
+  assert.strictEqual(G.ruleset('nonsense').key, 'standard');   // unknown falls back to standard
+  assert.strictEqual(G.ruleset('experimental').deviationUpper, true);
+});

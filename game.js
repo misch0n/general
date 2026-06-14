@@ -169,7 +169,69 @@
     }, 0);
   }
 
-  // Lock in a category. `value` is optional; when omitted the best candidate is
+  // ============================================================ EXPERIMENTAL ruleset
+  // The canonical Bulgarian „Генерал“: the number part (1-6) is scored as a DEVIATION
+  // from three-of-a-face, and a „два чифта“ (two pairs) combo joins the lower part.
+  //   • upper cell value = (count − 3) × face  →  3-of-a-face = 0, 4 = +face, 5 = +2·face,
+  //     fewer than three = negative (you can be forced to dump a bad roll here);
+  //   • if the number part is COMPLETE and nets negative, it's recorded as a −50 penalty;
+  //   • lower combos score exactly like standard (sum of the participating dice);
+  //   • два чифта = sum of the four dice in the two highest DISTINCT pairs.
+  var CATEGORIES_EXP = [
+    { key: 'ones',          label: '1',           group: 'upper' },
+    { key: 'twos',          label: '2',           group: 'upper' },
+    { key: 'threes',        label: '3',           group: 'upper' },
+    { key: 'fours',         label: '4',           group: 'upper' },
+    { key: 'fives',         label: '5',           group: 'upper' },
+    { key: 'sixes',         label: '6',           group: 'upper' },
+    { key: 'twoKind',       label: 'чифт',        group: 'lower' },
+    { key: 'twoPair',       label: '2 чифта',     group: 'lower' },
+    { key: 'threeKind',     label: '3x',          group: 'lower' },
+    { key: 'fourKind',      label: 'каре',        group: 'lower' },
+    { key: 'fullHouse',     label: 'фул хаус',     group: 'lower' },
+    { key: 'smallStraight', label: 'малка кента',  group: 'lower' },
+    { key: 'largeStraight', label: 'голяма кента', group: 'lower' },
+    { key: 'general',       label: 'генерал',      group: 'lower' },
+    { key: 'chance',        label: 'шанс',         group: 'lower' },
+  ];
+  var UPPER_KEYS = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
+  var UPPER_PENALTY = -50;
+
+  // candidate scores for the EXPERIMENTAL ruleset (high to low)
+  function candidatesExp(category, dice) {
+    if (FACE[category]) return [(counts(dice)[FACE[category]] - 3) * FACE[category]]; // deviation
+    if (category === 'twoPair') {
+      var faces = facesWithCount(dice, 2);                 // distinct faces with ≥2, high→low
+      return faces.length >= 2 ? [2 * (faces[0] + faces[1])] : [0];
+    }
+    return candidates(category, dice);                     // everything else scores like standard
+  }
+  function scoreForExp(category, dice) { return Math.max.apply(null, candidatesExp(category, dice)); }
+
+  // running number-part state (used for the board + the penalty)
+  function upperStateExp(player) {
+    var filled = 0, sub = 0;
+    UPPER_KEYS.forEach(function (k) { if (typeof player.scores[k] === 'number') { filled++; sub += player.scores[k]; } });
+    var complete = filled === UPPER_KEYS.length;
+    return { filled: filled, complete: complete, subtotal: sub, penalised: complete && sub < 0,
+             contribution: (complete && sub < 0) ? UPPER_PENALTY : sub };
+  }
+  function playerTotalExp(player) {
+    var lower = 0;
+    CATEGORIES_EXP.forEach(function (c) {
+      if (c.group === 'lower' && typeof player.scores[c.key] === 'number') lower += player.scores[c.key];
+    });
+    return lower + upperStateExp(player).contribution;
+  }
+
+  // ruleset registry — standard is the default; experimental is opt-in
+  var RULESETS = {
+    standard:     { key: 'standard',     label: 'Стандартен',      categories: CATEGORIES,     candidates: candidates,    scoreFor: scoreFor,    total: playerTotal,    deviationUpper: false },
+    experimental: { key: 'experimental', label: 'Експериментален', categories: CATEGORIES_EXP, candidates: candidatesExp, scoreFor: scoreForExp, total: playerTotalExp, deviationUpper: true },
+  };
+  function ruleset(key) { return RULESETS[key] || RULESETS.standard; }
+
+
   // used. A provided value must be one of the legal candidates for the roll.
   function assignScore(player, category, dice, value) {
     if (isCategoryFilled(player, category)) {
@@ -1036,6 +1098,15 @@
   return {
     SCORING: SCORING,
     CATEGORIES: CATEGORIES,
+    CATEGORIES_EXP: CATEGORIES_EXP,
+    RULESETS: RULESETS,
+    ruleset: ruleset,
+    candidatesExp: candidatesExp,
+    scoreForExp: scoreForExp,
+    playerTotalExp: playerTotalExp,
+    upperStateExp: upperStateExp,
+    UPPER_KEYS: UPPER_KEYS,
+    UPPER_PENALTY: UPPER_PENALTY,
     DICE_COUNT: DICE_COUNT,
     MAX_ROLLS: MAX_ROLLS,
     counts: counts,
