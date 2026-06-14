@@ -55,7 +55,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .pointsbox .ptotal{ font-size:46px; }   /* the points number — big; ТОЧКИ caption stays small */
 /* the advice popup OVERLAYS the points — it starts just below the combo cells (top of this
    strip) and grows downward over the points/medals, so it never covers the board or the dice */
-.dockhead .hintline{ position:absolute; left:12px; right:12px; top:0; z-index:9;
+.dockhead .hintline{ position:absolute; left:12px; right:12px; top:6px; z-index:9;
   background:rgba(9,11,6,.97); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 6px 18px rgba(0,0,0,.55); }
 .rank{ width:40px; height:40px; flex:none; display:grid; place-items:center; background:var(--gen-pill); color:var(--gen-brass);
   border:2px solid var(--pc); border-radius:var(--gen-r-tag); font-family:var(--gen-font-display); font-weight:700; font-size:15px;
@@ -789,8 +789,16 @@ body.modal-open{ overflow:hidden; }
 .hgc-yes{ color:#fff; background:rgba(178,58,46,.55); border:1px solid var(--gen-alert-line); }
 .hgc-no{ color:var(--gen-text); background:var(--gen-pill); border:1px solid var(--gen-pill-line); }
 .histgame:hover{ border-color:var(--gen-brass); }
+.histgame.ex{ opacity:.62; }   /* excluded from the career summary */
+/* ranking marker (left): the owner's finishing place, medal-coloured border + number;
+   tap to exclude this game from the career summary (turns the border + number grey) */
 .histgame .hg-count{ min-width:32px; height:30px; flex:none; padding:0 5px; display:grid; place-items:center; border-radius:6px; font-family:var(--gen-font-display);
-  font-weight:700; font-size:14px; background:var(--gen-pill); color:var(--gen-text); border:1px solid var(--gen-pill-line); font-variant-numeric:tabular-nums; }
+  font-weight:700; font-size:14px; background:rgba(0,0,0,.25); border:1.5px solid var(--gen-pill-line); color:var(--gen-text); font-variant-numeric:tabular-nums; cursor:pointer; }
+.histgame .hg-count.r1{ border-color:#c8a64b; color:#e3c463; }
+.histgame .hg-count.r2{ border-color:#c0c4cc; color:#d4d8df; }
+.histgame .hg-count.r3{ border-color:#b87333; color:#d08a4e; }
+.histgame .hg-count.r4{ border-color:var(--gen-pill-line); color:var(--gen-muted); }
+.histgame .hg-count.ex{ border-color:var(--gen-muted); color:var(--gen-muted); }
 .histgame .hg-main{ flex:1; min-width:0; }
 .histgame .hg-top{ font-family:var(--gen-font-display); font-weight:600; letter-spacing:.3px; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:5px; }
 .histgame .hg-crown{ font-size:12px; }
@@ -4473,7 +4481,9 @@ body.modal-open{ overflow:hidden; }
   // across the owner's games; honours ownerSkipped + AI exactly like the old overview.
   function computeOwnerCareer() {
     var games = loadHistory();
-    var owned = games.filter(function (r) { var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
+    // games flagged via the ranking-marker toggle are kept in the list but pulled out
+    // of every career aggregate (and the percentile distribution derived from it)
+    var owned = games.filter(function (r) { if (r.excluded) return false; var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
       return { rec: r, ana: analyzeRec(r, oi), total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
@@ -4651,18 +4661,23 @@ body.modal-open{ overflow:hidden; }
     var ownerScores = career ? career.scores : [];
     var html = '<div class="histhd">Битки (' + games.length + ')</div>';
     games.forEach(function (rec) {
-      var oi = recOwnerIdx(rec), skipped = oi < 0;
+      var oi = recOwnerIdx(rec), skipped = oi < 0, excluded = !!rec.excluded;
       var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
       var ptsPlayer = skipped ? top : rec.players[oi];
-      var oTotal = recTotal(ptsPlayer), winR = !skipped && recPlacement(rec, oi) === 1;
-      var pct = !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
+      var oTotal = recTotal(ptsPlayer), place = skipped ? null : recPlacement(rec, oi), winR = place === 1;
+      var pct = !excluded && !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
       // only flag genuinely standout games: top 5 / 10 / 15 % (bucketed); nothing below that
       var topPct = pct == null ? null : 100 - pct;
       var tier = topPct == null ? null : topPct <= 5 ? 5 : topPct <= 10 ? 10 : topPct <= 15 ? 15 : null;
       var pctTag = tier != null
         ? ' <span class="hg-pct hi" title="по-добра от ' + pct + '% от игрите ти">топ ' + tier + '%</span>' : '';
-      html += '<div class="histgame" data-id="' + esc(rec.id) + '">'
-        + '<span class="hg-count" title="' + rec.players.length + ' бойци">' + rec.players.length + '</span>'
+      // ranking marker: medal-coloured by finishing place, grey when excluded / unranked
+      var rankCls = excluded ? 'ex' : place === 1 ? 'r1' : place === 2 ? 'r2' : place === 3 ? 'r3' : 'r4';
+      var rankNum = place != null ? place : '–';
+      var rankTitle = excluded ? 'Извън статистиката · докосни за връщане'
+        : (place != null ? place + '-то място · докосни за изключване' : 'Без класиране · докосни за изключване');
+      html += '<div class="histgame' + (excluded ? ' ex' : '') + '" data-id="' + esc(rec.id) + '">'
+        + '<button type="button" class="hg-count ' + rankCls + '" title="' + esc(rankTitle) + '">' + rankNum + '</button>'
         + '<span class="hg-main"><span class="hg-top">' + esc(fmtDate(rec.ts))
         + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
@@ -4677,6 +4692,7 @@ body.modal-open{ overflow:hidden; }
       var id = row.getAttribute('data-id');
       var find = function () { return loadHistory().filter(function (r) { return r.id === id; })[0]; };
       row.onclick = function () { var rec = find(); if (rec) openHistoryGame(rec); };
+      row.querySelector('.hg-count').onclick = function (e) { e.stopPropagation(); toggleExcludeGame(id); };
       row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
       row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) chooseMethod('Изнеси играта', function () { exportGame(rec); }, function () { acousticSend(rec); }); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); confirmDeleteGame(row, id); };
@@ -4693,6 +4709,14 @@ body.modal-open{ overflow:hidden; }
   }
   function deleteGame(id) {
     persistHistory(loadHistory().filter(function (r) { return r.id !== id; }));
+    renderHistory();
+  }
+  // toggle a game out of (back into) the career summary via its ranking marker
+  function toggleExcludeGame(id) {
+    var arr = loadHistory(), r = arr.filter(function (x) { return x.id === id; })[0];
+    if (!r) return;
+    r.excluded = !r.excluded;
+    persistHistory(arr);
     renderHistory();
   }
   // ---- export / import a game (share local history across devices) ----
@@ -4716,7 +4740,9 @@ body.modal-open{ overflow:hidden; }
   function validateGameJSON(o) {
     if (!o || typeof o !== 'object') return 'Невалиден JSON обект.';
     if (!Array.isArray(o.players) || !o.players.length) return 'Липсват играчи.';
-    if (!Array.isArray(o.moveLog) || o.moveLog.length !== o.players.length) return 'moveLog не съвпада с играчите.';
+    // partial games are welcome: moveLog may be absent or shorter — sanitizeRecord
+    // pads/truncates per player safely, so we only reject an outright wrong type
+    if (o.moveLog != null && !Array.isArray(o.moveLog)) return 'moveLog е невалиден.';
     for (var i = 0; i < o.players.length; i++) {
       var p = o.players[i];
       if (!p || typeof p.name !== 'string' || !p.scores || typeof p.scores !== 'object') return 'Играч ' + (i + 1) + ' е невалиден.';
