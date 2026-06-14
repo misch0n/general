@@ -3004,13 +3004,38 @@ body.modal-open{ overflow:hidden; }
     }
     setTimeout(expAiFinish, AI_DELAY);
   }
+  // Penalty-aware 1-ply category choice for a free column: immediate score + the
+  // shipped (penalty-free) continuation value, minus an EXACT −50 whenever this fill
+  // LOCKS a negative number part (completes it negative, or makes it unrecoverable
+  // even with best-case future upper rolls). Stops the EV bot from eating penalties.
+  function expChooseCellEV(p, dice) {
+    var sc = p.cols[expCol], mask = EVX.maskOfScores(sc);
+    var upNow = G.colUpperState(sc, expCol).subtotal;
+    var best = null, bv = -Infinity;
+    X.availableCells(p).forEach(function (a) {
+      var imm = G.scoreForExp(a.key, dice);
+      var cont = EVX.vstar(mask | EVX.catBit(a.key));
+      var pen = 0;
+      if (expCol >= 1) {
+        var isUpper = G.UPPER_KEYS.indexOf(a.key) >= 0;
+        var upAfter = upNow + (isUpper ? imm : 0);
+        var maxFuture = 0;
+        G.UPPER_KEYS.forEach(function (k, fi) {
+          if (k === a.key) return;
+          if (typeof sc[k] !== 'number') maxFuture += 2 * (fi + 1);   // best case: five of that face
+        });
+        if (upAfter + maxFuture < 0) pen = G.UPPER_PENALTY;           // negative number part now locked in
+      }
+      var val = imm + cont + pen;
+      if (val > bv) { bv = val; best = a; }
+    });
+    return best;
+  }
   function expAiFinish() {
     var p = G.currentPlayer(game);
     var cell;
     if (evxReady && p.persona && expCol >= 1) {
-      // EV bot picks the category within the active free column; col is fixed by progression
-      var key = EVX.botCategory(p.cols[expCol], dice, p.persona.policy, Math.random);
-      cell = { col: expCol, key: key };
+      cell = expChooseCellEV(p, dice);     // EV value + exact penalty-at-the-margin
     } else {
       cell = X.aiChooseCell(p, dice);
     }
