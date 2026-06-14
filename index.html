@@ -605,8 +605,19 @@ body.modal-open{ overflow:hidden; }
 .mtile.forfeit{ background:rgba(150,150,138,.18); color:var(--gen-muted); border-color:var(--gen-ink-line); box-shadow:inset 0 0 0 2px rgba(255,255,255,.05); }
 .mtile.forfeit .mval, .mtile.forfeit .mlab{ color:var(--gen-muted); }
 .mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
-/* ===== experimental three-column card ===== */
-.expboard{ position:relative; z-index:1; padding:0 8px; }   /* lift above the camo layer */
+/* ===== experimental: stage bar + reused tile board ===== */
+.expboard{ position:relative; z-index:1; padding:4px 16px 0; }   /* lift above the camo layer */
+.stagebar{ display:flex; gap:6px; }
+.stagecol{ flex:1; display:flex; flex-direction:column; align-items:center; gap:1px; padding:5px 4px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
+.stagecol.on{ border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.12); }
+.stagecol.done{ opacity:.7; }
+.stagecol .st-rom{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
+.stagecol.on .st-rom{ color:var(--gen-brass-bright); }
+.stagecol .st-pts{ font-family:var(--gen-font-display); font-weight:700; font-size:17px; color:var(--gen-brass); font-variant-numeric:tabular-nums; line-height:1.05; }
+.stagecol .st-sub{ font-size:9px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+.stagecol .st-sub.neg{ color:#e8807a; }
+.tile.up.neg .pts{ color:#e8807a; }
+/* compact recap table (end-of-game summary only) */
 .expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
 .expgrid th{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-muted); padding:3px 0; text-align:center; }
 .expgrid th.act{ color:var(--gen-brass-bright); }
@@ -1116,13 +1127,13 @@ body.modal-open{ overflow:hidden; }
     <button id="hintBtn" class="minibtn" title="Съвет от щаба (оптимален ход)">СЪВЕТ</button>
   </div>
 
+  <!-- experimental stage bar (which stage + per-stage point counters); the active
+       stage's card is drawn into the standard .sheet board below -->
+  <div id="expBoard" class="expboard hidden"></div>
   <div class="sheet">
     <div id="boardUpper" class="upper"></div>
     <div id="boardLower" class="lower"></div>
   </div>
-
-  <!-- experimental three-column card (shown only in the experimental ruleset) -->
-  <div id="expBoard" class="expboard hidden"></div>
 
   <!-- running points, sitting above the medals separator; the advice popup overlays it -->
   <div id="dockHead" class="dockhead">
@@ -2922,8 +2933,8 @@ body.modal-open{ overflow:hidden; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.add('hidden');
-    document.querySelector('.sheet').classList.add('hidden');
-    $('expBoard').classList.remove('hidden');
+    document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
+    $('expBoard').classList.remove('hidden');                      // the stage bar above it
     document.querySelector('.dock').classList.remove('hidden');
     $('manualDock').classList.add('hidden');
     expBeginTurn();
@@ -2966,12 +2977,12 @@ body.modal-open{ overflow:hidden; }
     p.reserve--; throwsLeft = 1;                 // one extra re-roll, only in column III
     expRenderAll();
   }
-  function expCommit(col, key) {
+  function expCommit(col, key, value) {
     var p = G.currentPlayer(game);
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, col, key)) return;
     X.bankReserve(p, throwsLeft);                // unused throws bank as reserve rolls
-    X.assignScore(p, col, key, dice);
+    X.assignScore(p, col, key, dice, value);     // value omitted → the cell's score for the dice
     locked = true; expRenderAll(); $('fire').disabled = true; $('expReserve').classList.add('hidden');
     turnTimer = setTimeout(expEndTurn, END_DELAY);
   }
@@ -3090,13 +3101,60 @@ body.modal-open{ overflow:hidden; }
     html += '<tr class="ec-tot"><td>Общо</td>' + [0, 1, 2].map(function (col) { return '<td>' + G.colTotalExp(p.cols[col], col) + '</td>'; }).join('') + '</tr>';
     return html + '</tbody></table>';
   }
+  // the active stage's card drawn with the STANDARD tile board (+ the два чифта tile),
+  // plus a stage bar showing which stage is live and the three per-stage totals.
   function expRenderBoard() {
-    var p = G.currentPlayer(game);
-    var interactive = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
-    $('expBoard').innerHTML = expCardHTML(p, interactive);
-    $('expBoard').querySelectorAll('.ec-cell.av').forEach(function (td) {
-      td.onclick = function () { expCommit(+td.getAttribute('data-col'), td.getAttribute('data-key')); };
+    var p = G.currentPlayer(game), sc = p.cols[expCol];
+    var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    var avail = {};
+    if (canScore) X.availableCells(p).forEach(function (a) { avail[a.key] = 1; });   // col I → only the forced next
+    // ---- number part (deviation tiles) ----
+    $('boardUpper').innerHTML = '';
+    G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
+      var key = c.key, done = typeof sc[key] === 'number';
+      var dev = done ? sc[key] : (canScore ? G.scoreForExp(key, dice) : null);
+      var neg = (done ? sc[key] : dev) < 0;
+      var el = document.createElement('button');
+      el.className = 'tile up' + (done ? ' done' : '') + (neg ? ' neg' : '');
+      var open = canScore && !done && avail[key];
+      var pts = done ? sc[key] : (open ? (dev > 0 ? '+' + dev : dev) : '·');
+      el.innerHTML = '<span class="face-n">' + c.label + '</span><span class="pts' + (open ? ' upchip' : '') + '">' + pts + '</span>';
+      if (open) el.onclick = function () { expCommit(expCol, key); };   // upper takes its (signed) deviation
+      $('boardUpper').appendChild(el);
     });
+    // ---- combinations (sum scoring, incl. два чифта) ----
+    $('boardLower').innerHTML = '';
+    G.CATEGORIES_EXP.filter(function (c) { return c.group === 'lower'; }).forEach(function (c) {
+      var key = c.key, done = typeof sc[key] === 'number';
+      var row = document.createElement('div');
+      row.className = 'tile low' + (done ? ' done' : '') + (done && sc[key] === 0 ? ' void' : '');
+      var head = '<span class="cname">' + c.label + '</span>';
+      if (done) { row.innerHTML = head + '<span class="lval">' + sc[key] + '</span>'; }
+      else {
+        row.innerHTML = head + '<span class="acts"></span>';
+        var acts = row.querySelector('.acts');
+        if (canScore && avail[key]) {
+          var v = G.scoreForExp(key, dice);
+          if (v > 0) { var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v; chip.onclick = function (e) { e.stopPropagation(); expCommit(expCol, key, v); }; acts.appendChild(chip); }
+          var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се'); x.onclick = function (e) { e.stopPropagation(); expCommit(expCol, key, 0); }; acts.appendChild(x);
+          row.style.cursor = 'pointer';
+          row.onclick = function () { v > 0 ? expCommit(expCol, key, v) : expCommit(expCol, key, 0); };
+        }
+      }
+      $('boardLower').appendChild(row);
+    });
+    expRenderStage(p);
+  }
+  // stage marker + the three per-stage point counters
+  function expRenderStage(p) {
+    var roman = ['I', 'II', 'III'];
+    $('expBoard').innerHTML = '<div class="stagebar">' + [0, 1, 2].map(function (col) {
+      var st = G.colUpperState(p.cols[col], col), tot = G.colTotalExp(p.cols[col], col);
+      var cls = 'stagecol' + (col === expCol ? ' on' : '') + (col < expCol ? ' done' : '');
+      return '<div class="' + cls + '"><span class="st-rom">Стадий ' + roman[col] + '</span>'
+        + '<span class="st-pts">' + tot + '</span>'
+        + '<span class="st-sub' + (st.penalised ? ' neg' : '') + '">Σ ' + (st.penalised ? '−50' : st.subtotal) + '</span></div>';
+    }).join('') + '</div>';
   }
   function expRenderDice() {
     var p = G.currentPlayer(game);
