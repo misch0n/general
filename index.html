@@ -606,7 +606,7 @@ body.modal-open{ overflow:hidden; }
 .mtile.forfeit .mval, .mtile.forfeit .mlab{ color:var(--gen-muted); }
 .mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
 /* ===== experimental three-column card ===== */
-.expboard{ padding:0 8px; }
+.expboard{ position:relative; z-index:1; padding:0 8px; }   /* lift above the camo layer */
 .expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
 .expgrid th{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-muted); padding:3px 0; text-align:center; }
 .expgrid th.act{ color:var(--gen-brass-bright); }
