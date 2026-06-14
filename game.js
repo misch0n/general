@@ -516,21 +516,45 @@
     chance:  'шанс — сборът от всичките пет зара, каквото и да се падне.',
   };
 
-  // Shaming intros for the combo reminder tooltip.
+  // Floor-flop shame lines. %combo% = the combo's spoken name, %val% = the points
+  // scored (the cell's floor, or 0 for a forfeit). Tokens are %…% so genderFill's
+  // {…} pass leaves them alone.
   var SHAME_LINES = [
-    'Пак забрави, а? Гинкобилобата е в шкафа.',
-    'Сериозно? Това го учат в казармата първия ден.',
-    'Виж го ти — забрави устава.',
-    'Маразъм ли те хвана? Чети внимателно.',
-    'Ето ти подсказка, новобранец.',
-    'Главата ти само за каска ли става?',
-    'Стига си се правил на ударен. Запомни го.',
-    'Дъртофелнико, пак ли не помниш?',
+    'Дъно! %combo% за цели %val% точки.',
+    '%combo% за %val%? По-надолу няма накъде, войнико.',
+    'Поздравления — удари дъното: %combo%, %val% т.',
+    '%combo% за %val%. Баба ти хвърля по-добре.',
+    'Цели %val% от %combo%. Снимай го за устава.',
+    '%combo%: %val% точки. Гръмни заровете и почни пак.',
+    'Толкова ли? %combo% за %val% — срам за пагона.',
+    'Дъно на дъната: %combo% за %val%.',
   ];
+
+  // The lowest possible (non-zero) score per VARIABLE-sum combo. Fixed-value combos
+  // (straights, general) aren't here — their only value is never a "flop".
+  var COMBO_FLOOR = {
+    ones: 1, twos: 2, threes: 3, fours: 4, fives: 5, sixes: 6,
+    twoKind: 2, threeKind: 3, fourKind: 4, fullHouse: 7, chance: 5,
+  };
+
+  // A "floor flop" = a forfeit (0 pts, any cell) or a variable combo scored at its
+  // lowest possible value. Fixed-value combos never flop on their own value.
+  function isFloorFlop(categoryKey, value) {
+    if (value <= 0) return true;                                    // a forfeit
+    if (!Object.prototype.hasOwnProperty.call(COMBO_FLOOR, categoryKey)) return false;
+    return value <= COMBO_FLOOR[categoryKey];                       // hit the cell's floor
+  }
+
+  // Build the combo-dependent shame for a floor flop.
+  function floorShame(categoryKey, value, gender) {
+    var combo = ORDER_NAMES[categoryKey] || 'комбинация';
+    var tpl = SHAME_LINES[Math.floor(Math.random() * SHAME_LINES.length)];
+    return genderFill(tpl.replace(/%combo%/g, combo).replace(/%val%/g, value), gender);
+  }
 
   // Was a commit genuinely disappointing (worth a roast)? Either the player
   // ended up with (next to) nothing, or they re-rolled everything and still
-  // scraped together almost no points.
+  // scraped together almost no points. (Kept for compatibility / analytics.)
   function isDisappointing(value, rerolledAll) {
     if (value <= 3) return true;            // ended up with nothing
     if (rerolledAll && value < 15) return true; // gambled the lot for scraps
@@ -546,9 +570,9 @@
     general: 'генерал', chance: 'шанс',
   };
 
-  // The general's marching order shown at the start of a turn.
+  // The general's wager, shown (rarely) at the start of a turn: he bets you can't roll it.
   function orderText(addressee, categoryKey) {
-    return addressee + ', генералът ти заповядва да хвърлиш ' + (ORDER_NAMES[categoryKey] || '...') + '!';
+    return addressee + ', на бас, че не можеш да хвърлиш ' + (ORDER_NAMES[categoryKey] || '...') + '!';
   }
 
   // Fill a roast template's grammar tokens for the given (premium) combo.
@@ -1049,6 +1073,9 @@
     atRiskPremium: atRiskPremium,
     ROASTS: ROASTS,
     isDisappointing: isDisappointing,
+    isFloorFlop: isFloorFlop,
+    floorShame: floorShame,
+    COMBO_FLOOR: COMBO_FLOOR,
     ORDER_NAMES: ORDER_NAMES,
     orderText: orderText,
     COMBO_GRAMMAR: COMBO_GRAMMAR,

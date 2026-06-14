@@ -346,10 +346,29 @@ test('roast pools are non-empty', function () {
   assert.ok(G.ROASTS.risk.length > 0 && G.ROASTS.fail.length > 0 && G.ROASTS.flop.length > 0);
 });
 
-test('orderText builds a coherent command, every category has a name', function () {
-  assert.strictEqual(G.orderText('Майор', 'fullHouse'), 'Майор, генералът ти заповядва да хвърлиш фул хаус!');
-  assert.strictEqual(G.orderText('Ефрейтор', 'sixes'), 'Ефрейтор, генералът ти заповядва да хвърлиш шестици!');
+test('orderText builds a coherent wager, every category has a name', function () {
+  assert.strictEqual(G.orderText('Майор', 'fullHouse'), 'Майор, на бас, че не можеш да хвърлиш фул хаус!');
+  assert.strictEqual(G.orderText('Ефрейтор', 'sixes'), 'Ефрейтор, на бас, че не можеш да хвърлиш шестици!');
   G.CATEGORIES.forEach(function (c) { assert.ok(G.ORDER_NAMES[c.key], 'missing order name for ' + c.key); });
+});
+
+test('isFloorFlop fires on forfeits and variable-combo floors, not fixed combos', function () {
+  assert.strictEqual(G.isFloorFlop('chance', 0), true);          // forfeit
+  assert.strictEqual(G.isFloorFlop('largeStraight', 0), true);   // forfeit on a fixed combo still flops
+  assert.strictEqual(G.isFloorFlop('ones', 1), true);            // floor of ones
+  assert.strictEqual(G.isFloorFlop('threeKind', 3), true);       // floor of three-of-a-kind
+  assert.strictEqual(G.isFloorFlop('chance', 5), true);          // floor of chance
+  assert.strictEqual(G.isFloorFlop('chance', 18), false);        // a real chance score
+  assert.strictEqual(G.isFloorFlop('sixes', 12), false);         // two sixes — above the floor
+  assert.strictEqual(G.isFloorFlop('smallStraight', 15), false); // fixed value isn't a flop
+  assert.strictEqual(G.isFloorFlop('general', 60), false);       // fixed value isn't a flop
+});
+
+test('floorShame names the combo and the value, leaving no raw tokens', function () {
+  var s = G.floorShame('threeKind', 3, 'm');
+  assert.ok(s.indexOf('три еднакви') >= 0, 'mentions the combo');
+  assert.ok(s.indexOf('3') >= 0, 'mentions the value');
+  assert.ok(s.indexOf('%') < 0, 'no leftover %tokens%');
 });
 
 test('isDisappointing flags nothing-scores and all-in flops', function () {

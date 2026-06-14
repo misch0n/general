@@ -2447,12 +2447,9 @@ body.modal-open{ overflow:hidden; }
     });
   }
 
-  // make a category name tappable for the shaming reminder tooltip (human only)
-  function attachTip(nameEl, key, isAI) {
-    if (isAI || !fun()) return;                    // combo tooltips/penalties off outside казарма mode
-    nameEl.classList.add('tappable');
-    nameEl.onclick = function (e) { e.stopPropagation(); comboReminder(key, nameEl); };
-  }
+  // combo hints + the random penalties are retired — category names are no longer
+  // tappable. The low-point shaming now fires automatically on a floor-flop commit.
+  function attachTip(nameEl, key, isAI) { /* no-op */ }
 
   function boardKeys(group) {
     if (fx.order && fx.order[group]) return fx.order[group];
@@ -2750,7 +2747,7 @@ body.modal-open{ overflow:hidden; }
     $('fire').disabled = true;
     // after an AI turn, hold the board a beat so players can read it
     var delay = !manualMode && p.isAI ? AI_VIEW_DELAY : END_DELAY;
-    if ((manualMode || !p.isAI) && G.isDisappointing(value, rerolledAll) && showRoast()) delay = ROAST_MS + 250;
+    if ((manualMode || !p.isAI) && G.isFloorFlop(key, value) && showRoast(key, value)) delay = ROAST_MS + 250;
     turnTimer = setTimeout(endTurn, delay);
   }
   var turnTimer = null;
@@ -2822,6 +2819,10 @@ body.modal-open{ overflow:hidden; }
   // the general's order at turn start: aim for a still-open category
   function showOrder(player) {
     if (!fun()) return;                            // callouts off outside казарма mode
+    // the general's wager is rare — and ramps up over the last 1-3 rounds
+    var left = G.CATEGORIES.length - game.round;   // rounds remaining (0 on the final one)
+    var chance = left >= 3 ? 0.06 : left === 2 ? 0.22 : left === 1 ? 0.38 : 0.55;
+    if (Math.random() >= chance) return;
     var open = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(player, c.key); });
     if (!open.length) return;
     var cat = open[Math.floor(Math.random() * open.length)];
@@ -2834,10 +2835,10 @@ body.modal-open{ overflow:hidden; }
     roastTimer = setTimeout(clearRoast, ORDER_MS);
   }
 
-  function showRoast() {
+  function showRoast(key, value) {
     if (!fun()) return false;                      // roasts off outside казарма mode
-    var line = G.genderFill(G.ROASTS.flop[roastIx % G.ROASTS.flop.length], G.currentPlayer(game).gender);
-    roastIx++;
+    // combo-dependent floor shame (names the combo + the rock-bottom value)
+    var line = G.floorShame(key, value, G.currentPlayer(game).gender);
     var box = $('roast');
     box.className = 'roast show';
     box.innerHTML = '<span class="bubble">' + esc(line) + '</span>';
