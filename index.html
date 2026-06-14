@@ -4399,9 +4399,8 @@ body.modal-open{ overflow:hidden; }
       var f = typeof scores[c.key] === 'number', hl = c.key === hlKey ? ' hl' : '';
       var ff = f && scores[c.key] === 0 ? ' forfeit' : '';   // a sacrificed (0) cell is greyed out
       var isRec = f && recKeys && recKeys[c.key];             // this player holds the highest result here
-      // slightly tint the whole cell in the player's colour (not just the number)
-      // keep the cell as-is, just a slight player-colour accent on the border (not a fill)
-      var mstyle = isRec && myCol ? ' style="border-color:' + myCol + ';box-shadow:inset 0 0 0 2px rgba(255,255,255,.14),0 0 0 1.5px ' + rgba(myCol, 0.5) + '"' : '';
+      // record accent: a faint glow radiating outward from the cell, in the player's colour
+      var mstyle = isRec && myCol ? ' style="box-shadow:0 0 9px 1px ' + rgba(myCol, 0.6) + ', 0 0 3px ' + rgba(myCol, 0.55) + '"' : '';
       return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + ff + (isRec ? ' rec' : '') + '"' + mstyle + '><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] + 'т.' : '–') + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
