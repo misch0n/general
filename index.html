@@ -671,7 +671,10 @@ body.modal-open{ overflow:hidden; }
 
 /* device-owner token (seat #1) */
 .ownertok{ display:inline-grid; place-items:center; width:16px; height:16px; margin-right:5px; vertical-align:middle; flex:none;
-  background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; font-size:10px; font-weight:700; box-shadow:0 0 0 1px var(--gen-brass-stroke); }
+  background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; font-size:10px; font-weight:700; box-shadow:0 0 0 1px var(--gen-brass-stroke);
+  line-height:1; }
+/* the ★ glyph's ink sits a touch low in its em-box — nudge just the glyph to true centre */
+.ownertok > i{ display:block; font-style:normal; transform:translateY(-0.5px); }
 .ownertok.sm{ width:14px; height:14px; font-size:9px; }
 /* owner settings block */
 .ownerbox{ margin:0 0 12px; padding:11px; border:1px solid var(--gen-pill-line); border-radius:10px; background:rgba(0,0,0,.2); }
@@ -1490,7 +1493,7 @@ body.modal-open{ overflow:hidden; }
   // The device owner is a FLAGGED player (p.owner) — the token follows them when
   // the seats are reordered. Initialised on the first player.
   function isOwnerP(p) { return !!(p && p.owner); }
-  function ownerTokenHTML(small) { return '<span class="ownertok' + (small ? ' sm' : '') + '" title="Стопанин на устройството">★</span>'; }
+  function ownerTokenHTML(small) { return '<span class="ownertok' + (small ? ' sm' : '') + '" title="Стопанин на устройството"><i>★</i></span>'; }
   function ownerOf(players) { for (var i = 0; i < players.length; i++) if (players[i].owner) return players[i]; return players[0]; }
   function ensureOwner() { if (setupPlayers.length && !setupPlayers.some(isOwnerP)) setupPlayers[0].owner = true; }
   // force the owner's name to the configured owner name when the toggle is on
