@@ -121,6 +121,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   background:#d8cfa8; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-die);
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 3px 0 rgba(0,0,0,.4); transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
 .die:disabled{ cursor:default; opacity:.92; }
+/* freshly re-rolled dice — gold ring so you can spot what changed in the (re-sorted) tray */
+.die.fresh{ outline:2px solid #ffd86b; outline-offset:2px; }
+.die.fresh::after{ content:''; position:absolute; top:-5px; left:-5px; width:9px; height:9px; border-radius:50%;
+  background:#ffd86b; box-shadow:0 0 7px rgba(255,216,107,.9); }
 /* throw-mode (select-to-throw): marked = the dice you're re-rolling — RED outline + small ✕ */
 .die.sel{ transform:translateY(-7px); border-color:#e0584a; box-shadow:0 0 0 2px #e0584a, 0 0 16px rgba(224,88,74,.55), 0 3px 0 rgba(0,0,0,.4); }
 .die.sel .reticle{ color:#f0a097; border-color:#e0584a; }
@@ -2160,7 +2164,7 @@ body.modal-open{ overflow:hidden; }
     p.persona = { name: 'AI', policy: netAiPolicy(seat) };     // synthetic persona feeding aiKeepMask/aiCategory
     netAiActiveId = activeId;
     netMyTurn = false; awaitingRoll = false; locked = false;
-    throwsLeft = ROLLS - 1; selected = [false, false, false, false, false];
+    throwsLeft = ROLLS - 1; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
     dice = G.rollAll(); sortDice();
     curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     renderAll(); shakeDice(); showOrder(p);
@@ -2199,7 +2203,7 @@ body.modal-open{ overflow:hidden; }
   syncAcousticUI();     // hide every data-over-sound feature unless Акустика is on
 
   // ===================================================== GAME STATE
-  var game = null, dice = [], selected = [false,false,false,false,false], throwsLeft = 0;
+  var game = null, dice = [], selected = [false,false,false,false,false], diceNew = [false,false,false,false,false], throwsLeft = 0;
   var aiBusy = false, locked = false, rerolledAll = false, roastIx = 0, roastTimer = null;
   var moveLog = [];   // per player index: array of completed turn logs
   var curLog = null;  // the in-progress turn log
@@ -2264,6 +2268,7 @@ body.modal-open{ overflow:hidden; }
   function beginTurn() {
     locked = false;
     rerolledAll = false;
+    diceNew = [false, false, false, false, false];   // no "fresh" accent on a turn's first roll
     clearRoast();
     var p = G.currentPlayer(game);
     if (!netMode) saveResume();   // snapshot at every turn boundary (net games aren't resumed locally)
@@ -2591,8 +2596,9 @@ body.modal-open{ overflow:hidden; }
     shown.forEach(function (v, i) {
       var b = document.createElement('button');
       var sel = !fx.dice && fx.diceKeep == null && selected[i];
+      var fresh = !fx.dice && fx.diceKeep == null && diceNew[i];   // just rerolled — accent for easy scanning
       var keepMode = settings.selectKeep;
-      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '');
+      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive;
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
@@ -2663,14 +2669,21 @@ body.modal-open{ overflow:hidden; }
 
   // which dice get RE-THROWN this fire — interprets the tap marks per the keep/throw setting
   function rerollMask() { return settings.selectKeep ? selected.map(function (s) { return !s; }) : selected.slice(); }
+  // re-roll the masked dice, KEEP the tray sorted ascending, and remember which dice are
+  // new (rerolled) so they can be accented — otherwise the new ones vanish into the sort
+  function applyReroll(rr) {
+    var paired = dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i] }; });
+    paired.sort(function (a, b) { return a.v - b.v; });
+    dice = paired.map(function (x) { return x.v; });
+    diceNew = paired.map(function (x) { return x.nw; });
+  }
   function humanFire() {
     if (aiBusy || locked || throwsLeft <= 0) return;
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;                    // nothing to throw
     if (rr.every(Boolean)) rerolledAll = true;        // re-rolled the whole hand
     var kept = rr.map(function (x) { return !x; });
-    dice = dice.map(function (v, i) { return rr[i] ? G.rollDie() : v; });
-    sortDice();
+    applyReroll(rr);
     if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
     selected = [false,false,false,false,false];
     throwsLeft--;
@@ -2768,8 +2781,7 @@ body.modal-open{ overflow:hidden; }
         renderDice();
         setTimeout(function () {
           var kept = rr.map(function (x) { return !x; });
-          dice = dice.map(function (v, i) { return rr[i] ? G.rollDie() : v; });
-          sortDice();
+          applyReroll(rr);
           if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
           selected = [false,false,false,false,false]; throwsLeft--;
           renderAll(); shakeDice();
