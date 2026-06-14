@@ -880,7 +880,12 @@ body.modal-open{ overflow:hidden; }
 .progchart .pc-leg{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; color:var(--gen-text); }
 .progchart .pc-sw{ width:10px; height:10px; border-radius:50%; flex:none; }
 /* per-battle career charts (owner dossier): points / skill / luck across recent games */
-.ocard{ margin:10px 0 4px; padding:9px 10px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
+.ocharts{ margin:0 0 10px; }
+.oc-tabs{ display:flex; gap:6px; }
+.oc-tab{ flex:1; padding:7px 6px; border-radius:8px; cursor:pointer; background:var(--gen-pill); border:1px solid var(--gen-pill-line);
+  color:var(--gen-label); font-family:var(--gen-font-display); font-weight:700; font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.oc-tab.on{ color:var(--gen-brass-bright); border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.1); }
+.ocard{ margin:8px 0 4px; padding:9px 10px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
 .oc-title{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.7px; color:var(--gen-brass); font-size:10.5px; margin-bottom:4px; }
 .oc-wrap{ position:relative; }
 .oc-svg{ width:100%; height:auto; display:block; touch-action:none; }   /* none → vertical wobble never cancels the scrub */
@@ -4415,8 +4420,8 @@ body.modal-open{ overflow:hidden; }
       var f = typeof scores[c.key] === 'number', hl = c.key === hlKey ? ' hl' : '';
       var ff = f && scores[c.key] === 0 ? ' forfeit' : '';   // a sacrificed (0) cell is greyed out
       var isRec = f && recKeys && recKeys[c.key];             // this player holds the highest result here
-      // record accent: a faint glow radiating outward from the cell, in the player's colour
-      var mstyle = isRec && myCol ? ' style="box-shadow:0 0 9px 1px ' + rgba(myCol, 0.6) + ', 0 0 3px ' + rgba(myCol, 0.55) + '"' : '';
+      // record accent: an inward glow + inset ring in the player's colour (reads clearly on the small cell)
+      var mstyle = isRec && myCol ? ' style="box-shadow:inset 0 0 9px 1px ' + rgba(myCol, 0.75) + ', inset 0 0 0 1.6px ' + rgba(myCol, 0.6) + '"' : '';
       return '<div class="mtile ' + (up ? 'up' : 'low') + (f ? '' : ' empty') + hl + ff + (isRec ? ' rec' : '') + '"' + mstyle + '><span class="mlab">' + c.label + '</span><span class="mval">' + (f ? scores[c.key] + 'т.' : '–') + '</span></div>';
     }
     var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
@@ -4692,18 +4697,20 @@ body.modal-open{ overflow:hidden; }
     ownerCharts = null;
     if (!c || c.data.length < 2) return '';
     var color = settings.ownerColor || '#d4a02e';
-    var defs = [['points', 'Точки по битки'], ['skill', 'Точност по битки'], ['luck', 'Късмет по битки']];
-    var charts = {}, html = '';
+    var defs = [['points', 'Точки'], ['skill', 'Точност'], ['luck', 'Късмет']];
+    var charts = {}, tabs = '', cards = '';
     defs.forEach(function (d) {
       var ch = makeOwnerChart(d[0], ownerChartSeries(c.data, d[0]), color);
       if (!ch) return;
       charts[d[0]] = ch;
-      html += '<div class="ocard"><div class="oc-title">' + d[1] + '</div>'
+      // each category gets a button; its chart sits collapsed underneath (toggled on tap)
+      tabs += '<button type="button" class="oc-tab" data-kind="' + d[0] + '">' + d[1] + '</button>';
+      cards += '<div class="ocard hidden" data-card="' + d[0] + '">'
         + '<div class="oc-wrap"><svg viewBox="0 0 ' + ch.W + ' ' + ch.H + '" class="oc-svg" data-kind="' + d[0] + '" preserveAspectRatio="xMidYMid meet">'
         + ch.svg + '</svg><div class="oc-readout hidden"></div></div></div>';
     });
     ownerCharts = charts;
-    return html ? ('<div class="ho-sechd">Форма по битки</div>' + html) : '';
+    return tabs ? ('<div class="ocharts"><div class="oc-tabs">' + tabs + '</div>' + cards + '</div>') : '';
   }
   // attach the drag-to-scrub reader to each career chart (after its SVG is in the DOM)
   function wireOwnerCharts() {
@@ -4732,6 +4739,17 @@ body.modal-open{ overflow:hidden; }
       svg.addEventListener('pointermove', function (e) { if (on) show(e.clientX); });
       svg.addEventListener('pointerup', function () { on = false; hide(); });
       svg.addEventListener('pointercancel', function () { on = false; hide(); });
+    });
+    // each category button toggles its (collapsed-by-default) chart
+    $('historyOverview').querySelectorAll('.oc-tab').forEach(function (tab) {
+      tab.onclick = function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var kind = tab.getAttribute('data-kind');
+        var card = $('historyOverview').querySelector('.ocard[data-card="' + kind + '"]');
+        if (!card) return;
+        var open = card.classList.toggle('hidden') === false;
+        tab.classList.toggle('on', open);
+      };
     });
   }
 
@@ -4768,6 +4786,8 @@ body.modal-open{ overflow:hidden; }
       + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">' + esc(name) + '</span>'
       + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
+    // §2.7 per-battle form charts sit at the TOP of the body — three collapsible buttons
+    h += buildOwnerCharts(c);
     // analysis-category breakdown (colour-coded labels) sits between the name and recent battles
     h += careerAverages(c.report, { biggest: favBl ? { key: favBl, n: favN } : null, achievements: topGood });
     h += '<div class="histline">Последни битки:</div><div class="histform' + (recent.length >= 10 ? ' full' : '') + '">' + (form || '—') + '</div>';
@@ -4784,8 +4804,6 @@ body.modal-open{ overflow:hidden; }
     }
     var worst = c.catList.slice().filter(function (x) { return x.fills >= 2; }).sort(function (a, b) { return b.avgLeak - a.avgLeak; })[0];
     if (worst && worst.avgLeak > 0.6) h += '<div class="coachline career">🎖 За повишение наблегни на <b>' + esc(worst.label) + '</b> — там пробивът ти в строя е най-голям (средно −' + worst.avgLeak.toFixed(1) + ' т. на игра). Категорията, която да тренираш.</div>';
-    // §2.7 per-battle form charts: points / skill / luck across recent games
-    h += buildOwnerCharts(c);
     // category board (same layout as the end-game Категории)
     h += careerCatBoard(c);
     h += '</div></details>';
