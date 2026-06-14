@@ -124,10 +124,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   background:#d8cfa8; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-die);
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 3px 0 rgba(0,0,0,.4); transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
 .die:disabled{ cursor:default; opacity:.92; }
-/* freshly re-rolled dice — gold ring so you can spot what changed in the (re-sorted) tray */
-.die.fresh{ outline:2px solid #ffd86b; outline-offset:2px; }
-.die.fresh::after{ content:''; position:absolute; top:-5px; left:-5px; width:9px; height:9px; border-radius:50%;
-  background:#ffd86b; box-shadow:0 0 7px rgba(255,216,107,.9); }
+/* freshly re-rolled dice — a subtle gold hint so you can spot what changed */
+.die.fresh{ outline:1.5px solid rgba(255,216,107,.45); outline-offset:1px; }
+.die.fresh::after{ content:''; position:absolute; top:-3px; left:-3px; width:6px; height:6px; border-radius:50%; background:rgba(255,216,107,.8); }
 /* throw-mode (select-to-throw): marked = the dice you're re-rolling — RED outline + small ✕ */
 .die.sel{ transform:translateY(-7px); border-color:#e0584a; box-shadow:0 0 0 2px #e0584a, 0 0 16px rgba(224,88,74,.55), 0 3px 0 rgba(0,0,0,.4); }
 .die.sel .reticle{ color:#f0a097; border-color:#e0584a; }
