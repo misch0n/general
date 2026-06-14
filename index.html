@@ -132,6 +132,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .fire:active:not(:disabled){ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-brass-dark); }
 .fire:disabled{ background:var(--gen-disabled); color:#cfcca8; box-shadow:none; border-color:var(--gen-disabled-line); cursor:default; }
 .fire-wrap{ position:relative; }
+.fire-wrap .fire{ width:100%; }   /* keep the button full-width like before (it used to be the flex child) */
 /* small ? square on the left of the fire button — opens the throw/keep chooser (works even when the button is disabled) */
 .fire-q{ position:absolute; left:9px; top:calc(50% - 13px); width:26px; height:26px; display:grid; place-items:center; z-index:2;
   border-radius:6px; border:1.5px solid rgba(28,29,22,.55); background:rgba(0,0,0,.14); color:var(--gen-ink); cursor:pointer;
