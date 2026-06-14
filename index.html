@@ -65,6 +65,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .totalbox{ display:flex; flex-direction:column; align-items:center; flex:none; position:relative; }
 .ptotal{ font-family:var(--gen-font-display); font-weight:700; font-size:26px; color:var(--gen-brass); line-height:1; font-variant-numeric:tabular-nums; }
 .ptotal.rnum{ font-size:20px; color:var(--gen-text); }   /* round X/14 in the header */
+.ptotal.rnum .rsub{ font-size:11px; font-weight:400; letter-spacing:0; vertical-align:-3px; color:var(--gen-muted); }   /* /14 — smaller, thinner, dropped */
 .tcap{ font-size:8px; letter-spacing:2px; color:var(--gen-muted); margin-top:2px; }
 .badge-ai{ font-family:var(--gen-font-display); font-size:9px; font-weight:700; letter-spacing:1px; color:var(--gen-ink);
   background:var(--gen-brass); border-radius:3px; padding:1px 4px; margin-left:6px; vertical-align:middle; }
@@ -2424,7 +2425,7 @@ body.modal-open{ overflow:hidden; }
     // temporary penalties trim the DISPLAYED total: a fine, plus any zeroed-out combos
     var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
     $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
-    $('curRound').textContent = game.round + '/' + G.CATEGORIES.length;   // which turn of the game
+    $('curRound').innerHTML = game.round + '<span class="rsub">/' + G.CATEGORIES.length + '</span>';   // which turn of the game
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
