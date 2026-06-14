@@ -40,9 +40,12 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .banner,.hd,.pstrip,.sheet,.divider,.dock,.setup-body{ position:relative; z-index:1; }
 
 /* classification banner */
-.banner{ height:24px; display:flex; align-items:center; justify-content:center; background:var(--gen-ink);
-  color:var(--gen-brass); font-family:var(--gen-font-display); font-weight:700; font-size:11px; letter-spacing:2px;
-  border-bottom:2px solid var(--gen-brass); overflow:hidden; }
+/* top-center scoreboard banner: the current player's running points */
+.banner{ position:relative; min-height:36px; display:flex; align-items:center; justify-content:center; gap:9px; padding:5px 36px;
+  background:var(--gen-ink); border-bottom:2px solid var(--gen-brass); overflow:hidden; }
+.banner .bpts{ font-family:var(--gen-font-display); font-weight:700; font-size:25px; color:var(--gen-brass); line-height:1;
+  font-variant-numeric:tabular-nums; text-shadow:0 1px 2px rgba(0,0,0,.5); }
+.banner .bcap{ font-size:9px; letter-spacing:2.5px; color:var(--gen-muted); }
 .banner::before,.banner::after{ content:''; position:absolute; top:0; bottom:0; width:30px;
   background:repeating-linear-gradient(45deg, var(--gen-brass) 0 6px, var(--gen-ink) 6px 12px); }
 .banner::before{ left:0; } .banner::after{ right:0; }
@@ -59,6 +62,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ribbons i{ display:block; height:6px; border:1px solid rgba(0,0,0,.45); box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
 .totalbox{ display:flex; flex-direction:column; align-items:center; flex:none; position:relative; }
 .ptotal{ font-family:var(--gen-font-display); font-weight:700; font-size:26px; color:var(--gen-brass); line-height:1; font-variant-numeric:tabular-nums; }
+.ptotal.rnum{ font-size:20px; color:var(--gen-text); }   /* round X/14 in the header */
 .tcap{ font-size:8px; letter-spacing:2px; color:var(--gen-muted); margin-top:2px; }
 .badge-ai{ font-family:var(--gen-font-display); font-size:9px; font-weight:700; letter-spacing:1px; color:var(--gen-ink);
   background:var(--gen-brass); border-radius:3px; padding:1px 4px; margin-left:6px; vertical-align:middle; }
@@ -998,7 +1002,7 @@ body.modal-open{ overflow:hidden; }
 
 <!-- ============ GAME ============ -->
 <div id="game" class="board hidden">
-  <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО</div>
+  <div class="banner"><span id="curTotal" class="bpts">0</span><span class="bcap">ТОЧКИ</span></div>
   <div id="netLink" class="netlink hidden"></div>
 
   <div class="hd">
@@ -1011,8 +1015,8 @@ body.modal-open{ overflow:hidden; }
       </span>
     </span>
     <span class="totalbox">
-      <span id="curTotal" class="ptotal">0</span>
-      <span class="tcap">ТОЧКИ</span>
+      <span id="curRound" class="ptotal rnum">1/14</span>
+      <span class="tcap">ХОД</span>
     </span>
   </div>
 
@@ -2409,6 +2413,7 @@ body.modal-open{ overflow:hidden; }
     // temporary penalties trim the DISPLAYED total: a fine, plus any zeroed-out combos
     var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
     $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
+    $('curRound').textContent = game.round + '/' + G.CATEGORIES.length;   // which turn of the game
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
