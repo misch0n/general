@@ -3046,7 +3046,14 @@ body.modal-open{ overflow:hidden; }
       return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">'
         + '<span class="pdot" style="background:' + p.color + '"></span>' + initials(p.name) + ' · ' + X.total(p) + '</button>';
     }).join('');
-    $('pillWrap').querySelectorAll('.ppill').forEach(function (b) { b.onclick = function () { /* peek not yet wired for exp */ }; });
+    $('pillWrap').querySelectorAll('.ppill').forEach(function (b) { b.onclick = function () { expPeek(+b.getAttribute('data-i')); }; });
+  }
+  function expPeek(i) {
+    var p = game.players[i];
+    $('peekTitle').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
+    $('peekBody').innerHTML = expCardHTML(p);
+    $('peekTotal').textContent = X.total(p);
+    $('peekModal').classList.remove('hidden');
   }
   // single-card recap (end-of-game summary)
   function expCardHTML(p) {
