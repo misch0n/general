@@ -5576,9 +5576,9 @@ body.modal-open{ overflow:hidden; }
     };
   });
   function showRuleBubble() {
-    $('ruleBubble').innerHTML = '<b>Експериментален</b> — българският „Генерал“ в три колони '
-      + '(числова част със знак, „два чифта“, −50 за неизчистена колона). '
-      + '<i>Все още се изгражда — засега се играе по стандартните правила.</i>';
+    $('ruleBubble').innerHTML = '<b>Експериментален</b> — българският „Генерал“ в три колони: '
+      + 'колона I в ред (без −50), колони II/III свободни (−50 за минусова числова част), '
+      + 'резервни хвърляния в колона III. Числова част със знак, плюс „два чифта“.';
     $('ruleBubble').classList.remove('hidden');
   }
   $('ruleHelp').onclick = function (e) { e.preventDefault(); e.stopPropagation(); $('ruleBubble').classList.toggle('hidden'); if (!$('ruleBubble').innerHTML) showRuleBubble(); };
