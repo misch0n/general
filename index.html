@@ -53,8 +53,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .dockhead{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 16px; }
 .pointsbox{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; }
 .pointsbox .ptotal{ font-size:46px; }   /* the points number — big; ТОЧКИ caption stays small */
-/* the advice popup OVERLAYS the points (grows upward over the board) — never pushes the dice */
-.dockhead .hintline{ position:absolute; left:12px; right:12px; bottom:-2px; z-index:9;
+/* the advice popup OVERLAYS the points — it starts just below the combo cells (top of this
+   strip) and grows downward over the points/medals, so it never covers the board or the dice */
+.dockhead .hintline{ position:absolute; left:12px; right:12px; top:0; z-index:9;
   background:rgba(9,11,6,.97); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 6px 18px rgba(0,0,0,.55); }
 .rank{ width:40px; height:40px; flex:none; display:grid; place-items:center; background:var(--gen-pill); color:var(--gen-brass);
   border:2px solid var(--pc); border-radius:var(--gen-r-tag); font-family:var(--gen-font-display); font-weight:700; font-size:15px;
