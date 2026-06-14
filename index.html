@@ -131,6 +131,21 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   box-shadow:0 4px 0 var(--gen-brass-dark); transition:transform .08s ease; }
 .fire:active:not(:disabled){ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-brass-dark); }
 .fire:disabled{ background:var(--gen-disabled); color:#cfcca8; box-shadow:none; border-color:var(--gen-disabled-line); cursor:default; }
+.fire-wrap{ position:relative; }
+/* small ? square on the left of the fire button — opens the throw/keep chooser (works even when the button is disabled) */
+.fire-q{ position:absolute; left:9px; top:calc(50% - 13px); width:26px; height:26px; display:grid; place-items:center; z-index:2;
+  border-radius:6px; border:1.5px solid rgba(28,29,22,.55); background:rgba(0,0,0,.14); color:var(--gen-ink); cursor:pointer;
+  font-family:var(--gen-font-body); font-weight:700; font-size:14px; line-height:1; padding:0; }
+.fire-q:hover{ background:rgba(0,0,0,.22); }
+/* throw/keep chooser bubble */
+.ktbubble{ position:fixed; z-index:70; max-width:250px; padding:11px 14px; border-radius:12px; background:var(--gen-ink);
+  border:1.5px solid var(--gen-brass-stroke); box-shadow:0 8px 22px rgba(0,0,0,.5); text-align:center; }
+.ktbubble .kt-hd{ font-size:11.5px; color:var(--gen-label); margin-bottom:9px; }
+.ktbubble .kt-opts{ display:flex; gap:16px; justify-content:center; margin-bottom:9px; }
+.ktbubble .kt-opt{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.5px; text-transform:uppercase;
+  background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; padding:1px 3px 3px; color:var(--gen-muted); }
+.ktbubble .kt-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
+.ktbubble .kt-fine{ font-size:10px; color:var(--gen-muted); }
 .aithinking{ height:54px; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; color:var(--gen-brass);
   border:2px dashed var(--gen-brass-dark); border-radius:var(--gen-r-tag); }
 /* pre-roll placeholder: keeps the dock the same height as after the throw */
@@ -1020,7 +1035,10 @@ body.modal-open{ overflow:hidden; }
     <div id="throws" class="throws"></div>
     <div id="dice" class="dice"></div>
     <div id="hintLine" class="hintline hidden"></div>
-    <button id="fire" class="fire">ОГИН!</button>
+    <div id="fireWrap" class="fire-wrap">
+      <button id="fire" class="fire"><span id="fireTxt">ОГИН!</span></button>
+      <button type="button" id="fireQ" class="fire-q" aria-label="Как се избират заровете">?</button>
+    </div>
     <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
   </div>
@@ -1044,6 +1062,14 @@ body.modal-open{ overflow:hidden; }
      where #game is display:none, so it can't be nested inside it) -->
 <div id="colorPop" class="colorpop hidden"></div>
 <div id="medalTip" class="medaltip hidden"></div>
+<div id="keepThrowTip" class="ktbubble hidden">
+  <div class="kt-hd">Избери зарове, които да:</div>
+  <div class="kt-opts">
+    <button type="button" class="kt-opt" data-keep="0">ХВЪРЛИШ</button>
+    <button type="button" class="kt-opt" data-keep="1">ЗАДЪРЖИШ</button>
+  </div>
+  <div class="kt-fine">* докосни предпочитаното действие</div>
+</div>
 
 <!-- peek -->
 <div id="peekModal" class="overlay hidden">
@@ -2572,20 +2598,21 @@ body.modal-open{ overflow:hidden; }
   function renderFire() {
     if (manualMode) return;
     if (awaitingRoll) {
-      $('fire').classList.add('hidden'); $('aiThinking').classList.add('hidden');
+      $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden');
       $('rollHint').classList.remove('hidden'); // keeps the footer the same height as after the roll
       return;
     }
     $('rollHint').classList.add('hidden');
     var p = G.currentPlayer(game);
     var fire = $('fire'), think = $('aiThinking');
-    if (p.isAI) { fire.classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
-    think.classList.add('hidden'); fire.classList.remove('hidden');
-    var keep = settings.selectKeep, willThrow = rerollMask().some(Boolean);
-    if (locked) { fire.textContent = '…'; fire.disabled = true; }
-    else if (throwsLeft <= 0) { fire.textContent = 'ОТЧЕТИ!'; fire.disabled = true; }
-    else if (!willThrow) { fire.textContent = keep ? 'ДЪРЖИШ ВСИЧКИ' : 'ИЗБЕРИ ЦЕЛИ'; fire.disabled = true; }
-    else { fire.textContent = (keep ? 'ДРЪЖ! · ' : 'ОГИН! · ') + throwsLeft; fire.disabled = false; }
+    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
+    think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
+    var keep = settings.selectKeep, willThrow = rerollMask().some(Boolean), txt;
+    if (locked) { txt = '…'; fire.disabled = true; }
+    else if (throwsLeft <= 0) { txt = 'ОТЧЕТИ!'; fire.disabled = true; }
+    else if (!willThrow) { txt = 'ИЗБЕРИ ЗАРОВЕ!'; fire.disabled = true; }
+    else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
+    $('fireTxt').textContent = txt;
   }
 
   // ---------- dice interaction (select-to-reroll) ----------
@@ -2595,6 +2622,30 @@ body.modal-open{ overflow:hidden; }
     renderDice(); renderFire();
   }
   $('fire').onclick = function () { humanFire(); };
+  // throw/keep chooser — the ? on the fire button replaces the old settings toggle
+  function renderKeepThrowTip() {
+    $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
+      b.classList.toggle('on', (b.getAttribute('data-keep') === '1') === !!settings.selectKeep);
+    });
+  }
+  function showKeepThrowTip() {
+    var tip = $('keepThrowTip');
+    if (!tip.classList.contains('hidden')) { tip.classList.add('hidden'); return; }
+    renderKeepThrowTip(); tip.classList.remove('hidden');
+    var r = $('fireQ').getBoundingClientRect();
+    tip.style.left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8) + 'px';
+    tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';   // above the fire button
+  }
+  $('fireQ').onclick = function (e) { e.stopPropagation(); showKeepThrowTip(); };
+  $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
+    b.onclick = function (e) {
+      e.stopPropagation();
+      settings.selectKeep = b.getAttribute('data-keep') === '1';
+      selected = [false, false, false, false, false];   // the mark meaning inverts; clear it
+      saveSettings(); renderKeepThrowTip();
+      if (game) renderAll();
+    };
+  });
 
   // which dice get RE-THROWN this fire — interprets the tap marks per the keep/throw setting
   function rerollMask() { return settings.selectKeep ? selected.map(function (s) { return !s; }) : selected.slice(); }
@@ -2935,7 +2986,7 @@ body.modal-open{ overflow:hidden; }
     return '<h2>📖 Бойна задача</h2>'
       + '<p class="ht">Печели бойният, който събере най-много точки — и грабва чин <b>Генерал</b>. Последният получава <b>Редник</b>.</p>'
       + '<h3 class="hth">Ходът</h3>'
-      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай зарове и стреляй — или спри по-рано. Кои зарове маркираш зависи от настройка (<b>Настройки → Избери кои да хвърлиш/държиш</b>): по подразбиране маркираш <b>тези за прехвърляне</b> (✛) и натискаш <b>ОГИН!</b>; в другия режим маркираш <b>тези за задържане</b> (✓) и натискаш <b>ДРЪЖ!</b>, а останалите се хвърлят. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
+      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай зарове и стреляй — или спри по-рано. Кои зарове маркираш зависи от твоя избор (докосни <b>?</b> на бутона за огън): по подразбиране маркираш <b>тези за хвърляне</b> (✛) и натискаш <b>ХВЪРЛИ!</b>; в другия режим маркираш <b>тези за задържане</b> (✓) и натискаш <b>ДРЪЖ!</b>, а останалите се хвърлят. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
       + '<h3 class="hth">Категориите и какво искат</h3>'
       + '<button id="howtoCombos" class="btn">📋 Виж комбинациите</button>'
       + '<h3 class="hth">Полеви отчет</h3>'
@@ -3061,9 +3112,7 @@ body.modal-open{ overflow:hidden; }
       sub: { key: 'titlePoints', label: 'Бонус точки', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
       onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
     { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
-    // dice-selection flavour: tap-to-throw (ОГИН!) vs tap-to-keep (ДРЪЖ!)
-    { key: 'selectKeep', labelFn: function (on) { return on ? 'Избери кои да държиш' : 'Избери кои да хвърлиш'; },
-      onChange: function () { selected = [false, false, false, false, false]; if (game) renderAll(); } },
+    // (the tap-to-throw / tap-to-keep flavour moved to the ? on the in-game fire button)
     // Глупости — ON = profanity (NSFW words allowed); OFF = censored to the SFW set
     { key: 'glupost', label: 'Глупости', onChange: function () {
         G.setCensor(!settings.glupost);
@@ -4346,9 +4395,16 @@ body.modal-open{ overflow:hidden; }
     if (g.contains(t) || (t && t.closest && t.closest('.wbadge'))) return;
     g.classList.add('hidden');
   });
+  // tap outside the throw/keep chooser (and not on the ? button) closes it
+  document.addEventListener('click', function (e) {
+    var g = $('keepThrowTip'); if (g.classList.contains('hidden')) return;
+    var t = e.target;
+    if (g.contains(t) || (t && t.closest && t.closest('#fireQ'))) return;
+    g.classList.add('hidden');
+  });
   // changing focus away from the window dismisses transient popovers/explainers
   function dismissTransients() {
-    ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu', 'medalTip'].forEach(function (id) {
+    ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu', 'medalTip', 'keepThrowTip'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.classList.add('hidden');
     });
   }
