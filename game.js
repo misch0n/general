@@ -208,38 +208,21 @@
   }
   function scoreForExp(category, dice) { return Math.max.apply(null, candidatesExp(category, dice)); }
 
-  // The page describes THREE columns (нива): the whole 15-category card is played
-  // three times. Column 0 is filled strictly in table order and a negative number
-  // part is kept as its sum (NO −50); columns 1 & 2 are free order and apply the −50.
-  var COLS_EXP = 3;
-
-  // number-part state for ONE column
-  function colUpperState(scores, colIndex) {
+  // A single 15-row card, filled in any order. The number part (1-6) is a
+  // deviation-around-three section recorded as a flat −50 if it finishes negative
+  // (it's the one mandatory part); zero-or-positive, the surplus is kept.
+  function upperStateExp(scores) {
     var filled = 0, sub = 0;
     UPPER_KEYS.forEach(function (k) { if (typeof scores[k] === 'number') { filled++; sub += scores[k]; } });
     var complete = filled === UPPER_KEYS.length;
-    var penalise = colIndex >= 1 && complete && sub < 0;     // col 0 never penalised
-    return { filled: filled, complete: complete, subtotal: sub, penalised: penalise,
-             contribution: penalise ? UPPER_PENALTY : sub };
-  }
-  // total points for one column's score card
-  function colTotalExp(scores, colIndex) {
-    var lower = 0;
-    CATEGORIES_EXP.forEach(function (c) { if (c.group === 'lower' && typeof scores[c.key] === 'number') lower += scores[c.key]; });
-    return lower + colUpperState(scores, colIndex).contribution;
-  }
-  // grand total across the three columns (cols = [scores0, scores1, scores2])
-  function cardTotalExp(cols) {
-    return (cols || []).reduce(function (t, sc, i) { return t + colTotalExp(sc || {}, i); }, 0);
-  }
-  // column 0 is filled strictly top-to-bottom: the next category that must be played
-  function forcedNextExp(scores) {
-    for (var i = 0; i < CATEGORIES_EXP.length; i++) if (typeof scores[CATEGORIES_EXP[i].key] !== 'number') return CATEGORIES_EXP[i].key;
-    return null;
+    var penalised = complete && sub < 0;
+    return { filled: filled, complete: complete, subtotal: sub, penalised: penalised,
+             contribution: penalised ? UPPER_PENALTY : sub };
   }
   function playerTotalExp(player) {
-    if (player.cols) return cardTotalExp(player.cols);        // three-column card
-    return colTotalExp(player.scores || {}, 1);               // single-card fallback (penalised)
+    var s = player.scores || {}, lower = 0;
+    CATEGORIES_EXP.forEach(function (c) { if (c.group === 'lower' && typeof s[c.key] === 'number') lower += s[c.key]; });
+    return lower + upperStateExp(s).contribution;
   }
 
   // ruleset registry — standard is the default; experimental is opt-in
@@ -1122,11 +1105,7 @@
     candidatesExp: candidatesExp,
     scoreForExp: scoreForExp,
     playerTotalExp: playerTotalExp,
-    colUpperState: colUpperState,
-    colTotalExp: colTotalExp,
-    cardTotalExp: cardTotalExp,
-    forcedNextExp: forcedNextExp,
-    COLS_EXP: COLS_EXP,
+    upperStateExp: upperStateExp,
     UPPER_KEYS: UPPER_KEYS,
     UPPER_PENALTY: UPPER_PENALTY,
     DICE_COUNT: DICE_COUNT,

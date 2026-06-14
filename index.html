@@ -605,17 +605,15 @@ body.modal-open{ overflow:hidden; }
 .mtile.forfeit{ background:rgba(150,150,138,.18); color:var(--gen-muted); border-color:var(--gen-ink-line); box-shadow:inset 0 0 0 2px rgba(255,255,255,.05); }
 .mtile.forfeit .mval, .mtile.forfeit .mlab{ color:var(--gen-muted); }
 .mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
-/* ===== experimental: stage bar + reused tile board ===== */
+/* ===== experimental: number-part bar + reused tile board ===== */
 .expboard{ position:relative; z-index:1; padding:4px 16px 0; }   /* lift above the camo layer */
-.stagebar{ display:flex; gap:6px; }
-.stagecol{ flex:1; display:flex; flex-direction:column; align-items:center; gap:1px; padding:5px 4px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
-.stagecol.on{ border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.12); }
-.stagecol.done{ opacity:.7; }
-.stagecol .st-rom{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
-.stagecol.on .st-rom{ color:var(--gen-brass-bright); }
-.stagecol .st-pts{ font-family:var(--gen-font-display); font-weight:700; font-size:17px; color:var(--gen-brass); font-variant-numeric:tabular-nums; line-height:1.05; }
-.stagecol .st-sub{ font-size:9px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
-.stagecol .st-sub.neg{ color:#e8807a; }
+.numbar{ display:flex; align-items:center; gap:8px; padding:5px 11px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
+.numbar.ok{ border-color:var(--gen-brass-stroke); }
+.numbar.neg{ border-color:#9c3b34; background:rgba(170,50,40,.14); }
+.numbar .nb-l{ font-family:var(--gen-font-display); font-weight:700; font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
+.numbar .nb-v{ font-family:var(--gen-font-display); font-weight:700; font-size:16px; color:var(--gen-brass); font-variant-numeric:tabular-nums; margin-left:auto; }
+.numbar.neg .nb-v, .numbar.neg .nb-sub{ color:#e8807a; }
+.numbar .nb-sub{ font-size:10px; color:var(--gen-muted); }
 .tile.up.neg .pts{ color:#e8807a; }
 /* compact recap table (end-of-game summary only) */
 .expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
@@ -2800,7 +2798,6 @@ body.modal-open{ overflow:hidden; }
     renderDice(); renderFire();
   }
   $('fire').onclick = function () { humanFire(); };
-  $('expReserve').onclick = function () { expSpendReserve(); };
   $('expAgain').onclick = function () { var ps = game.players; $('expOver').classList.add('hidden'); expStartGame(ps); };
   $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); expMode = false; openHistory(); };
   $('expOver').onclick = function (e) { if (e.target === $('expOver')) $('expOver').classList.add('hidden'); };
@@ -2920,9 +2917,9 @@ body.modal-open{ overflow:hidden; }
     beginTurn();
   }
 
-  // ============================================================ EXPERIMENTAL flow (three columns)
-  var expMode = false, expCol = 0;
-  var EXP_CELLS = X ? X.KEYS.length * X.COLS : 45;
+  // ============================================================ EXPERIMENTAL flow (single column)
+  var expMode = false;
+  var EXP_CELLS = X ? X.KEYS.length : 15;
   function expStartGame(players) {
     expMode = true; netMode = false; manualMode = false;
     clearAllPenalties();
@@ -2934,7 +2931,8 @@ body.modal-open{ overflow:hidden; }
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.add('hidden');
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
-    $('expBoard').classList.remove('hidden');                      // the stage bar above it
+    $('expBoard').classList.remove('hidden');                      // the number-part status bar above it
+    $('expReserve').classList.add('hidden');
     document.querySelector('.dock').classList.remove('hidden');
     $('manualDock').classList.add('hidden');
     expBeginTurn();
@@ -2943,7 +2941,6 @@ body.modal-open{ overflow:hidden; }
     locked = false; rerolledAll = false; diceNew = [false, false, false, false, false];
     clearRoast();
     var p = G.currentPlayer(game);
-    expCol = X.activeCol(p);
     document.documentElement.style.setProperty('--pc', p.color);
     selected = [false, false, false, false, false];
     if (p.isAI) {
@@ -2971,19 +2968,12 @@ body.modal-open{ overflow:hidden; }
     throwsLeft--;
     expRenderAll(); shakeDice();
   }
-  function expSpendReserve() {
-    var p = G.currentPlayer(game);
-    if (aiBusy || locked || awaitingRoll || !X.canSpendReserve(p, throwsLeft)) return;
-    p.reserve--; throwsLeft = 1;                 // one extra re-roll, only in column III
-    expRenderAll();
-  }
-  function expCommit(col, key, value) {
+  function expCommit(key, value) {
     var p = G.currentPlayer(game);
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
-    if (!X.canPlay(p, col, key)) return;
-    X.bankReserve(p, throwsLeft);                // unused throws bank as reserve rolls
-    X.assignScore(p, col, key, dice, value);     // value omitted → the cell's score for the dice
-    locked = true; expRenderAll(); $('fire').disabled = true; $('expReserve').classList.add('hidden');
+    if (!X.canPlay(p, key)) return;
+    X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
+    locked = true; expRenderAll(); $('fire').disabled = true;
     turnTimer = setTimeout(expEndTurn, END_DELAY);
   }
   function expEndTurn() {
@@ -2992,10 +2982,9 @@ body.modal-open{ overflow:hidden; }
     expBeginTurn();
   }
   function expRunAiTurn() { aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
-  // EV-backed keeps in the FREE columns (II/III); heuristic toward the forced cell in column I
   function expAiKeeps(p) {
-    if (evxReady && p.persona && expCol >= 1) return EVX.botKeep(p.cols[expCol], dice, throwsLeft, p.persona.policy, Math.random);
-    return X.aiKeeps(p, dice, throwsLeft);
+    if (evxReady && p.persona) return EVX.botKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
+    return X.aiKeeps(p, dice);
   }
   function expAiStep() {
     var p = G.currentPlayer(game);
@@ -3015,44 +3004,27 @@ body.modal-open{ overflow:hidden; }
     }
     setTimeout(expAiFinish, AI_DELAY);
   }
-  // Penalty-aware 1-ply category choice for a free column: immediate score + the
-  // shipped (penalty-free) continuation value, minus an EXACT −50 whenever this fill
-  // LOCKS a negative number part (completes it negative, or makes it unrecoverable
-  // even with best-case future upper rolls). Stops the EV bot from eating penalties.
-  function expChooseCellEV(p, dice) {
-    var sc = p.cols[expCol], mask = EVX.maskOfScores(sc);
-    var upNow = G.colUpperState(sc, expCol).subtotal;
+  // Penalty-aware 1-ply row choice: immediate score + the shipped (penalty-free)
+  // continuation value, minus an EXACT −50 whenever this fill LOCKS a negative
+  // number part (even with best-case future upper rolls). Keeps the bot off the cliff.
+  function expChooseKeyEV(p, dice) {
+    var sc = p.scores, mask = EVX.maskOfScores(sc), upNow = G.upperStateExp(sc).subtotal;
     var best = null, bv = -Infinity;
-    X.availableCells(p).forEach(function (a) {
-      var imm = G.scoreForExp(a.key, dice);
-      var cont = EVX.vstar(mask | EVX.catBit(a.key));
-      var pen = 0;
-      if (expCol >= 1) {
-        var isUpper = G.UPPER_KEYS.indexOf(a.key) >= 0;
-        var upAfter = upNow + (isUpper ? imm : 0);
-        var maxFuture = 0;
-        G.UPPER_KEYS.forEach(function (k, fi) {
-          if (k === a.key) return;
-          if (typeof sc[k] !== 'number') maxFuture += 2 * (fi + 1);   // best case: five of that face
-        });
-        if (upAfter + maxFuture < 0) pen = G.UPPER_PENALTY;           // negative number part now locked in
-      }
+    X.availableKeys(p).forEach(function (key) {
+      var imm = G.scoreForExp(key, dice), cont = EVX.vstar(mask | EVX.catBit(key)), pen = 0;
+      var isUpper = G.UPPER_KEYS.indexOf(key) >= 0, upAfter = upNow + (isUpper ? imm : 0), maxFuture = 0;
+      G.UPPER_KEYS.forEach(function (k, fi) { if (k !== key && typeof sc[k] !== 'number') maxFuture += 2 * (fi + 1); });
+      if (upAfter + maxFuture < 0) pen = G.UPPER_PENALTY;
       var val = imm + cont + pen;
-      if (val > bv) { bv = val; best = a; }
+      if (val > bv) { bv = val; best = key; }
     });
     return best;
   }
   function expAiFinish() {
     var p = G.currentPlayer(game);
-    var cell;
-    if (evxReady && p.persona && expCol >= 1) {
-      cell = expChooseCellEV(p, dice);     // EV value + exact penalty-at-the-margin
-    } else {
-      cell = X.aiChooseCell(p, dice);
-    }
+    var key = (evxReady && p.persona) ? expChooseKeyEV(p, dice) : X.aiChooseKey(p, dice);
     aiBusy = false;
-    X.bankReserve(p, throwsLeft);
-    X.assignScore(p, cell.col, cell.key, dice);
+    X.assignScore(p, key, dice);
     locked = true; expRenderAll(); $('fire').disabled = true;
     turnTimer = setTimeout(expEndTurn, AI_VIEW_DELAY);
   }
@@ -3065,7 +3037,7 @@ body.modal-open{ overflow:hidden; }
     var per = $('curPersona');
     if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); } else per.classList.add('hidden');
     $('curTotal').textContent = X.total(p);
-    var filled = p.cols.reduce(function (s, c) { return s + X.filledCount(c); }, 0);
+    var filled = X.filledCount(p.scores);
     $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
@@ -3076,38 +3048,23 @@ body.modal-open{ overflow:hidden; }
     }).join('');
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) { b.onclick = function () { /* peek not yet wired for exp */ }; });
   }
-  function expCardHTML(p, interactive) {
-    var avail = {};
-    if (interactive) X.availableCells(p).forEach(function (a) { avail[a.col + '/' + a.key] = 1; });
-    var roman = ['I', 'II', 'III'];
-    var html = '<table class="expgrid"><thead><tr><th></th>'
-      + roman.map(function (n, ci) { return '<th class="' + (interactive && ci === expCol ? 'act' : '') + '">' + n + '</th>'; }).join('') + '</tr></thead><tbody>';
+  // single-card recap (end-of-game summary)
+  function expCardHTML(p) {
+    var s = p.scores, html = '<table class="expgrid"><tbody>';
     X.CATS.forEach(function (c) {
-      html += '<tr><td class="ec-lab">' + esc(c.label) + '</td>';
-      for (var col = 0; col < 3; col++) {
-        var v = p.cols[col][c.key], filled = typeof v === 'number';
-        if (filled) html += '<td class="ec-cell done' + (v < 0 ? ' neg' : '') + '">' + v + '</td>';
-        else if (avail[col + '/' + c.key]) {
-          var pv = G.scoreForExp(c.key, dice);
-          html += '<td class="ec-cell av" data-col="' + col + '" data-key="' + c.key + '">' + (pv !== 0 ? pv : '·') + '</td>';
-        } else html += '<td class="ec-cell"></td>';
-      }
-      html += '</tr>';
+      var v = s[c.key], has = typeof v === 'number';
+      html += '<tr><td class="ec-lab">' + esc(c.label) + '</td><td class="ec-cell' + (has ? ' done' : '') + (has && v < 0 ? ' neg' : '') + '">' + (has ? v : '·') + '</td></tr>';
     });
-    html += '<tr class="ec-sub"><td>Σ числа</td>' + [0, 1, 2].map(function (col) {
-      var st = G.colUpperState(p.cols[col], col);
-      return '<td class="' + (st.penalised ? 'neg' : '') + '">' + (st.penalised ? '−50' : st.subtotal) + '</td>';
-    }).join('') + '</tr>';
-    html += '<tr class="ec-tot"><td>Общо</td>' + [0, 1, 2].map(function (col) { return '<td>' + G.colTotalExp(p.cols[col], col) + '</td>'; }).join('') + '</tr>';
+    var st = G.upperStateExp(s);
+    html += '<tr class="ec-sub"><td>Σ числа</td><td class="' + (st.penalised ? 'neg' : '') + '">' + (st.penalised ? '−50' : st.subtotal) + '</td></tr>';
+    html += '<tr class="ec-tot"><td>Общо</td><td>' + G.playerTotalExp(p) + '</td></tr>';
     return html + '</tbody></table>';
   }
-  // the active stage's card drawn with the STANDARD tile board (+ the два чифта tile),
-  // plus a stage bar showing which stage is live and the three per-stage totals.
+  // the player's single card drawn with the STANDARD tile board (+ the два чифта tile),
+  // plus a number-part status bar (running Σ and the −50 risk).
   function expRenderBoard() {
-    var p = G.currentPlayer(game), sc = p.cols[expCol];
+    var p = G.currentPlayer(game), sc = p.scores;
     var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
-    var avail = {};
-    if (canScore) X.availableCells(p).forEach(function (a) { avail[a.key] = 1; });   // col I → only the forced next
     // ---- number part (deviation tiles) ----
     $('boardUpper').innerHTML = '';
     G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
@@ -3116,10 +3073,10 @@ body.modal-open{ overflow:hidden; }
       var neg = (done ? sc[key] : dev) < 0;
       var el = document.createElement('button');
       el.className = 'tile up' + (done ? ' done' : '') + (neg ? ' neg' : '');
-      var open = canScore && !done && avail[key];
+      var open = canScore && !done;
       var pts = done ? sc[key] : (open ? (dev > 0 ? '+' + dev : dev) : '·');
       el.innerHTML = '<span class="face-n">' + c.label + '</span><span class="pts' + (open ? ' upchip' : '') + '">' + pts + '</span>';
-      if (open) el.onclick = function () { expCommit(expCol, key); };   // upper takes its (signed) deviation
+      if (open) el.onclick = function () { expCommit(key); };   // number rows take their (signed) deviation
       $('boardUpper').appendChild(el);
     });
     // ---- combinations (sum scoring, incl. два чифта) ----
@@ -3133,28 +3090,26 @@ body.modal-open{ overflow:hidden; }
       else {
         row.innerHTML = head + '<span class="acts"></span>';
         var acts = row.querySelector('.acts');
-        if (canScore && avail[key]) {
+        if (canScore) {
           var v = G.scoreForExp(key, dice);
-          if (v > 0) { var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v; chip.onclick = function (e) { e.stopPropagation(); expCommit(expCol, key, v); }; acts.appendChild(chip); }
-          var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се'); x.onclick = function (e) { e.stopPropagation(); expCommit(expCol, key, 0); }; acts.appendChild(x);
+          if (v > 0) { var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v; chip.onclick = function (e) { e.stopPropagation(); expCommit(key, v); }; acts.appendChild(chip); }
+          var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се'); x.onclick = function (e) { e.stopPropagation(); expCommit(key, 0); }; acts.appendChild(x);
           row.style.cursor = 'pointer';
-          row.onclick = function () { v > 0 ? expCommit(expCol, key, v) : expCommit(expCol, key, 0); };
+          row.onclick = function () { v > 0 ? expCommit(key, v) : expCommit(key, 0); };
         }
       }
       $('boardLower').appendChild(row);
     });
-    expRenderStage(p);
+    expRenderNumberStatus(p);
   }
-  // stage marker + the three per-stage point counters
-  function expRenderStage(p) {
-    var roman = ['I', 'II', 'III'];
-    $('expBoard').innerHTML = '<div class="stagebar">' + [0, 1, 2].map(function (col) {
-      var st = G.colUpperState(p.cols[col], col), tot = G.colTotalExp(p.cols[col], col);
-      var cls = 'stagecol' + (col === expCol ? ' on' : '') + (col < expCol ? ' done' : '');
-      return '<div class="' + cls + '"><span class="st-rom">Стадий ' + roman[col] + '</span>'
-        + '<span class="st-pts">' + tot + '</span>'
-        + '<span class="st-sub' + (st.penalised ? ' neg' : '') + '">Σ ' + (st.penalised ? '−50' : st.subtotal) + '</span></div>';
-    }).join('') + '</div>';
+  // number-part status: running Σ, rows filled, and the −50 risk
+  function expRenderNumberStatus(p) {
+    var st = G.upperStateExp(p.scores);
+    var danger = st.penalised || (!st.complete && st.subtotal < 0);
+    var val = st.penalised ? '−50' : (st.subtotal >= 0 ? '+' + st.subtotal : '' + st.subtotal);
+    var tag = st.penalised ? 'наказание' : (st.complete ? 'изчистена ✓' : st.filled + '/6 реда');
+    $('expBoard').innerHTML = '<div class="numbar' + (danger ? ' neg' : (st.complete ? ' ok' : '')) + '">'
+      + '<span class="nb-l">Числова част</span><span class="nb-v">' + val + '</span><span class="nb-sub">' + tag + '</span></div>';
   }
   function expRenderDice() {
     var p = G.currentPlayer(game);
@@ -3180,14 +3135,13 @@ body.modal-open{ overflow:hidden; }
   }
   function expRenderFire() {
     var p = G.currentPlayer(game);
-    var resBtn = $('expReserve');
     if (awaitingRoll) {
       $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden');
-      $('rollHint').classList.remove('hidden'); resBtn.classList.add('hidden'); return;
+      $('rollHint').classList.remove('hidden'); return;
     }
     $('rollHint').classList.add('hidden');
     var fire = $('fire'), think = $('aiThinking');
-    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); resBtn.classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
+    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
     var keep = settings.selectKeep, someSel = selected.some(Boolean), txt;
     if (locked) { txt = '…'; fire.disabled = true; }
@@ -3195,9 +3149,6 @@ body.modal-open{ overflow:hidden; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
     else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
     $('fireTxt').textContent = txt;
-    // reserve-roll button: only in column III when throws are spent and a reserve is banked
-    resBtn.classList.toggle('hidden', !X.canSpendReserve(p, throwsLeft));
-    resBtn.textContent = '🎁 Резерва (' + p.reserve + ')';
   }
   function expEndGame() {
     locked = true;
@@ -3207,7 +3158,7 @@ body.modal-open{ overflow:hidden; }
   function archiveExpGame() {
     var players = game.players.map(function (p) {
       return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, gender: p.gender || 'm',
-               personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], cols: p.cols };
+               personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], scores: p.scores, pts: G.playerTotalExp(p) };
     });
     archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
       ruleset: 'experimental', ownerSkipped: !!game.ownerSkipped, players: players });
@@ -3229,7 +3180,7 @@ body.modal-open{ overflow:hidden; }
   }
   function openExpHistory(rec) {
     var g = { players: rec.players.map(function (sp) {
-      var pl = { name: sp.name, color: sp.color, isAI: !!sp.isAI, owner: !!sp.owner, gender: sp.gender || 'm', cols: sp.cols || [{}, {}, {}], ribbons: sp.ribbons };
+      var pl = { name: sp.name, color: sp.color, isAI: !!sp.isAI, owner: !!sp.owner, gender: sp.gender || 'm', scores: sp.scores || {}, ribbons: sp.ribbons };
       if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
       return pl;
     }) };
@@ -4735,7 +4686,7 @@ body.modal-open{ overflow:hidden; }
   // ============================================================ ARCHIVE / HISTORY
   var viewingHistory = false, histSnapshot = null, dossierCtx = null, currentHistRec = null;
 
-  function recTotal(sp) { if (sp.cols) return G.cardTotalExp(sp.cols); var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
+  function recTotal(sp) { if (typeof sp.pts === 'number') return sp.pts; var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
   function recOwnerIdx(rec) { if (rec.ownerSkipped) return -1; for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // -1: owner skipped; legacy: seat 0
   function analyzeRec(rec, i) {
@@ -5690,9 +5641,9 @@ body.modal-open{ overflow:hidden; }
     };
   });
   function showRuleBubble() {
-    $('ruleBubble').innerHTML = '<b>Експериментален</b> — българският „Генерал“ в три колони: '
-      + 'колона I в ред (без −50), колони II/III свободни (−50 за минусова числова част), '
-      + 'резервни хвърляния в колона III. Числова част със знак, плюс „два чифта“.';
+    $('ruleBubble').innerHTML = '<b>Експериментален</b> — българският „Генерал“: една карта, '
+      + 'попълваш редовете в произволен ред. Числовата част (1-6) се точкува със знак около три '
+      + '(−50, ако завърши на минус), плюс комбинация „два чифта“.';
     $('ruleBubble').classList.remove('hidden');
   }
   $('ruleHelp').onclick = function (e) { e.preventDefault(); e.stopPropagation(); $('ruleBubble').classList.toggle('hidden'); if (!$('ruleBubble').innerHTML) showRuleBubble(); };

@@ -1,17 +1,9 @@
-/* Experimental ruleset — the Bulgarian „Генерал“ in THREE columns (нива).
- * Kept deliberately separate from the standard game flow (game.js stays the
- * canonical original ruleset). Scoring primitives live in game.js
- * (scoreForExp / colTotalExp / cardTotalExp / forcedNextExp); this module is
- * the three-column STATE MACHINE + a heuristic AI.
- *
- * Columns (per player, each a full 15-category card):
- *   • column 0 — filled strictly top-to-bottom (forced order); a negative
- *     number part is kept as its sum (no −50);
- *   • column 1 — free order; −50 if the number part finishes negative;
- *   • column 2 — free order; −50 rule; plus RESERVE ROLLS: every turn that
- *     ends with re-rolls to spare banks them, and in column 2 a banked roll can
- *     be spent for one extra re-roll past the usual three throws.
- * A player works their columns in order (finish 0, then 1, then 2): 45 turns.
+/* Experimental ruleset — standard Bulgarian „Генерал“ (single column).
+ * One 15-row card per player, filled in ANY order. The number part (1-6) is a
+ * deviation-around-three section recorded as a flat −50 if it finishes negative;
+ * the combinations score as the sum of the dice involved (kента/генерал fixed).
+ * Kept separate from the standard game flow (game.js stays the canonical Yahtzee-
+ * like ruleset). Scoring lives in game.js; this module is the flow + a heuristic AI.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./game.js'));
@@ -21,55 +13,29 @@
 
   var CATS = G.CATEGORIES_EXP;
   var KEYS = CATS.map(function (c) { return c.key; });
-  var COLS = G.COLS_EXP;                 // 3
   var REROLLS = 2;                       // re-rolls after the opening throw (3 throws total)
 
-  function filledCount(scores) {
-    var n = 0; KEYS.forEach(function (k) { if (typeof scores[k] === 'number') n++; }); return n; }
+  function filledCount(scores) { var n = 0; KEYS.forEach(function (k) { if (typeof scores[k] === 'number') n++; }); return n; }
+  function playerDone(player) { return filledCount(player.scores) >= KEYS.length; }
+  // free order: any unfilled row is available
+  function availableKeys(player) { return KEYS.filter(function (k) { return typeof player.scores[k] !== 'number'; }); }
+  function canPlay(player, key) { return typeof player.scores[key] !== 'number'; }
 
-  // the lowest column a player hasn't finished yet (−1 when the whole card is done)
-  function activeCol(player) {
-    for (var c = 0; c < COLS; c++) if (filledCount(player.cols[c]) < KEYS.length) return c;
-    return -1;
-  }
-  function playerDone(player) { return activeCol(player) < 0; }
-
-  // the cells a player may legally fill this turn (column 0 → only the forced next)
-  function availableCells(player) {
-    var col = activeCol(player); if (col < 0) return [];
-    if (col === 0) { var k = G.forcedNextExp(player.cols[0]); return k ? [{ col: 0, key: k }] : []; }
-    return KEYS.filter(function (k) { return typeof player.cols[col][k] !== 'number'; })
-               .map(function (k) { return { col: col, key: k }; });
-  }
-  function canPlay(player, col, key) {
-    return availableCells(player).some(function (a) { return a.col === col && a.key === key; });
-  }
-
-  function createPlayerCard(player) { player.cols = [{}, {}, {}]; player.reserve = 0; return player; }
-  function createGame(players) {
-    players.forEach(createPlayerCard);
-    return { players: players, current: 0, turn: 1, ruleset: 'experimental' };
-  }
+  function createPlayerCard(player) { if (!player.scores) player.scores = {}; return player; }
+  function createGame(players) { players.forEach(createPlayerCard); return { players: players, current: 0, round: 1, ruleset: 'experimental' }; }
   function currentPlayer(game) { return game.players[game.current]; }
   function isGameOver(game) { return game.players.every(playerDone); }
 
-  // commit a roll into a cell (value optional — defaults to the cell's score for the dice)
-  function assignScore(player, col, key, dice, value) {
-    if (typeof player.cols[col][key] === 'number') throw new Error('cell already filled: ' + col + '/' + key);
-    player.cols[col][key] = (typeof value === 'number') ? value : G.scoreForExp(key, dice);
+  function assignScore(player, key, dice, value) {
+    if (typeof player.scores[key] === 'number') throw new Error('row already filled: ' + key);
+    player.scores[key] = (typeof value === 'number') ? value : G.scoreForExp(key, dice);
   }
-  // bank the unused re-rolls (only ever spent later, in column 2)
-  function bankReserve(player, rerollsLeft) { player.reserve += Math.max(0, rerollsLeft | 0); }
-  // a banked roll may be spent for an extra re-roll once the normal throws run out, in column 2
-  function canSpendReserve(player, rerollsLeft) { return activeCol(player) === 2 && rerollsLeft <= 0 && player.reserve > 0; }
-
-  function total(player) { return G.cardTotalExp(player.cols); }
+  function total(player) { return G.playerTotalExp(player); }
   function nextTurn(game) {
-    do { game.current = (game.current + 1) % game.players.length; if (game.current === 0) game.turn++; }
+    do { game.current = (game.current + 1) % game.players.length; if (game.current === 0) game.round++; }
     while (!isGameOver(game) && playerDone(currentPlayer(game)));
     return game;
   }
-  // standings: by grand total, highest first (ties keep input order)
   function ranking(game) {
     return game.players.map(function (p, i) { return { player: p, total: total(p), order: i }; })
       .sort(function (a, b) { return (b.total - a.total) || (a.order - b.order); });
@@ -77,9 +43,10 @@
 
   // ------------------------------------------------------------------ heuristic AI
   function counts(dice) { var c = [0, 0, 0, 0, 0, 0, 0]; dice.forEach(function (d) { c[d]++; }); return c; }
+  var PREMIUM = { general: 1, largeStraight: 1, smallStraight: 1, fullHouse: 1, fourKind: 1, twoPair: 1 };
 
-  // dice to KEEP when chasing a given category (only the relevant ones)
-  function keepFor(col, key, dice) {
+  // dice to KEEP when chasing a given category
+  function keepFor(key, dice) {
     var c = counts(dice);
     if (G.UPPER_KEYS.indexOf(key) >= 0) { var f = G.UPPER_KEYS.indexOf(key) + 1; return dice.map(function (v) { return v === f; }); }
     if (key === 'twoKind' || key === 'threeKind' || key === 'fourKind' || key === 'general') {
@@ -94,47 +61,44 @@
     if (key === 'chance') return dice.map(function (v) { return v >= 4; });
     return dice.map(function () { return false; });
   }
-
-  // pick the most promising available cell to chase (greedy on what this roll already scores,
-  // nudged so the upper deviation cells don't dump badly and premium combos aren't wasted)
   function bestTarget(player, dice) {
-    var avail = availableCells(player), best = null, bestV = -Infinity;
-    avail.forEach(function (a) {
-      var v = G.scoreForExp(a.key, dice);
-      // value an unfinished cell by its score, with a small bias toward premium combos
-      var w = v + (PREMIUM[a.key] ? 6 : 0) + (G.UPPER_KEYS.indexOf(a.key) >= 0 ? Math.max(0, v) : 0);
-      if (w > bestV) { bestV = w; best = a; }
+    var best = null, bestV = -Infinity;
+    availableKeys(player).forEach(function (key) {
+      var v = G.scoreForExp(key, dice);
+      var w = v + (PREMIUM[key] ? 6 : 0) + (G.UPPER_KEYS.indexOf(key) >= 0 ? Math.max(0, v) : 0);
+      if (w > bestV) { bestV = w; best = key; }
     });
     return best;
   }
-  var PREMIUM = { general: 1, largeStraight: 1, smallStraight: 1, fullHouse: 1, fourKind: 1, twoPair: 1 };
-
-  function aiKeeps(player, dice, rerollsLeft) {
-    var t = bestTarget(player, dice); if (!t) return dice.map(function () { return true; });
-    return keepFor(t.col, t.key, dice);
+  function aiKeeps(player, dice) {
+    var t = bestTarget(player, dice); return t ? keepFor(t, dice) : dice.map(function () { return true; });
   }
-  // which available cell to write the final dice into (avoid throwing away a good roll
-  // on a cell that wants something else; for the forced column there is only one choice)
-  function aiChooseCell(player, dice) {
-    var avail = availableCells(player); if (!avail.length) return null;
+  // which row to write the final dice into (avoid wasting a good roll; protect the number part)
+  function aiChooseKey(player, dice) {
+    var avail = availableKeys(player); if (!avail.length) return null;
     if (avail.length === 1) return avail[0];
+    var upNow = G.upperStateExp(player.scores).subtotal;
     var best = avail[0], bestV = -Infinity;
-    avail.forEach(function (a) {
-      var v = G.scoreForExp(a.key, dice);
-      // prefer to score where the roll lands well; dumping (low/negative) goes to the cheapest cell
-      var w = v - (PREMIUM[a.key] && v <= 0 ? 8 : 0);
-      if (w > bestV) { bestV = w; best = a; }
+    avail.forEach(function (key) {
+      var imm = G.scoreForExp(key, dice);
+      var isUpper = G.UPPER_KEYS.indexOf(key) >= 0;
+      // avoid locking a negative number part; don't dump premium combos for nothing
+      var w = imm - (PREMIUM[key] && imm <= 0 ? 8 : 0);
+      if (isUpper && imm < 0) {
+        var maxFuture = 0;
+        G.UPPER_KEYS.forEach(function (k, fi) { if (k !== key && typeof player.scores[k] !== 'number') maxFuture += 2 * (fi + 1); });
+        if (upNow + imm + maxFuture < 0) w += G.UPPER_PENALTY;   // this fill would lock the −50
+      }
+      if (w > bestV) { bestV = w; best = key; }
     });
     return best;
   }
 
   return {
-    CATS: CATS, KEYS: KEYS, COLS: COLS, REROLLS: REROLLS,
-    filledCount: filledCount, activeCol: activeCol, playerDone: playerDone,
-    availableCells: availableCells, canPlay: canPlay,
+    CATS: CATS, KEYS: KEYS, REROLLS: REROLLS,
+    filledCount: filledCount, playerDone: playerDone, availableKeys: availableKeys, canPlay: canPlay,
     createGame: createGame, createPlayerCard: createPlayerCard, currentPlayer: currentPlayer,
     isGameOver: isGameOver, assignScore: assignScore, total: total, nextTurn: nextTurn, ranking: ranking,
-    bankReserve: bankReserve, canSpendReserve: canSpendReserve,
-    keepFor: keepFor, bestTarget: bestTarget, aiKeeps: aiKeeps, aiChooseCell: aiChooseCell,
+    keepFor: keepFor, bestTarget: bestTarget, aiKeeps: aiKeeps, aiChooseKey: aiChooseKey,
   };
 });

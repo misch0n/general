@@ -693,35 +693,22 @@ test('experimental lower combos still score like standard', function () {
   assert.strictEqual(G.scoreForExp('chance', [6, 5, 4, 3, 2]), 20);
 });
 
-test('experimental column total: −50 only on cols 1 & 2 when the number part is complete', function () {
-  // a negative number part that ISN'T complete is just its running sum (no penalty yet)
+test('experimental number part: −50 only once complete and negative', function () {
+  // an incomplete negative number part is just its running sum (no penalty yet)
   var part = { ones: -2, twos: -4 };
-  assert.strictEqual(G.colUpperState(part, 1).penalised, false);
-  assert.strictEqual(G.colTotalExp(part, 1), -6);
-  // all six upper filled and net negative → recorded as a flat −50 in cols 1 & 2…
+  assert.strictEqual(G.upperStateExp(part).penalised, false);
+  assert.strictEqual(G.playerTotalExp({ scores: part }), -6);
+  // all six upper filled and net negative → recorded as a flat −50
   var neg = { ones: -2, twos: -4, threes: -3, fours: 0, fives: -5, sixes: -6, chance: 20 };
-  var st = G.colUpperState(neg, 2);
+  var st = G.upperStateExp(neg);
   assert.strictEqual(st.complete, true);
   assert.strictEqual(st.penalised, true);
   assert.strictEqual(st.contribution, -50);
-  assert.strictEqual(G.colTotalExp(neg, 2), -30);   // 20 (chance) − 50
-  // …but column 0 keeps the negative sum (no −50)
-  assert.strictEqual(G.colUpperState(neg, 0).penalised, false);
-  assert.strictEqual(G.colTotalExp(neg, 0), 0);     // 20 + (−2−4−3+0−5−6) = 20 − 20
-  // a non-negative complete number part keeps its subtotal everywhere
+  assert.strictEqual(G.playerTotalExp({ scores: neg }), -30);   // 20 (chance) − 50
+  // a non-negative complete number part keeps its surplus
   var pos = { ones: 0, twos: 0, threes: 3, fours: 4, fives: 0, sixes: 0, general: 80 };
-  assert.strictEqual(G.colUpperState(pos, 2).contribution, 7);
-  assert.strictEqual(G.colTotalExp(pos, 2), 87);
-});
-
-test('experimental grand total sums the three columns; forced order walks the card', function () {
-  var cols = [{ chance: 10 }, { chance: 12 }, { chance: 8 }];
-  assert.strictEqual(G.cardTotalExp(cols), 30);
-  assert.strictEqual(G.playerTotalExp({ cols: cols }), 30);
-  assert.strictEqual(G.forcedNextExp({}), 'ones');
-  assert.strictEqual(G.forcedNextExp({ ones: 1, twos: 2 }), 'threes');
-  assert.strictEqual(G.forcedNextExp({ ones: 1, twos: 2, threes: 0, fours: 4, fives: 5, sixes: 6 }), 'twoKind');
-  assert.strictEqual(G.COLS_EXP, 3);
+  assert.strictEqual(G.upperStateExp(pos).contribution, 7);
+  assert.strictEqual(G.playerTotalExp({ scores: pos }), 87);
 });
 
 test('ruleset registry exposes both rulesets with the right shapes', function () {
