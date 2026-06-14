@@ -190,7 +190,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-body{ padding:18px 16px 22px; display:flex; flex-direction:column; gap:12px; }
 .setup-intro{ font-size:12px; color:var(--gen-label); line-height:1.5; }
 .setup-title{ margin:2px 0 4px; text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:42px;
-  letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35); }
+  letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* press-and-hold = secret dev unlock */
 .pcard{ background:rgba(20,22,12,.72); border:1px solid var(--gen-pill-line); border-radius:10px; padding:12px; }
 .pcard .name{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:15px; text-transform:uppercase; letter-spacing:.5px;
   color:var(--gen-text); background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:9px 11px; }
@@ -917,7 +918,6 @@ body.modal-open{ overflow:hidden; }
 .setrow.setrow-sub{ padding:9px 0 9px 18px; font-size:12px; color:var(--gen-label); }
 .setrow.setrow-sub span::before{ content:'↳ '; color:var(--gen-muted); }
 /* secret developer mode */
-.setrow .devbox{ flex:none; width:22px; height:22px; margin-left:4px; border-radius:4px; background:transparent; cursor:default; }
 .devpanel{ margin-top:14px; border-top:2px dashed var(--gen-brass-stroke); padding-top:12px; max-height:46vh; overflow-y:auto; }
 .devhdr{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.5px; color:var(--gen-brass); font-size:13px; margin-bottom:10px; }
 .devsec{ border:1px solid var(--gen-pill-line); border-radius:8px; margin-bottom:8px; background:rgba(0,0,0,.18); }
@@ -989,7 +989,7 @@ body.modal-open{ overflow:hidden; }
 <div id="setup" class="board">
   <div class="banner">ЩАБ · НАБОР НА ЛИЧЕН СЪСТАВ</div>
   <div class="setup-body">
-    <h1 class="setup-title">ГЕНЕРАЛ</h1>
+    <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
     <div id="setupErr" class="err"></div>
@@ -1434,7 +1434,7 @@ body.modal-open{ overflow:hidden; }
   // selectKeep: which dice you tap each throw — false = tap the ones to RE-THROW (ОГИН!),
   // true = tap the ones to KEEP (ДРЪЖ!). Per-device; travels with saved games so replays
   // and reports read back in the same flavour they were played.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, acoustic: false, acousticDebug: false, selectKeep: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, selectKeep: false, ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1447,14 +1447,14 @@ body.modal-open{ overflow:hidden; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, selectKeep: settings.selectKeep, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
+              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, selectKeep: settings.selectKeep, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'acoustic', 'acousticDebug', 'selectKeep', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'selectKeep', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -1787,7 +1787,7 @@ body.modal-open{ overflow:hidden; }
         card.appendChild(box);
       }
 
-      if (fun()) { // the stupid wager — only in казарма mode
+      if (settings.bets) { // the stupid wager — its own toggle now
         var bet = document.createElement('div'); bet.className = 'betline';
         bet.innerHTML = 'Залага <span class="betval fixed">' + esc(p.bet) + '</span>';
         card.appendChild(bet);
@@ -1945,7 +1945,7 @@ body.modal-open{ overflow:hidden; }
     $('netPrep').classList.toggle('hidden', phase !== 'prep');
   }
   // bitmask of enabled pre-game settings (shown to clients as a read-only summary)
-  var SETT_BITS = [['barracks', 'КАЗАРМА'], ['titles', 'Титли'], ['titlePoints', 'Бонус точки'], ['advice', 'Съвети'], ['glupost', 'Глупости']];
+  var SETT_BITS = [['barracks', 'КАЗАРМА'], ['titles', 'Титли'], ['titlePoints', 'Бонус точки'], ['advice', 'Съвети'], ['glupost', 'Глупости'], ['bets', 'Облози']];
   function settingsBits() { var b = 0; SETT_BITS.forEach(function (s, i) { if (settings[s[0]]) b |= (1 << i); }); return b; }
   function renderSettSummary(bits) {
     var on = SETT_BITS.filter(function (s, i) { return bits & (1 << i); });
@@ -3147,6 +3147,10 @@ body.modal-open{ overflow:hidden; }
         if (game) renderAll();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
+    // Облози — the wager flavour; its own switch now (used to ride on КАЗАРМА)
+    { key: 'bets', label: 'Облози', onChange: function () {
+        if (!$('setup').classList.contains('hidden')) renderSetup();
+      } },
     // Титли — rare-name notifications (own switch, independent of КАЗАРМА); its hidden
     // sub-toggle „Бонус точки“ turns the rare-name extra points on
     { key: 'titles', label: 'Титли', preGameOnly: true,
@@ -3167,7 +3171,6 @@ body.modal-open{ overflow:hidden; }
       sub: { key: 'acousticDebug', label: 'Дебъг режим', onChange: function () { syncAcousticUI(); } },
       onChange: function () { syncAcousticUI(); } },
   ];
-  var devTaps = [];
   function buildSettingsRows(inGame) {
     var host = $('settingsRows'); host.innerHTML = '';
     SETTINGS_ROWS.forEach(function (row, idx) {
@@ -3181,9 +3184,7 @@ body.modal-open{ overflow:hidden; }
         if (row.onChange) row.onChange(); saveSettings();
         if (row.sub) buildSettingsRows(inGame); // reveal/hide the sub-toggle as the parent flips
       };
-      var box = document.createElement('span'); box.className = 'devbox';            // hidden unlock box (right edge)
-      box.onclick = function (e) { e.stopPropagation(); devBoxClick(idx); };
-      div.appendChild(span); div.appendChild(tog); div.appendChild(box);
+      div.appendChild(span); div.appendChild(tog);
       host.appendChild(div);
       // hidden mini-toggle (e.g. „Бонус точки“ under Титли) — shown only when the parent is on
       if (row.sub && settings[row.key]) {
@@ -3196,22 +3197,15 @@ body.modal-open{ overflow:hidden; }
       }
     });
   }
-  // the unlock KEY, flattened: box 0 once, box 1 twice, box i (i+1)× — i.e. the
-  // 1-2-3-…-x escalating pattern. We keep a ROLLING buffer of recent taps and
-  // unlock whenever its tail matches the key, so a mistap just needs re-tapping.
-  function devKey() {
-    var k = []; for (var i = 0; i < SETTINGS_ROWS.length; i++) for (var j = 0; j <= i; j++) k.push(i); return k;
-  }
-  function devBoxClick(idx) {
-    if (settings.dev) return;
-    var key = devKey();
-    devTaps.push(idx);
-    if (devTaps.length > key.length) devTaps = devTaps.slice(-key.length);
-    if (devTaps.length === key.length && devTaps.every(function (v, i) { return v === key[i]; })) {
-      devTaps = [];
-      activateDev();
-    }
-  }
+  // secret developer unlock: press-and-hold the ГЕНЕРАЛ title on the start screen for 5s
+  (function () {
+    var t = $('setupTitle'); if (!t) return;
+    var timer = null;
+    function start() { if (settings.dev) return; clearTimeout(timer); timer = setTimeout(activateDev, 5000); }
+    function cancel() { clearTimeout(timer); timer = null; }
+    t.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { t.addEventListener(ev, cancel); });
+  })();
   function activateDev() { settings.dev = true; devCats = null; renderDevPanel(); $('devPanel').classList.remove('hidden'); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
@@ -3388,7 +3382,6 @@ body.modal-open{ overflow:hidden; }
     if (!$('setup').classList.contains('hidden')) { setupPlayers.forEach(regenName); renderSetup(); }
   }
   function openSettings() {
-    if (!settings.dev) { devTaps = []; }
     // mid-game: hide the pre-game-only bits (старшина, name-bonus + advice toggles,
     // archive housekeeping) — those are decisions to make before a battle
     var inGame = !$('game').classList.contains('hidden');
@@ -3519,8 +3512,8 @@ body.modal-open{ overflow:hidden; }
     renderWinHeadline();   // WD-01 + WD-03 + WD-05 verdict
     renderWinBadges();     // WD-04 badges
 
-    // bet stakes — only in казарма mode
-    if (fun()) {
+    // bet stakes — gated by its own Облози toggle
+    if (settings.bets) {
       var msgs = '<div class="bet kept">🎖 ' + esc(winner.name) + ' запази ' + esc(winner.bet || 'облога') + '</div>';
       others.forEach(function (p) { msgs += '<div class="bet lost">☠ ' + esc(p.name) + ' загуби ' + esc(p.bet || 'облога') + '</div>'; });
       $('betMsgs').innerHTML = msgs;
