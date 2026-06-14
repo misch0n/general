@@ -40,18 +40,20 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .banner,.hd,.pstrip,.sheet,.divider,.dock,.setup-body{ position:relative; z-index:1; }
 
 /* classification banner */
-/* top-center scoreboard banner: the current player's running points */
-.banner{ position:relative; min-height:36px; display:flex; align-items:center; justify-content:center; gap:9px; padding:5px 36px;
-  background:var(--gen-ink); border-bottom:2px solid var(--gen-brass); overflow:hidden; }
-.banner .bpts{ font-family:var(--gen-font-display); font-weight:700; font-size:25px; color:var(--gen-brass); line-height:1;
-  font-variant-numeric:tabular-nums; text-shadow:0 1px 2px rgba(0,0,0,.5); }
-.banner .bcap{ font-size:9px; letter-spacing:2.5px; color:var(--gen-muted); }
+.banner{ height:24px; display:flex; align-items:center; justify-content:center; background:var(--gen-ink);
+  color:var(--gen-brass); font-family:var(--gen-font-display); font-weight:700; font-size:11px; letter-spacing:2px;
+  border-bottom:2px solid var(--gen-brass); overflow:hidden; }
 .banner::before,.banner::after{ content:''; position:absolute; top:0; bottom:0; width:30px;
   background:repeating-linear-gradient(45deg, var(--gen-brass) 0 6px, var(--gen-ink) 6px 12px); }
 .banner::before{ left:0; } .banner::after{ right:0; }
 
 /* ===== header ===== */
-.hd{ display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
+.hd{ position:relative; display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
+/* current player's points — centred between the name and the round, as a frosted square panel */
+.pointsbox{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:2;
+  display:flex; flex-direction:column; align-items:center; gap:1px; padding:4px 13px; border-radius:11px;
+  background:rgba(12,13,9,.42); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+  border:1px solid var(--gen-pill-line); box-shadow:0 2px 10px rgba(0,0,0,.35); }
 .rank{ width:40px; height:40px; flex:none; display:grid; place-items:center; background:var(--gen-pill); color:var(--gen-brass);
   border:2px solid var(--pc); border-radius:var(--gen-r-tag); font-family:var(--gen-font-display); font-weight:700; font-size:15px;
   box-shadow:inset 0 0 0 2px var(--gen-ink); }
@@ -1006,7 +1008,7 @@ body.modal-open{ overflow:hidden; }
 
 <!-- ============ GAME ============ -->
 <div id="game" class="board hidden">
-  <div class="banner"><span id="curTotal" class="bpts">0</span><span class="bcap">ТОЧКИ</span></div>
+  <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО</div>
   <div id="netLink" class="netlink hidden"></div>
 
   <div class="hd">
@@ -1017,6 +1019,10 @@ body.modal-open{ overflow:hidden; }
         <span id="curRibbons" class="ribbons"></span>
         <span id="curPersona" class="ppersona hidden"></span>
       </span>
+    </span>
+    <span class="pointsbox">
+      <span id="curTotal" class="ptotal">0</span>
+      <span class="tcap">ТОЧКИ</span>
     </span>
     <span class="totalbox">
       <span id="curRound" class="ptotal rnum">1/14</span>
