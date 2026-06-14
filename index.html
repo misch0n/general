@@ -1545,7 +1545,7 @@ body.modal-open{ overflow:hidden; }
   'use strict';
   var G = window.General;
   var EV = window.GeneralEV;
-  var X = window.GeneralExp;   // experimental three-column ruleset (separate flow)
+  var X = window.GeneralExp;   // experimental ruleset (single-column Генерал; separate flow)
   // load the precomputed optimal-value table (powers hints, luck/skill, bots)
   var evReady = false;
   try {
@@ -3000,7 +3000,10 @@ body.modal-open{ overflow:hidden; }
     if (!X.canPlay(p, key)) return;
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
     locked = true; expRenderAll(); $('fire').disabled = true;
-    turnTimer = setTimeout(expEndTurn, END_DELAY);
+    // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
+    var committed = p.scores[key], delay = END_DELAY;
+    if (G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
+    turnTimer = setTimeout(expEndTurn, delay);
   }
   function expEndTurn() {
     if (X.isGameOver(game)) { expEndGame(); return; }
