@@ -49,11 +49,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* ===== header ===== */
 .hd{ display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
-/* running points: a frosted square panel sitting between the board and the dice */
-.dockhead{ position:relative; display:flex; justify-content:center; padding:2px 16px; }
-.pointsbox{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; padding:4px 14px; border-radius:11px;
-  background:rgba(12,13,9,.42); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
-  border:1px solid var(--gen-pill-line); box-shadow:0 2px 10px rgba(0,0,0,.35); }
+/* running points: a plain stacked number above the medals separator (no box), styled like the turn marker */
+.dockhead{ position:relative; display:flex; justify-content:center; padding:2px 16px 4px; }
+.pointsbox{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; }
+.pointsbox .ptotal{ font-size:34px; }   /* the points number — bigger; ТОЧКИ caption stays small */
 /* the advice popup OVERLAYS the points (grows upward over the board) — never pushes the dice */
 .dockhead .hintline{ position:absolute; left:12px; right:12px; bottom:-2px; z-index:9;
   background:rgba(9,11,6,.97); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 6px 18px rgba(0,0,0,.55); }
@@ -1039,15 +1038,7 @@ body.modal-open{ overflow:hidden; }
     <div id="boardLower" class="lower"></div>
   </div>
 
-  <div class="divider">
-    <span class="rule"></span>
-    <span id="medals" class="medals"></span>
-    <span class="rule"></span>
-  </div>
-
-  <div id="roast" class="roast"></div>
-
-  <!-- running points, between the board and the dice; the advice popup overlays it -->
+  <!-- running points, sitting above the medals separator; the advice popup overlays it -->
   <div id="dockHead" class="dockhead">
     <span class="pointsbox">
       <span id="curTotal" class="ptotal">0</span>
@@ -1055,6 +1046,14 @@ body.modal-open{ overflow:hidden; }
     </span>
     <div id="hintLine" class="hintline hidden"></div>
   </div>
+
+  <div class="divider">
+    <span class="rule"></span>
+    <span id="medals" class="medals"></span>
+    <span class="rule"></span>
+  </div>
+
+  <div id="roast" class="roast"></div>
 
   <div class="dock">
     <div id="throws" class="throws"></div>
