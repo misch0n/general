@@ -1621,10 +1621,11 @@ body.modal-open{ overflow:hidden; }
   // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
   function saveResume() {
     if (!game || !game.players || !game.players.length || viewingHistory) return;
-    if (G.isGameOver(game)) { clearResume(); return; }
+    var over = expMode ? X.isGameOver(game) : G.isGameOver(game);
+    if (over) { clearResume(); return; }
     lsSet(RESUME_KEY, JSON.stringify({
-      v: 1, ts: Date.now(), manualMode: manualMode, current: game.current, round: game.round,
-      ownerSkipped: !!game.ownerSkipped, players: serializePlayers(), moveLog: moveLog,
+      v: 1, ts: Date.now(), ruleset: expMode ? 'experimental' : 'standard', manualMode: manualMode,
+      current: game.current, round: game.round, ownerSkipped: !!game.ownerSkipped, players: serializePlayers(), moveLog: moveLog,
     }));
   }
   function loadResume() {
@@ -2405,6 +2406,7 @@ body.modal-open{ overflow:hidden; }
   // rebuild an unfinished game from its resume snapshot and continue
   function resumeGame(snap) {
     clearAllPenalties();
+    if (snap.ruleset === 'experimental') { resumeExpGame(snap); return; }
     game = G.createGame(reconstructPlayers(snap));
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
     manualMode = !!snap.manualMode; undoStack = []; viewingHistory = false;
@@ -2419,10 +2421,14 @@ body.modal-open{ overflow:hidden; }
   }
   function maybeOfferResume() {
     var snap = loadResume(); if (!snap) return;
-    var filled = (snap.moveLog || []).reduce(function (s, l) { return s + (l ? l.length : 0); }, 0);
-    var turns = snap.players.length * G.CATEGORIES.length;
+    var exp = snap.ruleset === 'experimental', rows = exp ? (X ? X.KEYS.length : 15) : G.CATEGORIES.length;
+    // experimental doesn't log per-turn moves for resume; count filled rows from the cards instead
+    var filled = exp
+      ? snap.players.reduce(function (s, sp) { return s + Object.keys(sp.scores || {}).length; }, 0)
+      : (snap.moveLog || []).reduce(function (s, l) { return s + (l ? l.length : 0); }, 0);
+    var turns = snap.players.length * rows;
     $('resumeInfo').innerHTML = snap.players.length + ' бойци · ' + Math.min(filled, turns) + '/' + turns + ' хода'
-      + (snap.manualMode ? ' · отчет' : '') + '<br>от ' + esc(fmtDate(snap.ts)) + ' ' + esc(fmtTime(snap.ts));
+      + (exp ? ' · експ.' : '') + (snap.manualMode ? ' · отчет' : '') + '<br>от ' + esc(fmtDate(snap.ts)) + ' ' + esc(fmtTime(snap.ts));
     $('resumeModal').classList.remove('hidden');
   }
   $('resumeGo').onclick = function () { var snap = loadResume(); $('resumeModal').classList.add('hidden'); if (snap) resumeGame(snap); };
@@ -2937,10 +2943,30 @@ body.modal-open{ overflow:hidden; }
     $('manualDock').classList.add('hidden');
     expBeginTurn();
   }
+  function resumeExpGame(snap) {
+    expMode = true; netMode = false; manualMode = false;
+    var players = snap.players.map(function (sp) {
+      var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
+      pl.gender = sp.gender || 'm'; pl.owner = !!sp.owner; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.scores = sp.scores || {};
+      if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
+      return pl;
+    });
+    game = X.createGame(players);
+    game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
+    undoStack = []; viewingHistory = false; moveLog = snap.moveLog || players.map(function () { return []; });
+    $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
+    paintCamo($('game'));
+    $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
+    $('hintBtn').classList.add('hidden');
+    document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.remove('hidden'); $('expReserve').classList.add('hidden');
+    document.querySelector('.dock').classList.remove('hidden'); $('manualDock').classList.add('hidden');
+    expBeginTurn();
+  }
   function expBeginTurn() {
     locked = false; rerolledAll = false; diceNew = [false, false, false, false, false];
     clearRoast();
     var p = G.currentPlayer(game);
+    if (!netMode) saveResume();
     document.documentElement.style.setProperty('--pc', p.color);
     selected = [false, false, false, false, false];
     if (p.isAI) {
