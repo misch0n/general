@@ -823,6 +823,10 @@ body.modal-open{ overflow:hidden; }
 .iochip.on .iodot{ background:var(--gen-ink); }
 .iochip.io-none{ color:var(--gen-muted); border-color:var(--gen-pill-line); }
 .iochip.io-none.on{ background:var(--gen-muted); color:var(--gen-ink); box-shadow:0 0 0 2px var(--gen-muted); }
+/* import: whole-game vs merge-player choice + the scrollable target-battle list */
+.iochoice{ display:flex; flex-direction:column; gap:7px; margin:10px 0 4px; }
+.importowner .iogames{ max-height:168px; overflow:auto; flex-wrap:nowrap; flex-direction:column; align-items:stretch; }
+.importowner .iogames .iog{ justify-content:flex-start; }
 .importerr{ margin-top:9px; padding:8px 10px; border-radius:8px; font-size:12px; color:#e8807a; background:rgba(178,58,46,.16); border:1px solid var(--gen-alert-line); }
 .exportcopied{ margin-top:8px; text-align:center; font-size:12px; font-weight:700; color:#9bd17e; }
 .histhd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:6px 0 8px; }
@@ -1277,7 +1281,9 @@ body.modal-open{ overflow:hidden; }
     <h2>📥 Импортирай игра</h2>
     <p class="ht">Постави JSON-а на играта тук:</p>
     <textarea id="importText" class="importarea" placeholder='{ "players": […], "moveLog": […] }'></textarea>
+    <div id="importChoice" class="importowner hidden"></div>
     <div id="importOwner" class="importowner hidden"></div>
+    <div id="importMerge" class="importowner hidden"></div>
     <div id="importErr" class="importerr hidden"></div>
     <div class="setup-actions">
       <button id="importCancel" class="btn">Отказ</button>
@@ -4749,44 +4755,113 @@ body.modal-open{ overflow:hidden; }
     }
     return null;
   }
-  var importParsed = null;   // the validated record awaiting an owner choice
-  function openImport() {
-    importParsed = null;
-    $('importText').value = ''; $('importText').classList.remove('hidden');
+  var importParsed = null;     // the sanitised record being imported
+  var importStage = 'parse';   // parse → choice → owner | merge
+  function importReset() {
+    $('importChoice').innerHTML = ''; $('importChoice').classList.add('hidden');
     $('importOwner').innerHTML = ''; $('importOwner').classList.add('hidden');
+    $('importMerge').innerHTML = ''; $('importMerge').classList.add('hidden');
     $('importErr').classList.add('hidden'); $('importErr').textContent = '';
+  }
+  function openImport() {
+    importParsed = null; importStage = 'parse';
+    $('importText').value = ''; $('importText').classList.remove('hidden');
+    importReset();
     $('importDo').textContent = 'Провери'; $('importDo').classList.remove('hidden');
     $('historyModal').classList.add('hidden');
     $('importModal').classList.remove('hidden');
   }
   function importError(msg) { $('importErr').textContent = '⚠ ' + msg; $('importErr').classList.remove('hidden'); }
-  // step 2 of any import: show the owner picker for an already-sanitised record
+  function importSelect(scope, sel, b) { $(scope).querySelectorAll(sel).forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); }
+
+  // step 2: with games already in the archive, offer to file the whole game OR to
+  // graft one of its players onto an existing battle (handy for partial games)
+  function showImportChoice(rec) {
+    importParsed = rec; importStage = 'choice';
+    $('importText').classList.add('hidden'); importReset();
+    if (!loadHistory().length) { showImportOwner(rec); return; }   // nothing to merge into yet
+    $('importChoice').innerHTML = '<div class="iolbl">Какво да направя с играта?</div>'
+      + '<div class="iochoice">'
+      + '<button type="button" class="btn" id="impWhole">📥 Внеси като нова битка</button>'
+      + '<button type="button" class="btn" id="impMerge">➕ Добави играч към друга битка</button>'
+      + '</div>';
+    $('importChoice').classList.remove('hidden');
+    $('importDo').classList.add('hidden');
+    $('impWhole').onclick = function () { importReset(); showImportOwner(importParsed); };
+    $('impMerge').onclick = function () { importReset(); showImportMerge(importParsed); };
+  }
+  // file the whole record: pick which seat is the старшина (device owner)
   function showImportOwner(rec) {
-    importParsed = rec;
+    importParsed = rec; importStage = 'owner';
     $('importText').classList.add('hidden');
     var chips = rec.players.map(function (p, i) {
       return '<button type="button" class="iochip' + (i === 0 ? ' on' : '') + '" data-val="' + i + '" style="--c:' + p.color + '"><span class="iodot"></span>' + esc(p.name) + '</button>';
     }).join('') + '<button type="button" class="iochip io-none" data-val="-1"><span class="iodot"></span>Никой (само в архива)</button>';
     $('importOwner').innerHTML = '<div class="iolbl">Кой играч си ти (старшината)?</div><div class="iogrid">' + chips + '</div>';
     $('importOwner').querySelectorAll('.iochip').forEach(function (b) {
-      b.onclick = function () { $('importOwner').querySelectorAll('.iochip').forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); };
+      b.onclick = function () { importSelect('importOwner', '.iochip', b); };
     });
     $('importOwner').classList.remove('hidden');
     $('importDo').textContent = 'Импортирай';
     $('importDo').classList.remove('hidden');
     $('importModal').classList.remove('hidden');
   }
+  // merge path: choose a player from the imported game + a target battle to add them to
+  function showImportMerge(rec) {
+    importParsed = rec; importStage = 'merge';
+    $('importText').classList.add('hidden');
+    var pchips = rec.players.map(function (p, i) {
+      return '<button type="button" class="iochip iop' + (i === 0 ? ' on' : '') + '" data-val="' + i + '" style="--c:' + p.color + '"><span class="iodot"></span>' + esc(p.name) + '</button>';
+    }).join('');
+    var games = loadHistory().slice().reverse();   // newest first
+    var gchips = games.map(function (g, i) {
+      var lbl = fmtDate(g.ts) + ' · ' + g.players.length + ' бойци' + (g.manualMode ? ' · отчет' : '');
+      return '<button type="button" class="iochip iog' + (i === 0 ? ' on' : '') + '" data-gid="' + esc(g.id) + '" style="--c:#c8a64b"><span class="iodot"></span>' + esc(lbl) + '</button>';
+    }).join('');
+    $('importMerge').innerHTML = '<div class="iolbl">Кой играч да добавя?</div><div class="iogrid">' + pchips + '</div>'
+      + '<div class="iolbl">Към коя битка?</div><div class="iogrid iogames">' + gchips + '</div>';
+    $('importMerge').querySelectorAll('.iop').forEach(function (b) { b.onclick = function () { importSelect('importMerge', '.iop', b); }; });
+    $('importMerge').querySelectorAll('.iog').forEach(function (b) { b.onclick = function () { importSelect('importMerge', '.iog', b); }; });
+    $('importMerge').classList.remove('hidden');
+    $('importDo').textContent = 'Слей';
+    $('importDo').classList.remove('hidden');
+    $('importModal').classList.remove('hidden');
+  }
   function importStep() {
     $('importErr').classList.add('hidden');
-    if (!importParsed) {                         // step 1: parse + validate + SANITISE
+    if (importStage === 'parse') {               // step 1: parse + validate + SANITISE
       var obj; try { obj = JSON.parse($('importText').value); } catch (e) { importError('JSON не може да се прочете.'); return; }
       var err = validateGameJSON(obj); if (err) { importError(err); return; }
       var clean = MP.sanitizeRecord(obj, CAT_KEYS);          // never trust the input — whitelist it
       if (!clean) { importError('Данните са невалидни.'); return; }
-      showImportOwner(clean);
+      showImportChoice(clean);
       return;
     }
+    if (importStage === 'merge') { doMergePlayer(); return; }
     fileImportedRecord();
+  }
+  // graft the chosen player onto the chosen battle as an extra seat
+  function doMergePlayer() {
+    var psel = $('importMerge').querySelector('.iop.on'), gsel = $('importMerge').querySelector('.iog.on');
+    if (!psel || !gsel) { importError('Избери играч и битка.'); return; }
+    var err = mergePlayerIntoGame(importParsed, +psel.getAttribute('data-val'), gsel.getAttribute('data-gid'));
+    if (err) { importError(err); return; }
+    $('importModal').classList.add('hidden');
+    openHistory();
+  }
+  function mergePlayerIntoGame(srcRec, playerIdx, targetId) {
+    var arr = loadHistory(), target = arr.filter(function (r) { return r.id === targetId; })[0];
+    if (!target) return 'Целевата битка не е намерена.';
+    if (target.players.length >= 8) return 'Битката е пълна (8 бойци).';
+    var src = srcRec.players[playerIdx]; if (!src) return 'Невалиден играч.';
+    var clone = JSON.parse(JSON.stringify(src)); clone.owner = false;   // target keeps its own старшина
+    target.players.push(clone);
+    if (!Array.isArray(target.moveLog)) target.moveLog = [];
+    while (target.moveLog.length < target.players.length - 1) target.moveLog.push([]);
+    var srcLog = (Array.isArray(srcRec.moveLog) && Array.isArray(srcRec.moveLog[playerIdx])) ? srcRec.moveLog[playerIdx] : [];
+    target.moveLog.push(JSON.parse(JSON.stringify(srcLog)));
+    persistHistory(arr);
+    return null;
   }
   // step 3: assign the chosen owner and file the (already sanitised) record
   function fileImportedRecord() {
