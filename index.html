@@ -48,12 +48,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .banner::before{ left:0; } .banner::after{ right:0; }
 
 /* ===== header ===== */
-.hd{ position:relative; display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
-/* current player's points — centred between the name and the round, as a frosted square panel */
-.pointsbox{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:2;
-  display:flex; flex-direction:column; align-items:center; gap:1px; padding:4px 13px; border-radius:11px;
+.hd{ display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
+/* running points: a frosted square panel sitting between the board and the dice */
+.dockhead{ position:relative; display:flex; justify-content:center; padding:2px 16px; }
+.pointsbox{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; padding:4px 14px; border-radius:11px;
   background:rgba(12,13,9,.42); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
   border:1px solid var(--gen-pill-line); box-shadow:0 2px 10px rgba(0,0,0,.35); }
+/* the advice popup OVERLAYS the points (grows upward over the board) — never pushes the dice */
+.dockhead .hintline{ position:absolute; left:12px; right:12px; bottom:-2px; z-index:9;
+  background:rgba(9,11,6,.97); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 6px 18px rgba(0,0,0,.55); }
 .rank{ width:40px; height:40px; flex:none; display:grid; place-items:center; background:var(--gen-pill); color:var(--gen-brass);
   border:2px solid var(--pc); border-radius:var(--gen-r-tag); font-family:var(--gen-font-display); font-weight:700; font-size:15px;
   box-shadow:inset 0 0 0 2px var(--gen-ink); }
@@ -1020,10 +1023,6 @@ body.modal-open{ overflow:hidden; }
         <span id="curPersona" class="ppersona hidden"></span>
       </span>
     </span>
-    <span class="pointsbox">
-      <span id="curTotal" class="ptotal">0</span>
-      <span class="tcap">ТОЧКИ</span>
-    </span>
     <span class="totalbox">
       <span id="curRound" class="ptotal rnum">1/14</span>
       <span class="tcap">ХОД</span>
@@ -1048,10 +1047,18 @@ body.modal-open{ overflow:hidden; }
 
   <div id="roast" class="roast"></div>
 
+  <!-- running points, between the board and the dice; the advice popup overlays it -->
+  <div id="dockHead" class="dockhead">
+    <span class="pointsbox">
+      <span id="curTotal" class="ptotal">0</span>
+      <span class="tcap">ТОЧКИ</span>
+    </span>
+    <div id="hintLine" class="hintline hidden"></div>
+  </div>
+
   <div class="dock">
     <div id="throws" class="throws"></div>
     <div id="dice" class="dice"></div>
-    <div id="hintLine" class="hintline hidden"></div>
     <div id="fireWrap" class="fire-wrap">
       <button id="fire" class="fire"><span id="fireTxt">ОГИН!</span></button>
       <button type="button" id="fireQ" class="fire-q" aria-label="Как се избират заровете">?</button>
@@ -2275,6 +2282,7 @@ body.modal-open{ overflow:hidden; }
     locked = false;
     rerolledAll = false;
     diceNew = [false, false, false, false, false];   // no "fresh" accent on a turn's first roll
+    hintsOn = false; $('hintBtn').classList.remove('on');   // advice is per-turn: re-click each turn
     clearRoast();
     var p = G.currentPlayer(game);
     if (!netMode) saveResume();   // snapshot at every turn boundary (net games aren't resumed locally)
@@ -2375,8 +2383,6 @@ body.modal-open{ overflow:hidden; }
     var line = $('hintLine');
     var p = G.currentPlayer(game);
     var show = hintsOn && evReady && !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
-    // raise the speech bubble when the hint line lifts the dice (avoids overlap)
-    document.documentElement.style.setProperty('--roast-bottom', show ? '244px' : '172px');
     if (!show) { line.classList.add('hidden'); return; }
     var head, alts;
     if (throwsLeft > 0) {
