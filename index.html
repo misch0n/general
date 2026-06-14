@@ -605,6 +605,29 @@ body.modal-open{ overflow:hidden; }
 .mtile.forfeit{ background:rgba(150,150,138,.18); color:var(--gen-muted); border-color:var(--gen-ink-line); box-shadow:inset 0 0 0 2px rgba(255,255,255,.05); }
 .mtile.forfeit .mval, .mtile.forfeit .mlab{ color:var(--gen-muted); }
 .mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
+/* ===== experimental three-column card ===== */
+.expboard{ padding:0 8px; }
+.expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.expgrid th{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-muted); padding:3px 0; text-align:center; }
+.expgrid th.act{ color:var(--gen-brass-bright); }
+.expgrid .ec-lab{ font-family:var(--gen-font-display); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); padding:2px 6px 2px 2px; white-space:nowrap; }
+.expgrid td.ec-cell{ width:18%; text-align:center; padding:3px 2px; border:1px solid var(--gen-pill-line); border-radius:5px; font-weight:700; font-size:13px; color:var(--gen-muted); }
+.expgrid td.ec-cell.done{ color:var(--gen-text); background:rgba(255,255,255,.04); }
+.expgrid td.ec-cell.done.neg{ color:#e8807a; }
+.expgrid td.ec-cell.av{ cursor:pointer; color:var(--gen-brass-bright); border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.1); }
+.expgrid td.ec-cell.av:hover{ background:rgba(232,195,86,.2); }
+.expgrid tr.ec-sub td, .expgrid tr.ec-tot td{ text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:11px; padding:4px 2px; }
+.expgrid tr.ec-sub td{ color:var(--gen-muted); border-top:1px solid var(--gen-pill-line); }
+.expgrid tr.ec-sub td.neg{ color:#e8807a; }
+.expgrid tr.ec-tot td{ color:var(--gen-brass); font-size:13px; }
+.expgrid tr.ec-sub td:first-child, .expgrid tr.ec-tot td:first-child{ text-align:right; color:var(--gen-muted); font-size:9px; letter-spacing:.4px; padding-right:6px; }
+.expcardwrap{ margin-top:10px; }
+.expcardwrap .ecw-name{ font-family:var(--gen-font-display); font-weight:700; font-size:13px; letter-spacing:.4px; margin:8px 0 3px; display:flex; align-items:center; gap:7px; }
+.expcardwrap .ecw-tot{ margin-left:auto; color:var(--gen-brass); }
+.winrow{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; margin-bottom:5px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); }
+.winrow .wr-pl{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); width:16px; text-align:center; }
+.winrow .wr-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.winrow .wr-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 
 /* unrolled placeholder dice (tap to make the first throw) */
 .die.ghost{ background:linear-gradient(155deg,#e9e4cf,#c9c2a0); cursor:pointer; animation:ghostpulse 1.4s ease-in-out infinite; }
@@ -1098,6 +1121,9 @@ body.modal-open{ overflow:hidden; }
     <div id="boardLower" class="lower"></div>
   </div>
 
+  <!-- experimental three-column card (shown only in the experimental ruleset) -->
+  <div id="expBoard" class="expboard hidden"></div>
+
   <!-- running points, sitting above the medals separator; the advice popup overlays it -->
   <div id="dockHead" class="dockhead">
     <span class="pointsbox">
@@ -1124,6 +1150,7 @@ body.modal-open{ overflow:hidden; }
     </div>
     <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
     <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
+    <button type="button" id="expReserve" class="btn small hidden" title="Изхарчи резервно хвърляне">🎁 Резерва</button>
   </div>
 
   <!-- manual-entry console (ОТЧЕТ mode): tap in all five table dice, then pick
@@ -1144,6 +1171,20 @@ body.modal-open{ overflow:hidden; }
 <!-- colour picker popover — MUST live at top level (used on the setup screen + lobby,
      where #game is display:none, so it can't be nested inside it) -->
 <div id="colorPop" class="colorpop hidden"></div>
+
+<!-- experimental (three-column) end-of-game summary -->
+<div id="expOver" class="overlay hidden">
+  <div class="modal">
+    <h2>🏆 Край на битката</h2>
+    <div class="oversubdate" id="expOverSub">Експериментален · Генерал</div>
+    <div id="expStandings"></div>
+    <div id="expCards"></div>
+    <div class="setup-actions">
+      <button id="expAgain" class="btn primary">⚔ Пак</button>
+      <button id="expToArchive" class="btn">📜 Архив</button>
+    </div>
+  </div>
+</div>
 <div id="medalTip" class="medaltip hidden"></div>
 <div id="keepThrowTip" class="ktbubble hidden">
   <div class="kt-hd">Избери зарове, които да:</div>
@@ -1487,12 +1528,14 @@ body.modal-open{ overflow:hidden; }
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
 <script src="engine.js"></script>
+<script src="exp.js"></script>
 <script src="mp.js"></script>
 <script>
 (function () {
   'use strict';
   var G = window.General;
   var EV = window.GeneralEV;
+  var X = window.GeneralExp;   // experimental three-column ruleset (separate flow)
   // load the precomputed optimal-value table (powers hints, luck/skill, bots)
   var evReady = false;
   try {
@@ -2308,6 +2351,11 @@ body.modal-open{ overflow:hidden; }
 
   function startGame(players, manual) {
     netMode = false;   // a normal local game is never networked
+    // experimental ruleset runs its own separate three-column flow (not for ОТЧЕТ)
+    if (settings.ruleset === 'experimental' && !manual) { expStartGame(players); return; }
+    expMode = false;
+    document.querySelector('.sheet').classList.remove('hidden');
+    $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
     clearAllPenalties();
     game = G.createGame(players);
     game.ownerSkipped = skipOwnerNext; // record so this game is excluded from owner trends
@@ -2718,9 +2766,14 @@ body.modal-open{ overflow:hidden; }
   function toggleSelect(i) {
     if (aiBusy || locked || throwsLeft <= 0) return;
     selected[i] = !selected[i];
+    if (expMode) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
   }
   $('fire').onclick = function () { humanFire(); };
+  $('expReserve').onclick = function () { expSpendReserve(); };
+  $('expAgain').onclick = function () { var ps = game.players; $('expOver').classList.add('hidden'); expStartGame(ps); };
+  $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); expMode = false; openHistory(); };
+  $('expOver').onclick = function (e) { if (e.target === $('expOver')) $('expOver').classList.add('hidden'); };
   // throw/keep chooser — the ? on the fire button replaces the old settings toggle
   function renderKeepThrowTip() {
     $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
@@ -2761,6 +2814,7 @@ body.modal-open{ overflow:hidden; }
     diceNew = paired.map(function (x) { return x.nw; });
   }
   function humanFire() {
+    if (expMode) { expHumanFire(); return; }
     if (aiBusy || locked || throwsLeft <= 0) return;
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;                    // nothing to throw
@@ -2834,6 +2888,239 @@ body.modal-open{ overflow:hidden; }
     if (G.isGameOver(game)) { endGame(); return; }
     G.nextTurn(game);
     beginTurn();
+  }
+
+  // ============================================================ EXPERIMENTAL flow (three columns)
+  var expMode = false, expCol = 0;
+  var EXP_CELLS = X ? X.KEYS.length * X.COLS : 45;
+  function expStartGame(players) {
+    expMode = true; netMode = false; manualMode = false;
+    clearAllPenalties();
+    game = X.createGame(players);
+    game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
+    undoStack = []; moveLog = players.map(function () { return []; });
+    $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
+    paintCamo($('game'));
+    $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
+    $('hintBtn').classList.add('hidden');
+    document.querySelector('.sheet').classList.add('hidden');
+    $('expBoard').classList.remove('hidden');
+    document.querySelector('.dock').classList.remove('hidden');
+    $('manualDock').classList.add('hidden');
+    expBeginTurn();
+  }
+  function expBeginTurn() {
+    locked = false; rerolledAll = false; diceNew = [false, false, false, false, false];
+    clearRoast();
+    var p = G.currentPlayer(game);
+    expCol = X.activeCol(p);
+    document.documentElement.style.setProperty('--pc', p.color);
+    selected = [false, false, false, false, false];
+    if (p.isAI) {
+      awaitingRoll = false; throwsLeft = ROLLS - 1;
+      dice = G.rollAll(); sortDice();
+      expRenderAll(); shakeDice();
+      expRunAiTurn();
+    } else {
+      awaitingRoll = true; throwsLeft = ROLLS - 1; dice = [];
+      expRenderAll();
+    }
+  }
+  function expFirstRoll() {
+    if (!awaitingRoll || locked) return;
+    awaitingRoll = false; dice = G.rollAll(); sortDice();
+    clearRoast(); expRenderAll(); shakeDice();
+  }
+  function expHumanFire() {
+    if (aiBusy || locked || throwsLeft <= 0) return;
+    var rr = rerollMask();
+    if (!rr.some(Boolean)) return;
+    if (rr.every(Boolean)) rerolledAll = true;
+    applyReroll(rr);
+    selected = [false, false, false, false, false];
+    throwsLeft--;
+    expRenderAll(); shakeDice();
+  }
+  function expSpendReserve() {
+    var p = G.currentPlayer(game);
+    if (aiBusy || locked || awaitingRoll || !X.canSpendReserve(p, throwsLeft)) return;
+    p.reserve--; throwsLeft = 1;                 // one extra re-roll, only in column III
+    expRenderAll();
+  }
+  function expCommit(col, key) {
+    var p = G.currentPlayer(game);
+    if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
+    if (!X.canPlay(p, col, key)) return;
+    X.bankReserve(p, throwsLeft);                // unused throws bank as reserve rolls
+    X.assignScore(p, col, key, dice);
+    locked = true; expRenderAll(); $('fire').disabled = true; $('expReserve').classList.add('hidden');
+    turnTimer = setTimeout(expEndTurn, END_DELAY);
+  }
+  function expEndTurn() {
+    if (X.isGameOver(game)) { expEndGame(); return; }
+    X.nextTurn(game);
+    expBeginTurn();
+  }
+  function expRunAiTurn() { aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
+  function expAiStep() {
+    var p = G.currentPlayer(game);
+    if (throwsLeft > 0) {
+      var holds = X.aiKeeps(p, dice, throwsLeft);
+      selected = settings.selectKeep ? holds.slice() : holds.map(function (h) { return !h; });
+      var rr = rerollMask();
+      if (rr.some(Boolean)) {
+        expRenderDice();
+        setTimeout(function () {
+          applyReroll(rr); selected = [false, false, false, false, false]; throwsLeft--;
+          expRenderAll(); shakeDice();
+          setTimeout(throwsLeft > 0 ? expAiStep : expAiFinish, AI_DELAY);
+        }, AI_DELAY * 0.65);
+        return;
+      }
+    }
+    setTimeout(expAiFinish, AI_DELAY);
+  }
+  function expAiFinish() {
+    var p = G.currentPlayer(game);
+    var cell = X.aiChooseCell(p, dice);
+    aiBusy = false;
+    X.bankReserve(p, throwsLeft);
+    X.assignScore(p, cell.col, cell.key, dice);
+    locked = true; expRenderAll(); $('fire').disabled = true;
+    turnTimer = setTimeout(expEndTurn, AI_VIEW_DELAY);
+  }
+
+  // ----- experimental rendering -----
+  function expRenderAll() { expRenderHeader(); expRenderPills(); expRenderBoard(); expRenderDice(); expRenderFire(); }
+  function expRenderHeader() {
+    var p = G.currentPlayer(game);
+    $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
+    var per = $('curPersona');
+    if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); } else per.classList.add('hidden');
+    $('curTotal').textContent = X.total(p);
+    var filled = p.cols.reduce(function (s, c) { return s + X.filledCount(c); }, 0);
+    $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
+    $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
+  }
+  function expRenderPills() {
+    $('pillWrap').innerHTML = game.players.map(function (p, i) {
+      return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">'
+        + '<span class="pdot" style="background:' + p.color + '"></span>' + initials(p.name) + ' · ' + X.total(p) + '</button>';
+    }).join('');
+    $('pillWrap').querySelectorAll('.ppill').forEach(function (b) { b.onclick = function () { /* peek not yet wired for exp */ }; });
+  }
+  function expCardHTML(p, interactive) {
+    var avail = {};
+    if (interactive) X.availableCells(p).forEach(function (a) { avail[a.col + '/' + a.key] = 1; });
+    var roman = ['I', 'II', 'III'];
+    var html = '<table class="expgrid"><thead><tr><th></th>'
+      + roman.map(function (n, ci) { return '<th class="' + (interactive && ci === expCol ? 'act' : '') + '">' + n + '</th>'; }).join('') + '</tr></thead><tbody>';
+    X.CATS.forEach(function (c) {
+      html += '<tr><td class="ec-lab">' + esc(c.label) + '</td>';
+      for (var col = 0; col < 3; col++) {
+        var v = p.cols[col][c.key], filled = typeof v === 'number';
+        if (filled) html += '<td class="ec-cell done' + (v < 0 ? ' neg' : '') + '">' + v + '</td>';
+        else if (avail[col + '/' + c.key]) {
+          var pv = G.scoreForExp(c.key, dice);
+          html += '<td class="ec-cell av" data-col="' + col + '" data-key="' + c.key + '">' + (pv !== 0 ? pv : '·') + '</td>';
+        } else html += '<td class="ec-cell"></td>';
+      }
+      html += '</tr>';
+    });
+    html += '<tr class="ec-sub"><td>Σ числа</td>' + [0, 1, 2].map(function (col) {
+      var st = G.colUpperState(p.cols[col], col);
+      return '<td class="' + (st.penalised ? 'neg' : '') + '">' + (st.penalised ? '−50' : st.subtotal) + '</td>';
+    }).join('') + '</tr>';
+    html += '<tr class="ec-tot"><td>Общо</td>' + [0, 1, 2].map(function (col) { return '<td>' + G.colTotalExp(p.cols[col], col) + '</td>'; }).join('') + '</tr>';
+    return html + '</tbody></table>';
+  }
+  function expRenderBoard() {
+    var p = G.currentPlayer(game);
+    var interactive = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    $('expBoard').innerHTML = expCardHTML(p, interactive);
+    $('expBoard').querySelectorAll('.ec-cell.av').forEach(function (td) {
+      td.onclick = function () { expCommit(+td.getAttribute('data-col'), td.getAttribute('data-key')); };
+    });
+  }
+  function expRenderDice() {
+    var p = G.currentPlayer(game);
+    var box = $('dice'); box.innerHTML = '';
+    if (awaitingRoll) {
+      for (var k = 0; k < G.DICE_COUNT; k++) {
+        var g = document.createElement('button'); g.className = 'die ghost'; g.innerHTML = qmarkHTML(); g.onclick = expFirstRoll; box.appendChild(g);
+      }
+      var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>'; $('throws').innerHTML = td; return;
+    }
+    var interactive = !p.isAI && !locked && throwsLeft > 0;
+    dice.forEach(function (v, i) {
+      var b = document.createElement('button');
+      var sel = selected[i], keepMode = settings.selectKeep, fresh = diceNew[i];
+      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
+      b.disabled = !interactive;
+      b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
+      if (interactive) b.onclick = function () { toggleSelect(i); };
+      box.appendChild(b);
+    });
+    var t = ''; for (var r = 0; r < ROLLS - 1; r++) t += '<span class="tdot' + (r < throwsLeft ? ' on' : '') + '"></span>';
+    $('throws').innerHTML = t;
+  }
+  function expRenderFire() {
+    var p = G.currentPlayer(game);
+    var resBtn = $('expReserve');
+    if (awaitingRoll) {
+      $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden');
+      $('rollHint').classList.remove('hidden'); resBtn.classList.add('hidden'); return;
+    }
+    $('rollHint').classList.add('hidden');
+    var fire = $('fire'), think = $('aiThinking');
+    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); resBtn.classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
+    think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
+    var keep = settings.selectKeep, someSel = selected.some(Boolean), txt;
+    if (locked) { txt = '…'; fire.disabled = true; }
+    else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ ПОЛЕ'; fire.disabled = true; }
+    else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
+    else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
+    $('fireTxt').textContent = txt;
+    // reserve-roll button: only in column III when throws are spent and a reserve is banked
+    resBtn.classList.toggle('hidden', !X.canSpendReserve(p, throwsLeft));
+    resBtn.textContent = '🎁 Резерва (' + p.reserve + ')';
+  }
+  function expEndGame() {
+    locked = true;
+    if (!viewingHistory) { archiveExpGame(); clearResume(); }
+    expShowSummary(game, false);
+  }
+  function archiveExpGame() {
+    var players = game.players.map(function (p) {
+      return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, gender: p.gender || 'm',
+               personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], cols: p.cols };
+    });
+    archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
+      ruleset: 'experimental', ownerSkipped: !!game.ownerSkipped, players: players });
+  }
+  function expShowSummary(g, isHistory) {
+    var ranked = X.ranking(g);
+    $('expStandings').innerHTML = ranked.map(function (r, i) {
+      return '<div class="winrow"><span class="wr-pl">' + (i + 1) + '</span>'
+        + '<span class="pdot" style="background:' + r.player.color + '"></span>'
+        + '<span class="wr-nm">' + (isOwnerP(r.player) ? ownerTokenHTML(true) : '') + esc(r.player.name) + (r.player.isAI ? ' <span class="badge-ai">AI</span>' : '') + '</span>'
+        + '<span class="wr-pts">' + r.total + '</span></div>';
+    }).join('');
+    $('expCards').innerHTML = ranked.map(function (r) {
+      return '<div class="expcardwrap"><div class="ecw-name"><span class="pdot" style="background:' + r.player.color + '"></span>'
+        + esc(r.player.name) + '<span class="ecw-tot">' + r.total + ' т.</span></div>' + expCardHTML(r.player, false) + '</div>';
+    }).join('');
+    $('expAgain').classList.toggle('hidden', !!isHistory);
+    $('expOver').classList.remove('hidden');
+  }
+  function openExpHistory(rec) {
+    var g = { players: rec.players.map(function (sp) {
+      var pl = { name: sp.name, color: sp.color, isAI: !!sp.isAI, owner: !!sp.owner, gender: sp.gender || 'm', cols: sp.cols || [{}, {}, {}], ribbons: sp.ribbons };
+      if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
+      return pl;
+    }) };
+    $('historyModal').classList.add('hidden');
+    expShowSummary(g, true);
   }
 
   // ---------- AI ----------
@@ -4334,7 +4621,7 @@ body.modal-open{ overflow:hidden; }
   // ============================================================ ARCHIVE / HISTORY
   var viewingHistory = false, histSnapshot = null, dossierCtx = null, currentHistRec = null;
 
-  function recTotal(sp) { var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
+  function recTotal(sp) { if (sp.cols) return G.cardTotalExp(sp.cols); var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
   function recOwnerIdx(rec) { if (rec.ownerSkipped) return -1; for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // -1: owner skipped; legacy: seat 0
   function analyzeRec(rec, i) {
@@ -4355,6 +4642,7 @@ body.modal-open{ overflow:hidden; }
     });
   }
   function openHistoryGame(rec) {
+    if (rec.ruleset === 'experimental') { openExpHistory(rec); return; }
     histSnapshot = { game: game, moveLog: moveLog, manualMode: manualMode, summary: summary, undo: undoStack };
     viewingHistory = true;
     game = { players: reconstructPlayers(rec), current: 0, round: 1 };
@@ -4908,7 +5196,7 @@ body.modal-open{ overflow:hidden; }
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + subDate + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
+        + '<span class="hg-sub">' + subDate + (rec.ruleset === 'experimental' ? ' · експ.' : '') + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
