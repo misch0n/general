@@ -635,7 +635,10 @@ body.modal-open{ overflow:hidden; }
 .expcardwrap .ecw-tot{ margin-left:auto; color:var(--gen-brass); }
 .winrow{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; margin-bottom:5px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); }
 .winrow .wr-pl{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); width:16px; text-align:center; }
-.winrow .wr-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.winrow .wr-nm{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.winrow .wr-nmtop{ font-family:var(--gen-font-display); font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wr-ana{ font-size:10px; color:var(--gen-muted); }
+.wr-ana b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
 .winrow .wr-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 
 /* unrolled placeholder dice (tap to make the first throw) */
@@ -3004,16 +3007,21 @@ body.modal-open{ overflow:hidden; }
     if (p.isAI) {
       awaitingRoll = false; throwsLeft = ROLLS - 1;
       dice = G.rollAll(); sortDice();
+      curLog = expStartLog(p);
       expRenderAll(); shakeDice();
       expRunAiTurn();
     } else {
-      awaitingRoll = true; throwsLeft = ROLLS - 1; dice = [];
+      awaitingRoll = true; throwsLeft = ROLLS - 1; dice = []; curLog = null;
       expRenderAll();
     }
   }
+  // per-turn move log for skill/luck analysis (mask + upper-subtotal at turn start)
+  function expStartLog(p) { return exactReady ? { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, rolls: [dice.slice()], keeps: [] } : null; }
+  function expLogReroll(rr) { if (curLog) { curLog.keeps.push(rr.map(function (x) { return !x; })); curLog.rolls.push(dice.slice()); } }
   function expFirstRoll() {
     if (!awaitingRoll || locked) return;
     awaitingRoll = false; dice = G.rollAll(); sortDice();
+    curLog = expStartLog(G.currentPlayer(game));
     clearRoast(); expRenderAll(); shakeDice();
   }
   function expHumanFire() {
@@ -3022,6 +3030,7 @@ body.modal-open{ overflow:hidden; }
     if (!rr.some(Boolean)) return;
     if (rr.every(Boolean)) rerolledAll = true;
     applyReroll(rr);
+    expLogReroll(rr);
     selected = [false, false, false, false, false];
     throwsLeft--;
     expRenderAll(); shakeDice();
@@ -3030,6 +3039,7 @@ body.modal-open{ overflow:hidden; }
     var p = G.currentPlayer(game);
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, key)) return;
+    if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
     locked = true; expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
@@ -3057,14 +3067,43 @@ body.modal-open{ overflow:hidden; }
     else cont = vstarExp(child, childUp);
     return imm + cont;
   }
-  function expV0(scores) {
-    var mask = EVX.maskOfScores(scores), up = G.upperStateExp(scores).subtotal, v0 = new Float64Array(EVX.NMS);
+  function expV0M(mask, up) {
+    var v0 = new Float64Array(EVX.NMS);
     for (var d = 0; d < EVX.NMS; d++) {
       var dice = EVX.MULTISETS[d], best = -Infinity;
       for (var i = 0; i < EVX.NCAT; i++) { if (mask & (1 << i)) continue; var v = expCellValue(mask, up, i, dice); if (v > best) best = v; }
       v0[d] = best;
     }
     return v0;
+  }
+  function expV0(scores) { return expV0M(EVX.maskOfScores(scores), G.upperStateExp(scores).subtotal); }
+  function expExpectRoll(vec) { var s = 0; for (var d = 0; d < EVX.NMS; d++) s += EVX.ROLL_PROB[d] * vec[d]; return s; }
+
+  // ----- per-game skill/luck analysis (mirrors EV.analyzeTurn, threading the upper subtotal) -----
+  var EXP_CAT_IX = {}; if (EVX) EVX.CATS.forEach(function (c, i) { EXP_CAT_IX[c.key] = i; });
+  var EXP_EPS = 0.05;
+  function analyzeTurnExp(t) {
+    var mask = t.mask, up = t.up, rolls = t.rolls, keeps = t.keeps || [], R = rolls.length;
+    var v0 = expV0M(mask, up), v1 = expStageUp(v0), v2 = expStageUp(v1), arr = [v0, v1, v2];
+    function nodeVal(dice, r) { return arr[r][EVX.idxOfDice(dice)]; }
+    function keepVal(dice, r, kb) { var c = [0, 0, 0, 0, 0, 0, 0]; for (var i = 0; i < dice.length; i++) if (kb[i]) c[dice[i]]++; return EVX.dot(EVX.keepResult(c), arr[r - 1]); }
+    var luck = 0, skill = 0, dec = 0, opt = 0, worst = null;
+    luck += nodeVal(rolls[0], 2) - expExpectRoll(v2);                 // first-roll variance
+    for (var i = 0; i < keeps.length; i++) {
+      var rl = 2 - i, node = nodeVal(rolls[i], rl), chosen = keepVal(rolls[i], rl, keeps[i]), cost = chosen - node;
+      skill += cost; dec++; if (cost > -EXP_EPS) opt++; if (!worst || cost < worst.cost) worst = { cost: cost, type: 'keep' };
+      luck += nodeVal(rolls[i + 1], rl - 1) - chosen;                 // reroll variance
+    }
+    var last = rolls[R - 1], ci = EXP_CAT_IX[t.category];
+    var ccost = expCellValue(mask, up, ci, last) - nodeVal(last, 0);
+    skill += ccost; dec++; if (ccost > -EXP_EPS) opt++; if (!worst || ccost < worst.cost) worst = { cost: ccost, type: 'category', key: t.category };
+    return { luck: luck, skill: skill, decisions: dec, optimal: opt, worst: worst };
+  }
+  function analyzeGameExp(turns) {
+    if (!exactReady || !turns || !turns.length) return null;
+    var luck = 0, skill = 0, dec = 0, opt = 0, worst = null;
+    turns.forEach(function (t) { try { var a = analyzeTurnExp(t); luck += a.luck; skill += a.skill; dec += a.decisions; opt += a.optimal; if (a.worst && (!worst || a.worst.cost < worst.cost)) worst = a.worst; } catch (e) {} });
+    return { luck: luck, skill: skill, accuracy: dec ? opt / dec : 1, blunder: worst, turns: turns.length };
   }
   function expRankCategories(scores, dice) {
     var mask = EVX.maskOfScores(scores), up = G.upperStateExp(scores).subtotal, cats = [];
@@ -3111,7 +3150,7 @@ body.modal-open{ overflow:hidden; }
       if (rr.some(Boolean)) {
         expRenderDice();
         setTimeout(function () {
-          applyReroll(rr); selected = [false, false, false, false, false]; throwsLeft--;
+          applyReroll(rr); expLogReroll(rr); selected = [false, false, false, false, false]; throwsLeft--;
           expRenderAll(); shakeDice();
           setTimeout(throwsLeft > 0 ? expAiStep : expAiFinish, AI_DELAY);
         }, AI_DELAY * 0.65);
@@ -3141,6 +3180,7 @@ body.modal-open{ overflow:hidden; }
     var key = (exactReady && p.persona) ? expBotCategory(p.scores, dice, p.persona.policy, Math.random)
             : (evxReady && p.persona) ? expChooseKeyEV(p, dice) : X.aiChooseKey(p, dice);
     aiBusy = false;
+    if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     X.assignScore(p, key, dice);
     locked = true; expRenderAll(); $('fire').disabled = true;
     turnTimer = setTimeout(expEndTurn, AI_VIEW_DELAY);
@@ -3277,7 +3317,7 @@ body.modal-open{ overflow:hidden; }
   function expEndGame() {
     locked = true;
     if (!viewingHistory) { archiveExpGame(); clearResume(); }
-    expShowSummary(game, false);
+    expShowSummary(game, false, moveLog);
   }
   function archiveExpGame() {
     var players = game.players.map(function (p) {
@@ -3285,14 +3325,16 @@ body.modal-open{ overflow:hidden; }
                personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], scores: p.scores, pts: G.playerTotalExp(p) };
     });
     archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
-      ruleset: 'experimental', ownerSkipped: !!game.ownerSkipped, players: players });
+      ruleset: 'experimental', ownerSkipped: !!game.ownerSkipped, players: players, moveLog: moveLog });
   }
-  function expShowSummary(g, isHistory) {
+  function expShowSummary(g, isHistory, logs) {
     var ranked = X.ranking(g);
     $('expStandings').innerHTML = ranked.map(function (r, i) {
+      var ana = logs && logs[r.order] ? analyzeGameExp(logs[r.order]) : null;
+      var sub = ana ? '<span class="wr-ana">точност <b>' + Math.round(ana.accuracy * 100) + '%</b> · късмет <b>' + (ana.luck >= 0 ? '+' : '') + Math.round(ana.luck) + '</b> · умение <b>' + (ana.skill >= 0 ? '+' : '') + ana.skill.toFixed(1) + '</b></span>' : '';
       return '<div class="winrow"><span class="wr-pl">' + (i + 1) + '</span>'
         + '<span class="pdot" style="background:' + r.player.color + '"></span>'
-        + '<span class="wr-nm">' + (isOwnerP(r.player) ? ownerTokenHTML(true) : '') + esc(r.player.name) + (r.player.isAI ? ' <span class="badge-ai">AI</span>' : '') + '</span>'
+        + '<span class="wr-nm"><span class="wr-nmtop">' + (isOwnerP(r.player) ? ownerTokenHTML(true) : '') + esc(r.player.name) + (r.player.isAI ? ' <span class="badge-ai">AI</span>' : '') + '</span>' + sub + '</span>'
         + '<span class="wr-pts">' + r.total + '</span></div>';
     }).join('');
     $('expCards').innerHTML = ranked.map(function (r) {
@@ -3309,7 +3351,7 @@ body.modal-open{ overflow:hidden; }
       return pl;
     }) };
     $('historyModal').classList.add('hidden');
-    expShowSummary(g, true);
+    expShowSummary(g, true, rec.moveLog);
   }
 
   // ---------- AI ----------
