@@ -117,7 +117,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   background:#d8cfa8; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-die);
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 3px 0 rgba(0,0,0,.4); transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
 .die:disabled{ cursor:default; opacity:.92; }
-.die.sel{ transform:translateY(-7px); border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass), 0 0 16px rgba(200,166,75,.6), 0 3px 0 rgba(0,0,0,.4); }
+/* throw-mode (select-to-throw): marked = the dice you're re-rolling — RED outline + small ✕ */
+.die.sel{ transform:translateY(-7px); border-color:#e0584a; box-shadow:0 0 0 2px #e0584a, 0 0 16px rgba(224,88,74,.55), 0 3px 0 rgba(0,0,0,.4); }
+.die.sel .reticle{ color:#f0a097; border-color:#e0584a; }
 /* keep-mode: marked = the dice you're holding (green accent, sits down not up) */
 .die.sel.keep{ transform:translateY(0) scale(.94); border-color:#7bb85a; box-shadow:0 0 0 2px #7bb85a, 0 0 14px rgba(123,184,90,.5), 0 3px 0 rgba(0,0,0,.4); }
 .die.sel.keep .reticle{ color:#9bd17e; border-color:#7bb85a; }
@@ -2587,8 +2589,8 @@ body.modal-open{ overflow:hidden; }
       var keepMode = settings.selectKeep;
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '');
       b.disabled = !interactive;
-      b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', маркиран за огън') : ''));
-      b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✛') + '</span>' : '');
+      b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
+      b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
       if (interactive) b.onclick = function () { toggleSelect(i); };
       $('dice').appendChild(b);
     });
@@ -2608,10 +2610,12 @@ body.modal-open{ overflow:hidden; }
     var fire = $('fire'), think = $('aiThinking');
     if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
-    var keep = settings.selectKeep, willThrow = rerollMask().some(Boolean), txt;
+    // the button keys off whether the player has MARKED any dice (same in both modes):
+    // nothing marked → prompt to choose; once marked → throw/keep the selection
+    var keep = settings.selectKeep, someSel = selected.some(Boolean), txt;
     if (locked) { txt = '…'; fire.disabled = true; }
     else if (throwsLeft <= 0) { txt = 'ОТЧЕТИ!'; fire.disabled = true; }
-    else if (!willThrow) { txt = 'ИЗБЕРИ ЗАРОВЕ!'; fire.disabled = true; }
+    else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
     else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
     $('fireTxt').textContent = txt;
   }
@@ -2641,10 +2645,14 @@ body.modal-open{ overflow:hidden; }
   $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
     b.onclick = function (e) {
       e.stopPropagation();
-      settings.selectKeep = b.getAttribute('data-keep') === '1';
-      selected = [false, false, false, false, false];   // the mark meaning inverts; clear it
-      saveSettings(); renderKeepThrowTip();
-      if (game) renderAll();
+      var newKeep = b.getAttribute('data-keep') === '1';
+      if (newKeep !== settings.selectKeep) {
+        // switch the mechanic but KEEP the same marked dice — only their accent flips
+        // (red ✕ "throw these" ⇄ green ✓ "keep these"); no confusing inversion.
+        settings.selectKeep = newKeep; saveSettings();
+        if (game) renderAll();
+      }
+      renderKeepThrowTip();
     };
   });
 
