@@ -1527,6 +1527,7 @@ body.modal-open{ overflow:hidden; }
 
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
+<script src="ev-table-exp.js"></script>
 <script src="engine.js"></script>
 <script src="exp.js"></script>
 <script src="mp.js"></script>
@@ -1541,6 +1542,24 @@ body.modal-open{ overflow:hidden; }
   try {
     if (EV && window.GeneralEVTable) { EV.setTable(window.GeneralEVTable.V); evReady = true; }
   } catch (e) { evReady = false; }
+  // a second engine bound to the experimental ruleset (free-column EV: deviation
+  // scoring + два чифта). Powers the experimental EV bot and skill/luck analysis.
+  var EVX = null, evxReady = false;
+  try {
+    if (EV && EV.create) {
+      EVX = EV.create({
+        DICE_COUNT: G.DICE_COUNT, MAX_ROLLS: G.MAX_ROLLS,
+        CATEGORIES: G.CATEGORIES_EXP, scoreFor: G.scoreForExp,
+        aiChooseHolds: G.aiChooseHolds,
+        aiChooseCategory: function (p, dice) {
+          var best = null, bv = -Infinity;
+          G.CATEGORIES_EXP.forEach(function (c) { if (typeof p.scores[c.key] === 'number') return; var v = G.scoreForExp(c.key, dice); if (v > bv) { bv = v; best = c.key; } });
+          return { category: best, value: bv };
+        },
+      });
+      if (window.GeneralEVTableExp) { EVX.setTable(window.GeneralEVTableExp.V); evxReady = true; }
+    }
+  } catch (e) { evxReady = false; }
   var $ = function (id) { return document.getElementById(id); };
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2962,10 +2981,15 @@ body.modal-open{ overflow:hidden; }
     expBeginTurn();
   }
   function expRunAiTurn() { aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
+  // EV-backed keeps in the FREE columns (II/III); heuristic toward the forced cell in column I
+  function expAiKeeps(p) {
+    if (evxReady && p.persona && expCol >= 1) return EVX.botKeep(p.cols[expCol], dice, throwsLeft, p.persona.policy, Math.random);
+    return X.aiKeeps(p, dice, throwsLeft);
+  }
   function expAiStep() {
     var p = G.currentPlayer(game);
     if (throwsLeft > 0) {
-      var holds = X.aiKeeps(p, dice, throwsLeft);
+      var holds = expAiKeeps(p);
       selected = settings.selectKeep ? holds.slice() : holds.map(function (h) { return !h; });
       var rr = rerollMask();
       if (rr.some(Boolean)) {
@@ -2982,7 +3006,14 @@ body.modal-open{ overflow:hidden; }
   }
   function expAiFinish() {
     var p = G.currentPlayer(game);
-    var cell = X.aiChooseCell(p, dice);
+    var cell;
+    if (evxReady && p.persona && expCol >= 1) {
+      // EV bot picks the category within the active free column; col is fixed by progression
+      var key = EVX.botCategory(p.cols[expCol], dice, p.persona.policy, Math.random);
+      cell = { col: expCol, key: key };
+    } else {
+      cell = X.aiChooseCell(p, dice);
+    }
     aiBusy = false;
     X.bankReserve(p, throwsLeft);
     X.assignScore(p, cell.col, cell.key, dice);

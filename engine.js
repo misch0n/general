@@ -16,8 +16,10 @@
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./game.js'));
+    module.exports.create = factory;          // build a second engine for another ruleset (e.g. experimental)
   } else {
     root.GeneralEV = factory(root.General);
+    root.GeneralEV.create = factory;
   }
 })(typeof self !== 'undefined' ? self : this, function (General) {
   'use strict';
