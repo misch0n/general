@@ -240,6 +240,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 body.modal-open{ overflow:hidden; }
 .modal h2{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.5px; color:var(--gen-brass); font-size:18px; margin:0 0 12px; }
 .modal .sub{ color:var(--gen-label); font-size:12px; margin:0 0 14px; }
+/* editable battle title (history detail): the title sits in a dashed box with a pencil */
+.overhead{ display:flex; align-items:center; gap:8px; margin:0 0 4px; }
+.overhead h2{ margin:0; }
+.overhead.editable h2{ cursor:pointer; padding:4px 9px; border:1px dashed var(--gen-brass-stroke); border-radius:8px; background:rgba(255,255,255,.03); }
+.overhead.editable h2:hover{ border-color:var(--gen-brass); }
+.titlepencil{ flex:none; width:24px; height:24px; position:relative; border:1px solid var(--gen-pill-line); border-radius:6px; background:transparent; cursor:pointer; }
+.titlepencil:hover{ border-color:var(--gen-brass); }
+/* CSS-drawn pencil: a slanted brass body with a dark nib */
+.titlepencil::before{ content:''; position:absolute; left:7px; top:4px; width:5px; height:13px; background:var(--gen-brass); border-radius:1px;
+  transform:rotate(45deg); box-shadow:inset 0 0 0 1px rgba(0,0,0,.35); }
+.titlepencil::after{ content:''; position:absolute; left:5px; bottom:4px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid var(--gen-text); transform:rotate(45deg); }
+.oversubdate{ color:var(--gen-muted); font-size:11px; letter-spacing:.4px; margin:0 0 12px; font-variant-numeric:tabular-nums; }
+.titlerename{ font-family:var(--gen-font-display); font-weight:700; font-size:17px; color:var(--gen-text); letter-spacing:.5px;
+  padding:4px 9px; border:1px solid var(--gen-brass); border-radius:8px; background:rgba(0,0,0,.3); width:100%; max-width:240px; }
+.titlerename:focus{ outline:none; }
 .rankrow{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:7px; }
 .rankrow.first{ border-color:var(--gen-brass); }
 .rankrow .pos{ width:22px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-muted); }
@@ -834,7 +850,9 @@ body.modal-open{ overflow:hidden; }
 .progchart{ margin:10px 0 4px; padding:10px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--gen-pill-line); }
 .progchart:empty{ display:none; }
 .progchart .pc-title{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.8px; color:var(--gen-brass); font-size:11px; margin-bottom:4px; }
-.progchart .pc-svg{ width:100%; height:auto; display:block; touch-action:pan-y; }
+/* touch-action:none so a vertical finger wobble never hands the gesture to the
+   browser's scroller (which would cancel the pointer and drop the scrub line) */
+.progchart .pc-svg{ width:100%; height:auto; display:block; touch-action:none; }
 /* drag-to-scrub: a vertical reader that reports every player's tally at a turn */
 .progchart .pc-wrap{ position:relative; }
 .progchart .pc-scrubline{ stroke:var(--gen-text); stroke-width:1; stroke-dasharray:3 3; opacity:.6; }
@@ -1135,7 +1153,11 @@ body.modal-open{ overflow:hidden; }
 <div id="overModal" class="overlay hidden">
   <div class="modal">
     <button id="reportHelp" class="qmark over-qmark" title="Как се чете рапортът?">?</button>
-    <h2>🏆 Край на битката</h2>
+    <div id="overHead" class="overhead">
+      <h2 id="overTitle">🏆 Край на битката</h2>
+      <button type="button" id="overTitleEdit" class="titlepencil hidden" title="Преименувай битката" aria-label="Преименувай битката"></button>
+    </div>
+    <div id="overSubdate" class="oversubdate hidden"></div>
     <div id="winHeadline" class="winhead"></div>
     <div id="winBadges" class="winbadges"></div>
     <div class="tabs tabs4">
@@ -3535,7 +3557,50 @@ body.modal-open{ overflow:hidden; }
     } else $('betMsgs').innerHTML = '';
 
     renderSummary(); // also paints the progress chart
+    setOverTitle();  // live game → plain title (history overrides right after)
     $('overModal').classList.remove('hidden');
+  }
+  // the over-modal heading: plain for a live game; editable (box + pencil) with a
+  // date/time subline when reviewing an archived battle
+  function setOverTitle() {
+    var rec = viewingHistory ? currentHistRec : null;
+    var head = $('overHead'), title = $('overTitle'), pencil = $('overTitleEdit'), sub = $('overSubdate');
+    if (!rec) {
+      head.classList.remove('editable'); pencil.classList.add('hidden'); sub.classList.add('hidden');
+      title.textContent = '🏆 Край на битката';
+      return;
+    }
+    head.classList.add('editable'); pencil.classList.remove('hidden');
+    title.textContent = rec.name || 'Край на битката';
+    sub.textContent = fmtDate(rec.ts) + ' · ' + fmtTime(rec.ts); sub.classList.remove('hidden');
+    title.onclick = function () { startRename(rec); };
+    pencil.onclick = function () { startRename(rec); };
+  }
+  function startRename(rec) {
+    var title = $('overTitle');
+    if ($('overHead').querySelector('.titlerename')) return;   // already editing
+    var input = document.createElement('input');
+    input.type = 'text'; input.className = 'titlerename'; input.maxLength = 48;
+    input.value = rec.name || ''; input.placeholder = 'Име на битката…';
+    title.style.display = 'none';
+    title.parentNode.insertBefore(input, title);
+    input.focus(); input.select();
+    var done = false;
+    function commit(save) {
+      if (done) return; done = true;
+      if (save) renameGame(rec, input.value);
+      input.remove(); title.style.display = '';
+      setOverTitle();
+    }
+    input.onkeydown = function (e) { if (e.key === 'Enter') commit(true); else if (e.key === 'Escape') commit(false); };
+    input.onblur = function () { commit(true); };
+  }
+  // persist a battle's custom name (empty clears it back to the date)
+  function renameGame(rec, raw) {
+    var name = (raw || '').trim().slice(0, 48);
+    rec.name = name || undefined;
+    var arr = loadHistory(), r = arr.filter(function (x) { return x.id === rec.id; })[0];
+    if (r) { if (name) r.name = name; else delete r.name; persistHistory(arr); }
   }
 
   // §1.10 DA-19 — share the summary as an image. Primary: a pixel capture of the
@@ -4267,6 +4332,7 @@ body.modal-open{ overflow:hidden; }
     var oi = recOwnerIdx(rec);
     dossierCtx = (oi >= 0 && !rec.players[oi].isAI) ? { ownerPi: oi, career: computeOwnerCareer() } : null;
     currentHistRec = rec; $('overExport').classList.remove('hidden');  // export is active only from history
+    setOverTitle();   // editable title + date/time subline for the archived battle
     $('overBack').classList.remove('hidden'); $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
   }
   function exitHistoryGame(toArchive) {
@@ -4682,12 +4748,16 @@ body.modal-open{ overflow:hidden; }
       var rankNum = place != null ? place : '–';
       var rankTitle = excluded ? 'Извън статистиката · докосни за връщане'
         : (place != null ? place + '-то място · докосни за изключване' : 'Без класиране · докосни за изключване');
+      // a renamed battle leads with its name; otherwise the date stays the title
+      var named = !!rec.name;
+      var primary = named ? esc(rec.name) : esc(fmtDate(rec.ts));
+      var subDate = named ? esc(fmtDate(rec.ts) + ' ' + fmtTime(rec.ts)) : esc(fmtTime(rec.ts));
       html += '<div class="histgame' + (excluded ? ' ex' : '') + '" data-id="' + esc(rec.id) + '">'
         + '<button type="button" class="hg-count ' + rankCls + '" title="' + esc(rankTitle) + '">' + rankNum + '</button>'
-        + '<span class="hg-main"><span class="hg-top">' + esc(fmtDate(rec.ts))
+        + '<span class="hg-main"><span class="hg-top">' + primary
         + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + esc(fmtTime(rec.ts)) + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
+        + '<span class="hg-sub">' + subDate + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'

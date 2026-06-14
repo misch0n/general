@@ -654,7 +654,9 @@
         return clean;
       }));
     }
-    return { ts: clampInt(obj.ts, 0, 1e15, Date.now()) || Date.now(), manualMode: !!obj.manualMode, ownerSkipped: !!obj.ownerSkipped, selectKeep: !!obj.selectKeep, players: players, moveLog: moveLog };
+    var rec = { ts: clampInt(obj.ts, 0, 1e15, Date.now()) || Date.now(), manualMode: !!obj.manualMode, ownerSkipped: !!obj.ownerSkipped, selectKeep: !!obj.selectKeep, players: players, moveLog: moveLog };
+    if (typeof obj.name === 'string' && obj.name.trim()) rec.name = obj.name.trim().slice(0, 48);   // keep a custom battle name
+    return rec;
   }
 
   // ============================================================ acoustic record transfer
