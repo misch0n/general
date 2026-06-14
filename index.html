@@ -1537,6 +1537,7 @@ body.modal-open{ overflow:hidden; }
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
 <script src="ev-table-exp.js"></script>
+<script src="ev-exp-exact-table.js"></script>
 <script src="engine.js"></script>
 <script src="exp.js"></script>
 <script src="mp.js"></script>
@@ -1569,6 +1570,37 @@ body.modal-open{ overflow:hidden; }
       if (window.GeneralEVTableExp) { EVX.setTable(window.GeneralEVTableExp.V); evxReady = true; }
     }
   } catch (e) { evxReady = false; }
+  // EXACT penalty-aware value table V*(mask, upper-subtotal) — decoded async from the
+  // gzipped+base64 asset. Powers the truly-optimal experimental bot + skill/luck.
+  var exactExp = null, exactReady = false, EXP_UPPER_BITS = 0;
+  if (X && EVX) { for (var ei = 0; ei < EVX.NCAT; ei++) if (G.UPPER_KEYS.indexOf(EVX.CATS[ei].key) >= 0) EXP_UPPER_BITS |= (1 << ei); }
+  function expUpperComplete(mask) { return (mask & EXP_UPPER_BITS) === EXP_UPPER_BITS; }
+  function vstarExp(mask, up) {
+    if (expUpperComplete(mask)) return EVX.vstar(mask);          // penalty already realised → lower-only optimal
+    var rec = exactExp && exactExp[mask]; if (!rec) return EVX.vstar(mask);
+    var i = up - rec.lo; if (i < 0) i = 0; else if (i >= rec.arr.length) i = rec.arr.length - 1;
+    return rec.arr[i];
+  }
+  (function decodeExactExp() {
+    if (!window.GeneralEVExactExp || !EVX || typeof DecompressionStream === 'undefined') return;
+    try {
+      var bin = Uint8Array.from(atob(window.GeneralEVExactExp.gz), function (c) { return c.charCodeAt(0); });
+      new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer().then(function (ab) {
+        var dv = new DataView(ab), o = 0, count = dv.getUint32(o, true); o += 4;
+        var scale = dv.getUint16(o, true); o += 4;                // skip scale's pair + ncat
+        var table = {};
+        for (var i = 0; i < count; i++) {
+          var mask = dv.getUint32(o, true); o += 4;
+          var lo = dv.getInt16(o, true); o += 2;
+          var len = dv.getUint16(o, true); o += 2;
+          var arr = new Float32Array(len), prev = 0;
+          for (var t = 0; t < len; t++) { prev += dv.getInt16(o, true); o += 2; arr[t] = prev / scale; }
+          table[mask] = { lo: lo, arr: arr };
+        }
+        exactExp = table; exactReady = true;
+      }).catch(function () { exactReady = false; });
+    } catch (e) { exactReady = false; }
+  })();
   var $ = function (id) { return document.getElementById(id); };
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -3011,7 +3043,62 @@ body.modal-open{ overflow:hidden; }
     expBeginTurn();
   }
   function expRunAiTurn() { aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
+
+  // ----- EXACT penalty-aware evaluator (reuses the engine reroll DP, threading the upper subtotal) -----
+  function expStageUp(prev) {
+    var out = new Float64Array(EVX.NMS);
+    for (var d = 0; d < EVX.NMS; d++) { var ks = EVX.KEEPS[d], b = -Infinity; for (var k = 0; k < ks.length; k++) { var e = EVX.dot(ks[k], prev); if (e > b) b = e; } out[d] = b; }
+    return out;
+  }
+  function expCellValue(mask, up, i, dice) {
+    var key = EVX.CATS[i].key, imm = G.scoreForExp(key, dice), isUp = G.UPPER_KEYS.indexOf(key) >= 0;
+    var child = mask | (1 << i), childUp = up + (isUp ? imm : 0), cont;
+    if (expUpperComplete(child)) cont = EVX.vstar(child) + (childUp < 0 ? G.UPPER_PENALTY : 0);
+    else cont = vstarExp(child, childUp);
+    return imm + cont;
+  }
+  function expV0(scores) {
+    var mask = EVX.maskOfScores(scores), up = G.upperStateExp(scores).subtotal, v0 = new Float64Array(EVX.NMS);
+    for (var d = 0; d < EVX.NMS; d++) {
+      var dice = EVX.MULTISETS[d], best = -Infinity;
+      for (var i = 0; i < EVX.NCAT; i++) { if (mask & (1 << i)) continue; var v = expCellValue(mask, up, i, dice); if (v > best) best = v; }
+      v0[d] = best;
+    }
+    return v0;
+  }
+  function expRankCategories(scores, dice) {
+    var mask = EVX.maskOfScores(scores), up = G.upperStateExp(scores).subtotal, cats = [];
+    for (var i = 0; i < EVX.NCAT; i++) { if (mask & (1 << i)) continue; var key = EVX.CATS[i].key; cats.push({ key: key, immediate: G.scoreForExp(key, dice), ev: expCellValue(mask, up, i, dice) }); }
+    cats.sort(function (a, b) { return b.ev - a.ev; });
+    return cats;
+  }
+  function expRankKeeps(scores, dice, rollsLeft) {
+    var v0 = expV0(scores), arr = [v0]; for (var r = 1; r <= rollsLeft; r++) arr.push(expStageUp(arr[r - 1]));
+    var next = arr[rollsLeft - 1], dIdx = EVX.idxOfDice(dice), keeps = EVX.KEEPS[dIdx], ranked = [];
+    for (var k = 0; k < keeps.length; k++) ranked.push({ keep: EVX.keepPositions(dice, keeps[k].keptCounts), ev: EVX.dot(keeps[k], next) });
+    ranked.sort(function (a, b) { return b.ev - a.ev; });
+    return ranked;
+  }
+  // persona-respecting picks over the EXACT rankings (mirrors EV.botCategory/botKeep)
+  function expBotCategory(scores, dice, policy, rng) {
+    if (policy.type === 'greedy' || policy.type === 'random') return X.aiChooseKey({ scores: scores }, dice);
+    var ranked = expRankCategories(scores, dice);
+    if (policy.type === 'optimal') return ranked[0].key;
+    var positive = ranked.filter(function (r) { return r.immediate > 0; }), pool = positive.length ? positive : ranked;
+    if (policy.type === 'epsilon') { var eps = policy.epsilon == null ? 0.25 : policy.epsilon; if ((rng || Math.random)() < eps) return pool[Math.floor((rng || Math.random)() * pool.length)].key; return pool[0].key; }
+    return EVX.softmaxPick(pool, function (a) { return a.ev; }, policy.tau, rng).key;
+  }
+  function expBotKeep(scores, dice, rollsLeft, policy, rng) {
+    rng = rng || Math.random;
+    if (policy.type === 'greedy') return G.aiChooseHolds(dice);
+    if (policy.type === 'random') { var all = rollsLeft === 2 ? false : rng() < 0.5; return dice.map(function () { return all; }); }
+    var ranked = expRankKeeps(scores, dice, rollsLeft);
+    if (policy.type === 'epsilon') { var eps = policy.epsilon == null ? 0.25 : policy.epsilon; if (rng() < eps) return ranked[Math.floor(rng() * ranked.length)].keep; return ranked[0].keep; }
+    return EVX.softmaxPick(ranked, function (a) { return a.ev; }, policy.type === 'optimal' ? 0 : policy.tau, rng).keep;
+  }
+
   function expAiKeeps(p) {
+    if (exactReady && p.persona) return expBotKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
     if (evxReady && p.persona) return EVX.botKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
     return X.aiKeeps(p, dice);
   }
@@ -3051,7 +3138,8 @@ body.modal-open{ overflow:hidden; }
   }
   function expAiFinish() {
     var p = G.currentPlayer(game);
-    var key = (evxReady && p.persona) ? expChooseKeyEV(p, dice) : X.aiChooseKey(p, dice);
+    var key = (exactReady && p.persona) ? expBotCategory(p.scores, dice, p.persona.policy, Math.random)
+            : (evxReady && p.persona) ? expChooseKeyEV(p, dice) : X.aiChooseKey(p, dice);
     aiBusy = false;
     X.assignScore(p, key, dice);
     locked = true; expRenderAll(); $('fire').disabled = true;
