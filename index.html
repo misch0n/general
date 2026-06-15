@@ -3467,36 +3467,6 @@ body.modal-open{ overflow:hidden; }
     archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
       ruleset: 'experimental', manualMode: manualMode, ownerSkipped: !!game.ownerSkipped, players: players, moveLog: moveLog });
   }
-  function expShowSummary(g, isHistory, logs) {
-    var ranked = X.ranking(g);
-    $('expStandings').innerHTML = ranked.map(function (r, i) {
-      var ana = logs && logs[r.order] ? analyzeGameExp(logs[r.order]) : null;
-      var blk = ana && ana.blunder ? (ana.blunder.chosenKey || ana.blunder.turnCategory) : null;
-      var bl = ana && ana.blunder && ana.blunder.cost < -0.5
-        ? '<span class="wr-blun">пропуск: ' + (ana.blunder.type === 'keep' ? 'хвърляне' : esc(EXP_LABEL[blk] || blk)) + ' <b>' + ana.blunder.cost.toFixed(1) + '</b> т.</span>' : '';
-      var sub = ana ? '<span class="wr-ana">точност <b>' + Math.round(ana.accuracy * 100) + '%</b> · късмет <b>' + (ana.luck >= 0 ? '+' : '') + Math.round(ana.luck) + '</b> · умение <b>' + (ana.skill >= 0 ? '+' : '') + ana.skill.toFixed(1) + '</b></span>' + bl : '';
-      return '<div class="winrow"><span class="wr-pl">' + (i + 1) + '</span>'
-        + '<span class="pdot" style="background:' + r.player.color + '"></span>'
-        + '<span class="wr-nm"><span class="wr-nmtop">' + (isOwnerP(r.player) ? ownerTokenHTML(true) : '') + esc(r.player.name) + (r.player.isAI ? ' <span class="badge-ai">AI</span>' : '') + '</span>' + sub + '</span>'
-        + '<span class="wr-pts">' + r.total + '</span></div>';
-    }).join('');
-    $('expCards').innerHTML = ranked.map(function (r) {
-      return '<div class="expcardwrap"><div class="ecw-name"><span class="pdot" style="background:' + r.player.color + '"></span>'
-        + esc(r.player.name) + '<span class="ecw-tot">' + r.total + ' т.</span></div>' + expCardHTML(r.player, false) + '</div>';
-    }).join('');
-    $('expAgain').classList.toggle('hidden', !!isHistory);
-    $('expOver').classList.remove('hidden');
-  }
-  function openExpHistory(rec) {
-    var g = { players: rec.players.map(function (sp) {
-      var pl = { name: sp.name, color: sp.color, isAI: !!sp.isAI, owner: !!sp.owner, gender: sp.gender || 'm', scores: sp.scores || {}, ribbons: sp.ribbons };
-      if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
-      return pl;
-    }) };
-    $('historyModal').classList.add('hidden');
-    expShowSummary(g, true, rec.moveLog);
-  }
-
   // ---------- AI ----------
   // engine-backed persona policy when the EV table is ready; else heuristic.
   function aiKeepMask(p) {
