@@ -626,6 +626,11 @@ body.modal-open{ overflow:hidden; }
 .tile.up.neg .pts{ color:#e8807a; }
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
+/* archive ruleset tabs (Стандартен / Експериментален) */
+.histtabs{ display:flex; gap:6px; margin-bottom:10px; }
+.histtab{ flex:1; padding:8px 6px; border-radius:9px; cursor:pointer; background:var(--gen-pill); border:1px solid var(--gen-pill-line);
+  color:var(--gen-label); font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.5px; text-transform:uppercase; }
+.histtab.on{ color:var(--gen-brass-bright); border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.1); }
 /* compact recap table (end-of-game summary only) */
 .expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
 .expgrid th{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-muted); padding:3px 0; text-align:center; }
@@ -4183,6 +4188,8 @@ body.modal-open{ overflow:hidden; }
 
   var CAT_LABEL = {}, CAT_BY_KEY = {};
   G.CATEGORIES.forEach(function (c) { CAT_LABEL[c.key] = c.label; CAT_BY_KEY[c.key] = c; });
+  var CAT_LABEL_EXP = {}; if (G.CATEGORIES_EXP) G.CATEGORIES_EXP.forEach(function (c) { CAT_LABEL_EXP[c.key] = c.label; });
+  function catLabelOf(key, rs) { return (rs === 'experimental' ? CAT_LABEL_EXP : CAT_LABEL)[key] || key; }
 
   function showGameOver(winner) {
     var others = game.players.filter(function (p) { return p !== winner; })
@@ -5214,15 +5221,17 @@ body.modal-open{ overflow:hidden; }
   }
   // §2 owner dossier aggregates (cached per render). Reduces the per-category cube
   // across the owner's games; honours ownerSkipped + AI exactly like the old overview.
-  function computeOwnerCareer() {
+  function computeOwnerCareer(rs) {
+    rs = rs || 'standard'; var isExp = rs === 'experimental', CATS = isExp ? G.CATEGORIES_EXP : G.CATEGORIES;
     var games = loadHistory();
     // games flagged via the ranking-marker toggle are kept in the list but pulled out
     // of every career aggregate (and the percentile distribution derived from it)
-    var owned = games.filter(function (r) { if (r.excluded || r.ruleset === 'experimental') return false; var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
+    var owned = games.filter(function (r) { if (r.excluded) return false; if ((r.ruleset === 'experimental') !== isExp) return false; var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
-      return { rec: r, ana: analyzeRec(r, oi), total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
-               general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
+      var ana = isExp ? ((r.moveLog && r.moveLog[oi]) ? analyzeGameExp(r.moveLog[oi]) : null) : analyzeRec(r, oi);
+      return { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
+               general: (o.scores.general || 0) > 0, name: o.name, manual: isExp ? false : !!r.manualMode };
     }).filter(function (d) { return d.ana; });
     if (!data.length) return null;
     var n = data.length;
@@ -5232,7 +5241,7 @@ body.modal-open{ overflow:hidden; }
     var diceData = data.filter(function (d) { return !d.manual; });
     // §2.1 per-category mastery: reduce byCategory across games
     var cat = {};
-    G.CATEGORIES.forEach(function (c) { cat[c.key] = { key: c.key, label: c.label, fills: 0, hits: 0, sum: 0, rec: 0, leak: 0 }; });
+    CATS.forEach(function (c) { cat[c.key] = { key: c.key, label: c.label, fills: 0, hits: 0, sum: 0, rec: 0, leak: 0 }; });
     data.forEach(function (d) {
       var bc = d.ana.byCategory || {};
       Object.keys(bc).forEach(function (k) {
@@ -5240,7 +5249,7 @@ body.modal-open{ overflow:hidden; }
         t.fills++; if (cell.score > 0) { t.hits++; t.sum += cell.score; } if (cell.score > t.rec) t.rec = cell.score; t.leak += cell.leak;
       });
     });
-    var catList = G.CATEGORIES.map(function (c) {
+    var catList = CATS.map(function (c) {
       var t = cat[c.key];
       return { key: c.key, label: c.label, fills: t.fills, hitRate: t.fills ? t.hits / t.fills : 0,
                avg: t.hits ? t.sum / t.hits : 0, rec: t.rec, avgLeak: t.fills ? t.leak / t.fills : 0 };
@@ -5265,7 +5274,7 @@ body.modal-open{ overflow:hidden; }
       best: Math.max.apply(null, scores), avgPlace: data.reduce(function (s, d) { return s + d.place; }, 0) / n,
       generals: data.filter(function (d) { return d.general; }).length,
       avgLuck: diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null,
-      catList: catList, report: report,
+      catList: catList, report: report, ruleset: rs,
     };
   }
 
@@ -5381,48 +5390,10 @@ body.modal-open{ overflow:hidden; }
     });
   }
 
-  // experimental ruleset career (kept separate — different par/scoring). Needs the exact
-  // evaluator decoded to analyse; otherwise the section is omitted.
-  function computeOwnerCareerExp() {
-    if (!exactReady) return null;
-    var owned = loadHistory().filter(function (r) {
-      if (r.ruleset !== 'experimental' || r.excluded) return false;
-      var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI;
-    });
-    var data = owned.map(function (r) {
-      var oi = recOwnerIdx(r), o = r.players[oi], log = r.moveLog && r.moveLog[oi];
-      return { total: recTotal(o), place: recPlacement(r, oi), general: !!(o.scores && o.scores.general > 0), manual: false,
-               rec: { ts: r.ts, name: o.name }, ana: (log && log.length) ? analyzeGameExp(log) : null };
-    }).filter(function (d) { return d.ana; });
-    if (!data.length) return null;
-    var n = data.length, scores = data.map(function (d) { return d.total; });
-    var avg = function (f) { return data.reduce(function (s, d) { return s + f(d); }, 0) / n; };
-    var avgScore = avg(function (d) { return d.total; });
-    return { n: n, data: data, scores: scores, wins: data.filter(function (d) { return d.place === 1; }).length,
-      avgScore: avgScore, best: Math.max.apply(null, scores), avgPlace: avg(function (d) { return d.place; }),
-      avgAcc: avg(function (d) { return d.ana.accuracy; }), avgLuck: avg(function (d) { return d.ana.luck; }),
-      avgSkill: avg(function (d) { return d.ana.skill; }), generals: data.filter(function (d) { return d.general; }).length,
-      scoreSd: stdev(scores, avgScore) };
-  }
-  function ownerExpSection() {
-    var ce = computeOwnerCareerExp(); if (!ce) return '';
-    var n = ce.n;
-    var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
-      + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">Генерал <span class="expbadge">ЕКСП</span></span>'
-      + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + ce.wins + '</b> победи</span><span><b>' + Math.round(ce.avgAcc * 100) + '%</b> точност</span></span>'
-      + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
-    h += buildOwnerCharts(ce, 'exp');   // per-battle points/точност/късмет (namespaced)
-    h += statRows('Резултат', RC.upper, ['рекорд <b>' + ce.best + '</b> т.', 'среден <b>' + Math.round(ce.avgScore) + '</b> т.', 'късмет <b>' + (ce.avgLuck >= 0 ? '+' : '') + ce.avgLuck.toFixed(0) + '</b>']);
-    h += statRows('Игра', RC.skill, ['победи <b>' + Math.round(100 * ce.wins / n) + '%</b>', 'средно място <b>' + ce.avgPlace.toFixed(1) + '</b>', 'умение <b>' + (ce.avgSkill >= 0 ? '+' : '') + ce.avgSkill.toFixed(1) + '</b>']);
-    h += stat('Генерали', RC.gen, '<b>' + ce.generals + '</b> от ' + n + ' битки');
-    var consTag = ce.scoreSd < 18 ? 'стабилен' : ce.scoreSd > 32 ? 'нестабилен' : 'умерен';
-    h += stat('Постоянство', RC.stage, '<b>±' + Math.round(ce.scoreSd) + ' т.</b> <span class="hmuted">(' + consTag + ')</span>');
-    return h + '</div></details>';
-  }
-  function ownerOverview() {
-    var c = computeOwnerCareer();
+  function ownerOverview(rs) {
+    rs = rs || 'standard';
+    var c = computeOwnerCareer(rs);
     if (!c) {
-      ownerCharts = null;
       return '<div class="histover"><div class="noowner"><div class="nohd">🤷 Няма досие на стопанина</div>'
         + 'Щабът не намира нито една битка с теб на боец №1. За да следим бойната ти форма, '
         + '<b title="В настройките включи „Използвай моето име“, или просто играй като боец №1 (★) — без да го пускаш AI.">влез в боя сам</b> '
@@ -5453,9 +5424,9 @@ body.modal-open{ overflow:hidden; }
       + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     // §2.7 per-battle form charts sit at the TOP of the body — three collapsible buttons
-    h += buildOwnerCharts(c);
+    h += buildOwnerCharts(c, rs === 'experimental' ? 'exp' : 'std');
     // analysis-category breakdown (colour-coded labels) sits between the name and recent battles
-    h += careerAverages(c.report, { biggest: favBl ? { key: favBl, n: favN } : null, achievements: topGood });
+    h += careerAverages(c.report, { biggest: favBl ? { key: favBl, n: favN } : null, achievements: topGood }, rs);
     h += '<div class="histline">Последни битки:</div><div class="histform' + (recent.length >= 10 ? ' full' : '') + '">' + (form || '—') + '</div>';
     // career stat lines — each starts with a colour-coded term, its parts split onto their own rows
     h += statRows('Чин', RC.skill, ['по средно умение <b>' + esc(rank) + '</b>', 'процент победи <b>' + Math.round(100 * c.wins / n) + '%</b>', 'средно място <b>' + c.avgPlace.toFixed(1) + '</b>']);
@@ -5488,8 +5459,9 @@ body.modal-open{ overflow:hidden; }
         + '<span class="cg-rec">' + (x.rec ? x.rec + 'т.' : '—') + '</span>'
         + '<span class="cg-leak">−' + leak.toFixed(1) + '</span></div>';
     }
-    var up = G.CATEGORIES.filter(function (cc) { return cc.group === 'upper'; }).map(tile).join('');
-    var low = G.CATEGORIES.filter(function (cc) { return cc.group === 'lower'; }).map(tile).join('');
+    var CATS = c && c.ruleset === 'experimental' ? G.CATEGORIES_EXP : G.CATEGORIES;
+    var up = CATS.filter(function (cc) { return cc.group === 'upper'; }).map(tile).join('');
+    var low = CATS.filter(function (cc) { return cc.group === 'lower'; }).map(tile).join('');
     // the whole board folds away (collapsed by default — it's a screen-hog); the ? sits
     // inline next to the label and toggles the read-tips WITHOUT opening/closing the fold
     var tips = '<div class="cc-tips hidden">'
@@ -5507,16 +5479,16 @@ body.modal-open{ overflow:hidden; }
       + '<div class="catgrid-wrap hidden"><div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div></div></div>';
   }
   // career averages of the per-player report stats (mirrors renderReport's stat lines)
-  function careerAverages(r, extra) {
+  function careerAverages(r, extra, rs) {
     extra = extra || {};
     var h = '';
     if (r.luck != null) h += '<div class="evline" style="font-size:13px"><span class="luck">' + signed(Math.round(r.luck)) + ' късмет</span> <span class="skill">' + signed(Math.round(r.skill)) + ' решения</span> · загуба ' + nBad(r.lostPerTurn, 1) + ' т./ход</div>';
     if (r.leakKeep != null) h += statRows('Изтичане', RC.leak, ['задържания ' + nBad(r.leakKeep, 1) + ' т.', 'категории ' + nBad(r.leakCat, 1) + ' т.']);
     else if (r.leakCat != null) h += stat('Изтичане', RC.leak, 'категории ' + nBad(r.leakCat, 1) + ' т.');
     h += statRows('Издънки', RC.sev, [nNeut(r.sevMinor.toFixed(1)) + ' дребни', nNeut(r.sevMajor.toFixed(1)) + ' сериозни', '<b class="nn">' + r.sevFatal.toFixed(1) + '</b> фатални']);
-    if (extra.biggest) h += stat('Най-голяма издънка', RC.sev, '<b>' + esc(CAT_LABEL[extra.biggest.key] || extra.biggest.key) + '</b> · ×' + extra.biggest.n);
+    if (extra.biggest) h += stat('Най-голяма издънка', RC.sev, '<b>' + esc(catLabelOf(extra.biggest.key, rs)) + '</b> · ×' + extra.biggest.n);
     // Постижения: where your sharpest (biggest-EV) moves land — top categories by COUNT
-    if (extra.achievements && extra.achievements.length) h += statRows('Постижения', RC.upper, extra.achievements.map(function (a) { return esc(CAT_LABEL[a.key] || a.key) + ' <b>×' + a.n + '</b>'; }));
+    if (extra.achievements && extra.achievements.length) h += statRows('Постижения', RC.upper, extra.achievements.map(function (a) { return esc(catLabelOf(a.key, rs)) + ' <b>×' + a.n + '</b>'; }));
     if (r.luckFirst != null) h += statRows('Късмет', RC.luck, ['първо хвърляне ' + nSigned(r.luckFirst, 1), 'прехвърляния ' + nSigned(r.luckRerolls, 1), 'в решителния край ' + nSigned(r.clutch, 1)]);
     if (r.zeroTotal != null) h += statRows('Нули', RC.zero, [nNeut(r.zeroTotal.toFixed(1)) + ' общо', nNeut(r.zeroForced.toFixed(1)) + ' принудени', '<b class="nn">' + r.zeroUnforced.toFixed(1) + '</b> от твоята игра']);
     h += statRows('По етапи', RC.stage, ['начало <b class="nn">' + r.stageEarly.toFixed(1) + '</b> т./ход', 'среда <b class="nn">' + r.stageMid.toFixed(1) + '</b> т./ход', 'край <b class="nn">' + r.stageLate.toFixed(1) + '</b> т./ход']);
@@ -5530,10 +5502,16 @@ body.modal-open{ overflow:hidden; }
     var equal = scoresAll.filter(function (s) { return s === val; }).length;
     return Math.round(100 * (below + 0.5 * equal) / scoresAll.length);
   }
+  var histTab = 'standard';   // which ruleset the archive is showing
   function renderHistory() {
-    var games = loadHistory().slice().reverse(); // newest first
-    ownerCharts = null;  // rebuilt fresh each render; buildOwnerCharts accumulates std + exp groups
-    $('historyOverview').innerHTML = ownerOverview() + ownerExpSection();
+    var all = loadHistory().slice().reverse(); // newest first
+    var games = all.filter(function (r) { return (r.ruleset === 'experimental') === (histTab === 'experimental'); });
+    ownerCharts = null;  // rebuilt fresh each render
+    var tabs = '<div class="histtabs">'
+      + '<button class="histtab' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">Стандартен</button>'
+      + '<button class="histtab' + (histTab === 'experimental' ? ' on' : '') + '" data-rs="experimental">Експериментален</button></div>';
+    $('historyOverview').innerHTML = tabs + ownerOverview(histTab);
+    $('historyOverview').querySelectorAll('.histtab').forEach(function (b) { b.onclick = function () { histTab = b.getAttribute('data-rs'); renderHistory(); }; });
     wireOwnerCharts();   // attach the scrub readers to the per-battle career charts
     // the bar opens/closes the board; the ? toggles the read-tips on its own (no fold needed)
     var fold = $('historyOverview').querySelector('.catfold');
@@ -5543,11 +5521,11 @@ body.modal-open{ overflow:hidden; }
       if (q) q.onclick = function (e) { e.preventDefault(); e.stopPropagation(); if (tips) tips.classList.toggle('hidden'); };
     }
     if (!games.length) {
-      $('historyList').innerHTML = '<div class="noowner">Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.</div>';
+      $('historyList').innerHTML = '<div class="noowner">' + (histTab === 'experimental' ? 'Още няма експериментални битки. Превключи на „Експериментален“ в настройките и влез в боя.' : 'Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.') + '</div>';
       return;
     }
     // owner score distribution (for the percentile tags), drift-as-it-grows by design
-    var career = computeOwnerCareer();
+    var career = computeOwnerCareer(histTab);
     var ownerScores = career ? career.scores : [];
     var html = '<div class="histhd">Битки (' + games.length + ')</div>';
     games.forEach(function (rec) {
@@ -5575,7 +5553,7 @@ body.modal-open{ overflow:hidden; }
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + subDate + (rec.ruleset === 'experimental' ? ' · експ.' : '') + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
+        + '<span class="hg-sub">' + subDate + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
