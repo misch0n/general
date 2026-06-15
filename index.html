@@ -3937,8 +3937,9 @@ body.modal-open{ overflow:hidden; }
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
     // Акустична мрежа — reveals every data-over-sound feature (network play + sound transfer);
-    // its hidden sub-toggle „Дебъг" exposes the acoustic test/diagnostics + packet capture
-    { key: 'acoustic', label: 'Акустична мрежа',
+    // its hidden sub-toggle „Дебъг" exposes the acoustic test/diagnostics + packet capture.
+    // Pre-game only: a network battle is set up before play, so it's hidden in the in-game menu.
+    { key: 'acoustic', label: 'Акустична мрежа', preGameOnly: true,
       sub: { key: 'acousticDebug', label: 'Дебъг режим', onChange: function () { syncAcousticUI(); } },
       onChange: function () { syncAcousticUI(); } },
   ];
