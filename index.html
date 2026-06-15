@@ -550,11 +550,11 @@ body.modal-open{ overflow:hidden; }
 .wbadge::after{ content:'?'; position:absolute; top:-5px; right:-5px; width:13px; height:13px; display:grid; place-items:center; border-radius:50%;
   font-family:var(--gen-font-body); font-weight:700; font-size:8px; color:var(--gen-ink); background:var(--gen-brass); }
 .wbadge{ position:relative; }
-.wbadge .wb-role{ font-weight:700; font-size:8px; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-muted); }
-.wbadge .wb-name{ font-weight:700; font-size:11px; letter-spacing:.2px; text-transform:uppercase; color:var(--c); }
+.wbadge .wb-title{ font-weight:700; font-size:11px; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-text); }
 /* medal explainer bubble (tap a badge) — top level so it shows over the summary overlay */
 .medaltip{ position:fixed; z-index:70; max-width:240px; padding:9px 11px; border-radius:10px; background:var(--gen-ink);
   border:1.5px solid var(--gen-brass-stroke); color:var(--gen-text); font-size:11.5px; line-height:1.45; box-shadow:0 8px 22px rgba(0,0,0,.5); cursor:pointer; }
+.medaltip .mt-holder{ margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.12); }
 .medaltip b{ color:var(--gen-brass-bright); }
 /* §1.5 category board — in-game scoreboard layout, each cell tinted by the record holder */
 .catboard{ margin-bottom:12px; }
@@ -4571,16 +4571,27 @@ body.modal-open{ overflow:hidden; }
   };
   function renderWinBadges() {
     var m = summary.meta, players = game.players, b = [];
-    function badge(cls, c, icon, role, name, medal, tail) {
-      b.push('<button type="button" class="wbadge ' + cls + '" style="--c:' + c + '" data-medal="' + medal + '" aria-label="' + role + ' — как се присъжда">'
-        + '<span class="wb-role">' + icon + ' ' + role + '</span><span class="wb-name">' + esc(name) + (tail || '') + '</span></button>');
+    // the badge face carries ONLY the medal title; the box is tinted in the holder's
+    // colour, and the explainer (tap) names the holding player
+    function badge(cls, pl, icon, role, medal) {
+      b.push('<button type="button" class="wbadge ' + cls + '" style="--c:' + pl.color + ';background:' + rgba(pl.color, 0.22) + '" data-medal="' + medal + '" aria-label="' + role + ' — ' + esc(pl.name) + ', как се присъжда">'
+        + '<span class="wb-title">' + icon + ' ' + role + '</span></button>');
     }
-    if (m.skillIdx >= 0) badge('b-tac', players[m.skillIdx].color, '🎯', 'Тактик', players[m.skillIdx].name, 'tac');
-    if (m.luckIdx >= 0 && players.length > 1) badge('b-luck', players[m.luckIdx].color, '🍀', 'Късметлия', players[m.luckIdx].name, 'luck');
-    if (m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2) badge('b-mas', players[m.masterIdx].color, '📋', 'Майстор', players[m.masterIdx].name, 'mas', ' ×' + m.recCount[m.masterIdx]);
+    if (m.skillIdx >= 0) badge('b-tac', players[m.skillIdx], '🎯', 'Тактик', 'tac');
+    if (m.luckIdx >= 0 && players.length > 1) badge('b-luck', players[m.luckIdx], '🍀', 'Късметлия', 'luck');
+    if (m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2) badge('b-mas', players[m.masterIdx], '📋', 'Майстор', 'mas');
     $('winBadges').innerHTML = b.join('');
+    // the explainer adds a line naming the holder (records count for the Майстор)
+    function tipFor(medal) {
+      var pl, extra = '';
+      if (medal === 'tac') pl = players[m.skillIdx];
+      else if (medal === 'luck') pl = players[m.luckIdx];
+      else if (medal === 'mas') { pl = players[m.masterIdx]; extra = ' · ' + m.recCount[m.masterIdx] + ' рекорда'; }
+      var who = pl ? '<div class="mt-holder">Държи: <b style="color:' + pl.color + '">' + esc(pl.name) + '</b>' + extra + '</div>' : '';
+      return MEDAL_EXPL[medal] + who;
+    }
     $('winBadges').querySelectorAll('.wbadge').forEach(function (el) {
-      el.onclick = function (e) { e.stopPropagation(); showMedalTip(el, MEDAL_EXPL[el.getAttribute('data-medal')]); };
+      el.onclick = function (e) { e.stopPropagation(); showMedalTip(el, tipFor(el.getAttribute('data-medal'))); };
     });
   }
   function showMedalTip(anchor, html) {
