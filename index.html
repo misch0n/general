@@ -391,7 +391,16 @@ body.modal-open{ overflow:hidden; }
 /* AI persona subtitle in the header */
 .ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); }
 /* ribbons + AI persona share one row beneath the name (persona no longer pushes a row) */
-.pmeta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.pmeta{ display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0; overflow:hidden; }
+.pmeta .ppersona{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* experimental header: constant 2-line name (so the footer never shifts), persona inline, no ribbons */
+.pn2{ display:flex; flex-direction:column; gap:1px; min-width:0; line-height:1.12; }
+.pn2 .pn-a{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pn2 .pn-b{ font-size:12px; letter-spacing:.5px; color:var(--gen-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:14px; }
+.pn2 .pn-persona{ color:var(--gen-brass); }
+.numpart{ font-family:var(--gen-font-display); font-weight:700; font-size:10px; letter-spacing:.5px; color:var(--gen-muted); margin-top:1px; font-variant-numeric:tabular-nums; }
+.numpart .np-cap{ text-transform:uppercase; opacity:.8; }
+.numpart.neg{ color:#e8807a; }
 
 /* setup: add-button, reorder arrows, manual mode */
 .addbtn{ width:100%; margin-top:4px; }
@@ -1145,6 +1154,7 @@ body.modal-open{ overflow:hidden; }
     <span class="pointsbox">
       <span id="curTotal" class="ptotal">0</span>
       <span class="tcap">ТОЧКИ</span>
+      <span id="curNumPart" class="numpart hidden"></span>
     </span>
     <div id="hintLine" class="hintline hidden"></div>
   </div>
@@ -2626,6 +2636,7 @@ body.modal-open{ overflow:hidden; }
     // temporary penalties trim the DISPLAYED total: a fine, plus any zeroed-out combos
     var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
     $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
+    $('curNumPart').classList.add('hidden');   // number-part chip is experimental-only
     $('curRound').innerHTML = game.round + '<span class="rsub">/' + G.CATEGORIES.length + '</span>';   // which turn of the game
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
@@ -2977,7 +2988,7 @@ body.modal-open{ overflow:hidden; }
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.toggle('hidden', !exactReady);
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
-    $('expBoard').classList.remove('hidden');                      // the number-part status bar above it
+    $('expBoard').classList.add('hidden');
     $('expReserve').classList.add('hidden');
     document.querySelector('.dock').classList.remove('hidden');
     $('manualDock').classList.add('hidden');
@@ -2998,7 +3009,7 @@ body.modal-open{ overflow:hidden; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.toggle('hidden', !exactReady);
-    document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.remove('hidden'); $('expReserve').classList.add('hidden');
+    document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
     document.querySelector('.dock').classList.remove('hidden'); $('manualDock').classList.add('hidden');
     expBeginTurn();
   }
@@ -3230,13 +3241,22 @@ body.modal-open{ overflow:hidden; }
   function expRenderAll() { expRenderHeader(); expRenderPills(); expRenderBoard(); expRenderDice(); expRenderFire(); expRenderHint(); }
   function expRenderHeader() {
     var p = G.currentPlayer(game);
-    $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
-    var per = $('curPersona');
-    if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); } else per.classList.add('hidden');
+    // constant 2-line name: first two words on line 1, the rest + persona on line 2
+    var words = esc(p.name).split(/\s+/);
+    var l1 = (isOwnerP(p) ? ownerTokenHTML(true) : '') + words.slice(0, 2).join(' ');
+    var rest = words.slice(2).join(' ');
+    var persona = (p.isAI && p.persona) ? '<span class="pn-persona">⚙ ' + esc(p.persona.name) + '</span>' : (p.isAI ? '<span class="pn-persona">AI</span>' : '');
+    var l2 = rest + (rest && persona ? ' ' : '') + persona;
+    $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-b">' + (l2 || '&nbsp;') + '</span></span>';
+    $('curPersona').classList.add('hidden'); $('curRibbons').innerHTML = '';   // persona inline; no ribbons
     $('curTotal').textContent = X.total(p);
+    // number part next to the total, in fine print
+    var st = G.upperStateExp(p.scores);
+    $('curNumPart').className = 'numpart' + (st.penalised || (!st.complete && st.subtotal < 0) ? ' neg' : '');
+    $('curNumPart').innerHTML = '<span class="np-cap">числа</span> ' + (st.penalised ? '−50' : (st.subtotal >= 0 ? '+' : '') + st.subtotal);
+    $('curNumPart').classList.remove('hidden');
     var filled = X.filledCount(p.scores);
     $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
-    $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
   function expRenderPills() {
     $('pillWrap').innerHTML = game.players.map(function (p, i) {
@@ -3304,7 +3324,6 @@ body.modal-open{ overflow:hidden; }
       }
       $('boardLower').appendChild(row);
     });
-    expRenderNumberStatus(p);
   }
   // number-part status: running Σ, rows filled, and the −50 risk
   function expRenderNumberStatus(p) {
