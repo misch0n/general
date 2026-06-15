@@ -42,9 +42,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .gamefooter .dice{ margin:0; }
 .gamefooter.manual{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:12px 16px calc(20px + env(safe-area-inset-bottom, 0px)); }
 .firebar{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:12px 18px calc(22px + env(safe-area-inset-bottom, 0px)); }   /* simple padding above the button, more below it */
-.bottombar.preroll{ display:flex; flex-direction:column; justify-content:center; }   /* before the first throw: only the centred throw button, bar keeps its size */
+.bottombar.preroll{ display:flex; flex-direction:column; justify-content:center; }   /* before the first throw: only the throw button, centred in the bar's locked height */
 .bottombar.preroll #diceFooter{ display:none; }
-.bottombar.preroll #firebar{ padding-top:0; padding-bottom:0; }
+.bottombar.preroll #firebar{ padding-top:0; padding-bottom:0; justify-content:center; }
+.bottombar.preroll #fire{ height:72px; font-size:21px; }   /* a taller throw button (same width) */
 .camo{ position:absolute; inset:0; width:100%; height:100%; z-index:0; }
 .scrim{ position:absolute; inset:0; z-index:0; pointer-events:none;
   background:linear-gradient(180deg, rgba(16,18,9,.62), rgba(16,18,9,.12) 20%, rgba(16,18,9,.12) 74%, rgba(16,18,9,.66)); }
@@ -1664,10 +1665,21 @@ body.modal-open{ overflow:hidden; }
   // dice-roll footer + fire bar vs the manual-entry footer
   function setDockUI(manual) { if (manual) $('bottombar').classList.remove('preroll'); $('firebar').classList.toggle('hidden', manual); $('diceFooter').classList.toggle('hidden', manual); $('manualDock').classList.toggle('hidden', !manual); }
   // reserve scroll space under the fixed overlay bar so nothing stays hidden behind it
-  var barFullH = 0;   // remembered full bar height so the pre-throw state keeps the same size
+  var barFullH = 0;   // remembered full (dice + button) bar height so the pre-throw state keeps the same size
+  // measure the bar at its full rolling-state height without flashing — done in a single
+  // synchronous layout pass (offsetHeight forces layout, not paint), so no flicker
+  function measureBarFull(bb) {
+    var pre = bb.classList.contains('preroll'), mh = bb.style.minHeight;
+    if (pre) bb.classList.remove('preroll');
+    bb.style.minHeight = '';
+    var h = bb.offsetHeight;
+    bb.style.minHeight = mh;
+    if (pre) bb.classList.add('preroll');
+    return h;
+  }
   function syncBottomPad() {
     var bb = $('bottombar'), gb = $('gamebody'); if (!bb || !gb) return;
-    if (bb.classList.contains('preroll')) { bb.style.minHeight = (barFullH || 150) + 'px'; }
+    if (bb.classList.contains('preroll')) { barFullH = measureBarFull(bb); bb.style.minHeight = barFullH + 'px'; }
     else { bb.style.minHeight = ''; barFullH = bb.offsetHeight; }
     gb.style.paddingBottom = (bb.offsetHeight + 8) + 'px';
   }
