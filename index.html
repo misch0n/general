@@ -3096,31 +3096,77 @@ body.modal-open{ overflow:hidden; }
   function expV0(scores) { return expV0M(EVX.maskOfScores(scores), G.upperStateExp(scores).subtotal); }
   function expExpectRoll(vec) { var s = 0; for (var d = 0; d < EVX.NMS; d++) s += EVX.ROLL_PROB[d] * vec[d]; return s; }
 
-  // ----- per-game skill/luck analysis (mirrors EV.analyzeTurn, threading the upper subtotal) -----
-  var EXP_CAT_IX = {}; if (EVX) EVX.CATS.forEach(function (c, i) { EXP_CAT_IX[c.key] = i; });
-  var EXP_EPS = 0.05;
+  // ----- full per-game analysis (mirrors EV.analyzeTurn/analyzeGame, threading the upper subtotal,
+  //       so experimental games yield the SAME shape the standard summary/dossier consume) -----
+  var EXP_EPS = 0.05, EXP_SEV = { major: 3, fatal: 8 };
+  function expSeverityOf(cost) { var c = -cost; return c >= EXP_SEV.fatal ? 'fatal' : c >= EXP_SEV.major ? 'major' : 'minor'; }
+  function expStageOf(ti) { return ti < 5 ? 'early' : ti < 10 ? 'mid' : 'late'; }
+  function expAvg(a) { if (!a.length) return 0; var s = 0; a.forEach(function (x) { s += x; }); return s / a.length; }
   function analyzeTurnExp(t) {
     var mask = t.mask, up = t.up, rolls = t.rolls, keeps = t.keeps || [], R = rolls.length;
     var v0 = expV0M(mask, up), v1 = expStageUp(v0), v2 = expStageUp(v1), arr = [v0, v1, v2];
+    var stateVal = expExpectRoll(v2);
     function nodeVal(dice, r) { return arr[r][EVX.idxOfDice(dice)]; }
     function keepVal(dice, r, kb) { var c = [0, 0, 0, 0, 0, 0, 0]; for (var i = 0; i < dice.length; i++) if (kb[i]) c[dice[i]]++; return EVX.dot(EVX.keepResult(c), arr[r - 1]); }
-    var luck = 0, skill = 0, dec = 0, opt = 0, worst = null;
-    luck += nodeVal(rolls[0], 2) - expExpectRoll(v2);                 // first-roll variance
-    for (var i = 0; i < keeps.length; i++) {
-      var rl = 2 - i, node = nodeVal(rolls[i], rl), chosen = keepVal(rolls[i], rl, keeps[i]), cost = chosen - node;
-      skill += cost; dec++; if (cost > -EXP_EPS) opt++; if (!worst || cost < worst.cost) worst = { cost: cost, type: 'keep' };
-      luck += nodeVal(rolls[i + 1], rl - 1) - chosen;                 // reroll variance
+    function bestKeepAt(dice, r) {
+      var ks = EVX.KEEPS[EVX.idxOfDice(dice)], best = null, bv = -Infinity, second = -Infinity;
+      for (var k = 0; k < ks.length; k++) { var e = EVX.dot(ks[k], arr[r - 1]); if (e > bv) { second = bv; bv = e; best = ks[k]; } else if (e > second) second = e; }
+      return { keep: EVX.keepPositions(dice, best.keptCounts), ev: bv, second: second };
     }
-    var last = rolls[R - 1], ci = EXP_CAT_IX[t.category];
-    var ccost = expCellValue(mask, up, ci, last) - nodeVal(last, 0);
-    skill += ccost; dec++; if (ccost > -EXP_EPS) opt++; if (!worst || ccost < worst.cost) worst = { cost: ccost, type: 'category', key: t.category };
-    return { luck: luck, skill: skill, decisions: dec, optimal: opt, worst: worst };
+    var luck = 0, skill = 0, decisions = [];
+    var firstLuck = nodeVal(rolls[0], 2) - stateVal; luck += firstLuck;
+    for (var i = 0; i < keeps.length; i++) {
+      var rl = 2 - i, node = nodeVal(rolls[i], rl), chosenEV = keepVal(rolls[i], rl, keeps[i]), bk = bestKeepAt(rolls[i], rl);
+      skill += chosenEV - node;
+      decisions.push({ type: 'keep', cost: chosenEV - node, chosenEV: chosenEV, optimalEV: node, margin: node - bk.second, chosen: keeps[i], optimal: bk.keep });
+      luck += nodeVal(rolls[i + 1], rl - 1) - chosenEV;
+    }
+    var last = rolls[R - 1], cats = [];
+    for (var c = 0; c < EVX.NCAT; c++) { if (mask & (1 << c)) continue; var key = EVX.CATS[c].key; cats.push({ key: key, immediate: G.scoreForExp(key, last), ev: expCellValue(mask, up, c, last) }); }
+    cats.sort(function (a, b) { return b.ev - a.ev; });
+    var nodeVal0 = cats[0].ev, chosen = cats.filter(function (c) { return c.key === t.category; })[0];
+    var secondCat = cats.length > 1 ? cats[1].ev : cats[0].ev;
+    skill += chosen.ev - nodeVal0;
+    decisions.push({ type: 'category', cost: chosen.ev - nodeVal0, chosenEV: chosen.ev, optimalEV: nodeVal0, margin: cats[0].ev - secondCat, chosenKey: t.category, optimalKey: cats[0].key });
+    var anyPositive = cats.some(function (c) { return c.immediate > 0; });
+    return { luck: luck, skill: skill, decisions: decisions, firstLuck: firstLuck, rerollLuck: luck - firstLuck, score: chosen.immediate, forcedZero: !anyPositive, finalDice: last };
+  }
+  function expAggregate(decisions, turnDetails) {
+    var EPS = EXP_EPS, optimalCount = decisions.filter(function (d) { return d.cost > -EPS; }).length;
+    var blunder = null, sharpest = null;
+    decisions.forEach(function (d) { if (!blunder || d.cost < blunder.cost) blunder = d; if (d.cost > -EPS && (!sharpest || d.margin > sharpest.margin)) sharpest = d; });
+    var sev = { minor: 0, major: 0, fatal: 0 }, mistakes = { keep: 0, category: 0 }, costs = { keep: 0, category: 0 }, counts = { keep: 0, category: 0 };
+    decisions.forEach(function (d) { counts[d.type]++; costs[d.type] += d.cost; if (d.cost < -EPS) { sev[expSeverityOf(d.cost)]++; mistakes[d.type]++; } });
+    var topMoves = decisions.filter(function (d) { return d.cost > -EPS && d.margin > 0.5; }).sort(function (a, b) { return b.margin - a.margin; }).slice(0, 3);
+    var stages = { early: { skill: 0, luck: 0, n: 0 }, mid: { skill: 0, luck: 0, n: 0 }, late: { skill: 0, luck: 0, n: 0 } };
+    turnDetails.forEach(function (td) { var s = stages[expStageOf(td.turn)]; s.skill += td.skill; s.luck += (td.luck || 0); s.n++; });
+    var zeroOuts = { total: 0, forced: 0, unforced: 0 };
+    turnDetails.forEach(function (td) { if (td.score === 0) { zeroOuts.total++; td.forcedZero ? zeroOuts.forced++ : zeroOuts.unforced++; } });
+    var byCategory = {};
+    turnDetails.forEach(function (td) { byCategory[td.category] = { category: td.category, score: td.score, leak: -td.skill, luck: (typeof td.luck === 'number' ? td.luck : null), optimal: td.skill > -EPS }; });
+    return { decisions: decisions, nDecisions: decisions.length, turns: turnDetails,
+      accuracy: decisions.length ? optimalCount / decisions.length : 1, blunder: blunder, sharpest: sharpest, topMoves: topMoves,
+      severity: sev, mistakes: mistakes, leak: costs, leakCounts: counts, stages: stages, zeroOuts: zeroOuts, byCategory: byCategory };
   }
   function analyzeGameExp(turns) {
     if (!exactReady || !turns || !turns.length) return null;
-    var luck = 0, skill = 0, dec = 0, opt = 0, worst = null;
-    turns.forEach(function (t) { try { var a = analyzeTurnExp(t); luck += a.luck; skill += a.skill; dec += a.decisions; opt += a.optimal; if (a.worst && (!worst || a.worst.cost < worst.cost)) worst = a.worst; } catch (e) {} });
-    return { luck: luck, skill: skill, accuracy: dec ? opt / dec : 1, blunder: worst, turns: turns.length };
+    var luck = 0, skill = 0, decisions = [], turnDetails = [];
+    turns.forEach(function (t, ti) {
+      var a; try { a = analyzeTurnExp(t); } catch (e) { return; }
+      luck += a.luck; skill += a.skill;
+      a.decisions.forEach(function (d) { d.turnCategory = t.category; d.turn = ti; decisions.push(d); });
+      turnDetails.push({ turn: ti, category: t.category, score: a.score, luck: a.luck, skill: a.skill, firstLuck: a.firstLuck, rerollLuck: a.rerollLuck, forcedZero: a.forcedZero, finalDice: a.finalDice, nRolls: t.rolls.length, decisions: a.decisions });
+    });
+    if (!turnDetails.length) return null;
+    var out = expAggregate(decisions, turnDetails);
+    out.par = window.GeneralEVExactExp ? window.GeneralEVExactExp.par : 143.41;
+    out.luck = luck; out.skill = skill; out.projectedFinal = out.par + luck + skill;
+    out.avgLostPerDecision = decisions.length ? -skill / decisions.length : 0;
+    out.avgLostPerTurn = turns.length ? -skill / turns.length : 0;
+    out.luckFirst = expAvg(turnDetails.map(function (td) { return td.firstLuck; })) * turnDetails.length;
+    out.luckRerolls = out.luck - out.luckFirst;
+    out.clutch = out.stages.late.luck;
+    return out;
   }
 
   // ----- live hints (Щабът съветва), exact-EV backed -----
@@ -3390,8 +3436,9 @@ body.modal-open{ overflow:hidden; }
     var ranked = X.ranking(g);
     $('expStandings').innerHTML = ranked.map(function (r, i) {
       var ana = logs && logs[r.order] ? analyzeGameExp(logs[r.order]) : null;
+      var blk = ana && ana.blunder ? (ana.blunder.chosenKey || ana.blunder.turnCategory) : null;
       var bl = ana && ana.blunder && ana.blunder.cost < -0.5
-        ? '<span class="wr-blun">пропуск: ' + (ana.blunder.key ? esc(EXP_LABEL[ana.blunder.key] || ana.blunder.key) : 'хвърляне') + ' <b>' + ana.blunder.cost.toFixed(1) + '</b> т.</span>' : '';
+        ? '<span class="wr-blun">пропуск: ' + (ana.blunder.type === 'keep' ? 'хвърляне' : esc(EXP_LABEL[blk] || blk)) + ' <b>' + ana.blunder.cost.toFixed(1) + '</b> т.</span>' : '';
       var sub = ana ? '<span class="wr-ana">точност <b>' + Math.round(ana.accuracy * 100) + '%</b> · късмет <b>' + (ana.luck >= 0 ? '+' : '') + Math.round(ana.luck) + '</b> · умение <b>' + (ana.skill >= 0 ? '+' : '') + ana.skill.toFixed(1) + '</b></span>' + bl : '';
       return '<div class="winrow"><span class="wr-pl">' + (i + 1) + '</span>'
         + '<span class="pdot" style="background:' + r.player.color + '"></span>'
