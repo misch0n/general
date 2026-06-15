@@ -395,9 +395,10 @@ body.modal-open{ overflow:hidden; }
 .pmeta .ppersona{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* experimental header: constant 2-line name (so the footer never shifts), persona inline, no ribbons */
 .pn2{ display:flex; flex-direction:column; gap:1px; min-width:0; line-height:1.12; }
-.pn2 .pn-a{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.pn2 .pn-b{ font-size:12px; letter-spacing:.5px; color:var(--gen-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:14px; }
-.pn2 .pn-persona{ color:var(--gen-brass); }
+.pn2 .pn-a{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }   /* row 1 + the spilled-over word share this (full name style) */
+.pn2 .pn-line2{ display:flex; align-items:baseline; gap:6px; min-width:0; min-height:14px; }
+.pn2 .pn-line2 .pn-a{ flex:0 1 auto; }
+.pn2 .pn-persona{ flex:none; font-size:12px; letter-spacing:.5px; color:var(--gen-brass); text-transform:uppercase; }
 .numpart{ display:flex; align-items:baseline; gap:5px; margin-top:1px; font-family:var(--gen-font-display); font-variant-numeric:tabular-nums; }
 .numpart .np-x{ font-weight:700; font-size:13px; }
 .numpart .np-x.pos{ color:#86c986; } .numpart .np-x.neg{ color:#e8807a; } .numpart .np-x.zero{ color:var(--gen-brass-bright); }
@@ -634,6 +635,9 @@ body.modal-open{ overflow:hidden; }
 .tile.up .pts.pos, .tile.up .pts.upchip.pos{ color:#1c7a1c; }
 .tile.up .pts.neg, .tile.up .pts.upchip.neg{ color:#b02525; }
 .tile.low.fullspan{ grid-column:1 / -1; }   /* фул хаус spans both columns */
+/* experimental mini cell-board (peek): sign-coloured number part + full-house span */
+.miniboard .mtile.up .mval.pos{ color:#1c7a1c; } .miniboard .mtile.up .mval.neg{ color:#b02525; }
+.miniboard .mtile.low.fullspan{ grid-column:1 / -1; }
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
 /* archive ruleset tabs (Стандартен / Експериментален) */
@@ -3338,8 +3342,9 @@ body.modal-open{ overflow:hidden; }
     var l1 = (isOwnerP(p) ? ownerTokenHTML(true) : '') + words.slice(0, 2).join(' ');
     var rest = words.slice(2).join(' ');
     var persona = (p.isAI && p.persona) ? '<span class="pn-persona">⚙ ' + esc(p.persona.name) + '</span>' : (p.isAI ? '<span class="pn-persona">AI</span>' : '');
-    var l2 = rest + (rest && persona ? ' ' : '') + persona;
-    $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-b">' + (l2 || '&nbsp;') + '</span></span>';
+    var word2 = rest ? '<span class="pn-a">' + rest + '</span>' : '';   // spilled word keeps the full name style
+    var line2 = (rest || persona) ? word2 + (rest && persona ? ' ' : '') + persona : '&nbsp;';
+    $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-line2">' + line2 + '</span></span>';
     $('curPersona').classList.add('hidden'); $('curRibbons').innerHTML = '';   // persona inline; no ribbons
     $('curTotal').textContent = X.total(p);
     $('curNumPart').classList.add('hidden');   // number-part summary now sits between the board sections
@@ -3356,21 +3361,25 @@ body.modal-open{ overflow:hidden; }
   function expPeek(i) {
     var p = game.players[i];
     $('peekTitle').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
-    $('peekBody').innerHTML = expCardHTML(p);
+    $('peekBody').innerHTML = expMiniBoard(p);
     $('peekTotal').textContent = X.total(p);
     $('peekModal').classList.remove('hidden');
   }
-  // single-card recap (end-of-game summary)
-  function expCardHTML(p) {
-    var s = p.scores, html = '<table class="expgrid"><tbody>';
-    X.CATS.forEach(function (c) {
-      var v = s[c.key], has = typeof v === 'number';
-      html += '<tr><td class="ec-lab">' + esc(c.label) + '</td><td class="ec-cell' + (has ? ' done' : '') + (has && v < 0 ? ' neg' : '') + '">' + (has ? v : '·') + '</td></tr>';
-    });
-    var st = G.upperStateExp(s);
-    html += '<tr class="ec-sub"><td>Σ числа</td><td class="' + (st.penalised ? 'neg' : '') + '">' + (st.penalised ? '−50' : st.subtotal) + '</td></tr>';
-    html += '<tr class="ec-tot"><td>Общо</td><td>' + G.playerTotalExp(p) + '</td></tr>';
-    return html + '</tbody></table>';
+  // experimental mini cell-board (peek / summary recap) — same look as the standard miniBoard,
+  // with the signed number part (colour by value), the number-part bar, and фул хаус spanning two.
+  function expMiniBoard(p) {
+    var sc = p.scores;
+    function tile(c, up) {
+      var has = typeof sc[c.key] === 'number', v = sc[c.key];
+      var sign = up && has ? (v > 0 ? ' pos' : v < 0 ? ' neg' : ' zero') : '';
+      var span = (!up && c.key === 'fullHouse') ? ' fullspan' : '';
+      return '<div class="mtile ' + (up ? 'up' : 'low') + (has ? '' : ' empty') + span + '"><span class="mlab">' + esc(c.label) + '</span><span class="mval' + sign + '">' + (has ? v : '–') + '</span></div>';
+    }
+    var up = G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
+    var low = G.CATEGORIES_EXP.filter(function (c) { return c.group === 'lower'; }).map(function (c) { return tile(c, false); }).join('');
+    var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
+    var numbar = '<div class="expnumbar"><span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-y">' + st.filled + '/6</span></div>';
+    return '<div class="miniboard"><div class="upper">' + up + '</div>' + numbar + '<div class="lower">' + low + '</div></div>';
   }
   // the player's single card drawn with the STANDARD tile board (+ the два чифта tile),
   // plus a number-part status bar (running Σ and the −50 risk).
