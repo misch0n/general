@@ -1633,7 +1633,7 @@ body.modal-open{ overflow:hidden; }
   var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, selectKeep: false, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
-  function total(p) { return G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
+  function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
 
   // ---------- persistent settings + game archive (localStorage) ----------
   var SETTINGS_KEY = 'general:settings:v1', HISTORY_KEY = 'general:history:v1', RESUME_KEY = 'general:resume:v1';
@@ -3427,7 +3427,7 @@ body.modal-open{ overflow:hidden; }
   function expEndGame() {
     locked = true;
     if (!viewingHistory) { archiveExpGame(); clearResume(); }
-    expShowSummary(game, false, moveLog);
+    showGameOver(X.ranking(game)[0].player);   // same end screen as standard, sourced from the exp ruleset
   }
   function archiveExpGame() {
     var players = game.players.map(function (p) {
@@ -4190,6 +4190,10 @@ body.modal-open{ overflow:hidden; }
   G.CATEGORIES.forEach(function (c) { CAT_LABEL[c.key] = c.label; CAT_BY_KEY[c.key] = c; });
   var CAT_LABEL_EXP = {}; if (G.CATEGORIES_EXP) G.CATEGORIES_EXP.forEach(function (c) { CAT_LABEL_EXP[c.key] = c.label; });
   function catLabelOf(key, rs) { return (rs === 'experimental' ? CAT_LABEL_EXP : CAT_LABEL)[key] || key; }
+  // the end-game summary is shared between rulesets; these resolve by the active game's ruleset
+  function sumExp() { return !!(game && game.ruleset === 'experimental'); }
+  function sumCats() { return sumExp() ? G.CATEGORIES_EXP : G.CATEGORIES; }
+  function sumLabel(k) { return catLabelOf(k, sumExp() ? 'experimental' : 'standard'); }
 
   function showGameOver(winner) {
     var others = game.players.filter(function (p) { return p !== winner; })
@@ -4198,8 +4202,9 @@ body.modal-open{ overflow:hidden; }
     var analysisByPlayer = {};
     game.players.forEach(function (p, idx) {
       // manual games are analysed too — category decisions only (dice rolls unseen)
-      analysisByPlayer[idx] = (evReady && moveLog[idx] && moveLog[idx].length)
-        ? (manualMode ? EV.analyzeManualGame(moveLog[idx]) : EV.analyzeGame(moveLog[idx]))
+      var ready = sumExp() ? exactReady : evReady;
+      analysisByPlayer[idx] = (ready && moveLog[idx] && moveLog[idx].length)
+        ? (sumExp() ? analyzeGameExp(moveLog[idx]) : (manualMode ? EV.analyzeManualGame(moveLog[idx]) : EV.analyzeGame(moveLog[idx])))
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
@@ -4399,7 +4404,7 @@ body.modal-open{ overflow:hidden; }
       if (luckIdx < 0 || ana[i].luck > ana[luckIdx].luck) luckIdx = i;
     });
     // §1.5 category board: reduce scores across players → hit fraction + record (first-to-score holds ties)
-    var board = G.CATEGORIES.map(function (c) {
+    var board = sumCats().map(function (c) {
       var hit = 0, recVal = -1, recPi = -1;
       players.forEach(function (p, i) {
         var v = p.scores[c.key];
@@ -4578,8 +4583,8 @@ body.modal-open{ overflow:hidden; }
         + '<span class="cg-pct">' + pct + '%</span>'
         + '<span class="cg-rec">' + hi + '</span></div>';
     }
-    var up = G.CATEGORIES.filter(function (c) { return c.group === 'upper'; }).map(tile).join('');
-    var low = G.CATEGORIES.filter(function (c) { return c.group === 'lower'; }).map(tile).join('');
+    var up = sumCats().filter(function (c) { return c.group === 'upper'; }).map(tile).join('');
+    var low = sumCats().filter(function (c) { return c.group === 'lower'; }).map(tile).join('');
     var master = m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2
       ? '<div class="cb-master">📋 Майстор на категориите: <b style="color:' + players[m.masterIdx].color + '">' + esc(players[m.masterIdx].name) + '</b> · ' + m.recCount[m.masterIdx] + ' рекорда</div>' : '';
     var open = !summary || summary.catOpen !== false;   // collapsible; open by default
@@ -4852,8 +4857,8 @@ body.modal-open{ overflow:hidden; }
     if (fa.blunder && fa.blunder.cost < -0.5) {
       var b = fa.blunder, bcost = '−' + (-b.cost).toFixed(1) + ' т.', bhead, bdet;
       if (b.type === 'category') {
-        bhead = 'игра ' + (CAT_LABEL[b.chosenKey] || b.chosenKey);
-        bdet = (b.chosenKey !== b.optimalKey ? 'по-добре ' + (CAT_LABEL[b.optimalKey] || b.optimalKey) + ' · ' : '') + bcost;
+        bhead = 'игра ' + (sumLabel(b.chosenKey));
+        bdet = (b.chosenKey !== b.optimalKey ? 'по-добре ' + (sumLabel(b.optimalKey)) + ' · ' : '') + bcost;
       } else { bhead = 'задържане на заровете'; bdet = bcost; }
       html += '<div class="evpick blunder"><div class="epk-h">✗ Най-скъпа грешка: ' + esc(bhead) + '</div>'
         + '<div class="epk-d">' + esc(bdet) + '</div></div>';
@@ -4931,7 +4936,7 @@ body.modal-open{ overflow:hidden; }
         + '<span class="tl" title="избор (EV)">' + evNum(td.skill) + '</span></span>';
       html += '<div class="evtrow ' + q.cls + (genRow ? ' q-general' : '') + '">'
         + '<span class="tn">Х' + (td.turn + 1) + '</span>'
-        + '<span class="tc' + (forfeit ? ' forfeit' : '') + '">' + esc(CAT_LABEL[td.category] || td.category) + '</span>'
+        + '<span class="tc' + (forfeit ? ' forfeit' : '') + '">' + esc(sumLabel(td.category)) + '</span>'
         + '<span class="tv">' + td.score + ' т.</span>'
         + ev
         + qualityIcon(td.skill) + '</div>';
@@ -4945,8 +4950,8 @@ body.modal-open{ overflow:hidden; }
 
   function decisionLabel(d) {
     if (d.type === 'category') {
-      return 'игра ' + (CAT_LABEL[d.chosenKey] || d.chosenKey)
-        + (d.chosenKey !== d.optimalKey ? ' (по-добре ' + (CAT_LABEL[d.optimalKey] || d.optimalKey) + ')' : '');
+      return 'игра ' + (sumLabel(d.chosenKey))
+        + (d.chosenKey !== d.optimalKey ? ' (по-добре ' + (sumLabel(d.optimalKey)) + ')' : '');
     }
     return 'задържане на заровете';
   }
@@ -4989,10 +4994,9 @@ body.modal-open{ overflow:hidden; }
     });
   }
   function openHistoryGame(rec) {
-    if (rec.ruleset === 'experimental') { openExpHistory(rec); return; }
     histSnapshot = { game: game, moveLog: moveLog, manualMode: manualMode, summary: summary, undo: undoStack };
     viewingHistory = true;
-    game = { players: reconstructPlayers(rec), current: 0, round: 1 };
+    game = { players: reconstructPlayers(rec), current: 0, round: 1, ruleset: rec.ruleset };   // ruleset drives total()/summary
     moveLog = rec.moveLog || game.players.map(function () { return []; });
     manualMode = !!rec.manualMode; undoStack = [];
     var top = Math.max.apply(null, game.players.map(total));
@@ -5001,7 +5005,7 @@ body.modal-open{ overflow:hidden; }
     showGameOver(winner);
     // §2.5 dossier context: viewing a PAST owner game → annotate its report with deltas
     var oi = recOwnerIdx(rec);
-    dossierCtx = (oi >= 0 && !rec.players[oi].isAI) ? { ownerPi: oi, career: computeOwnerCareer() } : null;
+    dossierCtx = (oi >= 0 && !rec.players[oi].isAI) ? { ownerPi: oi, career: computeOwnerCareer(rec.ruleset) } : null;
     currentHistRec = rec; $('overExport').classList.remove('hidden');  // export is active only from history
     setOverTitle();   // editable title + date/time subline for the archived battle
     $('overBack').classList.remove('hidden'); $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
