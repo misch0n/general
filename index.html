@@ -565,6 +565,25 @@ body.modal-open{ overflow:hidden; }
 .medaltip{ position:fixed; z-index:70; max-width:240px; padding:9px 11px; border-radius:10px; background:var(--gen-ink);
   border:1.5px solid var(--gen-brass-stroke); color:var(--gen-text); font-size:11.5px; line-height:1.45; box-shadow:0 8px 22px rgba(0,0,0,.5); cursor:pointer; }
 .medaltip .mt-holder{ margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.12); }
+/* tutorial coach bubble + spotlight */
+.tutbubble{ position:fixed; z-index:85; max-width:290px; padding:14px 15px 12px; border-radius:13px; background:var(--gen-ink);
+  border:2px solid var(--gen-brass); color:var(--gen-text); font-size:13px; line-height:1.5; box-shadow:0 14px 38px rgba(0,0,0,.65); }
+.tutbubble.hidden{ display:none; }
+.tutbubble.nudge{ animation:tutnudge .32s ease; }
+@keyframes tutnudge{ 0%,100%{ transform:translateX(0); } 20%,60%{ transform:translateX(-6px); } 40%,80%{ transform:translateX(6px); } }
+.tutbubble .tb-text b{ color:var(--gen-brass-bright); }
+.tutbubble .tb-x{ position:absolute; top:6px; right:7px; width:20px; height:20px; border:none; background:transparent; color:var(--gen-muted); font-size:13px; cursor:pointer; border-radius:5px; }
+.tutbubble .tb-x:hover{ color:var(--gen-brass); }
+.tutbubble .tb-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px; }
+.tutbubble .tb-step{ font-size:10px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+.tutbubble .tb-next{ padding:7px 16px; border-radius:8px; background:var(--gen-brass); color:var(--gen-ink); font-weight:700; border:none; cursor:pointer; font-family:var(--gen-font-display); letter-spacing:.5px; }
+.tutbubble .tb-next:hover{ background:var(--gen-brass-bright); }
+.tutbubble .tb-hint{ font-size:11px; color:var(--gen-brass-bright); font-weight:700; }
+.tut-spot{ position:relative; }
+.tut-spot::after{ content:''; position:absolute; inset:-4px; border:2px solid var(--gen-brass-bright); border-radius:11px;
+  box-shadow:0 0 0 3px rgba(232,195,86,.22), 0 0 18px rgba(232,195,86,.4); pointer-events:none; z-index:6; animation:tutpulse 1.3s ease-in-out infinite; }
+@keyframes tutpulse{ 0%,100%{ opacity:.45; } 50%{ opacity:1; } }
+.tut-hint-sm{ font-size:9px; font-weight:600; color:var(--gen-muted); text-transform:none; letter-spacing:0; }
 .medaltip b{ color:var(--gen-brass-bright); }
 /* §1.5 category board — in-game scoreboard layout, each cell tinted by the record holder */
 .catboard{ margin-bottom:12px; }
@@ -807,7 +826,7 @@ body.modal-open{ overflow:hidden; }
 .oswatch.on{ border-color:#fff; box-shadow:0 0 0 2px var(--gen-ink), 0 0 0 4px var(--gen-brass-bright); transform:scale(1.12); }
 .ownersub{ display:flex; align-items:center; gap:6px; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px;
   font-size:12px; color:var(--gen-label); margin-bottom:8px; }
-.qmark{ width:18px; height:18px; flex:none; display:grid; place-items:center; border-radius:50%; font-family:var(--gen-font-body);
+.qmark{ width:18px; height:18px; flex:none; display:inline-grid; place-items:center; vertical-align:middle; border-radius:50%; font-family:var(--gen-font-body);
   font-weight:700; font-size:11px; color:var(--gen-ink); background:var(--gen-brass); border:none; cursor:pointer; }
 .qmark:hover{ background:var(--gen-brass-bright); }
 .ownerbubble{ margin-top:9px; padding:9px 11px; border-radius:9px; background:var(--gen-brass-bright); color:var(--gen-ink);
@@ -1309,6 +1328,7 @@ body.modal-open{ overflow:hidden; }
   </div>
 </div>
 <div id="medalTip" class="medaltip hidden"></div>
+<div id="tutBubble" class="tutbubble hidden"></div>
 <div id="keepThrowTip" class="ktbubble hidden">
   <div class="kt-hd">Избери зарове, които да:</div>
   <div class="kt-opts">
@@ -1425,6 +1445,10 @@ body.modal-open{ overflow:hidden; }
       </div>
     </div>
     <div id="ruleBubble" class="ownerbubble hidden"></div>
+    <div class="setrow" id="tutRow" style="cursor:default">
+      <span>Обучение <span class="tut-hint-sm">за избраните правила</span></span>
+      <button id="tutStartBtn" class="btn small">📚 Започни</button>
+    </div>
     <div id="settingsRows"></div>
     <div id="clearArchiveRow" style="margin-top:8px">
       <div id="storeInfo" class="storeinfo"></div>
@@ -1809,7 +1833,7 @@ body.modal-open{ overflow:hidden; }
   }
   // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
   function saveResume() {
-    if (!game || !game.players || !game.players.length || viewingHistory) return;
+    if (!game || !game.players || !game.players.length || viewingHistory || tut) return;   // tutorial games aren't resumable
     var over = expMode ? X.isGameOver(game) : G.isGameOver(game);
     if (over) { clearResume(); return; }
     lsSet(RESUME_KEY, JSON.stringify({
@@ -2566,6 +2590,7 @@ body.modal-open{ overflow:hidden; }
   var summary = null;      // end-game summary state (tab, selected player)
   var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face (the 5-dice entry)
   var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
+  var tut = null;          // active tutorial controller (scripted dice + coach bubbles), null otherwise
   var fx = {};             // combo-reminder penalties folded into one override (see rebuildFx)
 
   function startGame(players, manual) {
@@ -2668,13 +2693,15 @@ body.modal-open{ overflow:hidden; }
   // the human's first throw of the turn, triggered by tapping the dice tray
   function firstRoll() {
     if (!awaitingRoll || locked) return;
+    if (tut && !tutGate('roll')) return;          // tutorial: only roll on a roll step
     var p = G.currentPlayer(game);
     awaitingRoll = false;
-    dice = G.rollAll(); sortDice();
+    dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
     curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     clearRoast();
     renderAll();
     shakeDice();
+    if (tut) tutEvent('roll');
   }
 
   // ---------- previews ----------
@@ -3022,6 +3049,7 @@ body.modal-open{ overflow:hidden; }
     var r = $('fireQ').getBoundingClientRect();
     tip.style.left = Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8) + 'px';
     tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';   // above the fire button
+    if (tut) tutEvent('chooser');
   }
   $('fireQ').onclick = function (e) { e.stopPropagation(); showKeepThrowTip(); };
   $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
@@ -3054,6 +3082,7 @@ body.modal-open{ overflow:hidden; }
     if (expMode) { expHumanFire(); return; }
     if (awaitingRoll) { firstRoll(); return; }   // first throw via the ХВЪРЛИ! button
     if (aiBusy || locked || throwsLeft <= 0) return;
+    if (tut) { tutReroll(); return; }            // tutorial: scripted reroll
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;                    // nothing to throw
     if (rr.every(Boolean)) rerolledAll = true;        // re-rolled the whole hand
@@ -3077,17 +3106,20 @@ body.modal-open{ overflow:hidden; }
   function commitScore(key, value) {
     var p = G.currentPlayer(game);
     if (aiBusy || locked || (!manualMode && p.isAI) || G.isCategoryFilled(p, key)) return;
+    if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     G.assignScore(p, key, dice, value);
     afterCommit(key, value);
   }
   function commitForfeit(key) {
     var p = G.currentPlayer(game);
     if (aiBusy || locked || (!manualMode && p.isAI) || G.isCategoryFilled(p, key)) return;
+    if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     G.forfeitScore(p, key);
     afterCommit(key, 0);
   }
   function afterCommit(key, value) {
     var p = G.currentPlayer(game);  // still the player who just committed
+    if (tut) tutEvent('commit');
     var log = curLog;
     if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     if (netMode) {
@@ -3125,6 +3157,7 @@ body.modal-open{ overflow:hidden; }
   function endTurn() {
     if (G.isGameOver(game)) { endGame(); return; }
     G.nextTurn(game);
+    if (tut) { while (game.players[game.current].isAI) G.nextTurn(game); }   // tutorial: the opponent never plays
     beginTurn();
   }
 
@@ -3192,13 +3225,16 @@ body.modal-open{ overflow:hidden; }
   function expLogReroll(rr) { if (curLog) { curLog.keeps.push(rr.map(function (x) { return !x; })); curLog.rolls.push(dice.slice()); } }
   function expFirstRoll() {
     if (!awaitingRoll || locked) return;
-    awaitingRoll = false; dice = G.rollAll(); sortDice();
+    if (tut && !tutGate('roll')) return;
+    awaitingRoll = false; dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
     curLog = expStartLog(G.currentPlayer(game));
     clearRoast(); expRenderAll(); shakeDice();
+    if (tut) tutEvent('roll');
   }
   function expHumanFire() {
     if (awaitingRoll) { expFirstRoll(); return; }   // first throw via the ХВЪРЛИ! button
     if (aiBusy || locked || throwsLeft <= 0) return;
+    if (tut) { tutReroll(); return; }               // tutorial: scripted reroll
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;
     if (rr.every(Boolean)) rerolledAll = true;
@@ -3212,12 +3248,14 @@ body.modal-open{ overflow:hidden; }
     var p = G.currentPlayer(game);
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, key)) return;
+    if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     if (manualMode) {
       // ОПА can rewind this; the turn is logged for category-only analytics (mask BEFORE the pick)
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
       if (exactReady) moveLog[game.current].push({ mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true });
     } else if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
+    if (tut) tutEvent('commit');
     locked = true; expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
     var committed = p.scores[key], delay = END_DELAY;
@@ -3227,6 +3265,7 @@ body.modal-open{ overflow:hidden; }
   function expEndTurn() {
     if (X.isGameOver(game)) { expEndGame(); return; }
     X.nextTurn(game);
+    if (tut) { while (game.players[game.current].isAI) X.nextTurn(game); }   // tutorial: the opponent never plays
     expBeginTurn();
   }
   function expRunAiTurn() { aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
@@ -3494,6 +3533,7 @@ body.modal-open{ overflow:hidden; }
     $('peekBody').innerHTML = expMiniBoard(p);
     $('peekTotal').textContent = X.total(p);
     $('peekModal').classList.remove('hidden');
+    if (tut) tutEvent('peek');
   }
   // experimental mini cell-board (peek / summary recap) — same look as the standard miniBoard,
   // with the signed number part (colour by value), the number-part bar, and фул хаус spanning two.
@@ -4230,6 +4270,7 @@ body.modal-open{ overflow:hidden; }
     buildSettingsRows(inGame);
     $('ownerBox').classList.toggle('hidden', inGame);
     $('ruleBox').classList.toggle('hidden', inGame);          // ruleset is chosen before a battle
+    $('tutRow').classList.toggle('hidden', inGame);           // tutorial starts a fresh game → pre-game only
     $('clearArchiveRow').classList.toggle('hidden', inGame);
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
@@ -4268,6 +4309,7 @@ body.modal-open{ overflow:hidden; }
     $('peekBody').innerHTML = miniBoard(p);
     $('peekTotal').textContent = total(p);
     $('peekModal').classList.remove('hidden');
+    if (tut) tutEvent('peek');
   }
   $('peekClose').onclick = function () { $('peekModal').classList.add('hidden'); };
   $('peekModal').onclick = function (e) { if (e.target === $('peekModal')) $('peekModal').classList.add('hidden'); };
@@ -5877,6 +5919,139 @@ body.modal-open{ overflow:hidden; }
   $('calBtn').onclick = openCalendar;
   $('calClose').onclick = function () { $('calModal').classList.add('hidden'); };
   $('calModal').onclick = function (e) { if (e.target === $('calModal')) $('calModal').classList.add('hidden'); };
+
+  // ========================================================== TUTORIAL (scripted dice + coach bubbles)
+  // A fully-filled „Новобранец" opponent sits beside the learner so every nextTurn bounces
+  // straight back to the learner (the opponent is „done"), and so peeking shows a real board.
+  var TUT_OPP_STD = { ones:3, twos:6, threes:9, fours:8, fives:15, sixes:12, twoKind:10, threeKind:18, fourKind:0, fullHouse:25, smallStraight:30, largeStraight:0, general:0, chance:21 };
+  var TUT_OPP_EXP = { ones:-2, twos:0, threes:3, fours:4, fives:5, sixes:6, twoKind:10, twoPair:14, threeKind:12, fourKind:0, fullHouse:18, smallStraight:30, largeStraight:40, general:0, chance:17 };
+  var TUT_HINT = { roll:'👆 натисни ХВЪРЛИ!', reroll:'👆 хвърли заровете', rerollAll:'👆 маркирай всички и хвърли', commit:'👆 докосни полето', peek:'👆 докосни маркера', chooser:'👆 натисни ?' };
+  var TUT_STD = [
+    { t:'Добре дошъл в <b>Генерал</b>! Имаш <b>14 полета</b> — всеки ход пълниш по едно. Целта е най-много точки.', at:null },
+    { t:'Горе са играчите. <b>Светналият</b> маркер е този, който е на ход — сега си <b>ти</b>.', at:'pills' },
+    { t:'Всеки ход хвърляш <b>до 3 пъти</b>. Натисни <b>ХВЪРЛИ!</b>, за да започнеш.', at:'fire', gate:'roll', dice:[2,3,1,4,2] },
+    { t:'Слаб начален зар. Можеш да <b>маркираш</b> зарове с докосване — в режим „дръж" пазиш маркираните, а останалите се хвърлят пак.', at:'dice' },
+    { t:'С бутона <b>?</b> сменяш режима: маркираш кои да <b>държиш</b> или кои да <b>хвърлиш</b>. Отвори го да видиш.', at:'fireQ', gate:'chooser' },
+    { t:'Избери <b>„хвърли"</b> и затвори балончето — така маркираните зарове се хвърлят наново.', at:'fireQ' },
+    { t:'Този път <b>хвърли всичко</b> наново: маркирай и петте зара и натисни ХВЪРЛИ!', at:'dice', gate:'rerollAll', dice:[6,2,6,3,6] },
+    { t:'<b>Три шестици!</b> Запиши ги в полето <b>„шестици"</b> (18 т.) от таблото горе.', at:'up', gate:'commit', key:'sixes' },
+    { t:'Браво! Сега ще гоним <b>ГЕНЕРАЛ</b> — пет еднакви. Хвърли отново.', at:'fire', gate:'roll', dice:[4,4,1,4,2] },
+    { t:'Имаш <b>три четворки</b> — задръж тях и хвърли другите два.', at:'dice', gate:'reroll', dice:[4,4,4,5,4] },
+    { t:'Още една четворка! Хвърли последния зар.', at:'dice', gate:'reroll', dice:[4,4,4,4,4] },
+    { t:'<b>ГЕНЕРАЛ! 70 точки.</b> Запиши го в полето <b>„генерал"</b>.', at:'low', gate:'commit', key:'general' },
+    { t:'Един и същ зар често става за <b>няколко полета</b>. Хвърли.', at:'fire', gate:'roll', dice:[5,5,3,3,1] },
+    { t:'Тези зарове стават за <b>„2 еднакви"</b> (10 т.), но и за „петици". <b>Ти избираш</b> къде да ги запишеш. Сега избери <b>„2 еднакви"</b>.', at:'low', gate:'commit', key:'twoKind' },
+    { t:'Нов ход. Хвърли.', at:'fire', gate:'roll', dice:[1,2,4,6,1] },
+    { t:'Не можеш да направиш <b>голяма кента</b>. Понякога си <b>принуден да жертваш</b> поле за <b>0</b> точки. Докосни „голяма кента", за да я зачеркнеш.', at:'low', gate:'commit', key:'largeStraight' },
+    { t:'Последен ход за обучението. Хвърли.', at:'fire', gate:'roll', dice:[3,3,3,3,6] },
+    { t:'Преди да запишеш — <b>надникни</b> в дъската на съперника. Докосни неговия маркер горе.', at:'pills', gate:'peek' },
+    { t:'Това е неговата дъска. Затвори я и се върни към твоя ход.', at:null },
+    { t:'Имаш <b>каре</b> (четири еднакви). Запиши го в <b>„4 еднакви"</b> (12 т.).', at:'low', gate:'commit', key:'fourKind' },
+    { t:'<b>Готово, командире!</b> Хвърляш, държиш/хвърляш зарове и пълниш по едно поле всеки ход. На бой!', at:null },
+  ];
+  var TUT_EXP = [
+    { t:'Това е <b>Генерал „с минуси"</b>! <b>15 полета</b>, по едно на ход. Внимавай — числовата част може и да <b>отнема</b> точки.', at:null },
+    { t:'Горе са играчите. <b>Светналият</b> маркер е на ход — сега си <b>ти</b>.', at:'pills' },
+    { t:'Хвърляш <b>до 3 пъти</b> на ход. Натисни <b>ХВЪРЛИ!</b>.', at:'fire', gate:'roll', dice:[2,3,1,4,2] },
+    { t:'Маркирай зарове с докосване. С бутона <b>?</b> сменяш дали маркираш кои да <b>държиш</b> или кои да <b>хвърлиш</b>. Отвори го.', at:'fireQ', gate:'chooser' },
+    { t:'Избери режим, затвори, после <b>хвърли всичко</b> наново — маркирай и петте зара и натисни ХВЪРЛИ!', at:'dice', gate:'rerollAll', dice:[6,6,6,4,2] },
+    { t:'<b>Три шестици!</b> Задръж ги и хвърли другите два за още.', at:'dice', gate:'reroll', dice:[6,6,6,6,2] },
+    { t:'<b>Числата</b> (горе) се броят като <b>(брой − 3) × лицето</b>: четири шестици = <b>+6</b>. Запиши „шестици". ⚠ Ако сборът на числата завърши под нулата — <b>−50</b>!', at:'up', gate:'commit', key:'sixes' },
+    { t:'Браво! Сега <b>ГЕНЕРАЛ</b> — пет еднакви. Хвърли.', at:'fire', gate:'roll', dice:[4,4,1,4,2] },
+    { t:'Три четворки — задръж ги и хвърли другите.', at:'dice', gate:'reroll', dice:[4,4,4,5,4] },
+    { t:'Още един! Хвърли последния зар.', at:'dice', gate:'reroll', dice:[4,4,4,4,4] },
+    { t:'<b>ГЕНЕРАЛ! 70 точки.</b> Запиши „генерал".', at:'low', gate:'commit', key:'general' },
+    { t:'Един зар може да става за <b>няколко полета</b>. Хвърли.', at:'fire', gate:'roll', dice:[5,5,3,3,1] },
+    { t:'Имаш <b>два чифта</b>: стават за <b>„2x2"</b> (16 т.) или само „2x" (10 т.). Ти избираш. Запиши <b>„2x2"</b>.', at:'low', gate:'commit', key:'twoPair' },
+    { t:'Нов ход. Хвърли.', at:'fire', gate:'roll', dice:[1,2,4,6,1] },
+    { t:'Не става за <b>голяма кента</b>. Понякога си <b>принуден да жертваш</b> поле за <b>0</b>. Докосни „голяма кента", за да я зачеркнеш.', at:'low', gate:'commit', key:'largeStraight' },
+    { t:'Последен ход. Хвърли.', at:'fire', gate:'roll', dice:[6,6,6,6,2] },
+    { t:'Преди да запишеш — <b>надникни</b> в дъската на съперника. Докосни неговия маркер горе.', at:'pills', gate:'peek' },
+    { t:'Това е неговата дъска. Затвори я и се върни.', at:null },
+    { t:'<b>Каре</b> (четири еднакви) се пише в <b>„4x"</b> (24 т.). Запиши го.', at:'low', gate:'commit', key:'fourKind' },
+    { t:'<b>Готово!</b> Помни: пълниш по едно поле всеки ход, а числовата част да не завърши на минус. На бой!', at:null },
+  ];
+  function tutAnchor(at) {
+    return at === 'fire' ? $('fireWrap') : at === 'dice' ? $('dice') : at === 'pills' ? $('pillWrap')
+         : at === 'fireQ' ? $('fireQ') : at === 'up' ? $('boardUpper') : at === 'low' ? $('boardLower') : null;
+  }
+  function tutPlace(anchor) {
+    var b = $('tutBubble');
+    if (!anchor) { b.style.left = '50%'; b.style.top = '26%'; b.style.transform = 'translateX(-50%)'; return; }
+    b.style.transform = 'none';
+    var r = anchor.getBoundingClientRect(), bw = b.offsetWidth, bh = b.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - bw / 2), vw - bw - 8) + 'px';
+    b.style.top = (r.bottom + 10 + bh < vh - 8 ? r.bottom + 10 : Math.max(8, r.top - bh - 10)) + 'px';
+  }
+  function tutClearSpot() { var e = document.querySelector('.tut-spot'); while (e) { e.classList.remove('tut-spot'); e = document.querySelector('.tut-spot'); } }
+  function tutShow() {
+    if (!tut) return;
+    var st = tut.steps[tut.i];
+    if (!st) { tutEnd(); return; }
+    if (st.dice) tut.dice = st.dice.slice();
+    tutClearSpot();
+    var anchor = tutAnchor(st.at);
+    if (anchor) anchor.classList.add('tut-spot');
+    var last = tut.i === tut.steps.length - 1;
+    var foot = st.gate ? '<span class="tb-hint">' + (TUT_HINT[st.gate] || '') + '</span>'
+                       : '<button class="tb-next" id="tutNextBtn">' + (last ? 'Завърши' : 'Напред →') + '</button>';
+    $('tutBubble').innerHTML = '<button class="tb-x" id="tutExitBtn" aria-label="Изход">✕</button>'
+      + '<div class="tb-text">' + st.t + '</div>'
+      + '<div class="tb-foot"><span class="tb-step">' + (tut.i + 1) + ' / ' + tut.steps.length + '</span>' + foot + '</div>';
+    $('tutBubble').classList.remove('hidden');
+    tutPlace(anchor);
+    var nb = $('tutNextBtn'); if (nb) nb.onclick = tutAdvance;
+    $('tutExitBtn').onclick = tutEnd;
+  }
+  function tutAdvance() { if (!tut) return; tut.i++; tutShow(); }
+  function tutGate(name) { var st = tut && tut.steps[tut.i]; return !!(st && st.gate === name); }
+  function tutCommitOk(key) { var st = tut.steps[tut.i]; return !!(st && st.gate === 'commit' && (!st.key || st.key === key)); }
+  function tutEvent(ev) {
+    if (!tut) return;
+    var st = tut.steps[tut.i]; if (!st || !st.gate) return;
+    var ok = st.gate === ev || (st.gate === 'reroll' && ev === 'rerollAll');   // any reroll satisfies a generic reroll step
+    if (ok) tutAdvance();
+  }
+  function tutNudge() { var b = $('tutBubble'); b.classList.remove('nudge'); void b.offsetWidth; b.classList.add('nudge'); }
+  function tutReroll() {
+    var st = tut.steps[tut.i];
+    if (!st || (st.gate !== 'reroll' && st.gate !== 'rerollAll')) return;
+    var rr = rerollMask();
+    if (!rr.some(Boolean)) return;
+    var all = rr.every(Boolean);
+    if (st.gate === 'rerollAll' && !all) { tutNudge(); return; }
+    dice = (tut.dice || dice).slice(); sortDice();
+    diceNew = [false, false, false, false, false];
+    if (curLog) { curLog.keeps.push(rr.map(function (x) { return !x; })); curLog.rolls.push(dice.slice()); }
+    selected = [false, false, false, false, false];
+    throwsLeft--;
+    (expMode ? expRenderAll : renderAll)(); shakeDice();
+    tutEvent(all ? 'rerollAll' : 'reroll');
+  }
+  function tutStart() {
+    var exp = settings.ruleset === 'experimental';
+    $('settingsModal').classList.add('hidden');
+    clearResume(); viewingHistory = false; netMode = false; manualMode = false;
+    var me = G.createPlayer('Ти', settings.ownerColor || '#d4a02e', false);
+    me.owner = true; me.gender = settings.ownerGender || 'm'; me.selectKeep = !!settings.selectKeep;
+    me.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
+    var opp = G.createPlayer('Новобранец', '#cf4f2e', true);
+    opp.gender = 'm'; opp.ribbons = RIBBON_COLORS.slice(0, 6); opp.persona = G.PERSONAS ? G.PERSONAS[0] : null;
+    var CATS = exp ? G.CATEGORIES_EXP : G.CATEGORIES, OPP = exp ? TUT_OPP_EXP : TUT_OPP_STD;
+    CATS.forEach(function (c) { opp.scores[c.key] = (OPP[c.key] != null ? OPP[c.key] : 0); });
+    tut = { ruleset: settings.ruleset, steps: exp ? TUT_EXP : TUT_STD, i: 0, dice: null };
+    startGame([me, opp], false);   // routes to expStartGame when the ruleset is experimental
+    tutShow();
+  }
+  function tutEnd() {
+    tut = null;
+    $('tutBubble').classList.add('hidden'); tutClearSpot();
+    $('peekModal').classList.add('hidden');
+    clearResume();
+    $('game').classList.add('hidden'); $('overModal').classList.add('hidden'); $('setup').classList.remove('hidden');
+  }
+  var tb = $('tutStartBtn'); if (tb) tb.onclick = tutStart;
+
   function confirmDeleteGame(row, id) {
     if (row.querySelector('.hg-confirm')) return;
     var c = document.createElement('div'); c.className = 'hg-confirm';
