@@ -563,6 +563,12 @@ body.modal-open{ overflow:hidden; }
 .catgrid .cgtile{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 3px; border-radius:5px;
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); text-align:center; min-width:0; }
 .catgrid .cgtile.none{ opacity:.45; }
+.catgrid .lower .cgtile.fullspan{ grid-column:1 / -1; }   /* minus board: фул хаус spans both columns */
+.catgrid .cb-upline{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; margin:1px 0; font-size:9.5px; color:var(--gen-muted); }
+.catgrid .cb-upline b{ color:var(--gen-text); font-variant-numeric:tabular-nums; }
+.catgrid .cb-upline .cbu-ar{ font-size:10px; color:var(--gen-muted); }
+.catgrid .cb-upline .cbu-box{ font-family:var(--gen-font-display); font-weight:800; font-size:13px; line-height:1; padding:3px 8px; border-radius:5px;
+  border:1px solid var(--gen-pill-line); background:rgba(255,255,255,.04); color:var(--gen-text); font-variant-numeric:tabular-nums; }
 .catgrid .cgtile.dim{ opacity:.4; }   /* a player is expanded → mute the other record-holders' colours */
 .catgrid .cgtile.good{ background:rgba(123,184,90,.16); border-color:rgba(123,184,90,.5); }
 .catgrid .cgtile.bad{ background:rgba(224,85,69,.18); border-color:rgba(224,85,69,.55); }
@@ -4268,6 +4274,9 @@ body.modal-open{ overflow:hidden; }
   G.CATEGORIES.forEach(function (c) { CAT_LABEL[c.key] = c.label; CAT_BY_KEY[c.key] = c; });
   var CAT_LABEL_EXP = {}; if (G.CATEGORIES_EXP) G.CATEGORIES_EXP.forEach(function (c) { CAT_LABEL_EXP[c.key] = c.label; });
   function catLabelOf(key, rs) { return (rs === 'experimental' ? CAT_LABEL_EXP : CAT_LABEL)[key] || key; }
+  // fixed-value combos: every player who fills them scores the same — there's no real
+  // "record" to hold, so the category board never tints them in a player's colour
+  var FIXED_VALUE_CATS = { smallStraight: 1, largeStraight: 1 };
   // the end-game summary is shared between rulesets; these resolve by the active game's ruleset
   function sumExp() { return !!(game && game.ruleset === 'experimental'); }
   function sumCats() { return sumExp() ? G.CATEGORIES_EXP : G.CATEGORIES; }
@@ -4482,16 +4491,20 @@ body.modal-open{ overflow:hidden; }
       if (!ana[i] || ana[i].manual || typeof ana[i].luck !== 'number') return;
       if (luckIdx < 0 || ana[i].luck > ana[luckIdx].luck) luckIdx = i;
     });
-    // §1.5 category board: reduce scores across players → hit fraction + record (first-to-score holds ties)
+    // §1.5 category board: reduce scores across players → hit fraction + record holder.
+    // A holder colours the cell only for a UNIQUE top score in a variable-value category;
+    // fixed-value combos (kentas) and tied tops have no real record → left neutral.
     var board = sumCats().map(function (c) {
-      var hit = 0, recVal = -1, recPi = -1;
+      var hit = 0, recVal = -1, recPi = -1, recTies = 0;
       players.forEach(function (p, i) {
         var v = p.scores[c.key];
         if (typeof v !== 'number') return;
         if (v > 0) hit++;
-        if (v > recVal) { recVal = v; recPi = i; }
+        if (v > recVal) { recVal = v; recPi = i; recTies = 1; }
+        else if (v === recVal && v > 0) recTies++;
       });
-      return { key: c.key, label: c.label, hit: hit, n: players.length, recVal: recVal, recPi: recVal > 0 ? recPi : -1 };
+      var holder = (recVal > 0 && recTies === 1 && !FIXED_VALUE_CATS[c.key]) ? recPi : -1;
+      return { key: c.key, label: c.label, hit: hit, n: players.length, recVal: recVal, recPi: holder };
     });
     var recCount = players.map(function () { return 0; });
     board.forEach(function (b) { if (b.recPi >= 0) recCount[b.recPi]++; });
@@ -4657,13 +4670,30 @@ body.modal-open{ overflow:hidden; }
       var pct = Math.round(100 * b.hit / b.n), hi = b.recVal >= 0 ? b.recVal + 'т.' : '–';
       var muted = holder && hl >= 0 && b.recPi !== hl;
       var style = holder && !muted ? ' style="background:' + rgba(holder.color, 0.26) + ';border-color:' + holder.color + '"' : '';
-      return '<div class="cgtile' + (holder ? '' : ' none') + (muted ? ' dim' : '') + '"' + style + '>'
+      var empty = b.recVal <= 0;                                 // nobody scored → dim; scored-but-no-holder stays neutral
+      var span = (sumExp() && c.key === 'fullHouse') ? ' fullspan' : '';   // match the minus board: фул хаус spans a full row
+      return '<div class="cgtile' + (empty ? ' none' : '') + (muted ? ' dim' : '') + span + '"' + style + '>'
         + '<span class="cg-lab">' + esc(c.label) + '</span>'
         + '<span class="cg-pct">' + pct + '%</span>'
         + '<span class="cg-rec">' + hi + '</span></div>';
     }
     var up = sumCats().filter(function (c) { return c.group === 'upper'; }).map(tile).join('');
     var low = sumCats().filter(function (c) { return c.group === 'lower'; }).map(tile).join('');
+    // minus ruleset: a line under the number part — % who finished it at 0+ and the
+    // best/worst number-part totals, each boxed in that player's colour (like the cells)
+    var upLine = '';
+    if (sumExp()) {
+      var subs = players.map(function (p) { return G.upperStateExp(p.scores).subtotal; });
+      var cleared = subs.filter(function (s) { return s >= 0; }).length;
+      var pctUp = Math.round(100 * cleared / players.length);
+      var hiPi = 0, loPi = 0;
+      subs.forEach(function (s, i) { if (s > subs[hiPi]) hiPi = i; if (s < subs[loPi]) loPi = i; });
+      var signv = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v); };
+      var box = function (v, c) { return '<span class="cbu-box" style="background:' + rgba(c, 0.26) + ';border-color:' + c + '">' + signv(v) + '</span>'; };
+      upLine = '<div class="cb-upline"><span class="cbu-txt"><b>' + pctUp + '%</b> с 0 или повече</span>'
+        + '<span class="cbu-ar">▲</span>' + box(subs[hiPi], players[hiPi].color)
+        + '<span class="cbu-ar">▼</span>' + box(subs[loPi], players[loPi].color) + '</div>';
+    }
     var master = m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2
       ? '<div class="cb-master">📋 Майстор на категориите: <b style="color:' + players[m.masterIdx].color + '">' + esc(players[m.masterIdx].name) + '</b> · ' + m.recCount[m.masterIdx] + ' рекорда</div>' : '';
     var open = !summary || summary.catOpen !== false;   // collapsible; open by default
@@ -4671,7 +4701,7 @@ body.modal-open{ overflow:hidden; }
       + '<div class="catfold-bar"><span class="cf-lab">Категории</span><span class="cf-caret"></span></div>'
       + '<div class="catgrid-wrap' + (open ? '' : ' hidden') + '">'
       + '<div class="cb-legend">всяка клетка: <b>% вкарали</b> · <b>най-висок резултат</b> · цвят = рекордьорът</div>'
-      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div><div class="lower">' + low + '</div></div>' + master
+      + '<div class="miniboard catgrid"><div class="upper">' + up + '</div>' + upLine + '<div class="lower">' + low + '</div></div>' + master
       + '</div></div>';
     var fold = $('catBoard').querySelector('.catfold');
     fold.querySelector('.catfold-bar').onclick = function () {
