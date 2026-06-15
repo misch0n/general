@@ -802,8 +802,9 @@ body.modal-open{ overflow:hidden; }
 /* owner settings block */
 .ownerbox{ margin:0 0 12px; padding:11px; border:1px solid var(--gen-pill-line); border-radius:10px; background:rgba(0,0,0,.2); }
 .ownercolors{ display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
-.oswatch{ width:20px; height:20px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; }
-.oswatch.on{ border-color:var(--gen-text); box-shadow:0 0 0 2px var(--gen-brass); }
+.oswatch{ width:20px; height:20px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; transition:transform .1s; }
+/* selected default colour: a white ring + dark gap + bright outer ring so it reads on ANY swatch (incl. the brass default) */
+.oswatch.on{ border-color:#fff; box-shadow:0 0 0 2px var(--gen-ink), 0 0 0 4px var(--gen-brass-bright); transform:scale(1.12); }
 .ownersub{ display:flex; align-items:center; gap:6px; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px;
   font-size:12px; color:var(--gen-label); margin-bottom:8px; }
 .qmark{ width:18px; height:18px; flex:none; display:grid; place-items:center; border-radius:50%; font-family:var(--gen-font-body);
@@ -5717,7 +5718,8 @@ body.modal-open{ overflow:hidden; }
   var histTab = 'standard';   // which ruleset the archive is showing
   var histShown = 5;          // how many battles are listed; grows by 5 via „покажи още“
   function renderHistory() {
-    histShown = 5;            // reset paging on a full (re)open or tab switch
+    // paging is NOT reset here — loaded battles stay loaded across tab switches and
+    // exclude toggles; histShown only resets on a fresh openHistory() (full close→open)
     ownerCharts = null;  // rebuilt fresh each render
     var tabs = '<div class="histtabs">'
       + '<button class="histtab' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">без минуси</button>'
@@ -5860,7 +5862,7 @@ body.modal-open{ overflow:hidden; }
     for (var day = 1; day <= daysIn; day++) {
       var k = dayStart(new Date(y, mo, day).getTime()), b = by[k];
       var lv = b ? calLevel(b.count) : 0, has = !!b;
-      var meta = b ? '<span class="cd-meta">' + b.count + 'и<br>' + Math.round(b.sum / b.count) + 'т.</span>' : '';
+      var meta = b ? '<span class="cd-meta">' + b.count + '<br>~' + Math.round(b.sum / b.count) + 'т.</span>' : '';
       cells += '<button type="button" class="calday l' + lv + (has ? ' has' : '') + (k === todayK ? ' today' : '') + (k === histDateFilter ? ' sel' : '') + '"'
         + (has ? ' data-day="' + k + '"' : ' disabled') + '><span class="cd-num">' + day + '</span>' + meta + '</button>';
     }
@@ -6133,6 +6135,7 @@ body.modal-open{ overflow:hidden; }
   function openHistory() {
     histTab = (settings.ruleset === 'experimental') ? 'experimental' : 'standard';   // default to the active ruleset
     histDateFilter = null;   // a fresh open clears any calendar date filter
+    histShown = 5;           // fresh open starts at the first page
     $('calModal').classList.add('hidden');
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
