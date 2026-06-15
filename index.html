@@ -641,6 +641,8 @@ body.modal-open{ overflow:hidden; }
 .winrow .wr-nmtop{ font-family:var(--gen-font-display); font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wr-ana{ font-size:10px; color:var(--gen-muted); }
 .wr-ana b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+.wr-blun{ font-size:10px; color:#e08a82; }
+.wr-blun b{ font-variant-numeric:tabular-nums; }
 .winrow .wr-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
 
 /* unrolled placeholder dice (tap to make the first throw) */
@@ -3369,7 +3371,9 @@ body.modal-open{ overflow:hidden; }
     var ranked = X.ranking(g);
     $('expStandings').innerHTML = ranked.map(function (r, i) {
       var ana = logs && logs[r.order] ? analyzeGameExp(logs[r.order]) : null;
-      var sub = ana ? '<span class="wr-ana">точност <b>' + Math.round(ana.accuracy * 100) + '%</b> · късмет <b>' + (ana.luck >= 0 ? '+' : '') + Math.round(ana.luck) + '</b> · умение <b>' + (ana.skill >= 0 ? '+' : '') + ana.skill.toFixed(1) + '</b></span>' : '';
+      var bl = ana && ana.blunder && ana.blunder.cost < -0.5
+        ? '<span class="wr-blun">пропуск: ' + (ana.blunder.key ? esc(EXP_LABEL[ana.blunder.key] || ana.blunder.key) : 'хвърляне') + ' <b>' + ana.blunder.cost.toFixed(1) + '</b> т.</span>' : '';
+      var sub = ana ? '<span class="wr-ana">точност <b>' + Math.round(ana.accuracy * 100) + '%</b> · късмет <b>' + (ana.luck >= 0 ? '+' : '') + Math.round(ana.luck) + '</b> · умение <b>' + (ana.skill >= 0 ? '+' : '') + ana.skill.toFixed(1) + '</b></span>' + bl : '';
       return '<div class="winrow"><span class="wr-pl">' + (i + 1) + '</span>'
         + '<span class="pdot" style="background:' + r.player.color + '"></span>'
         + '<span class="wr-nm"><span class="wr-nmtop">' + (isOwnerP(r.player) ? ownerTokenHTML(true) : '') + esc(r.player.name) + (r.player.isAI ? ' <span class="badge-ai">AI</span>' : '') + '</span>' + sub + '</span>'
