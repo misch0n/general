@@ -326,6 +326,9 @@ body.modal-open{ overflow:hidden; }
 .hintline .kr-none{ color:var(--gen-disabled); }
 
 /* summary: ranks + EV panel */
+.rkbadge{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:11px;
+  color:var(--gen-brass); background:rgba(0,0,0,.32); border:1px solid currentColor; border-radius:5px; padding:3px 7px; min-width:62px; text-align:center; flex:none; }
+.rankrow.first .rkbadge{ box-shadow:0 0 9px rgba(232,195,86,.30); }
 .rankrow .nm{ display:flex; flex-direction:column; }
 .rsub{ font-family:var(--gen-font-body); font-weight:500; text-transform:none; letter-spacing:0; font-size:10px; color:var(--gen-muted); }
 .evpanel{ margin-top:12px; padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); }
@@ -4624,28 +4627,28 @@ body.modal-open{ overflow:hidden; }
     // rows are collapsed by default; the tapped player's full report is injected
     // right after their own row (so details sit *between* players)
     $('ranks').innerHTML = rows.map(function (p, i) {
-      var pi = idx(p), a = ana[pi], expanded = pi === summary.sel, badge, sub = '', val;
+      var pi = idx(p), a = ana[pi], expanded = pi === summary.sel, sub = '', val;
+      // each tab ranks independently: the rank TITLE is assigned by the player's POSITION
+      // in THIS tab's sequence — top row → Генерал, then the next lower title, and so on
+      var badge = G.rankForPlacement(i, n);
       if (tab === 'skill') {
-        badge = a ? G.rankForAccuracy(a.accuracy) : '—';
         val = a ? Math.round(a.accuracy * 100) + '%' : '–';
-      } else {
-        badge = G.rankForPlacement(summary.ordered.indexOf(p), n);
-        if (tab === 'luck') {
-          var lk = a && typeof a.luck === 'number' && !a.manual ? Math.round(a.luck) : null;
-          val = lk != null ? '<b class="' + (lk >= 0 ? 'np' : 'nn') + '">' + signed(lk) + '</b>' : '–';   // luck points only
-        } else if (tab === 'cats') {
-          val = m.recCount[pi];                              // record count — no second line
-        } else { // stand
-          var bonusTag = p.bonus ? ' · +' + p.bonus + ' аванс' : '';
-          var subStand = (p.isAI && p.persona ? '⚙ ' + esc(p.persona.name) : '') + bonusTag;
-          if (subStand.trim()) sub = '<div class="persub">' + subStand + '</div>';
-          val = total(p);
-        }
+      } else if (tab === 'luck') {
+        var lk = a && typeof a.luck === 'number' && !a.manual ? Math.round(a.luck) : null;
+        val = lk != null ? '<b class="' + (lk >= 0 ? 'np' : 'nn') + '">' + signed(lk) + '</b>' : '–';   // luck points only
+      } else if (tab === 'cats') {
+        val = m.recCount[pi];                              // record count — no second line
+      } else { // stand
+        var bonusTag = p.bonus ? ' · +' + p.bonus + ' аванс' : '';
+        var subStand = (p.isAI && p.persona ? '⚙ ' + esc(p.persona.name) : '') + bonusTag;
+        if (subStand.trim()) sub = '<div class="persub">' + subStand + '</div>';
+        val = total(p);
       }
-      // identity is the rank TITLE in the player's colour, not their name — titles are
-      // bounded in width so the row layout stays stable (names are too dynamic)
+      // the colour-coded rank title leads the row; the player's name follows (names are
+      // crucial to read a ranking), then the metric value for this tab
       var row = '<div class="rankrow' + (i === 0 ? ' first' : '') + (expanded ? ' picked' : '') + (a ? '' : ' nodata') + '" data-pi="' + pi + '">'
-        + '<span class="nm" style="color:' + p.color + '">' + esc(badge) + sub + '</span>'
+        + '<span class="rkbadge" style="color:' + p.color + ';border-color:' + p.color + '">' + esc(badge) + '</span>'
+        + '<span class="nm">' + esc(p.name) + sub + '</span>'
         + '<span class="tt">' + val + '</span>'
         + (a ? '<span class="rkcaret' + (expanded ? ' open' : '') + '"></span>' : '') + '</div>';
       if (expanded && a) row += '<div class="evinline">' + renderReport(pi) + '</div>';
