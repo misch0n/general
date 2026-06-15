@@ -398,9 +398,10 @@ body.modal-open{ overflow:hidden; }
 .pn2 .pn-a{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pn2 .pn-b{ font-size:12px; letter-spacing:.5px; color:var(--gen-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:14px; }
 .pn2 .pn-persona{ color:var(--gen-brass); }
-.numpart{ font-family:var(--gen-font-display); font-weight:700; font-size:10px; letter-spacing:.5px; color:var(--gen-muted); margin-top:1px; font-variant-numeric:tabular-nums; }
-.numpart .np-cap{ text-transform:uppercase; opacity:.8; }
-.numpart.neg{ color:#e8807a; }
+.numpart{ display:flex; align-items:baseline; gap:5px; margin-top:1px; font-family:var(--gen-font-display); font-variant-numeric:tabular-nums; }
+.numpart .np-x{ font-weight:700; font-size:13px; }
+.numpart .np-x.pos{ color:#86c986; } .numpart .np-x.neg{ color:#e8807a; } .numpart .np-x.zero{ color:var(--gen-brass-bright); }
+.numpart .np-y{ font-size:9px; font-weight:600; letter-spacing:.5px; color:var(--gen-muted); }
 
 /* setup: add-button, reorder arrows, manual mode */
 .addbtn{ width:100%; margin-top:4px; }
@@ -623,7 +624,9 @@ body.modal-open{ overflow:hidden; }
 .numbar .nb-v{ font-family:var(--gen-font-display); font-weight:700; font-size:16px; color:var(--gen-brass); font-variant-numeric:tabular-nums; margin-left:auto; }
 .numbar.neg .nb-v, .numbar.neg .nb-sub{ color:#e8807a; }
 .numbar .nb-sub{ font-size:10px; color:var(--gen-muted); }
-.tile.up.neg .pts{ color:#e8807a; }
+/* experimental number-part tiles: colour the value by sign (red − / black 0 / green +) */
+.tile.up .pts.pos{ color:#1c7a1c; } .tile.up .pts.neg{ color:#b02525; } .tile.up .pts.zero{ color:var(--gen-canvas-ink); }
+.tile.low.fullspan{ grid-column:1 / -1; }   /* фул хаус spans both columns */
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
 /* archive ruleset tabs (Стандартен / Експериментален) */
@@ -3331,10 +3334,11 @@ body.modal-open{ overflow:hidden; }
     $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-b">' + (l2 || '&nbsp;') + '</span></span>';
     $('curPersona').classList.add('hidden'); $('curRibbons').innerHTML = '';   // persona inline; no ribbons
     $('curTotal').textContent = X.total(p);
-    // number part next to the total, in fine print
-    var st = G.upperStateExp(p.scores);
-    $('curNumPart').className = 'numpart' + (st.penalised || (!st.complete && st.subtotal < 0) ? ' neg' : '');
-    $('curNumPart').innerHTML = '<span class="np-cap">числа</span> ' + (st.penalised ? '−50' : (st.subtotal >= 0 ? '+' : '') + st.subtotal);
+    // number-part summary row beneath the total: ±X (red/gold/green) · Y/6 in fine print
+    var st = G.upperStateExp(p.scores), Xv = st.contribution;
+    var xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
+    $('curNumPart').className = 'numpart';
+    $('curNumPart').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-y">' + st.filled + '/6</span>';
     $('curNumPart').classList.remove('hidden');
     var filled = X.filledCount(p.scores);
     $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
@@ -3373,14 +3377,14 @@ body.modal-open{ overflow:hidden; }
     // ---- number part (deviation tiles) ----
     $('boardUpper').innerHTML = '';
     G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
-      var key = c.key, done = typeof sc[key] === 'number';
+      var key = c.key, done = typeof sc[key] === 'number', open = canScore && !done;
       var dev = done ? sc[key] : (canScore ? G.scoreForExp(key, dice) : null);
-      var neg = (done ? sc[key] : dev) < 0;
+      var val = done ? sc[key] : (open ? dev : null);
+      var sign = val == null ? '' : (val > 0 ? ' pos' : val < 0 ? ' neg' : ' zero');   // colour the number by value
       var el = document.createElement('button');
-      el.className = 'tile up' + (done ? ' done' : '') + (neg ? ' neg' : '');
-      var open = canScore && !done;
+      el.className = 'tile up' + (done ? ' done' : '');
       var pts = done ? sc[key] : (open ? (dev > 0 ? '+' + dev : dev) : '·');
-      el.innerHTML = '<span class="face-n">' + c.label + '</span><span class="pts' + (open ? ' upchip' : '') + '">' + pts + '</span>';
+      el.innerHTML = '<span class="face-n">' + c.label + '</span><span class="pts' + (open ? ' upchip' : '') + sign + '">' + pts + '</span>';
       if (open) el.onclick = function () { expCommit(key); };   // number rows take their (signed) deviation
       $('boardUpper').appendChild(el);
     });
@@ -3389,7 +3393,7 @@ body.modal-open{ overflow:hidden; }
     G.CATEGORIES_EXP.filter(function (c) { return c.group === 'lower'; }).forEach(function (c) {
       var key = c.key, done = typeof sc[key] === 'number';
       var row = document.createElement('div');
-      row.className = 'tile low' + (done ? ' done' : '') + (done && sc[key] === 0 ? ' void' : '');
+      row.className = 'tile low' + (done ? ' done' : '') + (done && sc[key] === 0 ? ' void' : '') + (key === 'fullHouse' ? ' fullspan' : '');
       var head = '<span class="cname">' + c.label + '</span>';
       if (done) { row.innerHTML = head + '<span class="lval">' + sc[key] + '</span>'; }
       else {
