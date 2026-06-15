@@ -261,18 +261,18 @@ body.modal-open{ overflow:hidden; }
 .modal h2{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.5px; color:var(--gen-brass); font-size:18px; margin:0 0 12px; }
 .modal .sub{ color:var(--gen-label); font-size:12px; margin:0 0 14px; }
 /* editable battle title (history detail): the title sits in a dashed box with a pencil */
-.overhead{ display:flex; align-items:center; gap:8px; margin:0 0 4px; }
+.overhead{ display:flex; align-items:flex-start; gap:10px; margin:0 0 12px; }
+.overhead .oh-titles{ flex:1; min-width:0; }
 .overhead h2{ margin:0; }
-.overhead.editable h2{ cursor:pointer; padding:4px 9px; border:1px dashed var(--gen-brass-stroke); border-radius:8px; background:rgba(255,255,255,.03); }
+.overhead.editable h2{ cursor:pointer; display:inline-block; padding:4px 9px; border:1px dashed var(--gen-brass-stroke); border-radius:8px; background:rgba(255,255,255,.03); }
 .overhead.editable h2:hover{ border-color:var(--gen-brass); }
-.titlepencil{ flex:none; width:24px; height:24px; position:relative; border:1px solid var(--gen-pill-line); border-radius:6px; background:transparent; cursor:pointer; }
-.titlepencil:hover{ border-color:var(--gen-brass); }
-/* CSS-drawn pencil: a slanted brass body with a dark nib */
-.titlepencil::before{ content:''; position:absolute; left:7px; top:4px; width:5px; height:13px; background:var(--gen-brass); border-radius:1px;
-  transform:rotate(45deg); box-shadow:inset 0 0 0 1px rgba(0,0,0,.35); }
-.titlepencil::after{ content:''; position:absolute; left:5px; bottom:4px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent;
-  border-top:5px solid var(--gen-text); transform:rotate(45deg); }
-.oversubdate{ color:var(--gen-muted); font-size:11px; letter-spacing:.4px; margin:0 0 12px; font-variant-numeric:tabular-nums; }
+.oh-x{ flex:none; width:30px; height:30px; border-radius:7px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-muted);
+  font-size:15px; line-height:1; cursor:pointer; display:grid; place-items:center; }
+.oh-x:hover{ border-color:var(--gen-brass); color:var(--gen-brass); }
+.oversubdate{ color:var(--gen-muted); font-size:11px; letter-spacing:.4px; margin:4px 0 0; font-variant-numeric:tabular-nums; }
+/* the summary header stays pinned at the top while the rest scrolls beneath it */
+#overModal .modal{ padding-top:0; }
+#overHead{ position:sticky; top:0; z-index:6; background:var(--gen-ink); margin:0 -18px 12px; padding:18px 18px 10px; }
 .titlerename{ font-family:var(--gen-font-display); font-weight:700; font-size:17px; color:var(--gen-text); letter-spacing:.5px;
   padding:4px 9px; border:1px solid var(--gen-brass); border-radius:8px; background:rgba(0,0,0,.3); width:100%; max-width:240px; }
 .titlerename:focus{ outline:none; }
@@ -366,6 +366,8 @@ body.modal-open{ overflow:hidden; }
 /* coloured stat lines (laser-scannable labels + numbers) */
 .evstat{ font-size:11.5px; color:var(--gen-label); margin:4px 0; line-height:1.45; }
 .evstat .slbl{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; }
+/* tappable explainer term: a light dotted underline accent (section labels + EV references) */
+.xterm{ text-decoration:underline; text-decoration-style:dotted; text-decoration-color:rgba(232,225,200,.5); text-underline-offset:2px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .np{ color:#9bd17e; font-weight:700; } .nn{ color:#e8807a; font-weight:700; } .nu{ color:var(--gen-brass-bright); font-weight:700; }
 /* playstyle fingerprint chip (colour = the archetype) — legacy alias */
 .stylechip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px;
@@ -803,7 +805,6 @@ body.modal-open{ overflow:hidden; }
 .qmark{ width:18px; height:18px; flex:none; display:grid; place-items:center; border-radius:50%; font-family:var(--gen-font-body);
   font-weight:700; font-size:11px; color:var(--gen-ink); background:var(--gen-brass); border:none; cursor:pointer; }
 .qmark:hover{ background:var(--gen-brass-bright); }
-.over-qmark{ float:right; width:26px; height:26px; font-size:14px; }
 .ownerbubble{ margin-top:9px; padding:9px 11px; border-radius:9px; background:var(--gen-brass-bright); color:var(--gen-ink);
   font-size:11.5px; line-height:1.45; cursor:pointer; box-shadow:0 5px 14px rgba(0,0,0,.4); }
 .ownerbubble b{ font-weight:700; }
@@ -1292,12 +1293,13 @@ body.modal-open{ overflow:hidden; }
 <!-- game over -->
 <div id="overModal" class="overlay hidden">
   <div class="modal">
-    <button id="reportHelp" class="qmark over-qmark" title="Как се чете рапортът?">?</button>
     <div id="overHead" class="overhead">
-      <h2 id="overTitle">🏆 Край на битката</h2>
-      <button type="button" id="overTitleEdit" class="titlepencil hidden" title="Преименувай битката" aria-label="Преименувай битката"></button>
+      <div class="oh-titles">
+        <h2 id="overTitle">🏆 Край на битката</h2>
+        <div id="overSubdate" class="oversubdate hidden"></div>
+      </div>
+      <button type="button" id="overClose" class="oh-x" title="Затвори" aria-label="Затвори">✕</button>
     </div>
-    <div id="overSubdate" class="oversubdate hidden"></div>
     <div id="winHeadline" class="winhead"></div>
     <div id="winBadges" class="winbadges"></div>
     <div class="tabs tabs4">
@@ -1311,9 +1313,6 @@ body.modal-open{ overflow:hidden; }
     <div id="ranks"></div>
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
-      <button id="shareCard" class="btn">📤 Сподели</button>
-      <button id="overExport" class="btn hidden"><span class="ic ic-up"></span>Експорт</button>
-      <button id="overBack" class="btn hidden">← Архив</button>
       <button id="overUndo" class="btn hidden">ОПА!</button>
       <button id="playAgain" class="btn primary">↻ Нов набор</button>
     </div>
@@ -3804,50 +3803,12 @@ body.modal-open{ overflow:hidden; }
       + '<p class="ht">Режим за игра на маса с истински зарове: удряш долу <b>петте зара</b> от хвърлянето си и таблото само ти предлага всички възможни категории — избираш една, точно както в нормална игра. Така не пропускаш комбинация и щабът пак ти прави рапорт накрая. <b>ОПА!</b> връща назад действие по действие.</p>';
   }
   // the analytics-reading guide now lives behind the «?» on the end-game screen
-  function buildReportHelp() {
-    // term colours mirror the summary: късмет = green, решения = brass-orange, числа = brass,
-    // грешка/издънка = red — kept in sync with RC + np/nn/nu and the verdict tints
-    var cLuck = 'color:#9bd17e', cSkill = 'color:#e8b06a', cNum = 'color:var(--gen-brass-bright)', cBad = 'color:#e8807a';
-    var exp = sumExp();   // experimental summaries carry extra fields (Раздели + the −50 number part)
-    return '<h2>📋 Как се чете обобщението</h2>'
-      + '<div class="evexplain" style="margin-bottom:12px"><div class="evxhd">❔ Какво е EV?</div>'
-      + '<p><b style="' + cNum + '">EV (очаквана стойност)</b> = средно колко точки носи едно решение, ако се изиграе безброй пъти. '
-      + 'Щабът сравнява твоя ход с най-добрия възможен: разликата е „<b>загуба EV</b>“ — точките, които си оставил на масата. '
-      + 'Така отделяме <b style="' + cLuck + '">късмета</b> (какво ти дадоха заровете) от <b style="' + cSkill + '">уменията</b> (какво направи с тях).</p></div>'
-      + '<p class="ht"><b>Горе:</b> кой спечели и с колко, плюс <b>присъда</b> — '
-      + '<b style="' + cLuck + '">тотална</b> / <b style="' + cNum + '">заслужена</b> / <b style="' + cBad + '">късметлийска</b> '
-      + '(сравнява победителя с най-добрия по умение). Малките значки са акценти (докосни всяка за обяснение): '
-      + '🎯 Тактик (умение) · 🍀 Късметлия (заровете) · 📋 Майстор на категориите (най-много рекорди).</p>'
-      + '<p class="ht"><b>Разделите (горе):</b> <b style="' + cNum + '">Класиране</b> по точки · '
-      + '<b style="' + cSkill + '">Умение</b> по оптимална игра · <b style="' + cLuck + '">Късмет</b> с графика ход-по-ход и '
-      + 'резултат „без късмет“ · <b style="' + cNum + '">Категории</b> — таблото, всяка клетка с % вкарали и рекорда, в цвета на рекордьора. '
-      + 'Във всеки раздел можеш да <b>отвориш играч</b> за пълния му рапорт.</p>'
-      + '<p class="ht"><b>В рапорта на играч:</b></p>'
-      + '<ul class="htlist">'
-      + '<li><b style="' + cNum + '">Норма</b> — колко точки би вкарал перфектен играч средно (целта).</li>'
-      + '<li><b style="' + cLuck + '">Късмет</b> — колко ти дадоха или взеха заровете спрямо средното (плюс = вървя ти, минус = прецакаха те). Средно е нула.</li>'
-      + '<li><b style="' + cSkill + '">Решения</b> — колко точки си изпуснал заради грешни избори (винаги ≤ 0).</li>'
-      + '<li><b>норма + късмет + решения = крайният ти резултат.</b></li>'
-      + '<li><b style="' + cLuck + '">Без късмет</b> = резултат − късмет — точките, които идват само от решенията ти.</li>'
-      + '<li><b style="' + cNum + '">Оптимално %</b> — какъв процент от ходовете са били оптималните; чинът ти отразява това.</li>'
-      + (exp ? '<li><b style="' + cNum + '">Раздели</b> — как се представи всяка половина на листа: <b>числа</b> (числовата част, ±; <b style="' + cBad + '">−50</b> ако сборът ѝ е минус) и <b>комбинации</b>, плюс изтичането на точки за всяка.</li>' : '')
-      + '<li><b style="' + cSkill + '">🎯 Поработи над…</b> — една препоръка за тази игра, събрана от изтичането/издънките/етапите.</li>'
-      + '<li><b style="' + cLuck + '">Най-добър ход</b> / <b style="' + cBad + '">Най-скъпа грешка</b> — върховият ти момент и най-скъпата издънка.</li>'
-      + '<li><b>Стил</b> — щабът ти лепва досие: Хирург, Комарджия, Чиновник, Късметлия…</li>'
-      + '<li><b>Ход по ход</b> — разгъни го за пълния разбор; всеки ред показва точки, после две EV числа — '
-      + '<b style="' + cLuck + '">късмет</b> (ляво) и <b style="' + cSkill + '">избор</b> (дясно) — плюс оценка: '
-      + '👍👍 върхов · 👍 окей · 👎 слаб · 👎👎 издънка — <b>докосни оценката</b> за конкретен съвет какво е можело по-добре. Удебелените зарове са задържаните между хвърлянията; '
-      + '<b style="' + cBad + '">жертваните комбинации</b> са в червено.</li>'
-      + '</ul>';
-  }
   var combosFromHowto = false;   // came into the combo sheet via the how-to page?
   function openHowto() {
     $('howtoBody').innerHTML = buildHowTo();
     $('howtoCombos').onclick = function () { combosFromHowto = true; $('howtoModal').classList.add('hidden'); openCombos(); };
     $('howtoModal').classList.remove('hidden');
   }
-  function openReportHelp() { $('howtoBody').innerHTML = buildReportHelp(); $('howtoModal').classList.remove('hidden'); }
-  $('reportHelp').onclick = openReportHelp;
   $('howtoBtn').onclick = openHowto;
   $('howtoClose').onclick = function () { $('howtoModal').classList.add('hidden'); };
   $('howtoModal').onclick = function (e) { if (e.target === $('howtoModal')) $('howtoModal').classList.add('hidden'); };
@@ -4307,7 +4268,7 @@ body.modal-open{ overflow:hidden; }
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
-    dossierCtx = null; currentHistRec = null; $('overExport').classList.add('hidden'); // live game (history re-sets after)
+    dossierCtx = null; currentHistRec = null; // live game (history re-sets after)
     // sel = -1: nobody expanded by default (tap a player to reveal details); chartOpen: graph expanded
     summary = { winner: winner, ordered: ordered, ana: analysisByPlayer, tab: 'stand', sel: -1, chartOpen: true };
     summary.meta = computeSummaryMeta();   // §1 winner/skill/luck leaders + category board
@@ -4337,17 +4298,17 @@ body.modal-open{ overflow:hidden; }
   // date/time subline when reviewing an archived battle
   function setOverTitle() {
     var rec = viewingHistory ? currentHistRec : null;
-    var head = $('overHead'), title = $('overTitle'), pencil = $('overTitleEdit'), sub = $('overSubdate');
+    var head = $('overHead'), title = $('overTitle'), sub = $('overSubdate');
     if (!rec) {
-      head.classList.remove('editable'); pencil.classList.add('hidden'); sub.classList.add('hidden');
-      title.textContent = '🏆 Край на битката';
+      head.classList.remove('editable'); sub.classList.add('hidden');
+      title.textContent = '🏆 Край на битката'; title.onclick = null;
       return;
     }
-    head.classList.add('editable'); pencil.classList.remove('hidden');
+    // history: the title doubles as a rename box on tap (no pencil — the box itself implies it)
+    head.classList.add('editable');
     title.textContent = rec.name || 'Край на битката';
     sub.textContent = fmtDate(rec.ts) + ' · ' + fmtTime(rec.ts); sub.classList.remove('hidden');
     title.onclick = function () { startRename(rec); };
-    pencil.onclick = function () { startRename(rec); };
   }
   function startRename(rec) {
     var title = $('overTitle');
@@ -4376,105 +4337,7 @@ body.modal-open{ overflow:hidden; }
     if (r) { if (name) r.name = name; else delete r.name; persistHistory(arr); }
   }
 
-  // §1.10 DA-19 — share the summary as an image. Primary: a pixel capture of the
-  // ACTUAL summary panel exactly as shown (incl. an expanded player), via
-  // DOM → SVG <foreignObject> → canvas. Falls back to a hand-drawn card if the
-  // browser taints the canvas or the capture fails.
-  function shareSelected() {
-    if (!summary) return;
-    try { captureSummaryPanel(); } catch (e) { shareCardFallback(); }
-  }
-  function captureSummaryPanel() {
-    var modal = document.querySelector('#overModal .modal');
-    if (!modal || !document.createElement('canvas').getContext) { shareCardFallback(); return; }
-    var w = modal.clientWidth, h = modal.scrollHeight, scale = 2;
-    var clone = modal.cloneNode(true);
-    ['#reportHelp', '#shareCard', '.setup-actions'].forEach(function (sel) { var el = clone.querySelector(sel); if (el) el.parentNode.removeChild(el); });
-    clone.style.margin = '0'; clone.style.maxHeight = 'none'; clone.style.width = w + 'px'; clone.style.overflow = 'visible';
-    var css = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.textContent; }).join('\n');
-    var xml = new XMLSerializer().serializeToString(clone);
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
-      + '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '">'
-      + '<div xmlns="http://www.w3.org/1999/xhtml"><style>' + css + '</style>' + xml + '</div></foreignObject></svg>';
-    var img = new Image();
-    img.onload = function () {
-      var canvas = document.createElement('canvas'); canvas.width = w * scale; canvas.height = h * scale;
-      var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0e0f08'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      try { canvas.toBlob(function (blob) { blob ? deliverShare(blob) : shareCardFallback(); }, 'image/png'); }
-      catch (e) { shareCardFallback(); }
-    };
-    img.onerror = function () { shareCardFallback(); };
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-  }
-  function deliverShare(blob) {
-    var file = new File([blob], 'general.png', { type: 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: 'Генерал — край на битката' }).catch(function () {});
-    else { var url = URL.createObjectURL(blob), el = document.createElement('a'); el.href = url; el.download = 'general.png'; el.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1500); }
-  }
-  // fallback: a hand-drawn card of the selected player's result
-  function shareCardFallback() {
-    if (!summary) return;
-    var pi = summary.sel >= 0 ? summary.sel : summary.meta.winIdx;
-    var p = game.players[pi], a = summary.ana[pi];
-    var place = summary.ordered.indexOf(p) + 1, n = game.players.length;
-    var rank = G.rankForPlacement(place - 1, n), tot = total(p);
-    var W = 720, H = 940, c = document.createElement('canvas'); c.width = W; c.height = H;
-    var x = c.getContext('2d'), cx = W / 2;
-    if (!x) return;                                   // no canvas (shouldn't happen in a browser)
-    x.fillStyle = '#15160e'; x.fillRect(0, 0, W, H);
-    x.strokeStyle = '#b8923a'; x.lineWidth = 8; x.strokeRect(16, 16, W - 32, H - 32);
-    x.textAlign = 'center';
-    x.fillStyle = '#b8923a'; x.font = '700 30px Georgia, serif'; x.fillText('★ ГЕНЕРАЛ ★', cx, 92);
-    x.fillStyle = '#9a9476'; x.font = '600 22px Arial, sans-serif';
-    x.fillText('КРАЙ НА БИТКАТА', cx, 130);
-    // player name in their colour
-    x.fillStyle = p.color; x.font = '800 56px Arial, sans-serif';
-    x.fillText(p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name, cx, 230);
-    // rank badge
-    x.fillStyle = '#b8923a'; x.font = '700 30px Georgia, serif'; x.fillText(rank.toUpperCase(), cx, 296);
-    // result line
-    x.fillStyle = '#e8e2c8'; x.font = '700 40px Arial, sans-serif';
-    x.fillText(tot + ' точки · ' + place + '/' + n + ' място', cx, 380);
-    // stat tiles
-    var tiles = [['Точки', String(tot)]];
-    if (a) {
-      tiles.push(['Оптимално', Math.round(a.accuracy * 100) + '%']);
-      if (!a.manual && typeof a.luck === 'number') tiles.push(['Без късмет', String(Math.round(tot - a.luck))]);
-    }
-    if ((p.scores.general || 0) > 0) tiles.push(['Генерал', String(p.scores.general)]);
-    var tw = 300, th = 92, gap = 24, cols = 2, startY = 440;
-    tiles.slice(0, 4).forEach(function (t, i) {
-      var col = i % cols, row = Math.floor(i / cols);
-      var tx = cx - (cols * tw + (cols - 1) * gap) / 2 + col * (tw + gap), ty = startY + row * (th + gap);
-      x.fillStyle = 'rgba(255,255,255,.05)'; roundRect(x, tx, ty, tw, th, 12); x.fill();
-      x.strokeStyle = 'rgba(184,146,58,.5)'; x.lineWidth = 2; roundRect(x, tx, ty, tw, th, 12); x.stroke();
-      x.fillStyle = '#9a9476'; x.font = '600 20px Arial, sans-serif'; x.fillText(t[0], tx + tw / 2, ty + 34);
-      x.fillStyle = '#e8c356'; x.font = '800 38px Arial, sans-serif'; x.fillText(t[1], tx + tw / 2, ty + 74);
-    });
-    // a roast / brag at the bottom
-    var pool = place === 1 ? (G.ROASTS.risk || []) : (G.ROASTS.fail || G.ROASTS.flop || []);
-    var quip = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '';
-    x.fillStyle = '#c8c2a8'; x.font = 'italic 600 26px Georgia, serif';
-    wrapText(x, '„' + quip + '“', cx, H - 150, W - 120, 34);
-    x.fillStyle = '#6b6754'; x.font = '500 20px Arial, sans-serif';
-    x.fillText(fmtDate(Date.now()), cx, H - 56);
-
-    c.toBlob(function (blob) { if (blob) deliverShare(blob); }, 'image/png');
-  }
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
-  }
-  function wrapText(ctx, text, cx, y, maxW, lh) {
-    var words = String(text).split(' '), line = '', lines = [];
-    words.forEach(function (w) { var t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; });
-    if (line) lines.push(line);
-    lines.slice(0, 3).forEach(function (l, i) { ctx.fillText(l, cx, y + i * lh); });
-  }
-  $('shareCard').onclick = shareSelected;
-  $('overExport').onclick = function () { if (currentHistRec) chooseMethod('Изнеси играта', function () { exportGame(currentHistRec); }, function () { acousticSend(currentHistRec); }); };
+  // (share-as-image, the report-help ? window, and the export/back summary buttons were removed)
 
   $('tabStand').onclick = function () { if (summary) { summary.tab = 'stand'; renderSummary(); } };
   $('tabSkill').onclick = function () { if (summary) { summary.tab = 'skill'; renderSummary(); } };
@@ -4614,6 +4477,13 @@ body.modal-open{ overflow:hidden; }
     g.style.top = (below + g.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - g.offsetHeight - 8)) + 'px';
   }
   $('medalTip').onclick = function () { $('medalTip').classList.add('hidden'); };
+  // tap any underlined term (section label / EV reference) → a dismissible „how to read it" bubble
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('.xterm'); if (!t) return;
+    e.stopPropagation();
+    var html = EXPLAIN[t.getAttribute('data-x')];
+    if (html) showMedalTip(t, html);
+  });
 
   function renderSummary() {
     var n = game.players.length, m = summary.meta, tab = summary.tab, ana = summary.ana, idx = function (p) { return game.players.indexOf(p); };
@@ -4894,13 +4764,46 @@ body.modal-open{ overflow:hidden; }
     return '<b class="' + (near ? 'nu' : v > 0 ? 'np' : 'nn') + '">' + signed(v, d) + (unit ? ' ' + unit : '') + '</b>';
   }
 
-  // a coloured stat line: laser-scannable label + body (body carries .np/.nn/.nu numbers)
-  function stat(label, color, body) {
-    return '<div class="evstat"><span class="slbl" style="color:' + color + '">' + label + ':</span> ' + body + '</div>';
+  // ---- tappable explainer terms ----------------------------------------------
+  // section labels (and EV references) carry a light underline and pop a „how to
+  // read this" bubble on tap; the label→key map auto-tags every stat()/statRows()
+  var TERM_KEY = {
+    'Изтичане': 'leak', 'Избор на категория': 'leak', 'Раздели': 'razdeli', 'Издънки': 'sev',
+    'Късмет': 'luck', 'Изнервяне': 'nerves', 'Спасения': 'bail', 'Нули': 'zero', 'По етапи': 'stages',
+    'Чин': 'chin', 'Личен рекорд': 'pr', 'Генерали': 'generali', 'Постоянство': 'consist',
+    'Развитие': 'razvitie', 'Най-голяма издънка': 'sev', 'Постижения': 'achievements',
+  };
+  var EXPLAIN = {
+    ev: '<b>EV (очаквана стойност)</b> — средно колко точки носи едно решение при безброй повторения. Щабът сравнява хода ти с най-добрия възможен; разликата е „<b>загуба EV</b>“ — точките, оставени на масата. Така <span class="luck">късметът</span> (заровете) се отделя от <span class="skill">решенията</span> (какво направи с тях).',
+    norma: '<b>Норма</b> — колко точки би вкарал перфектен играч средно. Целта, спрямо която се мери всичко.',
+    luck: '<span class="luck"><b>Късмет</b></span> — колко ти дадоха или взеха заровете спрямо средното. Плюс = вървя ти, <b class="nn">минус</b> = прецакаха те. Средно е нула.',
+    skill: '<span class="skill"><b>Решения</b></span> — точките, изпуснати заради неоптимални избори (винаги ≤ 0). По-близо до нула = по-чиста игра.',
+    noluck: '<b>Без късмет</b> — резултат минус късмет: точките, които идват само от решенията ти.',
+    acc: '<b>Оптимално %</b> — какъв дял от ходовете ти са били най-добрите възможни. Чинът отразява това.',
+    leak: '<b>Изтичане</b> — точки EV, които изтичат при задържането на заровете и при избора на категория, и къде губиш повече.',
+    razdeli: '<b>Раздели</b> — как се представи всяка половина на листа: <b>числа</b> (числовата част, ±; <b class="nn">−50</b> ако сборът ѝ е минус) и <b>комбинации</b>, плюс изтичането за всяка.',
+    sev: '<b>Издънки</b> — грешките по тежест: дребни, сериозни и <b class="nn">фатални</b>. Една рядка едра грешка тежи повече от много дребни.',
+    nerves: '<b>Изнервяне</b> — дали след гадно хвърляне играеш по-зле. Показва дали губиш самообладание под лош късмет.',
+    bail: '<b>Спасения</b> — когато първото хвърляне счупи плана: колко добре превключваш към нов, вместо да се инатиш.',
+    zero: '<b>Нули</b> — нулираните полета: общо, <b>принудени</b> (нищо не върви) и <b class="nn">по твоя вина</b>.',
+    stages: '<b>По етапи</b> — средно изпуснати точки на ход в началото, средата и края на играта. Показва кога играеш най-слабо.',
+    chin: '<b>Чин</b> — средният ти чин по умение през игрите, процентът победи и средното ти място.',
+    pr: '<b>Личен рекорд</b> — най-добрият ти резултат, средният резултат и средният късмет през архива.',
+    generali: '<b>Генерали</b> — в колко от битките си хвърлял Генерал (пет еднакви).',
+    consist: '<b>Постоянство</b> — колко стабилни са резултатите и точността ти (± разсейване около средното).',
+    razvitie: '<b>Развитие</b> — накъде върви точността ти през игрите: качваш ли се, спадаш или си стабилен.',
+    achievements: '<b>Постижения</b> — категориите, в които най-често правиш върхови, оптимални ходове.',
+  };
+  function xterm(label, key) { return '<span class="xterm" data-x="' + key + '">' + label + '</span>'; }
+  function slbl(label, color) {
+    var key = TERM_KEY[label];
+    return '<span class="slbl' + (key ? ' xterm" data-x="' + key + '"' : '"') + ' style="color:' + color + '">' + label + ':</span>';
   }
+  // a coloured stat line: laser-scannable label + body (body carries .np/.nn/.nu numbers)
+  function stat(label, color, body) { return '<div class="evstat">' + slbl(label, color) + ' ' + body + '</div>'; }
   // same, but each item drops onto its own indented row
   function statRows(label, color, rows) {
-    return '<div class="evstat"><span class="slbl" style="color:' + color + '">' + label + ':</span>'
+    return '<div class="evstat">' + slbl(label, color)
       + '<div class="stlist">' + rows.map(function (r) { return '<div>' + r + '</div>'; }).join('') + '</div></div>';
   }
   function nSigned(v, d) { var s = signed(v, d); return '<b class="' + (v >= 0 ? 'np' : 'nn') + '">' + s + '</b>'; } // ±, green/red
@@ -5012,9 +4915,9 @@ body.modal-open{ overflow:hidden; }
     if (!fa.manual) {
       var tot = fpTotal, luckShown = Math.round(fa.luck), skillShown = Math.round(fa.skill);
       var parShown = tot - luckShown - skillShown;
-      html += '<div class="evline"><b>' + parShown + '</b> норма '
-        + '<span class="luck">' + signed(luckShown) + ' късмет</span> '
-        + '<span class="skill">' + signed(skillShown) + ' решения</span> → <b>' + tot + '</b></div>';
+      html += '<div class="evline"><b>' + parShown + '</b> ' + xterm('норма', 'norma') + ' '
+        + '<span class="luck">' + signed(luckShown) + ' ' + xterm('късмет', 'luck') + '</span> '
+        + '<span class="skill">' + signed(skillShown) + ' ' + xterm('решения', 'skill') + '</span> → <b>' + tot + '</b></div>';
     }
 
     // §5 playstyle box: stylised persona + Генерал badge, optimal% (right), description, avg EV/turn
@@ -5024,9 +4927,9 @@ body.modal-open{ overflow:hidden; }
     html += '<div class="stylebox"><div class="styhead"><div class="styleft">'
       + (st ? '<span class="stychip" style="background:' + st.color + '">' + esc(st.name) + '</span>' : '')
       + genBadge + '</div>'
-      + '<span class="styopt"><b class="nu">' + Math.round(fa.accuracy * 100) + '%</b></span></div>'
+      + '<span class="styopt">' + xterm('<b class="nu">' + Math.round(fa.accuracy * 100) + '%</b>', 'acc') + '</span></div>'
       + (st ? '<div class="stydesc">' + esc(st.desc) + '</div>' : '')
-      + '<div class="stymetrics">средно ' + nBad(fa.avgLostPerTurn, 1) + ' т. EV/ход загуба</div></div>';
+      + '<div class="stymetrics">средно ' + nBad(fa.avgLostPerTurn, 1) + ' т. ' + xterm('EV/ход', 'ev') + ' загуба</div></div>';
 
     // §1.8 DA-16 (game) — one synthesised "work on X" prescription for THIS game
     html += '<div class="coachline">' + coachLine(fa) + '</div>';
@@ -5134,8 +5037,8 @@ body.modal-open{ overflow:hidden; }
       var genRow = td.category === 'general' && td.score > 0;   // Генерал rolled — flag the event
       var forfeit = td.score === 0;                              // нулирана/жертвана комбинация
       // luck then decision (no letters; left = късмет, right = избор)
-      var ev = '<span class="tev">' + (fa.manual ? '' : '<span class="tl" title="късмет (EV)">' + evNum(td.luck) + '</span>')
-        + '<span class="tl" title="избор (EV)">' + evNum(td.skill) + '</span></span>';
+      var ev = '<span class="tev">' + (fa.manual ? '' : '<span class="tl xterm" data-x="ev" title="късмет (EV)">' + evNum(td.luck) + '</span>')
+        + '<span class="tl xterm" data-x="ev" title="избор (EV)">' + evNum(td.skill) + '</span></span>';
       html += '<div class="evtrow ' + q.cls + (genRow ? ' q-general' : '') + '">'
         + '<span class="tn">Х' + (td.turn + 1) + '</span>'
         + '<span class="tc' + (forfeit ? ' forfeit' : '') + '">' + esc(sumLabel(td.category)) + '</span>'
@@ -5208,18 +5111,23 @@ body.modal-open{ overflow:hidden; }
     // §2.5 dossier context: viewing a PAST owner game → annotate its report with deltas
     var oi = recOwnerIdx(rec);
     dossierCtx = (oi >= 0 && !rec.players[oi].isAI) ? { ownerPi: oi, career: computeOwnerCareer(rec.ruleset) } : null;
-    currentHistRec = rec; $('overExport').classList.remove('hidden');  // export is active only from history
+    currentHistRec = rec;
     setOverTitle();   // editable title + date/time subline for the archived battle
-    $('overBack').classList.remove('hidden'); $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
+    $('playAgain').classList.add('hidden'); $('overUndo').classList.add('hidden');
   }
   function exitHistoryGame(toArchive) {
     $('overModal').classList.add('hidden');
-    $('overBack').classList.add('hidden'); $('playAgain').classList.remove('hidden');
+    $('playAgain').classList.remove('hidden');
     if (histSnapshot) { game = histSnapshot.game; moveLog = histSnapshot.moveLog; manualMode = histSnapshot.manualMode; summary = histSnapshot.summary; undoStack = histSnapshot.undo; histSnapshot = null; }
     viewingHistory = false; dossierCtx = null;
     if (toArchive) openHistory();
   }
-  $('overBack').onclick = function () { exitHistoryGame(true); };
+  // the header ✕ closes the summary: back to the archive when reviewing history,
+  // otherwise (a live end screen) back to the muster
+  $('overClose').onclick = function () {
+    if (viewingHistory) { exitHistoryGame(true); return; }
+    $('overModal').classList.add('hidden'); $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
+  };
 
   // ---------- §8 replay viewer (turn-by-turn + roll-by-roll, scrubbable) ----------
   var replay = null;
@@ -5383,7 +5291,7 @@ body.modal-open{ overflow:hidden; }
   document.addEventListener('click', function (e) {
     var g = $('medalTip'); if (g.classList.contains('hidden')) return;
     var t = e.target;
-    if (g.contains(t) || (t && t.closest && t.closest('.wbadge'))) return;
+    if (g.contains(t) || (t && t.closest && (t.closest('.wbadge') || t.closest('.xterm')))) return;
     g.classList.add('hidden');
   });
   // tap outside the throw/keep chooser (and not on the ? button) closes it
@@ -6058,6 +5966,7 @@ body.modal-open{ overflow:hidden; }
   $('methodClose').onclick = function () { $('methodModal').classList.add('hidden'); };
   $('methodModal').onclick = function (e) { if (e.target === $('methodModal')) $('methodModal').classList.add('hidden'); };
   function openHistory() {
+    histTab = (settings.ruleset === 'experimental') ? 'experimental' : 'standard';   // default to the active ruleset
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
     $('historyModal').classList.remove('hidden');
