@@ -862,12 +862,13 @@ body.modal-open{ overflow:hidden; }
 .ho-sum{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
 .ho-sum::-webkit-details-marker{ display:none; }
 .ho-sum::before{ content:''; flex:none; width:9px; }   /* mirrors the caret so the head sits truly centred */
-.ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:9px; }
+.ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.ho-avgwrap{ display:inline-flex; flex-direction:column; align-items:center; gap:9px; }   /* shrinks to the averages width */
+.ho-winbar{ display:flex; width:70%; height:6px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.06); }   /* win/lose ratio separator */
+.ho-winbar .wb-win{ background:#5fa85f; } .ho-winbar .wb-lose{ background:#c0453b; }
 .ho-sum .ho-mini{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 24px; font-family:var(--gen-font-display); }
 .ho-sum .ho-mini .hom-cell{ display:flex; flex-direction:column; align-items:center; gap:6px; line-height:1; }
 .ho-sum .ho-mini b{ font-size:17px; font-weight:800; color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
-.ho-sum .ho-mini .hom-num{ display:inline-flex; align-items:baseline; gap:3px; }
-.ho-sum .ho-mini .hom-win{ font-size:9px; font-weight:600; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
 .ho-sum .ho-mini i{ font-size:7px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-muted); font-style:normal; white-space:nowrap; }
 .ho-sum .ho-caret{ flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted); transform:rotate(45deg); transition:transform .15s; }
 .histover[open] .ho-sum .ho-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
@@ -931,7 +932,7 @@ body.modal-open{ overflow:hidden; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
 .histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-brass); display:grid; place-items:center; }
 .histgame .hg-exp:hover{ border-color:var(--gen-brass); }
-.histmore{ display:flex; justify-content:center; margin:12px 0 4px; }
+.histmore{ display:flex; justify-content:center; margin:14px 0 22px; }
 .histmore-btn{ padding:9px 22px; border-radius:9px; font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.4px; text-transform:uppercase;
   color:var(--gen-brass); background:rgba(255,255,255,.04); border:1px solid var(--gen-brass-stroke); cursor:pointer; }
 .histmore-btn:hover{ border-color:var(--gen-brass); }
@@ -943,8 +944,8 @@ body.modal-open{ overflow:hidden; }
 .calicon:hover{ border-color:var(--gen-brass); }
 .calicon .cal-tab{ position:relative; width:18px; height:16px; border:2px solid var(--gen-brass); border-top:0; border-radius:0 0 3px 3px; box-sizing:border-box; }
 .calicon .cal-tab::before{ content:''; position:absolute; left:-2px; right:-2px; top:0; height:5px; background:var(--gen-brass); border-radius:2px 2px 0 0; }
-.calicon .cal-tab::after{ content:''; position:absolute; left:2px; top:8px; width:2px; height:2px; background:var(--gen-brass);
-  box-shadow:4px 0 0 var(--gen-brass), 8px 0 0 var(--gen-brass), 0 4px 0 var(--gen-brass), 4px 4px 0 var(--gen-brass), 8px 4px 0 var(--gen-brass); }
+.calicon .cal-tab::after{ content:''; position:absolute; left:50%; top:8px; transform:translateX(-50%); width:2px; height:2px; background:var(--gen-brass);
+  box-shadow:-5px 0 0 var(--gen-brass), 5px 0 0 var(--gen-brass), -5px 4px 0 var(--gen-brass), 0 4px 0 var(--gen-brass), 5px 4px 0 var(--gen-brass); }
 /* calendar modal — git-style activity heatmap (above the archive modal) */
 #calModal{ z-index:55; }
 .calmodal{ width:360px; }
@@ -5616,15 +5617,19 @@ body.modal-open{ overflow:hidden; }
       return '<i class="rk ' + cls + '">' + d.place + '</i>';
     }).join('');
 
-    // collapsed: just the headline trio; everything else lives in the expandable body.
-    // the owner name carries the старшина's default colour.
+    // collapsed: name, a win/lose ratio bar, then the averages trio. Everything else
+    // lives in the expandable body. The owner name carries the старшина's default colour.
+    var losses = Math.max(0, n - c.wins);
     var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
       + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">' + esc(name) + '</span>'
+      + '<span class="ho-avgwrap">'
+      + '<span class="ho-winbar" title="' + Math.round(100 * c.wins / n) + '% победи · ' + Math.round(100 * losses / n) + '% загуби">'
+      + '<i class="wb-win" style="flex:' + c.wins + '"></i><i class="wb-lose" style="flex:' + losses + '"></i></span>'
       + '<span class="ho-mini">'
       + '<span class="hom-cell"><b>' + n + '</b><i>битки</i></span>'
-      + '<span class="hom-cell"><span class="hom-num"><b>' + c.wins + '</b><span class="hom-win">' + Math.round(100 * c.wins / n) + '%</span></span><i>победи</i></span>'
-      + '<span class="hom-cell"><b>' + Math.round(c.avgAcc * 100) + '%</b><i>% точност</i></span>'
-      + '</span>'
+      + '<span class="hom-cell"><b>' + c.wins + '</b><i>победи</i></span>'
+      + '<span class="hom-cell"><b>' + Math.round(c.avgAcc * 100) + '%</b><i>точност</i></span>'
+      + '</span></span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     // §2.7 per-battle form charts sit at the TOP of the body — three collapsible buttons
     h += buildOwnerCharts(c, rs === 'experimental' ? 'exp' : 'std');
