@@ -852,16 +852,19 @@ body.modal-open{ overflow:hidden; }
 .cp-empty{ text-align:center; font-size:12px; color:var(--gen-muted); padding:10px; }
 /* archive (history) */
 .histover{ padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); margin-bottom:12px; }
-.histover .oname{ display:flex; align-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px;
+.histover .oname{ display:flex; justify-content:center; align-items:center; text-align:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px;
   color:var(--gen-brass); font-size:17px; }
-/* collapsible owner dossier: NAME on top, the headline trio (bigger, bolder) below */
+/* collapsible owner dossier: NAME centred on top, the averages centred below */
 .ho-sum{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
 .ho-sum::-webkit-details-marker{ display:none; }
-.ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
-.ho-sum .ho-mini{ display:flex; flex-wrap:wrap; gap:8px 18px; font-family:var(--gen-font-display); }
-.ho-sum .ho-mini .hom-cell{ display:flex; flex-direction:column; align-items:center; line-height:1.1; }
+.ho-sum::before{ content:''; flex:none; width:9px; }   /* mirrors the caret so the head sits truly centred */
+.ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:9px; }
+.ho-sum .ho-mini{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 24px; font-family:var(--gen-font-display); }
+.ho-sum .ho-mini .hom-cell{ display:flex; flex-direction:column; align-items:center; gap:6px; line-height:1; }
 .ho-sum .ho-mini b{ font-size:17px; font-weight:800; color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
-.ho-sum .ho-mini i{ font-size:9px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); font-style:normal; white-space:nowrap; }
+.ho-sum .ho-mini .hom-num{ display:inline-flex; align-items:baseline; gap:3px; }
+.ho-sum .ho-mini .hom-win{ font-size:9px; font-weight:600; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+.ho-sum .ho-mini i{ font-size:7px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-muted); font-style:normal; white-space:nowrap; }
 .ho-sum .ho-caret{ flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted); transform:rotate(45deg); transition:transform .15s; }
 .histover[open] .ho-sum .ho-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
 .ho-body{ margin-top:10px; padding-top:9px; border-top:1px solid var(--gen-pill-line); }
@@ -930,15 +933,16 @@ body.modal-open{ overflow:hidden; }
 .histmore-btn:hover{ border-color:var(--gen-brass); }
 .histmore-btn .hm-rem{ font-weight:600; color:var(--gen-muted); letter-spacing:0; text-transform:none; }
 /* archive title row + CSS-drawn calendar icon */
-.hist-titlerow{ display:flex; align-items:center; justify-content:center; gap:12px; }
+.hist-titlerow{ display:flex; align-items:center; justify-content:center; gap:12px; margin:4px 0 18px; }
 .hist-titlerow h2{ margin:0; }
-.calicon{ flex:none; width:34px; height:34px; border-radius:8px; border:1px solid var(--gen-brass-stroke); background:rgba(255,255,255,.04); cursor:pointer; display:grid; place-items:center; }
+.calicon{ flex:none; width:30px; height:30px; border-radius:8px; border:1px solid var(--gen-brass-stroke); background:rgba(255,255,255,.04); cursor:pointer; display:grid; place-items:center; }
 .calicon:hover{ border-color:var(--gen-brass); }
 .calicon .cal-tab{ position:relative; width:18px; height:16px; border:2px solid var(--gen-brass); border-top:0; border-radius:0 0 3px 3px; box-sizing:border-box; }
 .calicon .cal-tab::before{ content:''; position:absolute; left:-2px; right:-2px; top:0; height:5px; background:var(--gen-brass); border-radius:2px 2px 0 0; }
 .calicon .cal-tab::after{ content:''; position:absolute; left:2px; top:8px; width:2px; height:2px; background:var(--gen-brass);
   box-shadow:4px 0 0 var(--gen-brass), 8px 0 0 var(--gen-brass), 0 4px 0 var(--gen-brass), 4px 4px 0 var(--gen-brass), 8px 4px 0 var(--gen-brass); }
-/* calendar modal — git-style activity heatmap */
+/* calendar modal — git-style activity heatmap (above the archive modal) */
+#calModal{ z-index:55; }
 .calmodal{ width:360px; }
 .cal-header{ display:flex; align-items:center; gap:8px; margin:2px 0 10px; }
 .cal-nav{ flex:none; width:30px; height:30px; border-radius:7px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-brass); cursor:pointer; font-size:15px; line-height:1; display:grid; place-items:center; }
@@ -5159,7 +5163,7 @@ body.modal-open{ overflow:hidden; }
     manualMode = !!rec.manualMode; undoStack = [];
     var top = Math.max.apply(null, game.players.map(total));
     var winner = game.players.filter(function (p) { return total(p) === top; })[0];
-    $('historyModal').classList.add('hidden');
+    $('historyModal').classList.add('hidden'); $('calModal').classList.add('hidden');
     showGameOver(winner);
     // §2.5 dossier context: viewing a PAST owner game → annotate its report with deltas
     var oi = recOwnerIdx(rec);
@@ -5593,9 +5597,8 @@ body.modal-open{ overflow:hidden; }
       + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">' + esc(name) + '</span>'
       + '<span class="ho-mini">'
       + '<span class="hom-cell"><b>' + n + '</b><i>битки</i></span>'
-      + '<span class="hom-cell"><b>' + c.wins + '</b><i>победи</i></span>'
+      + '<span class="hom-cell"><span class="hom-num"><b>' + c.wins + '</b><span class="hom-win">' + Math.round(100 * c.wins / n) + '%</span></span><i>победи</i></span>'
       + '<span class="hom-cell"><b>' + Math.round(c.avgAcc * 100) + '%</b><i>% точност</i></span>'
-      + '<span class="hom-cell"><b>' + Math.round(100 * c.wins / n) + '%</b><i>% победи</i></span>'
       + '</span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     // §2.7 per-battle form charts sit at the TOP of the body — three collapsible buttons
@@ -6100,6 +6103,7 @@ body.modal-open{ overflow:hidden; }
   function openHistory() {
     histTab = (settings.ruleset === 'experimental') ? 'experimental' : 'standard';   // default to the active ruleset
     histDateFilter = null;   // a fresh open clears any calendar date filter
+    $('calModal').classList.add('hidden');
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
     $('historyModal').classList.remove('hidden');
