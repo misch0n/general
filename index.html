@@ -929,6 +929,45 @@ body.modal-open{ overflow:hidden; }
   color:var(--gen-brass); background:rgba(255,255,255,.04); border:1px solid var(--gen-brass-stroke); cursor:pointer; }
 .histmore-btn:hover{ border-color:var(--gen-brass); }
 .histmore-btn .hm-rem{ font-weight:600; color:var(--gen-muted); letter-spacing:0; text-transform:none; }
+/* archive title row + CSS-drawn calendar icon */
+.hist-titlerow{ display:flex; align-items:center; justify-content:center; gap:12px; }
+.hist-titlerow h2{ margin:0; }
+.calicon{ flex:none; width:34px; height:34px; border-radius:8px; border:1px solid var(--gen-brass-stroke); background:rgba(255,255,255,.04); cursor:pointer; display:grid; place-items:center; }
+.calicon:hover{ border-color:var(--gen-brass); }
+.calicon .cal-tab{ position:relative; width:18px; height:16px; border:2px solid var(--gen-brass); border-top:0; border-radius:0 0 3px 3px; box-sizing:border-box; }
+.calicon .cal-tab::before{ content:''; position:absolute; left:-2px; right:-2px; top:0; height:5px; background:var(--gen-brass); border-radius:2px 2px 0 0; }
+.calicon .cal-tab::after{ content:''; position:absolute; left:2px; top:8px; width:2px; height:2px; background:var(--gen-brass);
+  box-shadow:4px 0 0 var(--gen-brass), 8px 0 0 var(--gen-brass), 0 4px 0 var(--gen-brass), 4px 4px 0 var(--gen-brass), 8px 4px 0 var(--gen-brass); }
+/* calendar modal — git-style activity heatmap */
+.calmodal{ width:360px; }
+.cal-header{ display:flex; align-items:center; gap:8px; margin:2px 0 10px; }
+.cal-nav{ flex:none; width:30px; height:30px; border-radius:7px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-brass); cursor:pointer; font-size:15px; line-height:1; display:grid; place-items:center; }
+.cal-nav:disabled{ opacity:.28; cursor:default; }
+.cal-nav:hover:not(:disabled){ border-color:var(--gen-brass); }
+.cal-mtitle{ flex:1; text-align:center; line-height:1.2; min-width:0; }
+.cal-mname{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-text); }
+.cal-mstats{ font-size:10px; color:var(--gen-muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+.cal-wk{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px; }
+.cal-wk span{ text-align:center; font-size:9px; font-weight:700; text-transform:uppercase; color:var(--gen-muted); letter-spacing:.3px; }
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.calday{ aspect-ratio:1/1; border-radius:6px; border:1px solid var(--gen-pill-line); background:rgba(255,255,255,.03); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding:2px; cursor:default; color:var(--gen-disabled); position:relative; }
+.calday.empty{ visibility:hidden; }
+.calday .cd-num{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; }
+.calday .cd-meta{ font-size:7px; line-height:1.05; color:var(--gen-muted); font-variant-numeric:tabular-nums; text-align:center; }
+.calday.has{ cursor:pointer; color:var(--gen-text); }
+.calday.l1{ background:rgba(200,166,75,.16); border-color:rgba(200,166,75,.3); }
+.calday.l2{ background:rgba(200,166,75,.32); border-color:rgba(200,166,75,.45); }
+.calday.l3{ background:rgba(200,166,75,.54); border-color:rgba(200,166,75,.6); }
+.calday.l4{ background:rgba(200,166,75,.8); border-color:var(--gen-brass); color:var(--gen-ink); }
+.calday.l4 .cd-meta{ color:rgba(0,0,0,.6); }
+.calday.today{ box-shadow:inset 0 0 0 1.5px var(--gen-brass-bright); }
+.calday.sel{ outline:2px solid var(--gen-brass-bright); outline-offset:1px; }
+.cal-legend{ margin-top:10px; text-align:center; font-size:10px; color:var(--gen-muted); }
+/* active date filter chip in the archive list */
+.histfilter{ display:flex; align-items:center; justify-content:center; margin:0 0 8px; }
+.histfilter-chip{ display:inline-flex; align-items:center; gap:7px; padding:5px 12px; border-radius:9px; background:rgba(200,166,75,.16);
+  border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); font-size:11px; font-weight:700; cursor:pointer; }
+.histfilter-chip .hf-x{ font-size:12px; opacity:.8; }
 .importarea{ width:100%; min-height:120px; resize:vertical; font-family:monospace; font-size:11px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:8px; padding:8px 10px; }
 .importarea:focus{ outline:none; border-color:var(--gen-brass); }
@@ -1390,10 +1429,24 @@ body.modal-open{ overflow:hidden; }
 </div>
 
 <!-- military archive (history) -->
+<!-- battle calendar: git-style activity heatmap; tap a day to filter the archive -->
+<div id="calModal" class="overlay hidden">
+  <div class="modal calmodal">
+    <button class="x-close" id="calClose">✕</button>
+    <div id="calHeader" class="cal-header"></div>
+    <div class="cal-wk"><span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>нд</span></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div class="cal-legend">по-наситено = повече битки · докосни ден за филтър</div>
+  </div>
+</div>
+
 <div id="historyModal" class="overlay hidden">
   <div class="modal">
     <button class="x-close" id="historyClose">✕</button>
-    <h2>📜 Военен архив</h2>
+    <div class="hist-titlerow">
+      <h2>📜 Военен архив</h2>
+      <button type="button" id="calBtn" class="calicon" title="Календар на битките" aria-label="Календар на битките"><i class="cal-tab"></i></button>
+    </div>
     <div id="historyOverview"></div>
     <div id="historyList"></div>
     <div class="setup-actions">
@@ -5649,17 +5702,28 @@ body.modal-open{ overflow:hidden; }
     renderHistoryList();
   }
   // the battle list — paginated: 5 at a time, a centred „покажи още 5“ reveals the next batch
+  function wireClearFilter() {
+    var c = $('historyList').querySelector('#histClearFilter');
+    if (c) c.onclick = function () { histDateFilter = null; histShown = 5; renderHistoryList(); };
+  }
   function renderHistoryList() {
     var all = loadHistory().slice().reverse(); // newest first
-    var games = all.filter(function (r) { return (r.ruleset === 'experimental') === (histTab === 'experimental'); });
-    if (!games.length) {
-      $('historyList').innerHTML = '<div class="noowner">' + (histTab === 'experimental' ? 'Още няма битки „с минуси“. Превключи правилата в настройките и влез в боя.' : 'Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.') + '</div>';
-      return;
+    var rsGames = all.filter(function (r) { return (r.ruleset === 'experimental') === (histTab === 'experimental'); });
+    // an active calendar date filter narrows the section to that day (rulesets stay split)
+    var games = histDateFilter ? rsGames.filter(function (r) { return dayStart(r.ts) === histDateFilter; }) : rsGames;
+    var chip = histDateFilter ? '<div class="histfilter"><button type="button" class="histfilter-chip" id="histClearFilter">📅 ' + fmtDate(histDateFilter) + ' <span class="hf-x">✕</span></button></div>' : '';
+    if (!rsGames.length) {
+      $('historyList').innerHTML = chip + '<div class="noowner">' + (histTab === 'experimental' ? 'Още няма битки „с минуси“. Превключи правилата в настройките и влез в боя.' : 'Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.') + '</div>';
+      wireClearFilter(); return;
+    }
+    if (!games.length) {   // filtered to a date with no battles in THIS section
+      $('historyList').innerHTML = chip + '<div class="noowner">Няма битки на тази дата в този раздел.</div>';
+      wireClearFilter(); return;
     }
     // owner score distribution (for the percentile tags), drift-as-it-grows by design
     var career = computeOwnerCareer(histTab);
     var ownerScores = career ? career.scores : [];
-    var html = '<div class="histhd">Битки (' + games.length + ')</div>';
+    var html = chip + '<div class="histhd">Битки (' + games.length + ')</div>';
     games.slice(0, histShown).forEach(function (rec) {
       var oi = recOwnerIdx(rec), skipped = oi < 0, excluded = !!rec.excluded;
       var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
@@ -5709,7 +5773,75 @@ body.modal-open{ overflow:hidden; }
     });
     var mb = $('historyList').querySelector('.histmore-btn');
     if (mb) mb.onclick = function () { histShown += 5; renderHistoryList(); };
+    wireClearFilter();
   }
+
+  // ---------- §ист battle calendar (git-style activity heatmap over ALL rulesets) ----------
+  var histDateFilter = null;   // a day-start ts; when set the archive list shows only that day
+  var calMonth = null;         // first-of-month Date currently displayed
+  var CAL_MONTHS = ['януари', 'февруари', 'март', 'април', 'май', 'юни', 'юли', 'август', 'септември', 'октомври', 'ноември', 'декември'];
+  function dayStart(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  // representative score of a battle: the owner's total (or the top score if skipped)
+  function recRepScore(rec) {
+    var oi = recOwnerIdx(rec);
+    var p = oi < 0 ? rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0] : rec.players[oi];
+    return recTotal(p);
+  }
+  // aggregate EVERY archived battle (all rulesets) by calendar day
+  function calData() {
+    var by = {};
+    loadHistory().forEach(function (r) {
+      var k = dayStart(r.ts), b = by[k] || (by[k] = { count: 0, sum: 0 });
+      b.count++; b.sum += recRepScore(r);
+    });
+    return by;
+  }
+  function calLevel(count) { return count >= 6 ? 4 : count >= 4 ? 3 : count >= 2 ? 2 : count >= 1 ? 1 : 0; }
+  function openCalendar() {
+    var now = new Date();
+    calMonth = histDateFilter ? new Date(new Date(histDateFilter).getFullYear(), new Date(histDateFilter).getMonth(), 1)
+                              : new Date(now.getFullYear(), now.getMonth(), 1);
+    renderCalendar();
+    $('calModal').classList.remove('hidden');
+  }
+  function renderCalendar() {
+    var by = calData(), data = loadHistory();
+    var earliest = data.length ? new Date(Math.min.apply(null, data.map(function (r) { return r.ts; }))) : new Date();
+    var earliestM = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+    var now = new Date(), curM = new Date(now.getFullYear(), now.getMonth(), 1);
+    var y = calMonth.getFullYear(), mo = calMonth.getMonth();
+    // month totals (all rulesets)
+    var mCount = 0, mSum = 0;
+    Object.keys(by).forEach(function (k) { var d = new Date(+k); if (d.getFullYear() === y && d.getMonth() === mo) { mCount += by[k].count; mSum += by[k].sum; } });
+    var mAvg = mCount ? Math.round(mSum / mCount) : 0;
+    var atEarliest = calMonth.getTime() <= earliestM.getTime(), atCurrent = calMonth.getTime() >= curM.getTime();
+    $('calHeader').innerHTML = '<button type="button" class="cal-nav" id="calPrev"' + (atEarliest ? ' disabled' : '') + '>‹</button>'
+      + '<div class="cal-mtitle"><div class="cal-mname">' + CAL_MONTHS[mo] + ' ' + y + '</div>'
+      + '<div class="cal-mstats">' + (mCount ? mCount + ' игри · средно ' + mAvg + ' т.' : 'няма битки') + '</div></div>'
+      + '<button type="button" class="cal-nav" id="calNext"' + (atCurrent ? ' disabled' : '') + '>›</button>';
+    // grid: Monday-first, with leading blanks
+    var firstDow = (new Date(y, mo, 1).getDay() + 6) % 7, daysIn = new Date(y, mo + 1, 0).getDate();
+    var todayK = dayStart(now.getTime());
+    var cells = '';
+    for (var i = 0; i < firstDow; i++) cells += '<div class="calday empty"></div>';
+    for (var day = 1; day <= daysIn; day++) {
+      var k = dayStart(new Date(y, mo, day).getTime()), b = by[k];
+      var lv = b ? calLevel(b.count) : 0, has = !!b;
+      var meta = b ? '<span class="cd-meta">' + b.count + 'и<br>' + Math.round(b.sum / b.count) + 'т.</span>' : '';
+      cells += '<button type="button" class="calday l' + lv + (has ? ' has' : '') + (k === todayK ? ' today' : '') + (k === histDateFilter ? ' sel' : '') + '"'
+        + (has ? ' data-day="' + k + '"' : ' disabled') + '><span class="cd-num">' + day + '</span>' + meta + '</button>';
+    }
+    $('calGrid').innerHTML = cells;
+    var prev = $('calPrev'), next = $('calNext');
+    if (prev) prev.onclick = function () { calMonth = new Date(y, mo - 1, 1); renderCalendar(); };
+    if (next) next.onclick = function () { if (!atCurrent) { calMonth = new Date(y, mo + 1, 1); renderCalendar(); } };
+    $('calGrid').querySelectorAll('.calday.has').forEach(function (c) {
+      c.onclick = function () { histDateFilter = +c.getAttribute('data-day'); histShown = 5; $('calModal').classList.add('hidden'); renderHistoryList(); };
+    });
+  }
+  $('calBtn').onclick = openCalendar;
+  $('calClose').onclick = function () { $('calModal').classList.add('hidden'); };
+  $('calModal').onclick = function (e) { if (e.target === $('calModal')) $('calModal').classList.add('hidden'); };
   function confirmDeleteGame(row, id) {
     if (row.querySelector('.hg-confirm')) return;
     var c = document.createElement('div'); c.className = 'hg-confirm';
@@ -5967,6 +6099,7 @@ body.modal-open{ overflow:hidden; }
   $('methodModal').onclick = function (e) { if (e.target === $('methodModal')) $('methodModal').classList.add('hidden'); };
   function openHistory() {
     histTab = (settings.ruleset === 'experimental') ? 'experimental' : 'standard';   // default to the active ruleset
+    histDateFilter = null;   // a fresh open clears any calendar date filter
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
     $('historyModal').classList.remove('hidden');
