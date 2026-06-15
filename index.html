@@ -83,9 +83,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* player pills */
 .pstrip{ display:flex; gap:7px; padding:0 16px 4px; flex-wrap:wrap; align-items:center; }
-.ppill{ display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:var(--gen-r-pill); font-size:11px; font-weight:700;
-  background:var(--gen-pill); color:#cfcca8; border:1px solid var(--gen-pill-line); text-transform:uppercase; letter-spacing:.5px;
-  font-variant-numeric:tabular-nums; }
+.ppill{ display:inline-flex; align-items:center; justify-content:center; min-width:46px; padding:4px 9px; border-radius:var(--gen-r-pill); font-size:11px; font-weight:700;
+  background:var(--gen-pill); color:#cfcca8; border:1px solid var(--gen-pill-line); letter-spacing:.5px;
+  font-variant-numeric:tabular-nums; }   /* just the running total; sized to hold 3 digits without resizing */
 .ppill .pdot{ width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
 .ppill.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
 
@@ -2672,8 +2672,7 @@ body.modal-open{ overflow:hidden; }
 
   function renderPills() {
     $('pillWrap').innerHTML = game.players.map(function (p, i) {
-      return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">'
-        + '<span class="pdot" style="background:' + p.color + '"></span>' + initials(p.name) + ' · ' + total(p) + '</button>';
+      return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">' + total(p) + '</button>';
     }).join('');
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) {
       b.onclick = function () { openPeek(+b.getAttribute('data-i')); };
@@ -3360,8 +3359,7 @@ body.modal-open{ overflow:hidden; }
   }
   function expRenderPills() {
     $('pillWrap').innerHTML = game.players.map(function (p, i) {
-      return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">'
-        + '<span class="pdot" style="background:' + p.color + '"></span>' + initials(p.name) + ' · ' + X.total(p) + '</button>';
+      return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '">' + X.total(p) + '</button>';
     }).join('');
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) { b.onclick = function () { expPeek(+b.getAttribute('data-i')); }; });
   }
