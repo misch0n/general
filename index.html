@@ -402,6 +402,11 @@ body.modal-open{ overflow:hidden; }
 .numpart .np-x{ font-weight:700; font-size:13px; }
 .numpart .np-x.pos{ color:#86c986; } .numpart .np-x.neg{ color:#e8807a; } .numpart .np-x.zero{ color:var(--gen-brass-bright); }
 .numpart .np-y{ font-size:9px; font-weight:600; letter-spacing:.5px; color:var(--gen-muted); }
+/* number-part summary bar between the two board sections (experimental) */
+.expnumbar{ display:flex; align-items:baseline; justify-content:center; gap:6px; margin:6px 0; font-family:var(--gen-font-display); font-variant-numeric:tabular-nums; }
+.expnumbar .np-x{ font-weight:700; font-size:14px; }
+.expnumbar .np-x.pos{ color:#86c986; } .expnumbar .np-x.neg{ color:#e8807a; } .expnumbar .np-x.zero{ color:var(--gen-brass-bright); }
+.expnumbar .np-y{ font-size:10px; font-weight:600; letter-spacing:.5px; color:var(--gen-muted); }
 
 /* setup: add-button, reorder arrows, manual mode */
 .addbtn{ width:100%; margin-top:4px; }
@@ -624,8 +629,10 @@ body.modal-open{ overflow:hidden; }
 .numbar .nb-v{ font-family:var(--gen-font-display); font-weight:700; font-size:16px; color:var(--gen-brass); font-variant-numeric:tabular-nums; margin-left:auto; }
 .numbar.neg .nb-v, .numbar.neg .nb-sub{ color:#e8807a; }
 .numbar .nb-sub{ font-size:10px; color:var(--gen-muted); }
-/* experimental number-part tiles: colour the value by sign (red − / black 0 / green +) */
-.tile.up .pts.pos{ color:#1c7a1c; } .tile.up .pts.neg{ color:#b02525; } .tile.up .pts.zero{ color:var(--gen-canvas-ink); }
+/* experimental number-part tiles: colour the value by sign (red − / black 0 / green +).
+   the .upchip variants beat the later .upchip colour rule so the SUGGESTION box colours too */
+.tile.up .pts.pos, .tile.up .pts.upchip.pos{ color:#1c7a1c; }
+.tile.up .pts.neg, .tile.up .pts.upchip.neg{ color:#b02525; }
 .tile.low.fullspan{ grid-column:1 / -1; }   /* фул хаус spans both columns */
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
@@ -1154,6 +1161,7 @@ body.modal-open{ overflow:hidden; }
   <div id="expBoard" class="expboard hidden"></div>
   <div class="sheet">
     <div id="boardUpper" class="upper"></div>
+    <div id="expNumBar" class="expnumbar hidden"></div>
     <div id="boardLower" class="lower"></div>
   </div>
 
@@ -2441,7 +2449,7 @@ body.modal-open{ overflow:hidden; }
     if (settings.ruleset === 'experimental') { expStartGame(players, manual); return; }
     expMode = false;
     document.querySelector('.sheet').classList.remove('hidden');
-    $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
+    $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden'); $('expNumBar').classList.add('hidden');
     clearAllPenalties();
     game = G.createGame(players);
     game.ownerSkipped = skipOwnerNext; // record so this game is excluded from owner trends
@@ -3334,12 +3342,7 @@ body.modal-open{ overflow:hidden; }
     $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-b">' + (l2 || '&nbsp;') + '</span></span>';
     $('curPersona').classList.add('hidden'); $('curRibbons').innerHTML = '';   // persona inline; no ribbons
     $('curTotal').textContent = X.total(p);
-    // number-part summary row beneath the total: ±X (red/gold/green) · Y/6 in fine print
-    var st = G.upperStateExp(p.scores), Xv = st.contribution;
-    var xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
-    $('curNumPart').className = 'numpart';
-    $('curNumPart').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-y">' + st.filled + '/6</span>';
-    $('curNumPart').classList.remove('hidden');
+    $('curNumPart').classList.add('hidden');   // number-part summary now sits between the board sections
     var filled = X.filledCount(p.scores);
     $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
   }
@@ -3409,15 +3412,10 @@ body.modal-open{ overflow:hidden; }
       }
       $('boardLower').appendChild(row);
     });
-  }
-  // number-part status: running Σ, rows filled, and the −50 risk
-  function expRenderNumberStatus(p) {
-    var st = G.upperStateExp(p.scores);
-    var danger = st.penalised || (!st.complete && st.subtotal < 0);
-    var val = st.penalised ? '−50' : (st.subtotal >= 0 ? '+' + st.subtotal : '' + st.subtotal);
-    var tag = st.penalised ? 'наказание' : (st.complete ? 'изчистена ✓' : st.filled + '/6 реда');
-    $('expBoard').innerHTML = '<div class="numbar' + (danger ? ' neg' : (st.complete ? ' ok' : '')) + '">'
-      + '<span class="nb-l">Числова част</span><span class="nb-v">' + val + '</span><span class="nb-sub">' + tag + '</span></div>';
+    // number-part summary BETWEEN the two sections: ±X (red/gold/green) · Y/6 in fine print
+    var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
+    $('expNumBar').className = 'expnumbar';
+    $('expNumBar').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-y">' + st.filled + '/6</span>';
   }
   function expRenderDice() {
     var p = G.currentPlayer(game);
