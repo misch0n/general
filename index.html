@@ -857,10 +857,10 @@ body.modal-open{ overflow:hidden; }
 .ho-sum{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
 .ho-sum::-webkit-details-marker{ display:none; }
 .ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
-.ho-sum .ho-mini{ display:flex; flex-wrap:wrap; gap:5px 16px; font-family:var(--gen-font-display); font-weight:700;
-  font-size:13px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-label); }
-.ho-sum .ho-mini > span{ white-space:nowrap; }
-.ho-sum .ho-mini b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+.ho-sum .ho-mini{ display:flex; flex-wrap:wrap; gap:8px 18px; font-family:var(--gen-font-display); }
+.ho-sum .ho-mini .hom-cell{ display:flex; flex-direction:column; align-items:center; line-height:1.1; }
+.ho-sum .ho-mini b{ font-size:17px; font-weight:800; color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+.ho-sum .ho-mini i{ font-size:9px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); font-style:normal; white-space:nowrap; }
 .ho-sum .ho-caret{ flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted); transform:rotate(45deg); transition:transform .15s; }
 .histover[open] .ho-sum .ho-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
 .ho-body{ margin-top:10px; padding-top:9px; border-top:1px solid var(--gen-pill-line); }
@@ -923,6 +923,11 @@ body.modal-open{ overflow:hidden; }
 .histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
 .histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-brass); display:grid; place-items:center; }
 .histgame .hg-exp:hover{ border-color:var(--gen-brass); }
+.histmore{ display:flex; justify-content:center; margin:12px 0 4px; }
+.histmore-btn{ padding:9px 22px; border-radius:9px; font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.4px; text-transform:uppercase;
+  color:var(--gen-brass); background:rgba(255,255,255,.04); border:1px solid var(--gen-brass-stroke); cursor:pointer; }
+.histmore-btn:hover{ border-color:var(--gen-brass); }
+.histmore-btn .hm-rem{ font-weight:600; color:var(--gen-muted); letter-spacing:0; text-transform:none; }
 .importarea{ width:100%; min-height:120px; resize:vertical; font-family:monospace; font-size:11px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:8px; padding:8px 10px; }
 .importarea:focus{ outline:none; border-color:var(--gen-brass); }
@@ -5625,7 +5630,12 @@ body.modal-open{ overflow:hidden; }
     // the owner name carries the старшина's default colour.
     var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
       + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">' + esc(name) + '</span>'
-      + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + c.wins + '</b> победи</span><span><b>' + Math.round(c.avgAcc * 100) + '%</b> точност</span></span>'
+      + '<span class="ho-mini">'
+      + '<span class="hom-cell"><b>' + n + '</b><i>битки</i></span>'
+      + '<span class="hom-cell"><b>' + c.wins + '</b><i>победи</i></span>'
+      + '<span class="hom-cell"><b>' + Math.round(c.avgAcc * 100) + '%</b><i>% точност</i></span>'
+      + '<span class="hom-cell"><b>' + Math.round(100 * c.wins / n) + '%</b><i>% победи</i></span>'
+      + '</span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
     // §2.7 per-battle form charts sit at the TOP of the body — three collapsible buttons
     h += buildOwnerCharts(c, rs === 'experimental' ? 'exp' : 'std');
@@ -5711,9 +5721,9 @@ body.modal-open{ overflow:hidden; }
     return Math.round(100 * (below + 0.5 * equal) / scoresAll.length);
   }
   var histTab = 'standard';   // which ruleset the archive is showing
+  var histShown = 5;          // how many battles are listed; grows by 5 via „покажи още“
   function renderHistory() {
-    var all = loadHistory().slice().reverse(); // newest first
-    var games = all.filter(function (r) { return (r.ruleset === 'experimental') === (histTab === 'experimental'); });
+    histShown = 5;            // reset paging on a full (re)open or tab switch
     ownerCharts = null;  // rebuilt fresh each render
     var tabs = '<div class="histtabs">'
       + '<button class="histtab' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">без минуси</button>'
@@ -5728,6 +5738,12 @@ body.modal-open{ overflow:hidden; }
       bar.onclick = function () { fold.classList.toggle('open'); if (grid) grid.classList.toggle('hidden'); };
       if (q) q.onclick = function (e) { e.preventDefault(); e.stopPropagation(); if (tips) tips.classList.toggle('hidden'); };
     }
+    renderHistoryList();
+  }
+  // the battle list — paginated: 5 at a time, a centred „покажи още 5“ reveals the next batch
+  function renderHistoryList() {
+    var all = loadHistory().slice().reverse(); // newest first
+    var games = all.filter(function (r) { return (r.ruleset === 'experimental') === (histTab === 'experimental'); });
     if (!games.length) {
       $('historyList').innerHTML = '<div class="noowner">' + (histTab === 'experimental' ? 'Още няма битки „с минуси“. Превключи правилата в настройките и влез в боя.' : 'Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.') + '</div>';
       return;
@@ -5736,7 +5752,7 @@ body.modal-open{ overflow:hidden; }
     var career = computeOwnerCareer(histTab);
     var ownerScores = career ? career.scores : [];
     var html = '<div class="histhd">Битки (' + games.length + ')</div>';
-    games.forEach(function (rec) {
+    games.slice(0, histShown).forEach(function (rec) {
       var oi = recOwnerIdx(rec), skipped = oi < 0, excluded = !!rec.excluded;
       var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
       var ptsPlayer = skipped ? top : rec.players[oi];
@@ -5767,6 +5783,12 @@ body.modal-open{ overflow:hidden; }
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
         + '<button class="hg-del" title="Изтрий">✕</button></div>';
     });
+    // batch loader: reveal the next 5 until the whole archive is shown
+    if (histShown < games.length) {
+      var more = Math.min(5, games.length - histShown);
+      html += '<div class="histmore"><button type="button" class="histmore-btn">Покажи още ' + more
+        + ' <span class="hm-rem">(' + (games.length - histShown) + ' остават)</span></button></div>';
+    }
     $('historyList').innerHTML = html;
     $('historyList').querySelectorAll('.histgame').forEach(function (row) {
       var id = row.getAttribute('data-id');
@@ -5777,6 +5799,8 @@ body.modal-open{ overflow:hidden; }
       row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) chooseMethod('Изнеси играта', function () { exportGame(rec); }, function () { acousticSend(rec); }); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); confirmDeleteGame(row, id); };
     });
+    var mb = $('historyList').querySelector('.histmore-btn');
+    if (mb) mb.onclick = function () { histShown += 5; renderHistoryList(); };
   }
   function confirmDeleteGame(row, id) {
     if (row.querySelector('.hg-confirm')) return;
