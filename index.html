@@ -1342,8 +1342,8 @@ body.modal-open{ overflow:hidden; }
     <div class="rulebox setrow" id="ruleBox" style="cursor:default">
       <span>Правила <button id="ruleHelp" class="qmark" aria-label="Кои са правилата?">?</button></span>
       <div class="ruleseg" id="ruleSeg">
-        <button class="rlabel" data-rs="standard">Стандартен</button>
-        <button class="rlabel" data-rs="experimental">Експериментален</button>
+        <button class="rlabel" data-rs="standard">без минуси</button>
+        <button class="rlabel" data-rs="experimental">с минуси</button>
       </div>
     </div>
     <div id="ruleBubble" class="ownerbubble hidden"></div>
@@ -5528,8 +5528,8 @@ body.modal-open{ overflow:hidden; }
     var games = all.filter(function (r) { return (r.ruleset === 'experimental') === (histTab === 'experimental'); });
     ownerCharts = null;  // rebuilt fresh each render
     var tabs = '<div class="histtabs">'
-      + '<button class="histtab' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">Стандартен</button>'
-      + '<button class="histtab' + (histTab === 'experimental' ? ' on' : '') + '" data-rs="experimental">Експериментален</button></div>';
+      + '<button class="histtab' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">без минуси</button>'
+      + '<button class="histtab' + (histTab === 'experimental' ? ' on' : '') + '" data-rs="experimental">с минуси</button></div>';
     $('historyOverview').innerHTML = tabs + ownerOverview(histTab);
     $('historyOverview').querySelectorAll('.histtab').forEach(function (b) { b.onclick = function () { histTab = b.getAttribute('data-rs'); renderHistory(); }; });
     wireOwnerCharts();   // attach the scrub readers to the per-battle career charts
@@ -5541,7 +5541,7 @@ body.modal-open{ overflow:hidden; }
       if (q) q.onclick = function (e) { e.preventDefault(); e.stopPropagation(); if (tips) tips.classList.toggle('hidden'); };
     }
     if (!games.length) {
-      $('historyList').innerHTML = '<div class="noowner">' + (histTab === 'experimental' ? 'Още няма експериментални битки. Превключи на „Експериментален“ в настройките и влез в боя.' : 'Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.') + '</div>';
+      $('historyList').innerHTML = '<div class="noowner">' + (histTab === 'experimental' ? 'Още няма битки „с минуси“. Превключи правилата в настройките и влез в боя.' : 'Архивът е празен, командире. Спечели (или загуби) някоя битка и тя ще влезе тук.') + '</div>';
       return;
     }
     // owner score distribution (for the percentile tags), drift-as-it-grows by design
@@ -5953,9 +5953,9 @@ body.modal-open{ overflow:hidden; }
     };
   });
   function showRuleBubble() {
-    $('ruleBubble').innerHTML = '<b>Експериментален</b> — българският „Генерал“: една карта, '
+    $('ruleBubble').innerHTML = '<b>С минуси</b> — българският „Генерал“: една карта, '
       + 'попълваш редовете в произволен ред. Числовата част (1-6) се точкува със знак около три '
-      + '(−50, ако завърши на минус), плюс комбинация „два чифта“.';
+      + '(−50, ако завърши на минус), плюс комбинация „два чифта“. <b>Без минуси</b> е класическата игра.';
     $('ruleBubble').classList.remove('hidden');
   }
   $('ruleHelp').onclick = function (e) { e.preventDefault(); e.stopPropagation(); $('ruleBubble').classList.toggle('hidden'); if (!$('ruleBubble').innerHTML) showRuleBubble(); };

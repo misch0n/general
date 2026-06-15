@@ -227,8 +227,8 @@
 
   // ruleset registry — standard is the default; experimental is opt-in
   var RULESETS = {
-    standard:     { key: 'standard',     label: 'Стандартен',      categories: CATEGORIES,     candidates: candidates,    scoreFor: scoreFor,    total: playerTotal,    deviationUpper: false },
-    experimental: { key: 'experimental', label: 'Експериментален', categories: CATEGORIES_EXP, candidates: candidatesExp, scoreFor: scoreForExp, total: playerTotalExp, deviationUpper: true },
+    standard:     { key: 'standard',     label: 'без минуси', categories: CATEGORIES,     candidates: candidates,    scoreFor: scoreFor,    total: playerTotal,    deviationUpper: false },
+    experimental: { key: 'experimental', label: 'с минуси',   categories: CATEGORIES_EXP, candidates: candidatesExp, scoreFor: scoreForExp, total: playerTotalExp, deviationUpper: true },
   };
   function ruleset(key) { return RULESETS[key] || RULESETS.standard; }
 
