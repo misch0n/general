@@ -5251,23 +5251,23 @@ body.modal-open{ overflow:hidden; }
              W: W, H: H, padL: padL, padT: padT, iw: iw, ih: ih, n: n, xfn: xfn, yfn: yfn,
              svg: grid + segs + dots + '<g class="oc-scrub"></g>' };
   }
-  function buildOwnerCharts(c) {
-    ownerCharts = null;
+  function buildOwnerCharts(c, grp) {
+    grp = grp || 'std';
     if (!c || c.data.length < 2) return '';
+    if (!ownerCharts) ownerCharts = {};                 // accumulate across groups (std + exp)
     var color = settings.ownerColor || '#d4a02e';
     var defs = [['points', 'Точки'], ['skill', 'Точност'], ['luck', 'Късмет']];
-    var charts = {}, tabs = '', cards = '';
+    var tabs = '', cards = '';
     defs.forEach(function (d) {
       var ch = makeOwnerChart(d[0], ownerChartSeries(c.data, d[0]), color);
       if (!ch) return;
-      charts[d[0]] = ch;
-      // each category gets a button; its chart sits collapsed underneath (toggled on tap)
-      tabs += '<button type="button" class="oc-tab" data-kind="' + d[0] + '">' + d[1] + '</button>';
-      cards += '<div class="ocard hidden" data-card="' + d[0] + '">'
-        + '<div class="oc-wrap"><svg viewBox="0 0 ' + ch.W + ' ' + ch.H + '" class="oc-svg" data-kind="' + d[0] + '" preserveAspectRatio="xMidYMid meet">'
+      var id = grp + ':' + d[0];                         // namespaced so the two dossier cards don't collide
+      ownerCharts[id] = ch;
+      tabs += '<button type="button" class="oc-tab" data-kind="' + id + '">' + d[1] + '</button>';
+      cards += '<div class="ocard hidden" data-card="' + id + '">'
+        + '<div class="oc-wrap"><svg viewBox="0 0 ' + ch.W + ' ' + ch.H + '" class="oc-svg" data-kind="' + id + '" preserveAspectRatio="xMidYMid meet">'
         + ch.svg + '</svg><div class="oc-readout hidden"></div></div></div>';
     });
-    ownerCharts = charts;
     return tabs ? ('<div class="ocharts"><div class="oc-tabs">' + tabs + '</div>' + cards + '</div>') : '';
   }
   // attach the drag-to-scrub reader to each career chart (after its SVG is in the DOM)
@@ -5321,13 +5321,14 @@ body.modal-open{ overflow:hidden; }
     });
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi], log = r.moveLog && r.moveLog[oi];
-      return { total: recTotal(o), place: recPlacement(r, oi), general: !!(o.scores && o.scores.general > 0), ana: (log && log.length) ? analyzeGameExp(log) : null };
+      return { total: recTotal(o), place: recPlacement(r, oi), general: !!(o.scores && o.scores.general > 0), manual: false,
+               rec: { ts: r.ts, name: o.name }, ana: (log && log.length) ? analyzeGameExp(log) : null };
     }).filter(function (d) { return d.ana; });
     if (!data.length) return null;
     var n = data.length, scores = data.map(function (d) { return d.total; });
     var avg = function (f) { return data.reduce(function (s, d) { return s + f(d); }, 0) / n; };
     var avgScore = avg(function (d) { return d.total; });
-    return { n: n, scores: scores, wins: data.filter(function (d) { return d.place === 1; }).length,
+    return { n: n, data: data, scores: scores, wins: data.filter(function (d) { return d.place === 1; }).length,
       avgScore: avgScore, best: Math.max.apply(null, scores), avgPlace: avg(function (d) { return d.place; }),
       avgAcc: avg(function (d) { return d.ana.accuracy; }), avgLuck: avg(function (d) { return d.ana.luck; }),
       avgSkill: avg(function (d) { return d.ana.skill; }), generals: data.filter(function (d) { return d.general; }).length,
@@ -5340,6 +5341,7 @@ body.modal-open{ overflow:hidden; }
       + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">Генерал <span class="expbadge">ЕКСП</span></span>'
       + '<span class="ho-mini"><span><b>' + n + '</b> битки</span><span><b>' + ce.wins + '</b> победи</span><span><b>' + Math.round(ce.avgAcc * 100) + '%</b> точност</span></span>'
       + '</span><span class="ho-caret"></span></summary><div class="ho-body">';
+    h += buildOwnerCharts(ce, 'exp');   // per-battle points/точност/късмет (namespaced)
     h += statRows('Резултат', RC.upper, ['рекорд <b>' + ce.best + '</b> т.', 'среден <b>' + Math.round(ce.avgScore) + '</b> т.', 'късмет <b>' + (ce.avgLuck >= 0 ? '+' : '') + ce.avgLuck.toFixed(0) + '</b>']);
     h += statRows('Игра', RC.skill, ['победи <b>' + Math.round(100 * ce.wins / n) + '%</b>', 'средно място <b>' + ce.avgPlace.toFixed(1) + '</b>', 'умение <b>' + (ce.avgSkill >= 0 ? '+' : '') + ce.avgSkill.toFixed(1) + '</b>']);
     h += stat('Генерали', RC.gen, '<b>' + ce.generals + '</b> от ' + n + ' битки');
@@ -5460,6 +5462,7 @@ body.modal-open{ overflow:hidden; }
   }
   function renderHistory() {
     var games = loadHistory().slice().reverse(); // newest first
+    ownerCharts = null;  // rebuilt fresh each render; buildOwnerCharts accumulates std + exp groups
     $('historyOverview').innerHTML = ownerOverview() + ownerExpSection();
     wireOwnerCharts();   // attach the scrub readers to the per-battle career charts
     // the bar opens/closes the board; the ? toggles the read-tips on its own (no fold needed)
