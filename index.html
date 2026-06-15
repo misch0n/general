@@ -947,6 +947,8 @@ body.modal-open{ overflow:hidden; }
 /* end-game / history progress chart */
 .progchart{ margin:10px 0 4px; padding:10px; border-radius:10px; background:rgba(0,0,0,.2); border:1px solid var(--gen-pill-line); }
 .progchart:empty{ display:none; }
+/* charts are touch-scrubbed — never let a press-and-hold start a text selection */
+.progchart, .catboard, .ocharts{ -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none; -webkit-touch-callout:none; }
 .progchart .pc-title{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.8px; color:var(--gen-brass); font-size:11px; margin-bottom:4px; }
 /* touch-action:none so a vertical finger wobble never hands the gesture to the
    browser's scroller (which would cancel the pointer and drop the scrub line) */
