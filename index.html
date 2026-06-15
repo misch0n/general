@@ -4830,6 +4830,7 @@ body.modal-open{ overflow:hidden; }
 
   function renderReport(pi) {
     var fp = game.players[pi], fa = summary.ana[pi];
+    var fpTotal = sumExp() ? X.total(fp) : G.playerTotal(fp);   // ruleset-aware running total
     var genVal = fp.scores.general;
     var html = '<div class="evpanel">';
     // (no "Рапорт за…" header — the details speak for themselves; EV lives in the ? window)
@@ -4838,7 +4839,7 @@ body.modal-open{ overflow:hidden; }
     // round the parts so they SUM to the shown final — absorb the remainder into
     // par (the largest term, 195.41), so a user adding them up never sees a gap.
     if (!fa.manual) {
-      var tot = G.playerTotal(fp), luckShown = Math.round(fa.luck), skillShown = Math.round(fa.skill);
+      var tot = fpTotal, luckShown = Math.round(fa.luck), skillShown = Math.round(fa.skill);
       var parShown = tot - luckShown - skillShown;
       html += '<div class="evline"><b>' + parShown + '</b> норма '
         + '<span class="luck">' + signed(luckShown) + ' късмет</span> '
@@ -4862,7 +4863,7 @@ body.modal-open{ overflow:hidden; }
     // §2.5 DA-14 — viewing a past owner game: how this result compares to your average
     if (dossierCtx && dossierCtx.career && pi === dossierCtx.ownerPi) {
       var car = dossierCtx.career, parts = [];
-      parts.push('резултат ' + deltaTag(G.playerTotal(fp) - car.avgScore, 0, 'т.'));
+      parts.push('резултат ' + deltaTag(fpTotal - car.avgScore, 0, 'т.'));
       parts.push('точност ' + deltaTag(fa.accuracy * 100 - car.avgAcc * 100, 0, '%'));
       if (!fa.manual && car.avgLuck != null) parts.push('късмет ' + deltaTag(fa.luck - car.avgLuck, 0, 'т.'));
       html += '<div class="dossierdelta">спрямо средното ти: ' + parts.join(' · ') + '</div>';
@@ -4890,6 +4891,20 @@ body.modal-open{ overflow:hidden; }
         'повече губиш в <b>' + leakWord + '</b>' ]);
     } else {
       html += stat('Избор на категория', RC.leak, fa.mistakes.category + ' от ' + fa.leakCounts.category + ' неоптимални (' + nBad(-fa.leak.category, 0) + ' т. изпуснати)');
+    }
+
+    // §6.x experimental: how each half of the card performed (points + EV-leak)
+    if (sumExp()) {
+      var upPts = G.upperStateExp(fp.scores).contribution, lowPts = 0, upLeak = 0, lowLeak = 0;
+      G.CATEGORIES_EXP.forEach(function (c) {
+        var bc = fa.byCategory && fa.byCategory[c.key];
+        if (c.group === 'lower' && typeof fp.scores[c.key] === 'number') lowPts += fp.scores[c.key];
+        if (bc) { if (c.group === 'upper') upLeak += bc.leak; else lowLeak += bc.leak; }
+      });
+      var upB = upPts > 0 ? '<b class="np">+' + upPts + '</b>' : upPts < 0 ? '<b class="nn">' + upPts + '</b>' : '<b class="nu">0</b>';
+      html += statRows('Раздели', RC.upper, [
+        'числа ' + upB + ' т. · теч ' + nBad(upLeak, 1),
+        'комбинации ' + nNeut(lowPts) + ' т. · теч ' + nBad(lowLeak, 1) ]);
     }
 
     // blunder categorisation by severity — each tier on its own row
@@ -5250,8 +5265,10 @@ body.modal-open{ overflow:hidden; }
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
       var ana = isExp ? ((r.moveLog && r.moveLog[oi]) ? (r.manualMode ? analyzeManualGameExp(r.moveLog[oi]) : analyzeGameExp(r.moveLog[oi])) : null) : analyzeRec(r, oi);
-      return { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
+      var item = { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
                general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
+      if (isExp) { item.secUpper = G.upperStateExp(o.scores).contribution; item.secLower = 0; CATS.forEach(function (c) { if (c.group === 'lower' && typeof o.scores[c.key] === 'number') item.secLower += o.scores[c.key]; }); }
+      return item;
     }).filter(function (d) { return d.ana; });
     if (!data.length) return null;
     var n = data.length;
@@ -5278,6 +5295,7 @@ body.modal-open{ overflow:hidden; }
     function mean(get, dice) { var a = (dice ? diceData : data).map(get).filter(function (v) { return typeof v === 'number'; }); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
     function stageLoss(s) { return s.n ? -s.skill / s.n : 0; }
     var report = {
+      secUpper: isExp ? mean(function (d) { return d.secUpper; }) : null, secLower: isExp ? mean(function (d) { return d.secLower; }) : null,
       luck: mean(function (d) { return d.ana.luck; }, true), skill: mean(function (d) { return d.ana.skill; }),
       lostPerTurn: mean(function (d) { return d.ana.avgLostPerTurn; }),
       leakKeep: mean(function (d) { return d.ana.leak.keep; }, true), leakCat: mean(function (d) { return d.ana.leak.category; }),
@@ -5505,6 +5523,10 @@ body.modal-open{ overflow:hidden; }
     if (r.luck != null) h += '<div class="evline" style="font-size:13px"><span class="luck">' + signed(Math.round(r.luck)) + ' късмет</span> <span class="skill">' + signed(Math.round(r.skill)) + ' решения</span> · загуба ' + nBad(r.lostPerTurn, 1) + ' т./ход</div>';
     if (r.leakKeep != null) h += statRows('Изтичане', RC.leak, ['задържания ' + nBad(r.leakKeep, 1) + ' т.', 'категории ' + nBad(r.leakCat, 1) + ' т.']);
     else if (r.leakCat != null) h += stat('Изтичане', RC.leak, 'категории ' + nBad(r.leakCat, 1) + ' т.');
+    if (rs === 'experimental' && r.secUpper != null) {   // section performance: avg points each half yields
+      var su = Math.round(r.secUpper), suB = su > 0 ? '<b class="np">+' + su + '</b>' : su < 0 ? '<b class="nn">' + su + '</b>' : '<b class="nu">0</b>';
+      h += statRows('Раздели', RC.upper, ['числа ' + suB + ' т.', 'комбинации ' + nNeut(Math.round(r.secLower)) + ' т.']);
+    }
     h += statRows('Издънки', RC.sev, [nNeut(r.sevMinor.toFixed(1)) + ' дребни', nNeut(r.sevMajor.toFixed(1)) + ' сериозни', '<b class="nn">' + r.sevFatal.toFixed(1) + '</b> фатални']);
     if (extra.biggest) h += stat('Най-голяма издънка', RC.sev, '<b>' + esc(catLabelOf(extra.biggest.key, rs)) + '</b> · ×' + extra.biggest.n);
     // Постижения: where your sharpest (biggest-EV) moves land — top categories by COUNT
