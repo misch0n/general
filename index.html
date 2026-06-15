@@ -3742,10 +3742,16 @@ body.modal-open{ overflow:hidden; }
 
   // ---------- how to play + in-game menu ----------
   function buildHowTo() {
+    var exp = uiRuleset() === 'experimental';
+    var scoring = exp
+      ? '<h3 class="hth">Точкуване „с минуси“</h3>'
+        + '<p class="ht">Числовата част (1-6) се точкува <b>около три</b>: три еднакви = 0, четири = +стойността, пет = +2×; <b>по-малко</b> от три вади минус. Събери шестте реда — ако сборът завърши на минус, отнемат ти <b>−50</b>. В комбинациите има и <b>2x2</b> (два различни чифта).</p>'
+      : '';
     return '<h2>📖 Бойна задача</h2>'
       + '<p class="ht">Печели бойният, който събере най-много точки — и грабва чин <b>Генерал</b>. Последният получава <b>Редник</b>.</p>'
       + '<h3 class="hth">Ходът</h3>'
-      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Докосни заровете за първото хвърляне. После маркирай зарове и стреляй — или спри по-рано. Кои зарове маркираш зависи от твоя избор (докосни <b>?</b> на бутона за огън): по подразбиране маркираш <b>тези за хвърляне</b> (✛) и натискаш <b>ХВЪРЛИ!</b>; в другия режим маркираш <b>тези за задържане</b> (✓) и натискаш <b>ДРЪЖ!</b>, а останалите се хвърлят. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
+      + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Натисни <b>ХВЪРЛИ!</b> за първото хвърляне. После маркирай зарове и стреляй — или спри по-рано. Кои зарове маркираш зависи от твоя избор (докосни <b>?</b> на бутона за огън): по подразбиране маркираш <b>тези за хвърляне</b> (✛) и натискаш <b>ХВЪРЛИ!</b>; в другия режим маркираш <b>тези за задържане</b> (✓) и натискаш <b>ДРЪЖ!</b>, а останалите се хвърлят. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
+      + scoring
       + '<h3 class="hth">Категориите и какво искат</h3>'
       + '<button id="howtoCombos" class="btn">📋 Виж комбинациите</button>'
       + '<h3 class="hth">Полеви отчет</h3>'
@@ -3810,19 +3816,45 @@ body.modal-open{ overflow:hidden; }
     smallStraight: [1, 2, 3, 4, 5], largeStraight: [2, 3, 4, 5, 6], general: [4, 4, 4, 4, 4], chance: [1, 3, 4, 5, 6],
   };
   function miniDie(v) { return '<span class="csdie">' + pipFace(v) + '</span>'; }
+  // which ruleset the help screens describe: the live game's, else the picked setting
+  function uiRuleset() {
+    var inGame = !$('game').classList.contains('hidden');
+    if (inGame) return (game && game.ruleset === 'experimental') ? 'experimental' : 'standard';
+    return settings.ruleset === 'experimental' ? 'experimental' : 'standard';
+  }
+  var COMBO_SCORE_EXP = {
+    ones: '(брой−3)×1', twos: '(брой−3)×2', threes: '(брой−3)×3', fours: '(брой−3)×4', fives: '(брой−3)×5', sixes: '(брой−3)×6',
+    twoKind: 'сбор на 2-те', twoPair: 'сбор на 2+2', threeKind: 'сбор на 3-те', fourKind: 'сбор на 4-те', fullHouse: 'сбор на петте',
+    smallStraight: '15 т.', largeStraight: '20 т.', general: '50 + сбора', chance: 'сбор на петте',
+  };
+  var COMBO_EXAMPLE_EXP = {
+    ones: [1, 1, 1, 3, 5], twos: [2, 2, 4, 5, 6], threes: [3, 3, 3, 2, 6], fours: [4, 4, 1, 2, 6], fives: [5, 5, 5, 1, 3], sixes: [6, 6, 2, 3, 4],
+    twoKind: [4, 4, 1, 3, 6], twoPair: [6, 6, 3, 3, 1], threeKind: [5, 5, 5, 2, 3], fourKind: [2, 2, 2, 2, 6], fullHouse: [3, 3, 3, 6, 6],
+    smallStraight: [1, 2, 3, 4, 5], largeStraight: [2, 3, 4, 5, 6], general: [4, 4, 4, 4, 4], chance: [1, 3, 4, 5, 6],
+  };
+  var COMBO_DESC_EXP = {
+    ones: 'около 3: повече +, по-малко −', twos: 'около 3: повече +, по-малко −', threes: 'около 3: повече +, по-малко −',
+    fours: 'около 3: повече +, по-малко −', fives: 'около 3: повече +, по-малко −', sixes: 'около 3: повече +, по-малко −',
+    twoKind: 'два еднакви зара', twoPair: 'два различни чифта', threeKind: 'три еднакви', fourKind: 'четири еднакви',
+    fullHouse: '3 + 2 еднакви', smallStraight: '1-2-3-4-5', largeStraight: '2-3-4-5-6', general: 'пет еднакви', chance: 'кои да е пет',
+  };
   function buildComboSheet() {
+    var exp = uiRuleset() === 'experimental';
+    var CATS = exp ? G.CATEGORIES_EXP : G.CATEGORIES, SCORE = exp ? COMBO_SCORE_EXP : COMBO_SCORE;
+    var EX = exp ? COMBO_EXAMPLE_EXP : COMBO_EXAMPLE, DESC = exp ? COMBO_DESC_EXP : G.COMBO_DESC;
     function rows(group) {
-      return G.CATEGORIES.filter(function (c) { return c.group === group; }).map(function (c) {
+      return CATS.filter(function (c) { return c.group === group; }).map(function (c) {
         return '<div class="csitem">'
           + '<div class="csrow"><span class="cslab">' + esc(c.label) + '</span>'
-          + '<span class="csdesc">' + esc(G.COMBO_DESC[c.key] || '') + '</span>'
-          + '<span class="csval">' + esc(COMBO_SCORE[c.key] || '') + '</span></div>'
-          + '<div class="csex">' + (COMBO_EXAMPLE[c.key] || []).map(miniDie).join('') + '</div>'
+          + '<span class="csdesc">' + esc(DESC[c.key] || '') + '</span>'
+          + '<span class="csval">' + esc(SCORE[c.key] || '') + '</span></div>'
+          + '<div class="csex">' + (EX[c.key] || []).map(miniDie).join('') + '</div>'
           + '</div>';
       }).join('');
     }
-    return '<div class="cssec">Горна секция</div>' + rows('upper')
-      + '<div class="cssec">Долна секция</div>' + rows('lower');
+    var note = exp ? '<p class="ht" style="margin:2px 16px 6px">3 еднакви = 0, всеки над/под три мести точките с ±стойността; ако сборът на числовата част е минус → <b>−50</b>.</p>' : '';
+    return '<div class="cssec">' + (exp ? 'Числова част' : 'Горна секция') + '</div>' + note + rows('upper')
+      + '<div class="cssec">' + (exp ? 'Комбинации' : 'Долна секция') + '</div>' + rows('lower');
   }
   function openCombos() { $('combosBody').innerHTML = buildComboSheet(); $('combosModal').classList.remove('hidden'); }
   // closing the combo sheet returns to the how-to page when we arrived from there
