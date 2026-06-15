@@ -227,6 +227,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .rlabel{ padding:5px 9px; border-radius:6px; background:transparent; color:var(--gen-disabled);
   font-family:var(--gen-font-display); font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
 .rlabel.on{ font-weight:700; background:rgba(255,255,255,.06); color:var(--gen-brass-bright); }
+.keepseg{ display:inline-flex; gap:2px; padding:2px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; }
+.klabel{ padding:5px 9px; border-radius:6px; background:transparent; color:var(--gen-disabled); cursor:pointer;
+  font-family:var(--gen-font-display); font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.klabel.on{ font-weight:700; background:rgba(255,255,255,.06); color:var(--gen-brass-bright); }
 .toggle{ display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-family:var(--gen-font-display); font-size:11px; letter-spacing:1px; color:var(--gen-muted); }
 .switch{ width:40px; height:22px; border-radius:999px; background:rgba(255,255,255,.1); position:relative; transition:.18s; border:1px solid var(--gen-ink-line); }
 .switch::after{ content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#d8cfa8; transition:.18s; }
@@ -1401,6 +1405,13 @@ body.modal-open{ overflow:hidden; }
         <span>Цвят по подразбиране</span>
         <div class="ownercolors" id="ownerColors"></div>
       </div>
+      <div class="ownertog setrow" style="cursor:default">
+        <span>Зарове по подразбиране</span>
+        <div class="keepseg" id="ownerKeep">
+          <button class="klabel" data-keep="1">дръж</button>
+          <button class="klabel" data-keep="0">хвърли</button>
+        </div>
+      </div>
       <div id="ownerBubble" class="ownerbubble hidden"></div>
     </div>
     <!-- ruleset picker (pre-game): switches the in-game scoring rules -->
@@ -1726,9 +1737,10 @@ body.modal-open{ overflow:hidden; }
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
   // глупости (profanity) ON by default = NSFW words allowed; OFF = censored to the SFW set
   // selectKeep: which dice you tap each throw — false = tap the ones to RE-THROW (ОГИН!),
-  // true = tap the ones to KEEP (ДРЪЖ!). Per-device; travels with saved games so replays
-  // and reports read back in the same flavour they were played.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, selectKeep: false, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  // true = tap the ones to KEEP (ДРЪЖ!). Default „keep". This is the owner's/default
+  // preference (set in owner customisation); each HUMAN player carries their own copy
+  // (p.selectKeep) so several humans in one game can play in different flavours.
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1789,7 +1801,8 @@ body.modal-open{ overflow:hidden; }
   function serializePlayers() {
     return game.players.map(function (p) {
       return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, personaId: p.persona ? p.persona.id : null,
-               gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [] };
+               gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [],
+               selectKeep: p.selectKeep };
     });
   }
   // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
@@ -2164,6 +2177,7 @@ body.modal-open{ overflow:hidden; }
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.owner = skipOwnerNext ? false : !!p.owner; // owner skipped → nobody carries the flag this game
+      if (!p.isAI) pl.selectKeep = !!settings.selectKeep;   // each human starts on the default, then keeps their own
       pl.bonus = namePointsOn() ? (p.bonus || 0) : 0; // rare-name starting bonus (Титли + точки)
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
@@ -2462,6 +2476,7 @@ body.modal-open{ overflow:hidden; }
     var players = roster.map(function (m) {
       var pl = G.createPlayer(m.name, m.color, !!m.isAI);       // humans play on their own device; AI seats are host-driven
       pl.gender = m.gender; pl.bet = ''; pl.bonus = 0; pl.netId = m.id;
+      if (!m.isAI) pl.selectKeep = !!settings.selectKeep;       // each device's human plays in its own flavour
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       pl.owner = (m.id === localPid);                           // ★ each device owns ITS OWN player (history attribution)
       return pl;
@@ -2938,7 +2953,7 @@ body.modal-open{ overflow:hidden; }
       var b = document.createElement('button');
       var sel = !fx.dice && fx.diceKeep == null && selected[i];
       var fresh = !fx.dice && fx.diceKeep == null && diceNew[i];   // just rerolled — accent for easy scanning
-      var keepMode = settings.selectKeep;
+      var keepMode = activeKeep();
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive;
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
@@ -2967,7 +2982,7 @@ body.modal-open{ overflow:hidden; }
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
     // the button keys off whether the player has MARKED any dice (same in both modes):
     // nothing marked → prompt to choose; once marked → throw/keep the selection
-    var keep = settings.selectKeep, someSel = selected.some(Boolean), txt;
+    var keep = activeKeep(), someSel = selected.some(Boolean), txt;
     if (locked) { txt = '…'; fire.disabled = true; }
     else if (throwsLeft <= 0) { txt = 'ОТЧЕТИ!'; fire.disabled = true; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
@@ -2986,10 +3001,16 @@ body.modal-open{ overflow:hidden; }
   $('expAgain').onclick = function () { var ps = game.players; $('expOver').classList.add('hidden'); expStartGame(ps); };
   $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); expMode = false; openHistory(); };
   $('expOver').onclick = function (e) { if (e.target === $('expOver')) $('expOver').classList.add('hidden'); };
-  // throw/keep chooser — the ? on the fire button replaces the old settings toggle
+  // throw/keep chooser — the ? on the fire button. The flavour is PER HUMAN PLAYER:
+  // activeKeep() reads the current player's own preference (falling back to the default).
+  function activeKeep() {
+    var p = game && game.players && game.players[game.current];
+    if (p && !p.isAI && typeof p.selectKeep === 'boolean') return p.selectKeep;
+    return !!settings.selectKeep;
+  }
   function renderKeepThrowTip() {
     $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
-      b.classList.toggle('on', (b.getAttribute('data-keep') === '1') === !!settings.selectKeep);
+      b.classList.toggle('on', (b.getAttribute('data-keep') === '1') === activeKeep());
     });
   }
   function showKeepThrowTip() {
@@ -3005,18 +3026,20 @@ body.modal-open{ overflow:hidden; }
     b.onclick = function (e) {
       e.stopPropagation();
       var newKeep = b.getAttribute('data-keep') === '1';
-      if (newKeep !== settings.selectKeep) {
+      if (newKeep !== activeKeep()) {
         // switch the mechanic but KEEP the same marked dice — only their accent flips
         // (red ✕ "throw these" ⇄ green ✓ "keep these"); no confusing inversion.
-        settings.selectKeep = newKeep; saveSettings();
+        var p = game && game.players[game.current];
+        if (p && !p.isAI) p.selectKeep = newKeep;               // the change sticks to THIS player
+        if (!p || p.owner || p.isAI) { settings.selectKeep = newKeep; saveSettings(); }  // owner's choice is also the persistent default
         if (game) renderAll();
       }
       renderKeepThrowTip();
     };
   });
 
-  // which dice get RE-THROWN this fire — interprets the tap marks per the keep/throw setting
-  function rerollMask() { return settings.selectKeep ? selected.map(function (s) { return !s; }) : selected.slice(); }
+  // which dice get RE-THROWN this fire — interprets the tap marks per the player's keep/throw flavour
+  function rerollMask() { return activeKeep() ? selected.map(function (s) { return !s; }) : selected.slice(); }
   // re-roll the masked dice, KEEP the tray sorted ascending, and remember which dice are
   // new (rerolled) so they can be accented — otherwise the new ones vanish into the sort
   function applyReroll(rr) {
@@ -3126,6 +3149,7 @@ body.modal-open{ overflow:hidden; }
     var players = snap.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
       pl.gender = sp.gender || 'm'; pl.owner = !!sp.owner; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.scores = sp.scores || {};
+      if (!sp.isAI) pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep;
       if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
       return pl;
     });
@@ -3395,7 +3419,7 @@ body.modal-open{ overflow:hidden; }
     var p = G.currentPlayer(game);
     if (throwsLeft > 0) {
       var holds = expAiKeeps(p);
-      selected = settings.selectKeep ? holds.slice() : holds.map(function (h) { return !h; });
+      selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
       var rr = rerollMask();
       if (rr.some(Boolean)) {
         expRenderDice();
@@ -3542,7 +3566,7 @@ body.modal-open{ overflow:hidden; }
     var interactive = !p.isAI && !locked && throwsLeft > 0;
     dice.forEach(function (v, i) {
       var b = document.createElement('button');
-      var sel = selected[i], keepMode = settings.selectKeep, fresh = diceNew[i];
+      var sel = selected[i], keepMode = activeKeep(), fresh = diceNew[i];
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive;
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
@@ -3564,7 +3588,7 @@ body.modal-open{ overflow:hidden; }
     var fire = $('fire'), think = $('aiThinking');
     if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
-    var keep = settings.selectKeep, someSel = selected.some(Boolean), txt;
+    var keep = activeKeep(), someSel = selected.some(Boolean), txt;
     if (locked) { txt = '…'; fire.disabled = true; }
     else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ ПОЛЕ'; fire.disabled = true; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
@@ -3606,7 +3630,7 @@ body.modal-open{ overflow:hidden; }
     if (throwsLeft > 0) {
       var holds = aiKeepMask(p);                    // true = keep this die
       // mark the dice the same way a human would under the active setting (keep vs throw)
-      selected = settings.selectKeep ? holds.slice() : holds.map(function (h) { return !h; });
+      selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
       var rr = rerollMask();
       if (rr.some(Boolean)) {
         renderDice();
@@ -4208,7 +4232,7 @@ body.modal-open{ overflow:hidden; }
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
-    syncOwnerGender(); syncOwnerColor(); syncRuleset();
+    syncOwnerGender(); syncOwnerColor(); syncRuleset(); syncOwnerKeep();
     $('clearPanel').classList.add('hidden'); $('ownerBubble').classList.add('hidden'); $('ruleBubble').classList.add('hidden'); updateStorageInfo();
     if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
     else $('devPanel').classList.add('hidden');
@@ -5151,6 +5175,7 @@ body.modal-open{ overflow:hidden; }
     return rec.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
       pl.gender = sp.gender || 'm'; pl.bet = sp.bet; pl.scores = sp.scores || {}; pl.bonus = sp.bonus || 0; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.owner = !!sp.owner;
+      if (!sp.isAI) pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep;
       if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
       return pl;
     });
@@ -6229,6 +6254,11 @@ body.modal-open{ overflow:hidden; }
         if (!$('setup').classList.contains('hidden')) renderSetup();
       }
     };
+  });
+  // default dice-selection flavour for the старшина (also the default for any human seat)
+  function syncOwnerKeep() { $('ownerKeep').querySelectorAll('.klabel').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-keep') === '1') === !!settings.selectKeep); }); }
+  $('ownerKeep').querySelectorAll('.klabel').forEach(function (b) {
+    b.onclick = function () { settings.selectKeep = b.getAttribute('data-keep') === '1'; syncOwnerKeep(); saveSettings(); };
   });
   // ---- localStorage fullness gauge (next to the clear-archive control) ----
   var LS_QUOTA = 5 * 1024 * 1024;   // typical per-origin localStorage cap (~5 MB)
