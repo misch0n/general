@@ -407,7 +407,10 @@ body.modal-open{ overflow:hidden; }
 .expnumbar{ display:flex; align-items:baseline; justify-content:center; gap:6px; margin:6px 0; font-family:var(--gen-font-display); font-variant-numeric:tabular-nums; }
 .expnumbar .np-x{ font-weight:700; font-size:14px; }
 .expnumbar .np-x.pos{ color:#86c986; } .expnumbar .np-x.neg{ color:#e8807a; } .expnumbar .np-x.zero{ color:var(--gen-brass-bright); }
-.expnumbar .np-y{ font-size:10px; font-weight:600; letter-spacing:.5px; color:var(--gen-muted); }
+.expnumbar .np-unit{ font-size:11px; color:var(--gen-muted); }   /* peek: neutral т. after the total */
+/* in-game bar: stack the coloured total over a small точки label (like ТОЧКИ, thinner/smaller) */
+#expNumBar.expnumbar{ flex-direction:column; align-items:center; gap:0; }
+#expNumBar .np-cap{ font-size:7px; font-weight:400; letter-spacing:1.5px; text-transform:uppercase; color:var(--gen-muted); margin-top:1px; }
 
 /* setup: add-button, reorder arrows, manual mode */
 .addbtn{ width:100%; margin-top:4px; }
@@ -3379,7 +3382,7 @@ body.modal-open{ overflow:hidden; }
     var up = G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
     var low = G.CATEGORIES_EXP.filter(function (c) { return c.group === 'lower'; }).map(function (c) { return tile(c, false); }).join('');
     var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
-    var numbar = '<div class="expnumbar"><span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span></div>';
+    var numbar = '<div class="expnumbar"><span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-unit">т.</span></div>';
     return '<div class="miniboard"><div class="upper">' + up + '</div>' + numbar + '<div class="lower">' + low + '</div></div>';
   }
   // the player's single card drawn with the STANDARD tile board (+ the два чифта tile),
@@ -3425,7 +3428,7 @@ body.modal-open{ overflow:hidden; }
     // number-part points-so-far BETWEEN the two sections: ±X (red/gold/green)
     var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
     $('expNumBar').className = 'expnumbar';
-    $('expNumBar').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span>';
+    $('expNumBar').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-cap">точки</span>';
   }
   function expRenderDice() {
     var p = G.currentPlayer(game);
