@@ -38,10 +38,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 #game.board{ height:100vh; height:100dvh; min-height:0; }
 .gamebody{ position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; z-index:1; }   /* fills the screen + scrolls beneath the bar */
 .bottombar{ position:absolute; left:0; right:0; bottom:0; z-index:30; background:var(--gen-panel); border-top:2px solid var(--gen-brass); }
-.gamefooter{ position:relative; z-index:1; padding:10px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+.gamefooter{ position:relative; z-index:1; padding:13px 16px 8px; }   /* dice on top: padding from the bar's edge + gap to the button */
 .gamefooter .dice{ margin:0; }
-.gamefooter.manual{ display:flex; flex-direction:column; align-items:center; gap:12px; padding-top:12px; }
-.firebar{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:10px 18px 8px; }   /* action button, small gap above the dice */
+.gamefooter.manual{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:12px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+.firebar{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:8px 18px calc(14px + env(safe-area-inset-bottom, 0px)); }   /* action button below the dice */
 .camo{ position:absolute; inset:0; width:100%; height:100%; z-index:0; }
 .scrim{ position:absolute; inset:0; z-index:0; pointer-events:none;
   background:linear-gradient(180deg, rgba(16,18,9,.62), rgba(16,18,9,.12) 20%, rgba(16,18,9,.12) 74%, rgba(16,18,9,.66)); }
@@ -1191,8 +1191,11 @@ body.modal-open{ overflow:hidden; }
     </div>
   </div>
 
-  <!-- fixed overlay bottom bar: action button + dice (page scrolls beneath it) -->
+  <!-- fixed overlay bottom bar: dice on top, action button below (page scrolls beneath it) -->
   <div id="bottombar" class="bottombar">
+    <div id="diceFooter" class="gamefooter">
+      <div id="dice" class="dice"></div>
+    </div>
     <div id="firebar" class="firebar">
       <div id="throws" class="throws"></div>
       <div id="fireWrap" class="fire-wrap">
@@ -1202,9 +1205,6 @@ body.modal-open{ overflow:hidden; }
       <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
       <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
       <button type="button" id="expReserve" class="btn small hidden" title="Изхарчи резервно хвърляне">🎁 Резерва</button>
-    </div>
-    <div id="diceFooter" class="gamefooter">
-      <div id="dice" class="dice"></div>
     </div>
     <!-- manual-entry footer (ОТЧЕТ mode): tap the five table dice, then pick a combo above -->
     <div id="manualDock" class="gamefooter manual hidden">
