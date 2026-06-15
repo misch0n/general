@@ -634,9 +634,10 @@ body.modal-open{ overflow:hidden; }
    the .upchip variants beat the later .upchip colour rule so the SUGGESTION box colours too */
 .tile.up .pts.pos, .tile.up .pts.upchip.pos{ color:#1c7a1c; }
 .tile.up .pts.neg, .tile.up .pts.upchip.neg{ color:#b02525; }
+.tile.up.done .pts.pos{ color:#6f9a6f; } .tile.up.done .pts.neg{ color:#bf8b86; }   /* SUBMITTED values: muted red/green */
 .tile.low.fullspan{ grid-column:1 / -1; }   /* фул хаус spans both columns */
-/* experimental mini cell-board (peek): sign-coloured number part + full-house span */
-.miniboard .mtile.up .mval.pos{ color:#1c7a1c; } .miniboard .mtile.up .mval.neg{ color:#b02525; }
+/* experimental mini cell-board (peek): muted sign-coloured (submitted) number part + full-house span */
+.miniboard .mtile.up .mval.pos{ color:#6f9a6f; } .miniboard .mtile.up .mval.neg{ color:#bf8b86; }
 .miniboard .mtile.low.fullspan{ grid-column:1 / -1; }
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
@@ -3378,7 +3379,7 @@ body.modal-open{ overflow:hidden; }
     var up = G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).map(function (c) { return tile(c, true); }).join('');
     var low = G.CATEGORIES_EXP.filter(function (c) { return c.group === 'lower'; }).map(function (c) { return tile(c, false); }).join('');
     var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
-    var numbar = '<div class="expnumbar"><span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-y">' + st.filled + '/6</span></div>';
+    var numbar = '<div class="expnumbar"><span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span></div>';
     return '<div class="miniboard"><div class="upper">' + up + '</div>' + numbar + '<div class="lower">' + low + '</div></div>';
   }
   // the player's single card drawn with the STANDARD tile board (+ the два чифта tile),
@@ -3421,10 +3422,10 @@ body.modal-open{ overflow:hidden; }
       }
       $('boardLower').appendChild(row);
     });
-    // number-part summary BETWEEN the two sections: ±X (red/gold/green) · Y/6 in fine print
+    // number-part points-so-far BETWEEN the two sections: ±X (red/gold/green)
     var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
     $('expNumBar').className = 'expnumbar';
-    $('expNumBar').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-y">' + st.filled + '/6</span>';
+    $('expNumBar').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span>';
   }
   function expRenderDice() {
     var p = G.currentPlayer(game);
