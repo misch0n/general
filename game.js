@@ -136,7 +136,26 @@
 
   // ----------------------------------------------------------------- dice
 
-  function rollDie(rng) { return 1 + Math.floor((rng || Math.random)() * 6); }
+  // Default dice entropy comes from the platform CSPRNG (crypto.getRandomValues),
+  // not Math.random — stronger, unpredictable bits. Bytes are drawn in a pool and
+  // mapped to 1..6 with REJECTION SAMPLING (drop the top 4 of 256, i.e. ≥252) so the
+  // six faces are exactly equiprobable — no modulo/float bias. Falls back to
+  // Math.random where Web Crypto is unavailable. An explicit `rng` still overrides
+  // (kept for tests/tools); networked play rolls on one device and shares the result,
+  // so there is no shared-RNG path to desync here.
+  var _crypto = (function () {
+    try { if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) return globalThis.crypto; } catch (e) {}
+    try { if (typeof self !== 'undefined' && self.crypto && self.crypto.getRandomValues) return self.crypto; } catch (e) {}
+    return null;
+  })();
+  var _pool = null, _pos = 0;
+  function _randByte() {
+    if (!_crypto) return Math.floor(Math.random() * 256) & 255;
+    if (!_pool || _pos >= _pool.length) { _pool = new Uint8Array(64); _crypto.getRandomValues(_pool); _pos = 0; }
+    return _pool[_pos++];
+  }
+  function _cryptoDie() { var b; do { b = _randByte(); } while (b >= 252); return 1 + (b % 6); }   // 252 = 42×6
+  function rollDie(rng) { return rng ? (1 + Math.floor(rng() * 6)) : _cryptoDie(); }
 
   function rollAll(rng) {
     var out = [];
