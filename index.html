@@ -2435,7 +2435,7 @@ body.modal-open{ overflow:hidden; }
   function startGame(players, manual) {
     netMode = false;   // a normal local game is never networked
     // experimental ruleset runs its own separate three-column flow (not for ОТЧЕТ)
-    if (settings.ruleset === 'experimental' && !manual) { expStartGame(players); return; }
+    if (settings.ruleset === 'experimental') { expStartGame(players, manual); return; }
     expMode = false;
     document.querySelector('.sheet').classList.remove('hidden');
     $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
@@ -2766,7 +2766,7 @@ body.modal-open{ overflow:hidden; }
     manualCounts[face]++;
     dice = manualDiceArray();
     undoStack.push({ t: 'tap', face: face });
-    renderAll();
+    expMode ? expRenderAll() : renderAll();
   }
 
   // ОПА — undoes action by action across the whole game: dice taps first, then
@@ -2789,7 +2789,7 @@ body.modal-open{ overflow:hidden; }
     }
     locked = false;
     clearRoast();
-    renderAll();
+    expMode ? expRenderAll() : renderAll();
   }
   $('undoBottom').onclick = popUndo;
   $('overUndo').onclick = popUndo;
@@ -2982,8 +2982,8 @@ body.modal-open{ overflow:hidden; }
   // ============================================================ EXPERIMENTAL flow (single column)
   var expMode = false;
   var EXP_CELLS = X ? X.KEYS.length : 15;
-  function expStartGame(players) {
-    expMode = true; netMode = false; manualMode = false;
+  function expStartGame(players, manual) {
+    expMode = true; netMode = false; manualMode = !!manual;
     clearAllPenalties();
     game = X.createGame(players);
     game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
@@ -2991,12 +2991,12 @@ body.modal-open{ overflow:hidden; }
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
-    $('hintBtn').classList.toggle('hidden', !exactReady);
+    $('hintBtn').classList.toggle('hidden', !exactReady || manualMode);
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
     $('expBoard').classList.add('hidden');
     $('expReserve').classList.add('hidden');
-    document.querySelector('.dock').classList.remove('hidden');
-    $('manualDock').classList.add('hidden');
+    document.querySelector('.dock').classList.toggle('hidden', manualMode);
+    $('manualDock').classList.toggle('hidden', !manualMode);
     expBeginTurn();
   }
   function resumeExpGame(snap) {
@@ -3026,7 +3026,10 @@ body.modal-open{ overflow:hidden; }
     if (!netMode) saveResume();
     document.documentElement.style.setProperty('--pc', p.color);
     selected = [false, false, false, false, false];
-    if (p.isAI) {
+    if (manualMode) {                          // ОТЧЕТ: tap the five dice in, then pick a row
+      manualCounts = [0, 0, 0, 0, 0, 0, 0]; awaitingRoll = false; throwsLeft = 0; dice = []; curLog = null;
+      expRenderAll();
+    } else if (p.isAI) {
       awaitingRoll = false; throwsLeft = ROLLS - 1;
       dice = G.rollAll(); sortDice();
       curLog = expStartLog(p);
@@ -3061,12 +3064,16 @@ body.modal-open{ overflow:hidden; }
     var p = G.currentPlayer(game);
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, key)) return;
-    if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
+    if (manualMode) {
+      // ОПА can rewind this; the turn is logged for category-only analytics (mask BEFORE the pick)
+      undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
+      if (exactReady) moveLog[game.current].push({ mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true });
+    } else if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
     locked = true; expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
     var committed = p.scores[key], delay = END_DELAY;
-    if (G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
+    if (!manualMode && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
     turnTimer = setTimeout(expEndTurn, delay);
   }
   function expEndTurn() {
@@ -3171,6 +3178,25 @@ body.modal-open{ overflow:hidden; }
     out.luckFirst = expAvg(turnDetails.map(function (td) { return td.firstLuck; })) * turnDetails.length;
     out.luckRerolls = out.luck - out.luckFirst;
     out.clutch = out.stages.late.luck;
+    return out;
+  }
+  // manual (ОТЧЕТ) analysis: only the final dice + the row pick are known → category-only, no luck
+  function analyzeManualGameExp(turns) {
+    if (!exactReady || !turns || !turns.length) return null;
+    var decisions = [], turnDetails = [], skill = 0;
+    turns.forEach(function (t, ti) {
+      var cats = [];
+      for (var c = 0; c < EVX.NCAT; c++) { if (t.mask & (1 << c)) continue; var key = EVX.CATS[c].key; cats.push({ key: key, immediate: G.scoreForExp(key, t.dice), ev: expCellValue(t.mask, t.up, c, t.dice) }); }
+      cats.sort(function (a, b) { return b.ev - a.ev; });
+      var chosen = cats.filter(function (c) { return c.key === t.category; })[0], second = cats.length > 1 ? cats[1].ev : cats[0].ev, cost = chosen.ev - cats[0].ev;
+      skill += cost;
+      var dec = { type: 'category', turn: ti, cost: cost, chosenEV: chosen.ev, optimalEV: cats[0].ev, margin: cats[0].ev - second, chosenKey: t.category, optimalKey: cats[0].key, turnCategory: t.category };
+      decisions.push(dec);
+      turnDetails.push({ turn: ti, category: t.category, score: chosen.immediate, skill: cost, forcedZero: !cats.some(function (c) { return c.immediate > 0; }), finalDice: t.dice, decisions: [dec] });
+    });
+    var out = expAggregate(decisions, turnDetails);
+    out.manual = true; out.skill = skill; out.par = window.GeneralEVExactExp ? window.GeneralEVExactExp.par : 143.41;
+    out.avgLostPerTurn = turns.length ? -skill / turns.length : 0;
     return out;
   }
 
@@ -3289,7 +3315,11 @@ body.modal-open{ overflow:hidden; }
   }
 
   // ----- experimental rendering -----
-  function expRenderAll() { expRenderHeader(); expRenderPills(); expRenderBoard(); expRenderDice(); expRenderFire(); expRenderHint(); }
+  function expRenderAll() {
+    expRenderHeader(); expRenderPills(); expRenderBoard();
+    if (manualMode) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; return; }
+    expRenderDice(); expRenderFire(); expRenderHint();
+  }
   function expRenderHeader() {
     var p = G.currentPlayer(game);
     // constant 2-line name: first two words on line 1, the rest + persona on line 2
@@ -3435,7 +3465,7 @@ body.modal-open{ overflow:hidden; }
                personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], scores: p.scores, pts: G.playerTotalExp(p) };
     });
     archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
-      ruleset: 'experimental', ownerSkipped: !!game.ownerSkipped, players: players, moveLog: moveLog });
+      ruleset: 'experimental', manualMode: manualMode, ownerSkipped: !!game.ownerSkipped, players: players, moveLog: moveLog });
   }
   function expShowSummary(g, isHistory, logs) {
     var ranked = X.ranking(g);
@@ -4204,7 +4234,8 @@ body.modal-open{ overflow:hidden; }
       // manual games are analysed too — category decisions only (dice rolls unseen)
       var ready = sumExp() ? exactReady : evReady;
       analysisByPlayer[idx] = (ready && moveLog[idx] && moveLog[idx].length)
-        ? (sumExp() ? analyzeGameExp(moveLog[idx]) : (manualMode ? EV.analyzeManualGame(moveLog[idx]) : EV.analyzeGame(moveLog[idx])))
+        ? (sumExp() ? (manualMode ? analyzeManualGameExp(moveLog[idx]) : analyzeGameExp(moveLog[idx]))
+                    : (manualMode ? EV.analyzeManualGame(moveLog[idx]) : EV.analyzeGame(moveLog[idx])))
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
@@ -5233,9 +5264,9 @@ body.modal-open{ overflow:hidden; }
     var owned = games.filter(function (r) { if (r.excluded) return false; if ((r.ruleset === 'experimental') !== isExp) return false; var oi = recOwnerIdx(r); if (oi < 0) return false; var o = r.players[oi]; return o && !o.isAI; });
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
-      var ana = isExp ? ((r.moveLog && r.moveLog[oi]) ? analyzeGameExp(r.moveLog[oi]) : null) : analyzeRec(r, oi);
+      var ana = isExp ? ((r.moveLog && r.moveLog[oi]) ? (r.manualMode ? analyzeManualGameExp(r.moveLog[oi]) : analyzeGameExp(r.moveLog[oi])) : null) : analyzeRec(r, oi);
       return { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
-               general: (o.scores.general || 0) > 0, name: o.name, manual: isExp ? false : !!r.manualMode };
+               general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
     }).filter(function (d) { return d.ana; });
     if (!data.length) return null;
     var n = data.length;
