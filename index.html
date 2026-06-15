@@ -679,6 +679,7 @@ body.modal-open{ overflow:hidden; }
 
 /* unrolled placeholder dice (tap to make the first throw) */
 .die.ghost{ background:linear-gradient(155deg,#e9e4cf,#c9c2a0); cursor:pointer; animation:ghostpulse 1.4s ease-in-out infinite; }
+.die.preroll{ opacity:.26; cursor:default; box-shadow:none; }   /* blank placeholder before the first throw (no ?) */
 .die.ghost .ghostq{ display:grid; grid-template-columns:repeat(6,1fr); grid-template-rows:repeat(6,1fr); gap:2px; width:42px; height:42px; }
 .die.ghost .ghostq span{ border-radius:2px; }
 .die.ghost .ghostq span.on{ background:var(--gen-pip); box-shadow:inset 0 1px 1px rgba(0,0,0,.5); }
@@ -2818,11 +2819,9 @@ body.modal-open{ overflow:hidden; }
     var p = G.currentPlayer(game);
     var box = $('dice'); box.innerHTML = '';
     if (awaitingRoll) {
+      // before the first throw: dimmed placeholder dice (no ?), the throw happens via the ХВЪРЛИ! button
       for (var k = 0; k < G.DICE_COUNT; k++) {
-        var g = document.createElement('button');
-        g.className = 'die ghost'; g.setAttribute('aria-label', 'Хвърли заровете');
-        g.innerHTML = qmarkHTML();
-        g.onclick = firstRoll;
+        var g = document.createElement('button'); g.className = 'die preroll'; g.disabled = true; g.setAttribute('aria-hidden', 'true');
         box.appendChild(g);
       }
       var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>';
@@ -2852,8 +2851,9 @@ body.modal-open{ overflow:hidden; }
   function renderFire() {
     if (manualMode) return;
     if (awaitingRoll) {
-      $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden');
-      $('rollHint').classList.remove('hidden'); // keeps the footer the same height as after the roll
+      // before the first throw: a single ХВЪРЛИ! button (no ? chooser yet)
+      $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
+      var fa = $('fire'); fa.classList.remove('hidden'); fa.disabled = false; $('fireTxt').textContent = 'ХВЪРЛИ!';
       return;
     }
     $('rollHint').classList.add('hidden');
@@ -2923,6 +2923,7 @@ body.modal-open{ overflow:hidden; }
   }
   function humanFire() {
     if (expMode) { expHumanFire(); return; }
+    if (awaitingRoll) { firstRoll(); return; }   // first throw via the ХВЪРЛИ! button
     if (aiBusy || locked || throwsLeft <= 0) return;
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;                    // nothing to throw
@@ -3069,6 +3070,7 @@ body.modal-open{ overflow:hidden; }
     clearRoast(); expRenderAll(); shakeDice();
   }
   function expHumanFire() {
+    if (awaitingRoll) { expFirstRoll(); return; }   // first throw via the ХВЪРЛИ! button
     if (aiBusy || locked || throwsLeft <= 0) return;
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;
@@ -3435,7 +3437,7 @@ body.modal-open{ overflow:hidden; }
     var box = $('dice'); box.innerHTML = '';
     if (awaitingRoll) {
       for (var k = 0; k < G.DICE_COUNT; k++) {
-        var g = document.createElement('button'); g.className = 'die ghost'; g.innerHTML = qmarkHTML(); g.onclick = expFirstRoll; box.appendChild(g);
+        var g = document.createElement('button'); g.className = 'die preroll'; g.disabled = true; g.setAttribute('aria-hidden', 'true'); box.appendChild(g);
       }
       var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>'; $('throws').innerHTML = td; return;
     }
@@ -3455,8 +3457,8 @@ body.modal-open{ overflow:hidden; }
   function expRenderFire() {
     var p = G.currentPlayer(game);
     if (awaitingRoll) {
-      $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden');
-      $('rollHint').classList.remove('hidden'); return;
+      $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
+      var fa = $('fire'); fa.classList.remove('hidden'); fa.disabled = false; $('fireTxt').textContent = 'ХВЪРЛИ!'; return;
     }
     $('rollHint').classList.add('hidden');
     var fire = $('fire'), think = $('aiThinking');
