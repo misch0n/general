@@ -3762,6 +3762,7 @@ body.modal-open{ overflow:hidden; }
     // term colours mirror the summary: късмет = green, решения = brass-orange, числа = brass,
     // грешка/издънка = red — kept in sync with RC + np/nn/nu and the verdict tints
     var cLuck = 'color:#9bd17e', cSkill = 'color:#e8b06a', cNum = 'color:var(--gen-brass-bright)', cBad = 'color:#e8807a';
+    var exp = sumExp();   // experimental summaries carry extra fields (Раздели + the −50 number part)
     return '<h2>📋 Как се чете обобщението</h2>'
       + '<div class="evexplain" style="margin-bottom:12px"><div class="evxhd">❔ Какво е EV?</div>'
       + '<p><b style="' + cNum + '">EV (очаквана стойност)</b> = средно колко точки носи едно решение, ако се изиграе безброй пъти. '
@@ -3783,6 +3784,7 @@ body.modal-open{ overflow:hidden; }
       + '<li><b>норма + късмет + решения = крайният ти резултат.</b></li>'
       + '<li><b style="' + cLuck + '">Без късмет</b> = резултат − късмет — точките, които идват само от решенията ти.</li>'
       + '<li><b style="' + cNum + '">Оптимално %</b> — какъв процент от ходовете са били оптималните; чинът ти отразява това.</li>'
+      + (exp ? '<li><b style="' + cNum + '">Раздели</b> — как се представи всяка половина на листа: <b>числа</b> (числовата част, ±; <b style="' + cBad + '">−50</b> ако сборът ѝ е минус) и <b>комбинации</b>, плюс изтичането на точки за всяка.</li>' : '')
       + '<li><b style="' + cSkill + '">🎯 Поработи над…</b> — една препоръка за тази игра, събрана от изтичането/издънките/етапите.</li>'
       + '<li><b style="' + cLuck + '">Най-добър ход</b> / <b style="' + cBad + '">Най-скъпа грешка</b> — върховият ти момент и най-скъпата издънка.</li>'
       + '<li><b>Стил</b> — щабът ти лепва досие: Хирург, Комарджия, Чиновник, Късметлия…</li>'
