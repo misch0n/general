@@ -379,7 +379,7 @@ body.modal-open{ overflow:hidden; }
 .evturns[open] summary::before, .evboard[open] summary::before{ content:'▾ '; }
 .evboard .miniboard{ padding:0 10px 10px; }
 /* left: [Хn][combo] · right: [points][luck/decision EV][quality thumb] — uniform columns so rows line up */
-.evtrow{ display:grid; grid-template-columns:26px minmax(0,1fr) 40px 64px 22px; align-items:center; column-gap:6px; padding:4px 10px; font-size:11px;
+.evtrow{ display:grid; grid-template-columns:26px minmax(0,1fr) 40px 64px 38px; align-items:center; column-gap:6px; padding:4px 10px; font-size:11px;
   color:var(--gen-label); border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; }
 .evtrow .tn{ color:var(--gen-muted); font-family:var(--gen-font-display); font-weight:700; }
 .evtrow .tc{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.2px; color:var(--gen-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -388,10 +388,11 @@ body.modal-open{ overflow:hidden; }
 .evtrow .tev{ display:flex; gap:6px; justify-content:flex-end; white-space:nowrap; font-size:10px; color:var(--gen-muted); }
 .evtrow .tev .tl{ display:inline-flex; align-items:baseline; }
 /* per-turn quality thumb (CSS/SVG, theme-coloured) */
-.qicon{ display:inline-flex; align-items:center; justify-content:flex-end; gap:1px; }
+.qicon{ display:inline-flex; align-items:center; justify-content:flex-end; gap:1px; -webkit-appearance:none; appearance:none; background:none; border:0; padding:3px 0 3px 8px; margin:-3px 0; cursor:pointer; color:inherit; position:relative; }
 .qicon .thumb{ width:14px; height:14px; display:block; }
-.qicon.great .thumb{ fill:#9bd17e; } .qicon.ok .thumb{ fill:var(--gen-brass-bright); } .qicon.blunder .thumb{ fill:#e8807a; }
-.evtrow.q-great{ background:rgba(75,140,60,.10); } .evtrow.q-blunder{ background:rgba(178,58,46,.10); }
+.qicon.great .thumb{ fill:#9bd17e; } .qicon.ok .thumb{ fill:var(--gen-brass-bright); }
+.qicon.bad .thumb{ fill:#e8a05a; } .qicon.blunder .thumb{ fill:#e0584a; }
+.evtrow.q-great{ background:rgba(75,140,60,.10); } .evtrow.q-bad{ background:rgba(200,120,40,.10); } .evtrow.q-blunder{ background:rgba(178,58,46,.13); }
 /* Генерал rolled — celebrate the row */
 .evtrow.q-general{ background:linear-gradient(90deg, rgba(232,195,86,.22), rgba(232,195,86,.06)); box-shadow:inset 2px 0 0 var(--gen-brass-bright); }
 .evtrow.q-general .tc{ color:var(--gen-brass-bright); }
@@ -3830,7 +3831,7 @@ body.modal-open{ overflow:hidden; }
       + '<li><b>Стил</b> — щабът ти лепва досие: Хирург, Комарджия, Чиновник, Късметлия…</li>'
       + '<li><b>Ход по ход</b> — разгъни го за пълния разбор; всеки ред показва точки, после две EV числа — '
       + '<b style="' + cLuck + '">късмет</b> (ляво) и <b style="' + cSkill + '">избор</b> (дясно) — плюс оценка: '
-      + '👍👍 върхов · 👍 окей · 👎 издънка. Удебелените зарове са задържаните между хвърлянията; '
+      + '👍👍 върхов · 👍 окей · 👎 слаб · 👎👎 издънка — <b>докосни оценката</b> за конкретен съвет какво е можело по-добре. Удебелените зарове са задържаните между хвърлянията; '
       + '<b style="' + cBad + '">жертваните комбинации</b> са в червено.</li>'
       + '</ul>';
   }
@@ -4664,6 +4665,15 @@ body.modal-open{ overflow:hidden; }
         renderSummary();
       };
     });
+    // tap a turn rating → a small bubble with a tailored coach note for that turn
+    $('ranks').querySelectorAll('.qicon').forEach(function (b) {
+      b.onclick = function (e) {
+        e.stopPropagation();
+        var qpi = +b.getAttribute('data-pi'), qt = +b.getAttribute('data-turn');
+        var ana = summary.ana[qpi]; if (!ana || !ana.turns || !ana.turns[qt]) return;
+        showMedalTip(b, turnComment(qpi, ana.turns[qt], ana));
+      };
+    });
     if (tab === 'cats') renderCatBoard(); else renderProgressChart();
   }
 
@@ -4911,21 +4921,68 @@ body.modal-open{ overflow:hidden; }
     }).join('<span class="rarrow">→</span>');
     return '<div class="evrolls">' + rolls + '</div>';
   }
+  // four-tier turn rating off the decision EV lost in the turn (skill ≤ 0)
   function turnQuality(skill) {
-    if (skill >= -0.05) return { cls: 'q-great' };   // optimal turn
-    if (skill <= -3) return { cls: 'q-blunder' };    // a real blunder
-    return { cls: 'q-ok' };
+    if (skill >= -0.5) return { cls: 'q-great', tier: 'great' };   // essentially optimal
+    if (skill >= -2)   return { cls: 'q-ok', tier: 'ok' };         // minor leak
+    if (skill >= -5)   return { cls: 'q-bad', tier: 'bad' };       // a weak turn
+    return { cls: 'q-blunder', tier: 'blunder' };                  // a real blunder
   }
-  // CSS/SVG thumb glyph (theme-coloured); double thumbs-up = great, single = ok, down = blunder
+  // CSS/SVG thumb glyph (theme-coloured); up = good, down = bad
   function thumbSVG(down) {
     return '<svg class="thumb" viewBox="0 0 24 24" aria-hidden="true"' + (down ? ' style="transform:scaleY(-1)"' : '') + '>'
       + '<path d="M2.5 10.2h3.4v9.3H2.5zM7.4 19.5v-9.1l3.3-5.2c.2-.3.6-.5 1-.4.8.1 1.4.9 1.2 1.7l-.8 3.6h5.2c1.2 0 2 1.1 1.7 2.2l-1.5 5.1c-.2.8-1 1.4-1.8 1.4z"/></svg>';
   }
-  function qualityIcon(skill) {
-    var cls = turnQuality(skill).cls;
-    if (cls === 'q-great') return '<span class="qicon great" title="върхов ход">' + thumbSVG(false) + thumbSVG(false) + '</span>';
-    if (cls === 'q-blunder') return '<span class="qicon blunder" title="издънка">' + thumbSVG(true) + '</span>';
-    return '<span class="qicon ok" title="окей">' + thumbSVG(false) + '</span>';
+  // touchable rating: 👍👍 great · 👍 ok · 👎 bad · 👎👎 blunder — tap pops a tailored coach note
+  function qualityIcon(skill, pi, turn) {
+    var tier = turnQuality(skill).tier, body, title;
+    if (tier === 'great') { body = thumbSVG(false) + thumbSVG(false); title = 'върхов ход'; }
+    else if (tier === 'ok') { body = thumbSVG(false); title = 'окей'; }
+    else if (tier === 'bad') { body = thumbSVG(true); title = 'слаб ход'; }
+    else { body = thumbSVG(true) + thumbSVG(true); title = 'издънка'; }
+    return '<button type="button" class="qicon ' + tier + '" data-pi="' + pi + '" data-turn="' + turn + '"'
+      + ' title="' + title + ' — докосни за съвет" aria-label="' + title + ', докосни за съвет">' + body + '</button>';
+  }
+  // a practical, growth-oriented note for one turn: what was better with these dice,
+  // a flag for blind chasing / over-risk, or plain praise when there's nothing to fix
+  function turnComment(pi, td, fa) {
+    var tier = turnQuality(td.skill).tier;
+    var worst = null;
+    (td.decisions || []).forEach(function (d) { if (!worst || d.cost < worst.cost) worst = d; });
+    var lost = worst ? (Math.round(-worst.cost * 10) / 10) : 0;
+    // nothing material to fix → praise (call out good play through bad dice / a Генерал)
+    if (!worst || worst.cost > -0.5) {
+      if (!fa.manual && typeof td.luck === 'number' && td.luck < -4) return '👌 Лоши зарове, но изигра ги оптимално.';
+      if (td.category === 'general' && td.score > 0) return '🎖 Генерал! Върхов ход.';
+      return tier === 'great' ? '👌 Оптимален ход — нямаше по-добро с тези зарове.' : '👌 Почти оптимално — само дребни загуби.';
+    }
+    // costliest mistake was the category choice
+    if (worst.type === 'category') {
+      var chosenL = sumLabel(worst.chosenKey), optL = sumLabel(worst.optimalKey);
+      if (td.score === 0 && !td.forcedZero)
+        return '🎯 Нулира <b>' + esc(chosenL) + '</b> на сляпо — по-сигурно беше <b>' + esc(optL) + '</b> (−' + lost + ' т.).';
+      if (worst.chosenKey !== worst.optimalKey)
+        return '🎯 По-добре играй <b>' + esc(optL) + '</b> вместо <b>' + esc(chosenL) + '</b> (−' + lost + ' т.).';
+      return '🎯 Имаше малко по-добър избор на поле (−' + lost + ' т.).';
+    }
+    // costliest mistake was a keep — name the better dice to hold + flag over-chasing
+    var found = -1, k = 0;
+    td.decisions.forEach(function (d) { if (d.type === 'keep') { if (d === worst) found = k; k++; } });
+    var log = moveLog[pi] && moveLog[pi][td.turn];
+    var dice = (log && log.rolls && found >= 0) ? log.rolls[found] : null;
+    var keepStr = '';
+    if (dice && worst.optimal) {
+      var kept = []; dice.forEach(function (v, j) { if (worst.optimal[j]) kept.push(v); });
+      keepStr = kept.length ? ' — по-добре задръж <b>' + kept.slice().sort(function (a, b) { return a - b; }).join(' ') + '</b>'
+                            : ' — по-добре не задържай нищо';
+    }
+    var chase = '';
+    if (worst.chosen && worst.optimal) {
+      var chN = worst.chosen.filter(Boolean).length, opN = worst.optimal.filter(Boolean).length;
+      if (chN < opN) chase = ' Подгони по-голямо и прехвърли излишно.';
+      else if (chN > opN) chase = ' Задържа твърде много, без да опиташ да подобриш.';
+    }
+    return '🎲 Слаб избор кои зарове да задържиш (−' + lost + ' т.).' + chase + keepStr;
   }
   // signed EV cell: zero shows as a green +0; negatives red, positives green
   function evNum(v) {
@@ -5079,7 +5136,7 @@ body.modal-open{ overflow:hidden; }
         + '<span class="tc' + (forfeit ? ' forfeit' : '') + '">' + esc(sumLabel(td.category)) + '</span>'
         + '<span class="tv">' + td.score + ' т.</span>'
         + ev
-        + qualityIcon(td.skill) + '</div>';
+        + qualityIcon(td.skill, pi, td.turn) + '</div>';
       html += turnDiceHTML(pi, td, fa.manual);
     });
     html += '</details>';
