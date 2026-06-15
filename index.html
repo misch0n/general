@@ -2550,6 +2550,7 @@ body.modal-open{ overflow:hidden; }
 
   // §1 live "best move" hint (toggle; off for serious play)
   $('hintBtn').onclick = function () {
+    if (expMode) { if (!exactReady) return; hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); expRenderHint(); return; }
     if (!evReady) return;
     hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); renderHint();
   };
@@ -2972,7 +2973,7 @@ body.modal-open{ overflow:hidden; }
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
-    $('hintBtn').classList.add('hidden');
+    $('hintBtn').classList.toggle('hidden', !exactReady);
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
     $('expBoard').classList.remove('hidden');                      // the number-part status bar above it
     $('expReserve').classList.add('hidden');
@@ -2994,13 +2995,14 @@ body.modal-open{ overflow:hidden; }
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
-    $('hintBtn').classList.add('hidden');
+    $('hintBtn').classList.toggle('hidden', !exactReady);
     document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.remove('hidden'); $('expReserve').classList.add('hidden');
     document.querySelector('.dock').classList.remove('hidden'); $('manualDock').classList.add('hidden');
     expBeginTurn();
   }
   function expBeginTurn() {
     locked = false; rerolledAll = false; diceNew = [false, false, false, false, false];
+    hintsOn = false; $('hintBtn').classList.remove('on'); $('hintBtn').classList.toggle('hidden', !exactReady);  // hints need the exact table
     clearRoast();
     var p = G.currentPlayer(game);
     if (!netMode) saveResume();
@@ -3107,6 +3109,40 @@ body.modal-open{ overflow:hidden; }
     turns.forEach(function (t) { try { var a = analyzeTurnExp(t); luck += a.luck; skill += a.skill; dec += a.decisions; opt += a.optimal; if (a.worst && (!worst || a.worst.cost < worst.cost)) worst = a.worst; } catch (e) {} });
     return { luck: luck, skill: skill, accuracy: dec ? opt / dec : 1, blunder: worst, turns: turns.length };
   }
+
+  // ----- live hints (Щабът съветва), exact-EV backed -----
+  var EXP_LABEL = {}; if (X) X.CATS.forEach(function (c) { EXP_LABEL[c.key] = c.label; });
+  function expKeepValue(scores, dice, rollsLeft, keepBools) {
+    var v0 = expV0(scores), arr = [v0]; for (var r = 1; r <= rollsLeft; r++) arr.push(expStageUp(arr[r - 1]));
+    var c = [0, 0, 0, 0, 0, 0, 0]; for (var i = 0; i < dice.length; i++) if (keepBools[i]) c[dice[i]]++;
+    return EVX.dot(EVX.keepResult(c), arr[rollsLeft - 1]);
+  }
+  function expRenderHint() {
+    var line = $('hintLine'), p = G.currentPlayer(game);
+    var show = hintsOn && exactReady && !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    if (!show) { line.classList.add('hidden'); return; }
+    var head, alts;
+    if (throwsLeft > 0) {
+      head = 'Щабът съветва:';
+      var ranked = X.availableKeys(p).map(function (key) {
+        var keep = X.keepFor(key, dice);
+        return { key: key, keep: keep, ev: expKeepValue(p.scores, dice, throwsLeft, keep) };
+      }).sort(function (a, b) { return b.ev - a.ev; });
+      var sigSeen = {}, opts = [];
+      ranked.forEach(function (o) { if (opts.length >= 3) return; var sig = o.keep.map(function (b) { return b ? 1 : 0; }).join(''); if (sigSeen[sig]) return; sigSeen[sig] = 1; opts.push(o); });
+      alts = opts.map(function (o) {
+        var kept = dice.filter(function (v, j) { return o.keep[j]; }), tname = EXP_LABEL[o.key] || o.key;
+        if (kept.length === G.DICE_COUNT) return '<span class="kr">спри · отчети <b>' + esc(tname) + '</b></span>';
+        var dd = kept.length ? '<span class="krd">' + kept.map(hintDie).join('') + '</span>' : '<span class="kr-none">нищо</span>';
+        return '<span class="kr">дръж ' + dd + ' · търсиш <b>' + esc(tname) + '</b></span>';
+      }).join('');
+    } else {
+      head = 'Щабът съветва да отчетеш:';
+      alts = expRankCategories(p.scores, dice).slice(0, 3).map(function (c) { return '<span class="kr"><b>' + esc(EXP_LABEL[c.key] || c.key) + '</b></span>'; }).join('');
+    }
+    line.innerHTML = '<div class="hh">' + esc(head) + '</div><div class="krs">' + alts + '</div>';
+    line.classList.remove('hidden');
+  }
   function expRankCategories(scores, dice) {
     var mask = EVX.maskOfScores(scores), up = G.upperStateExp(scores).subtotal, cats = [];
     for (var i = 0; i < EVX.NCAT; i++) { if (mask & (1 << i)) continue; var key = EVX.CATS[i].key; cats.push({ key: key, immediate: G.scoreForExp(key, dice), ev: expCellValue(mask, up, i, dice) }); }
@@ -3189,7 +3225,7 @@ body.modal-open{ overflow:hidden; }
   }
 
   // ----- experimental rendering -----
-  function expRenderAll() { expRenderHeader(); expRenderPills(); expRenderBoard(); expRenderDice(); expRenderFire(); }
+  function expRenderAll() { expRenderHeader(); expRenderPills(); expRenderBoard(); expRenderDice(); expRenderFire(); expRenderHint(); }
   function expRenderHeader() {
     var p = G.currentPlayer(game);
     $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
