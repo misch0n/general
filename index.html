@@ -34,6 +34,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .board{ position:relative; width:100%; max-width:760px; margin:0 auto; min-height:calc(100vh - 12px);
   border-radius:var(--gen-r-board); overflow:hidden; display:flex; flex-direction:column;
   border:3px solid #1c1d12; box-shadow:0 24px 60px rgba(0,0,0,.6); }
+/* the in-game screen pins a dice footer to the bottom; everything else scrolls beneath it */
+#game.board{ height:100vh; height:100dvh; min-height:0; }
+.gamebody{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; z-index:1; }
+.gamefooter{ flex:none; position:relative; z-index:2; padding:9px 16px 14px; background:var(--gen-panel); border-top:2px solid var(--gen-brass); }
+.gamefooter .dice{ margin:0; }
+.gamefooter.manual{ display:flex; flex-direction:column; align-items:center; gap:12px; }
+.firebar{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:8px 18px 10px; }
 .camo{ position:absolute; inset:0; width:100%; height:100%; z-index:0; }
 .scrim{ position:absolute; inset:0; z-index:0; pointer-events:none;
   background:linear-gradient(180deg, rgba(16,18,9,.62), rgba(16,18,9,.12) 20%, rgba(16,18,9,.12) 74%, rgba(16,18,9,.66)); }
@@ -1145,74 +1152,73 @@ body.modal-open{ overflow:hidden; }
   <div class="banner">ДОСИЕ #0042 — СТРОГО СЕКРЕТНО</div>
   <div id="netLink" class="netlink hidden"></div>
 
-  <div class="hd">
-    <button id="menuBtn" class="rank menubtn" title="Меню" aria-label="Меню"><span class="burger"></span></button>
-    <span class="pinfo">
-      <span id="curName" class="pn"></span>
-      <span class="pmeta">
-        <span id="curRibbons" class="ribbons"></span>
-        <span id="curPersona" class="ppersona hidden"></span>
+  <span id="medals" class="medals" hidden></span>
+  <div class="gamebody">
+    <div class="hd">
+      <button id="menuBtn" class="rank menubtn" title="Меню" aria-label="Меню"><span class="burger"></span></button>
+      <span class="pinfo">
+        <span id="curName" class="pn"></span>
+        <span class="pmeta">
+          <span id="curRibbons" class="ribbons"></span>
+          <span id="curPersona" class="ppersona hidden"></span>
+        </span>
       </span>
-    </span>
-    <span class="totalbox">
-      <span id="curRound" class="ptotal rnum">1/14</span>
-      <span class="tcap">ХОД</span>
-    </span>
-  </div>
-
-  <div class="pstrip">
-    <span id="pillWrap" style="display:contents"></span>
-    <button id="hintBtn" class="minibtn" title="Съвет от щаба (оптимален ход)">СЪВЕТ</button>
-  </div>
-
-  <!-- experimental stage bar (which stage + per-stage point counters); the active
-       stage's card is drawn into the standard .sheet board below -->
-  <div id="expBoard" class="expboard hidden"></div>
-  <div class="sheet">
-    <div id="boardUpper" class="upper"></div>
-    <div id="expNumBar" class="expnumbar hidden"></div>
-    <div id="boardLower" class="lower"></div>
-  </div>
-
-  <!-- running points, sitting above the medals separator; the advice popup overlays it -->
-  <div id="dockHead" class="dockhead">
-    <span class="pointsbox">
-      <span id="curTotal" class="ptotal">0</span>
-      <span class="tcap">ТОЧКИ</span>
-      <span id="curNumPart" class="numpart hidden"></span>
-    </span>
-    <div id="hintLine" class="hintline hidden"></div>
-  </div>
-
-  <div class="divider">
-    <span class="rule"></span>
-    <span id="medals" class="medals"></span>
-    <span class="rule"></span>
-  </div>
-
-  <div id="roast" class="roast"></div>
-
-  <div class="dock">
-    <div id="throws" class="throws"></div>
-    <div id="dice" class="dice"></div>
-    <div id="fireWrap" class="fire-wrap">
-      <button id="fire" class="fire"><span id="fireTxt">ОГИН!</span></button>
-      <button type="button" id="fireQ" class="fire-q" aria-label="Как се избират заровете">?</button>
+      <span class="totalbox">
+        <span id="curRound" class="ptotal rnum">1/14</span>
+        <span class="tcap">ХОД</span>
+      </span>
     </div>
-    <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
-    <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
-    <button type="button" id="expReserve" class="btn small hidden" title="Изхарчи резервно хвърляне">🎁 Резерва</button>
+
+    <div class="pstrip">
+      <span id="pillWrap" style="display:contents"></span>
+      <button id="hintBtn" class="minibtn" title="Съвет от щаба (оптимален ход)">СЪВЕТ</button>
+    </div>
+
+    <div id="expBoard" class="expboard hidden"></div>
+    <div class="sheet">
+      <div id="boardUpper" class="upper"></div>
+      <div id="expNumBar" class="expnumbar hidden"></div>
+      <div id="boardLower" class="lower"></div>
+    </div>
+
+    <!-- running points -->
+    <div id="dockHead" class="dockhead">
+      <span class="pointsbox">
+        <span id="curTotal" class="ptotal">0</span>
+        <span class="tcap">ТОЧКИ</span>
+        <span id="curNumPart" class="numpart hidden"></span>
+      </span>
+      <div id="hintLine" class="hintline hidden"></div>
+    </div>
+
+    <!-- fire controls, in place of the old medals separator -->
+    <div id="firebar" class="firebar">
+      <div id="throws" class="throws"></div>
+      <div id="fireWrap" class="fire-wrap">
+        <button id="fire" class="fire"><span id="fireTxt">ОГИН!</span></button>
+        <button type="button" id="fireQ" class="fire-q" aria-label="Как се избират заровете">?</button>
+      </div>
+      <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
+      <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
+      <button type="button" id="expReserve" class="btn small hidden" title="Изхарчи резервно хвърляне">🎁 Резерва</button>
+    </div>
   </div>
 
-  <!-- manual-entry console (ОТЧЕТ mode): tap in all five table dice, then pick
-       a combo from the board exactly like in regular play -->
-  <div id="manualDock" class="dock manual hidden">
+  <!-- pinned dice footer — only the dice live here -->
+  <div id="diceFooter" class="gamefooter">
+    <div id="dice" class="dice"></div>
+  </div>
+
+  <!-- manual-entry footer (ОТЧЕТ mode): tap the five table dice, then pick a combo above -->
+  <div id="manualDock" class="gamefooter manual hidden">
     <div id="manualSel" class="manualsel">Въведи заровете от масата ↓</div>
     <div id="manualDice" class="dice"></div>
     <div class="manualbtns">
       <button id="undoBottom" class="btn opabtn" title="Отмени последното" disabled>ОПА!</button>
     </div>
   </div>
+
+  <div id="roast" class="roast"></div>
 
   <div id="comboTip" class="combotip hidden"></div>
   <div id="fxBubble" class="fxbubble hidden"></div>
@@ -1654,6 +1660,8 @@ body.modal-open{ overflow:hidden; }
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
+  // dice-roll footer + fire bar vs the manual-entry footer
+  function setDockUI(manual) { $('firebar').classList.toggle('hidden', manual); $('diceFooter').classList.toggle('hidden', manual); $('manualDock').classList.toggle('hidden', !manual); }
 
   // ---------- persistent settings + game archive (localStorage) ----------
   var SETTINGS_KEY = 'general:settings:v1', HISTORY_KEY = 'general:history:v1', RESUME_KEY = 'general:resume:v1';
@@ -2374,7 +2382,7 @@ body.modal-open{ overflow:hidden; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     syncHintBtn();
-    document.querySelector('.dock').classList.remove('hidden'); $('manualDock').classList.add('hidden');
+    setDockUI(false);
     // the first GRANT (onTurn) drives beginTurn
   }
   function netSetTurn(activeId) {
@@ -2472,8 +2480,7 @@ body.modal-open{ overflow:hidden; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     syncHintBtn();
-    document.querySelector('.dock').classList.toggle('hidden', manualMode);
-    $('manualDock').classList.toggle('hidden', !manualMode);
+    setDockUI(manualMode);
     beginTurn();
   }
 
@@ -2489,8 +2496,7 @@ body.modal-open{ overflow:hidden; }
     paintCamo($('game'));
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     syncHintBtn();
-    document.querySelector('.dock').classList.toggle('hidden', manualMode);
-    $('manualDock').classList.toggle('hidden', !manualMode);
+    setDockUI(manualMode);
     beginTurn();
   }
   function maybeOfferResume() {
@@ -3015,8 +3021,7 @@ body.modal-open{ overflow:hidden; }
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
     $('expBoard').classList.add('hidden');
     $('expReserve').classList.add('hidden');
-    document.querySelector('.dock').classList.toggle('hidden', manualMode);
-    $('manualDock').classList.toggle('hidden', !manualMode);
+    setDockUI(manualMode);
     expBeginTurn();
   }
   function resumeExpGame(snap) {
@@ -3035,7 +3040,7 @@ body.modal-open{ overflow:hidden; }
     $('medals').innerHTML = medalSVG('cross') + medalSVG('star') + medalSVG('disc');
     $('hintBtn').classList.toggle('hidden', !exactReady);
     document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
-    document.querySelector('.dock').classList.remove('hidden'); $('manualDock').classList.add('hidden');
+    setDockUI(false);
     expBeginTurn();
   }
   function expBeginTurn() {
