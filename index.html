@@ -2057,7 +2057,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.18.0';
+  var APP_VERSION = '1.18.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4370,7 +4370,7 @@ body.modal-open{ overflow:hidden; }
   function applyReroll(rr) {
     rollNo++;
     var paired = dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i], g: rr[i] ? rollNo : (diceGen[i] || 1) }; });
-    if (settings.newDiceBatch && !expMode) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
+    if (settings.newDiceBatch) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
     else paired.sort(function (a, b) { return a.v - b.v; });
     dice = paired.map(function (x) { return x.v; });
     diceNew = paired.map(function (x) { return x.nw; });
@@ -4524,6 +4524,7 @@ body.modal-open{ overflow:hidden; }
     } else if (p.isAI) {
       awaitingRoll = false; throwsLeft = ROLLS - 1;
       dice = G.rollAll(); sortDice();
+      rollNo = 1; diceGen = dice.map(function () { return 1; });
       curLog = expStartLog(p);
       expRenderAll(); shakeDice();
       expRunAiTurn();
@@ -4539,6 +4540,7 @@ body.modal-open{ overflow:hidden; }
     if (!awaitingRoll || locked) return;
     if (tut && !tutGate('roll')) return;
     awaitingRoll = false; dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
+    rollNo = 1; diceGen = dice.map(function () { return 1; });
     curLog = expStartLog(G.currentPlayer(game));
     clearRoast(); expRenderAll(); shakeDice();
     if (tut) tutEvent('roll');
@@ -4918,9 +4920,13 @@ body.modal-open{ overflow:hidden; }
       var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>'; $('throws').innerHTML = td; return;
     }
     var interactive = !p.isAI && !locked && throwsLeft > 0;
+    var batchMode = settings.newDiceBatch && diceGen.length === dice.length;   // group by roll instead of accenting
     dice.forEach(function (v, i) {
+      if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {
+        var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true'); box.appendChild(sep);
+      }
       var b = document.createElement('button');
-      var sel = selected[i], keepMode = activeKeep(), fresh = diceNew[i];
+      var sel = selected[i], keepMode = activeKeep(), fresh = !batchMode && diceNew[i];
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive;
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
