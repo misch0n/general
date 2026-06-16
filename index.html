@@ -2018,7 +2018,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.12.1';
+  var APP_VERSION = '1.12.2';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -3898,13 +3898,13 @@ body.modal-open{ overflow:hidden; }
   }
   function isMyNetPlayer(p) { return netMode && p && p.owner; }   // each device owns exactly its own seat
   function filledCount(p) { return G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length; }
-  // manual net free-for-all: shame a player who races 2+ categories ahead of the next-fastest one
+  // manual net free-for-all: shame a player who races 2+ categories ahead of the SLOWEST one
   function isMamnik(i) {
     if (!(netMode && manualMode) || !game) return false;
     var others = game.players.filter(function (p, j) { return j !== i && !p.dropped; });
     if (!others.length) return false;
-    var maxOther = Math.max.apply(null, others.map(filledCount));
-    return filledCount(game.players[i]) >= maxOther + 2;
+    var minOther = Math.min.apply(null, others.map(filledCount));
+    return filledCount(game.players[i]) >= minOther + 2;
   }
   function pillHTML(p, i) {
     var col = p.color || 'var(--gen-pill)';
