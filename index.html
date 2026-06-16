@@ -1284,6 +1284,9 @@ body.modal-open{ overflow:hidden; }
   border:1px solid var(--gen-brass-stroke,rgba(212,160,46,.6)); color:var(--gen-brass-bright); font-size:12px; font-weight:700;
   white-space:nowrap; cursor:pointer; -webkit-user-select:none; user-select:none; vertical-align:1px; }
 .ph-chip::before{ content:'⌗ '; opacity:.6; font-weight:400; }
+/* compact read-only chips used in the collapsed item preview */
+.ph-chip.mini{ padding:0 6px; font-size:11px; vertical-align:0; cursor:inherit; }
+.ph-chip.mini::before{ content:none; }
 .tmpl-bar{ display:flex; gap:6px; align-items:center; margin-top:6px; }
 .tmpl-varsel{ flex:1; min-width:0; font-size:12px; padding:5px 6px; border-radius:7px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); color:inherit; }
 /* the variable picker popup (anchored to a tapped chip) */
@@ -1947,7 +1950,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.7.1';
+  var APP_VERSION = '1.7.2';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4839,8 +4842,16 @@ body.modal-open{ overflow:hidden; }
     var changed = cat.items.filter(function (i) { return i.status !== 'unchanged'; }).length;
     return esc(cat.label) + ' (' + cat.items.length + ')' + (changed ? ' <span class="devbadge mod">' + changed + ' промени</span>' : '');
   }
+  // collapsed preview: render placeholder tokens as (read-only) chips, exactly like the editor
+  function tmplPreviewHTML(str) {
+    if (!str) return '∅';
+    return parseTemplate(str).map(function (s) {
+      return s.t === 'text' ? esc(s.v) : '<span class="ph-chip mini">' + esc(varLabelFor(s.token)) + '</span>';
+    }).join('') || '∅';
+  }
   function devItemHeadHTML(cat, it) {
-    return '<span class="diword">' + esc(devItemText(cat, it)) + '</span>'
+    var body = cat.kind === 'word' ? esc(devItemText(cat, it)) : tmplPreviewHTML(it.val);
+    return '<span class="diword">' + body + '</span>'
       + (cat.kind === 'word' && it.val.b && it.val.b !== '10+' ? '<span class="devbk r' + bracketRank(it.val.b) + '" style="pointer-events:none">' + it.val.b + '</span>' : '')
       + (cat.kind === 'word' && it.val.nsfw ? '<span class="dinsfw">NSFW</span>' : '')
       + devBadge(it.status);
