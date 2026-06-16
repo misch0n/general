@@ -1695,6 +1695,7 @@ body.modal-open{ overflow:hidden; }
     <h2 id="netTitle">🔊 Акустична игра</h2>
     <p class="ht ac-only">Играй на няколко телефона наблизо — звукът пренася ходовете. Дръж телефоните на ~1 м, със звук нагоре.</p>
     <p class="ht wr-only hidden">Играй на няколко телефона по интернет. Хостът дава код, останалите го въвеждат.</p>
+    <div class="acwarn wr-only hidden"><span class="acw-ic">📱</span><span><b>Две отделни устройства!</b> На iPhone фоновият раздел се спира — два прозореца на един телефон няма да се свържат. Дръж и двата екрана активни.</span></div>
     <div class="acwarn ac-only"><span class="acw-ic">🎧</span><span><b>Без слушалки!</b> Звукът трябва да минава през високоговорителя и микрофона — със слушалки преносът не работи.</span></div>
     <div id="netChoose">
       <p class="ht">Ти играеш като <b id="netMeName">—</b>.</p>
@@ -1885,7 +1886,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.4.1';
+  var APP_VERSION = '1.4.2';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2642,40 +2643,55 @@ body.modal-open{ overflow:hidden; }
     conn.on('error', function (e) { wrlog('conn-error', wrPeerErr(e)); });
     self.onPeers(self.conns.length);
   };
+  // the PeerJS broker websocket can drop (iOS backgrounding, flaky free cloud) without killing
+  // live data channels — but new joins need it. Re-establish it (same id) instead of giving up.
+  PeerBus.prototype._reconnect = function () {
+    var self = this;
+    if (self._stopped || !self.peer || self.peer.destroyed) return;
+    self._recon = (self._recon || 0) + 1;
+    if (self._recon > 8) { wrlog('reconnect-giveup', { attempts: self._recon }); return; }
+    setTimeout(function () {
+      if (self._stopped || !self.peer || self.peer.destroyed || !self.peer.disconnected) return;
+      wrlog('peer-reconnect', { attempt: self._recon });
+      try { self.peer.reconnect(); } catch (e) { wrlog('reconnect-error', { message: e.message }); }
+    }, Math.min(800 * self._recon, 4000));
+  };
   PeerBus.prototype.start = function () {
     var self = this;
+    self._stopped = false;
     wrlog('bus-start', { role: self.isHost ? 'host' : 'client', code: self.code });
     return new Promise(function (resolve, reject) {
       if (!window.Peer) { wrlog('start-fail', { reason: 'no-peerjs' }); reject(new Error('no-peerjs')); return; }
       var done = false, fail = function (e) { wrlog('start-fail', wrPeerErr(e)); if (!done) { done = true; reject(e); } };
       if (self.isHost) {
         self.peer = new window.Peer(PEER_PREFIX + self.code);
-        self.peer.on('open', function (id) { wrlog('peer-open', { id: id }); if (!done) { done = true; resolve(); } });
+        self.peer.on('open', function (id) { wrlog('peer-open', { id: id }); self._recon = 0; if (!done) { done = true; resolve(); } });
         self.peer.on('connection', function (conn) {
           wrlog('host-incoming', { peer: conn.peer });
           conn.on('open', function () { wrlog('host-conn-open', { peer: conn.peer }); self._addConn(conn); });
           conn.on('error', function (e) { wrlog('host-conn-error', wrPeerErr(e)); });
         });
-        self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); });
+        self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); self._reconnect(); });
+        // a 'network'/socket error after we're open is a transient broker drop — keep the lobby alive
         self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); if (!done) fail(e); });
       } else {
         self.peer = new window.Peer();
         self.peer.on('open', function (id) {
-          wrlog('peer-open', { id: id });
+          wrlog('peer-open', { id: id }); self._recon = 0;
           wrlog('conn-attempt', { target: PEER_PREFIX + self.code });
           var conn = self.peer.connect(PEER_PREFIX + self.code, { reliable: true });
-          var t = setTimeout(function () { wrlog('conn-timeout', {}); fail(new Error('timeout')); }, 15000);
+          var t = setTimeout(function () { wrlog('conn-timeout', {}); fail(new Error('timeout')); }, 20000);
           conn.on('open', function () { wrlog('client-conn-open', { peer: conn.peer }); clearTimeout(t); self._addConn(conn); if (!done) { done = true; resolve(); } });
           conn.on('error', function (e) { wrlog('client-conn-error', wrPeerErr(e)); clearTimeout(t); fail(e); });
           conn.on('close', function () { wrlog('client-conn-close', {}); });
         });
-        self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); });
+        self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); self._reconnect(); });
         self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); fail(e); });
       }
     });
   };
   PeerBus.prototype.stop = function () {
-    wrlog('bus-stop', {});
+    wrlog('bus-stop', {}); this._stopped = true;
     this.conns.forEach(function (c) { try { c.close(); } catch (e) {} }); this.conns = [];
     if (this.peer) { try { this.peer.destroy(); } catch (e) {} } this.peer = null;
   };
