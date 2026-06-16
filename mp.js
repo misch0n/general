@@ -108,8 +108,8 @@
   function unpackPrep(p) { return new Reader(p).u8(); }
   function packAICtrl(id, on) { return new Writer().u8(id).u8(on ? 1 : 0).out(); }              // host → all: a seat is now AI-driven (display)
   function unpackAICtrl(p) { var r = new Reader(p); return { id: r.u8(), on: !!r.u8() }; }
-  function packSpur(id, heat) { return new Writer().u8(id).u8(Math.max(0, Math.min(255, Math.round(heat * 255)))).out(); }
-  function unpackSpur(p) { var r = new Reader(p); return { id: r.u8(), heat: r.u8() / 255 }; }
+  function packSpur(id, heat, clicks) { return new Writer().u8(id).u8(Math.max(0, Math.min(255, Math.round(heat * 255)))).u8(Math.max(0, Math.min(255, clicks || 0))).out(); }
+  function unpackSpur(p) { var r = new Reader(p); return { id: r.u8(), heat: r.u8() / 255, clicks: r.u8() }; }
   // TACT — the active player's live turn action so everyone else can WATCH (display-only):
   // a roll/reroll (dice + remaining throws + which dice are freshly rolled) or a commit (category+value).
   function packAct(a) {
@@ -425,7 +425,7 @@
   };
 
   // lobby cheer: broadcast my „ДАЙ ЗОР" heat so everyone sees it on my entry (host relays)
-  Session.prototype.sendSpur = function (heat) { if (this.state.indexOf('PREP') < 0 && this.state.indexOf('LOBBY') < 0) return; this._send(T.SPUR, packSpur(this.myId, heat)); };
+  Session.prototype.sendSpur = function (heat, clicks) { if (this.state.indexOf('PREP') < 0 && this.state.indexOf('LOBBY') < 0) return; this._send(T.SPUR, packSpur(this.myId, heat, clicks)); };
   // the local active player broadcasts a live turn action (display-only; spectators render it).
   // host → all clients; a client → host, which relays to the rest.
   Session.prototype.sendAction = function (a) {
@@ -566,7 +566,7 @@
       }
     } else if (pkt.type === T.SPUR && this.state === 'PREP') {
       var sp = unpackSpur(pkt.payload);
-      if (this._byId(sp.id)) { this._send(T.SPUR, packSpur(sp.id, sp.heat)); if (this.cb.onSpur) this.cb.onSpur(sp.id, sp.heat); }   // relay + show
+      if (this._byId(sp.id)) { this._send(T.SPUR, packSpur(sp.id, sp.heat, sp.clicks)); if (this.cb.onSpur) this.cb.onSpur(sp.id, sp.heat, sp.clicks); }   // relay + show
     } else if (pkt.type === T.TACT && this.state === 'IN_GAME') {
       var ta = unpackAct(pkt.payload);
       if (ta.playerId === this.activeId) { this._send(T.TACT, packAct(ta)); if (this.cb.onAction) this.cb.onAction(ta); }   // relay to all + render locally
@@ -629,7 +629,7 @@
       if (this.cb.onTakeover) this.cb.onTakeover(ac.id, ac.on);
     } else if (pkt.type === T.SPUR) {
       var csp = unpackSpur(pkt.payload);
-      if (csp.id !== this.myId && this.cb.onSpur) this.cb.onSpur(csp.id, csp.heat);   // someone else's cheer
+      if (csp.id !== this.myId && this.cb.onSpur) this.cb.onSpur(csp.id, csp.heat, csp.clicks);   // someone else's cheer
     } else if (pkt.type === T.TACT) {
       var cta = unpackAct(pkt.payload);
       if (cta.playerId !== this.myId && this.cb.onAction) this.cb.onAction(cta);   // watch the active player live

@@ -514,10 +514,16 @@ body.modal-open{ overflow:hidden; }
 /* „ДАЙ ЗОР" cheer bubble that pops over the spurred player's row */
 .netpp .pp-spur{ position:absolute; right:10px; top:-11px; font-family:var(--gen-font-display); font-weight:800; font-size:12px; letter-spacing:.5px; color:#fff;
   background:#c0392b; padding:2px 9px; border-radius:11px; white-space:nowrap; pointer-events:none; opacity:0; box-shadow:0 2px 7px rgba(0,0,0,.45); transition:opacity .1s; }
+/* full rage: garbled cursing — brighter, jittering */
+.netpp .pp-spur.rage{ background:#e23a26; color:#ffe; box-shadow:0 0 10px rgba(226,58,38,.85); animation:ragejit .08s steps(2) infinite; }
+@keyframes ragejit{ 0%{ transform:translate(0,0) rotate(-1.5deg); } 100%{ transform:translate(1px,-1px) rotate(1.5deg); } }
 .netpp .pp-tag{ font-size:9px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); flex:none; }
 .netpp .pp-rdy{ flex:none; }
 /* readied: a green circle with a white tick */
 .netpp .pp-rdy.ready{ display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#2e9e5b; color:#fff; font-size:11px; font-weight:800; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+/* the same green-circle tick, inline in the „ГОТОВ!" button — as tall as the label, vertically centred */
+#netReady{ display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+.rdy-ic{ display:inline-grid; place-items:center; width:1.15em; height:1.15em; border-radius:50%; background:#2e9e5b; color:#fff; font-size:.82em; font-weight:800; box-shadow:0 0 0 1px rgba(0,0,0,.3); flex:none; }
 /* still configuring: animated „typing" dots */
 .netpp .pp-cfg{ display:inline-flex; gap:4px; align-items:center; flex:none; padding:0 4px; }
 .netpp .pp-cfg i{ width:5px; height:5px; border-radius:50%; background:var(--gen-muted); animation:cfgdot 1.05s infinite ease-in-out; }
@@ -2018,7 +2024,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.12.2';
+  var APP_VERSION = '1.13.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2649,6 +2655,7 @@ body.modal-open{ overflow:hidden; }
       + '</div>';
     $('netMeColor').onclick = function (e) {
       e.stopPropagation();
+      touchedField();   // opening the colour picker signals intent to change → a ready client reverts to ГОТОВ
       // offer only colours no other device is using (the host dedupes anyway, but show free ones)
       var used = net.roster.filter(function (m) { return m.id !== localPid; }).map(function (m) { return (m.color || '').toLowerCase(); });
       openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); markEdited(); }, freeSwatches(netMe.color, used));
@@ -2678,43 +2685,52 @@ body.modal-open{ overflow:hidden; }
   // ---------- „ДАЙ ЗОР" lobby cheer: a spammable button that spurs YOUR entry; heat reddens the
   // row + speeds a rotating cheer; it decays when you stop. Broadcast so everyone sees it. ----------
   var SPUR_MSGS = ['Айде бе!', 'По-бързо!', 'Стегнете се!', 'До кога ще чакам?', 'Бавняри!', 'Кога ще почваме?', 'Айде бе, свине!', 'Мързеливци!', 'Заспахте ли?', 'Стига сте се мотали!', 'Цял ден ли ще се излежавате?', 'Размърдайте се!'];
-  var spurHeat = {}, spurMsgIx = {}, spurAcc = {}, spurRaf = 0, spurLast = 0, spurTxAt = 0;
-  var SPUR_AUTO = 0.35;   // below this, a hit just shows ONE message; above it (spamming), messages auto-cycle
+  var GARBLE_CHARS = '€$¥&)(@#%*!?§£¢¤½‰±×÷~^¶•';
+  var FULL_RAGE = 0.82;   // heat at/above this = full rage → the cheer turns into garbled special chars
+  var spurHeat = {}, spurClicks = {}, spurGarble = {}, spurGarbleT = {}, spurRaf = 0, spurLast = 0, spurTxAt = 0;
   function nowMs() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
-  // one local hit: pop a (new) message + add heat. The first hit picks a random line; further hits advance.
+  // which message a player is on, by how many times they've hit ДАЙ ЗОР this burst:
+  // 1st hit → msg 0; then it takes +2 hits for msg 1, +3 for msg 2, +4 for msg 3, … (rising threshold)
+  function spurMsgForClicks(c) {
+    if (c < 1) return 0;
+    var idx = 0, thr = 1, gap = 2;
+    while (c >= thr + gap) { thr += gap; gap++; idx++; }
+    return idx;
+  }
+  // full rage: garbled special chars, same length as the message it replaces (re-shuffled ~9×/s)
+  function garbleFor(id, len) {
+    var now = Date.now();
+    if (!spurGarble[id] || spurGarble[id].length !== len || now - (spurGarbleT[id] || 0) > 110) {
+      var s = ''; for (var i = 0; i < len; i++) s += GARBLE_CHARS.charAt(Math.floor(Math.random() * GARBLE_CHARS.length));
+      spurGarble[id] = s; spurGarbleT[id] = now;
+    }
+    return spurGarble[id];
+  }
   function spurBump(id) {
     var was = spurHeat[id] || 0;
-    spurHeat[id] = Math.min(1, was + 0.16);
-    spurMsgIx[id] = (was > 0.01) ? (((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length) : Math.floor(Math.random() * SPUR_MSGS.length);
-    spurAcc[id] = 0; applySpurVisual(id); startSpurLoop();
+    spurHeat[id] = Math.min(1, was + 0.17);
+    spurClicks[id] = (was > 0.01 ? (spurClicks[id] || 0) : 0) + 1;   // count hits this burst (resets when cooled)
+    applySpurVisual(id); startSpurLoop();
   }
   function spurMe() {
     if (netPhase !== 'prep' || !net || localPid == null) return;
     spurBump(localPid);
     var t = Date.now();
-    if (t - spurTxAt > 110 && net.sendSpur) { spurTxAt = t; net.sendSpur(spurHeat[localPid]); }   // throttle the broadcast
+    if (t - spurTxAt > 110 && net.sendSpur) { spurTxAt = t; net.sendSpur(spurHeat[localPid], spurClicks[localPid] || 0); }   // throttle the broadcast
   }
-  function onNetSpur(id, heat) {
-    var was = spurHeat[id] || 0;
-    spurHeat[id] = Math.max(was, heat);
-    spurMsgIx[id] = (was > 0.01) ? (((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length) : Math.floor(Math.random() * SPUR_MSGS.length);
-    spurAcc[id] = 0; applySpurVisual(id); startSpurLoop();
+  function onNetSpur(id, heat, clicks) {
+    spurHeat[id] = Math.max(spurHeat[id] || 0, heat);
+    if (clicks != null) spurClicks[id] = clicks;
+    applySpurVisual(id); startSpurLoop();
   }
   function startSpurLoop() { if (spurRaf) return; spurLast = nowMs(); spurRaf = requestAnimationFrame(spurTick); }
   function spurTick(t) {
     var n = t || nowMs(), dt = Math.min(120, n - spurLast); spurLast = n; var any = false;
     Object.keys(spurHeat).forEach(function (id) {
       var h = spurHeat[id]; if (!h) return;
-      h *= Math.pow(0.90, dt / 100); if (h < 0.02) h = 0;   // decay ~10%/100ms
+      h *= Math.pow(0.90, dt / 100); if (h < 0.02) { h = 0; spurClicks[id] = 0; }   // cooled → reset the burst
       spurHeat[id] = h;
-      if (h > 0) {
-        any = true;
-        if (h > SPUR_AUTO) {                                 // only spamming auto-cycles the messages
-          spurAcc[id] = (spurAcc[id] || 0) + dt;
-          var period = Math.max(90, 360 - (h - SPUR_AUTO) * 420);   // hotter → faster (≈360ms…90ms)
-          if (spurAcc[id] >= period) { spurAcc[id] = 0; spurMsgIx[id] = ((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length; }
-        }
-      }
+      if (h > 0) any = true;
       applySpurVisual(id);
     });
     spurRaf = any ? requestAnimationFrame(spurTick) : 0;
@@ -2723,10 +2739,15 @@ body.modal-open{ overflow:hidden; }
     var box = $('netPrepRoster'); if (!box) return;
     var row = box.querySelector('.netpp[data-id="' + id + '"]'); if (!row) return;
     var h = spurHeat[id] || 0; row.style.setProperty('--heat', h.toFixed(3));
-    var sp = row.querySelector('.pp-spur');
-    if (sp) { if (h > 0.05) { sp.textContent = SPUR_MSGS[spurMsgIx[id] || 0]; sp.style.opacity = Math.min(1, h * 2.4); } else { sp.textContent = ''; sp.style.opacity = 0; } }
+    var sp = row.querySelector('.pp-spur'); if (!sp) return;
+    if (h <= 0.05) { sp.textContent = ''; sp.style.opacity = 0; sp.classList.remove('rage'); return; }
+    var base = SPUR_MSGS[Math.min(spurMsgForClicks(spurClicks[id] || 0), SPUR_MSGS.length - 1)] || SPUR_MSGS[0];
+    var rage = h >= FULL_RAGE;
+    sp.textContent = rage ? garbleFor(id, base.length) : base;
+    sp.classList.toggle('rage', rage);
+    sp.style.opacity = Math.min(1, 0.55 + h * 1.2);
   }
-  function resetSpur() { spurHeat = {}; spurMsgIx = {}; spurAcc = {}; if (spurRaf) { cancelAnimationFrame(spurRaf); spurRaf = 0; } }
+  function resetSpur() { spurHeat = {}; spurClicks = {}; spurGarble = {}; spurGarbleT = {}; if (spurRaf) { cancelAnimationFrame(spurRaf); spurRaf = 0; } }
   function renderNetPrep() {
     if (!net) return;
     $('netPrepRoster').innerHTML = net.roster.map(function (m) {
@@ -2760,7 +2781,8 @@ body.modal-open{ overflow:hidden; }
     } else {
       $('netReady').classList.toggle('on', netMyReady);
       $('netReady').classList.toggle('spur', netMyReady);
-      $('netReady').textContent = netMyReady ? '🔥 ДАЙ ЗОР!' : 'Готов съм ✔';
+      // not ready → „ГОТОВ!" with the same green-circle tick used on the roster rows
+      $('netReady').innerHTML = netMyReady ? '🔥 ДАЙ ЗОР!' : 'ГОТОВ! <span class="rdy-ic">✓</span>';
     }
   }
   function netStartTransport(then) {
