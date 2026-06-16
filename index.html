@@ -520,7 +520,8 @@ body.modal-open{ overflow:hidden; }
 .netpp .pp-tag{ font-size:9px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); flex:none; }
 .netpp .pp-rdy{ flex:none; }
 /* readied: a green circle with a white tick */
-.netpp .pp-rdy.ready{ display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#2e9e5b; color:#fff; font-size:11px; font-weight:800; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+.netpp .pp-rdy.ready{ position:relative; display:inline-block; width:18px; height:18px; border-radius:50%; background:#2e9e5b; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+.netpp .pp-rdy.ready::after{ content:''; position:absolute; left:50%; top:50%; width:4px; height:7px; border:solid #fff; border-width:0 2px 2px 0; transform:translate(-50%,-58%) rotate(45deg); }
 /* the same green-circle tick, inline in the „ГОТОВ!" button — as tall as the label, vertically centred */
 #netReady{ display:inline-flex; align-items:center; justify-content:center; gap:7px; }
 .rdy-ic{ position:relative; display:inline-block; width:1.2em; height:1.2em; border-radius:50%; background:#2e9e5b; box-shadow:0 0 0 1px rgba(0,0,0,.3); flex:none; }
@@ -2026,7 +2027,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.13.1';
+  var APP_VERSION = '1.13.2';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2755,7 +2756,7 @@ body.modal-open{ overflow:hidden; }
     $('netPrepRoster').innerHTML = net.roster.map(function (m) {
       var tags = (m.id === MP.HOST_ID ? '<span class="pp-tag">старшина</span>' : '') + (m.isAI ? '<span class="pp-tag">🤖 AI</span>' : '');
       var rdy = m.id === MP.HOST_ID || m.isAI ? ''
-        : (m.ready ? '<span class="pp-rdy ready" title="готов">✓</span>'
+        : (m.ready ? '<span class="pp-rdy ready" title="готов"></span>'
                    : '<span class="pp-cfg" title="нагласява се"><i></i><i></i><i></i></span>');
       var kick = (net.isHost && m.isAI) ? '<button class="pp-kick" data-id="' + m.id + '">✕</button>' : '';
       return '<div class="netpp" data-id="' + m.id + '" style="--heat:' + ((spurHeat[m.id] || 0).toFixed(3)) + '"><span class="netdot" style="background:' + m.color + '"></span><span class="pp-nm">' + esc(m.name)
