@@ -463,29 +463,29 @@ body.modal-open{ overflow:hidden; }
 .nethostcode .netcode-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; }
 .nethostcode .netcode-show{ font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright);
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:pointer; }
-.codecopy, .codeqr{ display:inline-grid; place-items:center; width:30px; height:30px; flex:none;
+.codecopy{ display:inline-grid; place-items:center; width:30px; height:30px; flex:none;
   border-radius:7px; background:rgba(255,255,255,.06); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); cursor:pointer; transition:background .15s, border-color .15s, color .15s; }
+/* join-code row: the scan/paste buttons match the code field's height, kept square */
+.netjoincode .codecopy{ width:auto; height:auto; aspect-ratio:1/1; min-width:38px; }
 /* CSS-drawn copy glyph: two overlapping document sheets */
 .copy-ic{ position:relative; width:13px; height:14px; display:block; color:inherit; }
 .copy-ic::before{ content:''; position:absolute; top:0; right:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; }
 .copy-ic::after{ content:''; position:absolute; bottom:0; left:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; background:var(--gen-ink,#16160e); }
 /* tapped: green tint (no text) */
 .codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
-/* CSS-drawn QR glyph: three finder squares + a stray module */
-.qr-ic{ position:relative; width:15px; height:15px; display:block; color:inherit; }
-.qr-ic::before{ content:''; position:absolute; top:0; left:0; width:5px; height:5px; border:1.5px solid currentColor;
-  box-shadow:10px 0 0 -0.5px currentColor, 0 10px 0 -0.5px currentColor; }
-.qr-ic::after{ content:''; position:absolute; right:1px; bottom:1px; width:3px; height:3px; background:currentColor;
-  box-shadow:-5px 0 0 currentColor, 0 -5px 0 currentColor; }
-.codeqr.on{ background:rgba(212,160,46,.28); border-color:var(--gen-brass); color:var(--gen-brass-bright); }
 /* CSS-drawn camera glyph: body + lens */
 .cam-ic{ position:relative; width:17px; height:13px; display:block; color:inherit; }
 .cam-ic::before{ content:''; position:absolute; top:1px; left:0; right:0; bottom:0; border:1.5px solid currentColor; border-radius:2px; }
 .cam-ic::after{ content:''; position:absolute; top:4px; left:50%; transform:translateX(-50%); width:5px; height:5px; border:1.5px solid currentColor; border-radius:50%; }
-/* the revealed game-code QR (host side) */
-.netcodeqr{ width:100%; max-width:180px; margin:10px auto 2px; background:#fff; padding:8px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+/* CSS-drawn clipboard-paste glyph: a board with a clip on top */
+.paste-ic{ position:relative; width:13px; height:15px; display:block; color:inherit; }
+.paste-ic::before{ content:''; position:absolute; top:2px; left:0; right:0; bottom:0; border:1.5px solid currentColor; border-radius:2px; }
+.paste-ic::after{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:6px; height:4px; border:1.5px solid currentColor; border-radius:1px; background:var(--gen-ink,#16160e); }
+/* the game-code QR (host side / in-game reconnect) — always shown above the code */
+.netcodeqr{ width:100%; max-width:172px; margin:10px auto 8px; background:#fff; padding:8px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
 .netcodeqr svg{ display:block; width:100%; height:auto; }
 .netcodeqr .qr-load{ display:block; padding:18px 6px; color:#16160e; font-size:12px; text-transform:none; letter-spacing:0; }
+.netcode-lbl{ margin-bottom:2px; }
 .netjoinview{ margin:6px 0; }
 /* regular vs manual network-game switcher */
 .netmodeswitch{ display:flex; gap:0; margin:4px 0 12px; border:1px solid var(--gen-pill-line); border-radius:9px; overflow:hidden; background:rgba(0,0,0,.25); }
@@ -1841,12 +1841,13 @@ body.modal-open{ overflow:hidden; }
         <div class="netjoincode">
           <input id="netCodeInput" class="netcode-in" maxlength="6" placeholder="КОД" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" />
           <button type="button" id="netCodeScan" class="codecopy wr-only hidden" title="Сканирай QR код" aria-label="Сканирай QR код"><i class="cam-ic"></i></button>
+          <button type="button" id="netCodePaste" class="codecopy wr-only hidden" title="Постави от клипборда" aria-label="Постави код от клипборда"><i class="paste-ic"></i></button>
         </div>
         <div class="setup-actions">
           <button id="netCodeJoin" class="btn primary">Влез с кода</button>
         </div>
         <div class="setup-actions">
-          <button id="netJoinCancel" class="btn small">↩ Назад</button>
+          <button id="netJoinCancel" class="btn small">Назад</button>
         </div>
       </div>
       <div class="setup-actions">
@@ -1863,7 +1864,7 @@ body.modal-open{ overflow:hidden; }
         <button id="optNext" class="btn primary hidden"></button>
       </div>
       <div class="setup-actions">
-        <button id="optCancel" class="btn small">↩ Назад</button>
+        <button id="optCancel" class="btn small">Назад</button>
       </div>
     </div>
     <!-- WebRTC packet/event capture: record every connection event + frame, export base64 JSON -->
@@ -2050,7 +2051,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.15.0';
+  var APP_VERSION = '1.16.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2207,6 +2208,7 @@ body.modal-open{ overflow:hidden; }
   }
   var RIBBON_COLORS = ['#b23a2e', '#2f4a6b', '#c8a64b', '#3f6b3a', '#7a4632', '#c8a64b'];
   var AI_DELAY = 680, END_DELAY = 620, AI_VIEW_DELAY = 1500, ROLLS = G.MAX_ROLLS; // 1 auto roll + (ROLLS-1) rerolls
+  var NET_HANDOVER_DELAY = 2800;   // net: hold the committed board longer so the chosen category is clearly seen before the turn passes
 
   function initials(name) {
     var p = name.trim().split(/\s+/);
@@ -3192,6 +3194,16 @@ body.modal-open{ overflow:hidden; }
       netChooseMsg(''); codeScanShow();
     });
   };
+  // paste: pull the code straight from the clipboard into the field
+  $('netCodePaste').onclick = function () {
+    if (netKind !== 'webrtc') return;
+    if (!(navigator.clipboard && navigator.clipboard.readText)) { netChooseMsg('⚠ Браузърът не дава достъп до клипборда — постави ръчно.'); return; }
+    navigator.clipboard.readText().then(function (t) {
+      var code = extractGameCode(t);
+      if (code) { $('netCodeInput').value = code; netChooseMsg('Поставен код: ' + code + '.'); }
+      else netChooseMsg('⚠ В клипборда няма код за игра.');
+    }).catch(function () { netChooseMsg('⚠ Нямам достъп до клипборда — постави ръчно.'); });
+  };
   // leave the join sub-view, back to the host/join picker
   $('netJoinCancel').onclick = function () {
     $('netJoinCode').classList.add('hidden'); $('netPickRole').classList.remove('hidden');
@@ -3207,12 +3219,10 @@ body.modal-open{ overflow:hidden; }
   // ---- WebRTC host: mint a code, open the PeerJS link, then run the normal lobby ----
   // host code display: the code is NOT selectable; a copy button next to it flips to a „copied" state.
   // shared markup + wiring for a game code with a CSS copy icon
-  function codeCopyHTML(code, withQR) {
+  // the code text + copy button; tapping either the text or the button copies the code.
+  function codeCopyLine(code) {
     return '<div class="netcode-line"><b class="netcode-show">' + code + '</b>'
-      + '<button type="button" class="codecopy" title="Копирай кода" aria-label="Копирай кода"><i class="copy-ic"></i></button>'
-      + (withQR ? '<button type="button" class="codeqr" title="Покажи QR код" aria-label="Покажи QR код"><i class="qr-ic"></i></button>' : '')
-      + '</div>'
-      + (withQR ? '<div class="netcodeqr hidden"></div>' : '');
+      + '<button type="button" class="codecopy" title="Копирай кода" aria-label="Копирай кода"><i class="copy-ic"></i></button></div>';
   }
   function wireCodeCopy(container, code) {
     var btn = container.querySelector('.codecopy');
@@ -3221,34 +3231,32 @@ body.modal-open{ overflow:hidden; }
     // not pointerdown (which iOS Safari does NOT treat as activating for the clipboard)
     var hold = container.querySelector('.netcode-show');
     if (hold) hold.onclick = function () { copyGameCode(code, btn); };
-    var qrBtn = container.querySelector('.codeqr');
-    if (qrBtn) qrBtn.onclick = function () { toggleCodeQR(container, code, qrBtn); };
   }
-  // host: a tap reveals (or hides) a QR of the game code — the guest can scan it instead of typing.
-  // qrcode-generator is lazy-loaded the first time (needs internet once, then it's cached).
-  function toggleCodeQR(container, code, btn) {
-    var box = container.querySelector('.netcodeqr'); if (!box) return;
-    if (!box.classList.contains('hidden')) { box.classList.add('hidden'); btn.classList.remove('on'); return; }
-    box.classList.remove('hidden'); btn.classList.add('on');
-    if (window.qrcode) { renderCodeQR(box, code); return; }
-    box.innerHTML = '<span class="qr-load">Зареждам QR…</span>';
+  // render a scannable QR of the code into qbox; qrcode-generator is lazy-loaded the first
+  // time (needs internet once, then it's cached), with a graceful offline fallback.
+  function renderCodeQRInto(qbox, code) {
+    if (!qbox) return;
+    if (window.qrcode) { renderCodeQR(qbox, code); return; }
+    qbox.innerHTML = '<span class="qr-load">Зареждам QR…</span>';
     loadOpticalLibs(function (ok) {
-      if (!ok || !window.qrcode) { box.innerHTML = '<span class="qr-load">⚠ Няма QR (нужен е интернет първия път).</span>'; return; }
-      renderCodeQR(box, code);
+      if (ok && window.qrcode) renderCodeQR(qbox, code);
+      else qbox.innerHTML = '<span class="qr-load">⚠ Няма QR (нужен е интернет първия път).</span>';
     });
   }
-  function renderCodeQR(box, code) {
+  function renderCodeQR(qbox, code) {
     try {
       var qr = window.qrcode(0, 'M'); qr.addData(String(code)); qr.make();
-      box.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
-      var svg = box.querySelector('svg'); if (svg) { svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto'; }
-    } catch (e) { box.innerHTML = '<span class="qr-load">⚠ Грешка при QR.</span>'; }
+      qbox.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+      var svg = qbox.querySelector('svg'); if (svg) { svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto'; }
+    } catch (e) { qbox.innerHTML = '<span class="qr-load">⚠ Грешка при QR.</span>'; }
   }
+  // host lobby: show the QR up top so a guest can scan it, with the code + copy button beneath.
   function renderHostCode(code) {
     var box = $('netHostCode');
-    box.innerHTML = 'Код за играта' + codeCopyHTML(code, true);
+    box.innerHTML = '<div class="netcode-lbl">Код за играта</div><div class="netcodeqr"></div>' + codeCopyLine(code);
     box.classList.remove('hidden');
     wireCodeCopy(box, code);
+    renderCodeQRInto(box.querySelector('.netcodeqr'), code);
   }
   // robust clipboard copy: a synchronous execCommand path (works inside the tap gesture on iOS
   // Safari, where navigator.clipboard often rejects), with the async Clipboard API as a backup.
@@ -3643,8 +3651,10 @@ body.modal-open{ overflow:hidden; }
     if (!(netMode && netKind === 'webrtc' && net)) return;
     var pid = (netAiActiveId != null && net.isHost) ? netAiActiveId : (netMyTurn ? localPid : null);
     if (pid == null) return;
-    var mask = 0; for (var i = 0; i < 5; i++) if (diceNew[i]) mask |= (1 << i);
-    var a = { playerId: pid, throwsLeft: throwsLeft, dice: dice.slice(), mask: mask };
+    var mask = 0, selMask = 0;
+    for (var i = 0; i < 5; i++) { if (diceNew[i]) mask |= (1 << i); if (selected[i]) selMask |= (1 << i); }
+    // sel/keep let spectators see which dice the active player is holding vs throwing, live
+    var a = { playerId: pid, throwsLeft: throwsLeft, dice: dice.slice(), mask: mask, sel: selMask, keep: activeKeep() ? 1 : 0 };
     if (extra) for (var k in extra) a[k] = extra[k];
     try { net.sendAction(a); } catch (e) {}
   }
@@ -3662,16 +3672,18 @@ body.modal-open{ overflow:hidden; }
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
     dice = (a.dice || []).slice(); throwsLeft = a.throwsLeft || 0;
     diceNew = [0, 1, 2, 3, 4].map(function (i) { return !!(a.mask & (1 << i)); });
-    selected = [false, false, false, false, false];
+    // mirror the active player's keep/throw selection so watchers see their decision form
+    selected = [0, 1, 2, 3, 4].map(function (i) { return !!(a.sel & (1 << i)); });
+    specKeepMode = (a.keep != null) ? !!a.keep : null;
     renderAll();
     if (a.commit) { if (a.category != null) flashTile(G.CATEGORIES[a.category].key); }
-    else { shakeDice(); }
+    else if (!a.selOnly) { shakeDice(); }   // a pure selection change shouldn't re-shake the tray
   }
   // tap your own board while spectating → see your usual during-turn screen (read-only preview)
   function previewSelf() {
     if (!netMode || localPid == null) return;
     var seat = netOrder.indexOf(localPid); if (seat < 0) return;
-    specSelf = true;
+    specSelf = true; specKeepMode = null;   // my own board uses my own keep/throw flavour
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
     dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
     renderAll(); syncSpecReturn();
@@ -3765,8 +3777,9 @@ body.modal-open{ overflow:hidden; }
     var box = $('menuNetCode'); if (!box) return;
     if (!netMode || !net || !net.isHost || netKind !== 'webrtc' || !wrCode) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     box.classList.remove('hidden');
-    box.innerHTML = 'Код за връщане в играта' + codeCopyHTML(wrCode, true) + '<div class="mnc-hint">Разпаднал се боец може да влезе пак с този код — или да сканира QR-а.</div>';
+    box.innerHTML = '<div class="netcode-lbl">Код за връщане в играта</div><div class="netcodeqr"></div>' + codeCopyLine(wrCode) + '<div class="mnc-hint">Разпаднал се боец може да влезе пак с този код — или да сканира QR-а.</div>';
     wireCodeCopy(box, wrCode);
+    renderCodeQRInto(box.querySelector('.netcodeqr'), wrCode);
   }
   // in-game WebRTC log export: same payload as wrCapCopy, but reachable mid-game from the Щаб menu
   // (shown only with the debug toggle on) so a connection hiccup can be captured the moment it happens.
@@ -3801,6 +3814,7 @@ body.modal-open{ overflow:hidden; }
   var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var netActiveId = null, specSelf = false, specAct = null;   // spectating: who's playing, am I previewing my own board, last action
+  var specKeepMode = null;   // while watching: the active player's keep/throw flavour (null = use my own)
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
@@ -3872,7 +3886,7 @@ body.modal-open{ overflow:hidden; }
     document.documentElement.style.setProperty('--pc', p.color);
     if (netMode) {
       // the active player drives input on their own device; everyone else watches
-      selected = [false, false, false, false, false];
+      selected = [false, false, false, false, false]; specKeepMode = null;
       dice = []; throwsLeft = 0; curLog = null;
       if (netMyTurn) { awaitingRoll = true; locked = false; throwsLeft = ROLLS - 1; renderAll(); showOrder(p); }   // my turn: a first roll + (ROLLS-1) rerolls
       else { awaitingRoll = false; locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
@@ -4216,7 +4230,7 @@ body.modal-open{ overflow:hidden; }
       var b = document.createElement('button');
       var sel = !fx.dice && fx.diceKeep == null && selected[i];
       var fresh = !fx.dice && fx.diceKeep == null && diceNew[i];   // just rerolled — accent for easy scanning
-      var keepMode = activeKeep();
+      var keepMode = specKeepMode != null ? specKeepMode : activeKeep();   // watching → mirror the active player's flavour
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive;
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
@@ -4273,6 +4287,7 @@ body.modal-open{ overflow:hidden; }
     selected[i] = !selected[i];
     if (expMode) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
+    if (netMode && netKind === 'webrtc' && netMyTurn) netSendAct({ selOnly: true });   // watchers see my keep/throw choice live
   }
   $('fire').onclick = function () { humanFire(); };
   $('specReturn').onclick = function () { returnToCurrent(); };
@@ -4389,8 +4404,8 @@ body.modal-open{ overflow:hidden; }
       if (netAiActiveId == null && G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming on my own commit
       var mv = { category: CAT_INDEX[key], score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
       // hold the committed board a beat (comprehension) before the move propagates and the turn passes
-      if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, AI_VIEW_DELAY); }  // host injects the AI seat's move
-      else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, AI_VIEW_DELAY); }
+      if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }  // host injects the AI seat's move
+      else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
       return;
     }
     if (manualMode) {
