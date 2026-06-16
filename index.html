@@ -921,6 +921,18 @@ body.modal-open{ overflow:hidden; }
 .histform .rk.r2{ background:#c0c4cc; color:#1a1a12; }
 .histform .rk.r3{ background:#b87333; color:#fff; }
 .histform .rk.r4{ background:rgba(255,255,255,.12); color:var(--gen-muted); }
+.histform .rk.rx{ background:rgba(255,255,255,.06); color:var(--gen-disabled); }   /* unranked (single-player) game */
+.ho-noranked{ font-size:9px; color:var(--gen-muted); font-style:italic; }
+.hg-mode{ text-transform:uppercase; font-size:8.5px; letter-spacing:.4px; color:var(--gen-label); opacity:.9; }
+/* manual-game multiplayer / placement annotation (summary) */
+.mpresult{ margin:0 0 11px; padding:9px 11px; border-radius:9px; background:rgba(200,166,75,.1); border:1px solid var(--gen-brass-stroke); }
+.mpresult.hidden{ display:none; }
+.mpresult .mpr-q{ display:block; font-size:11px; color:var(--gen-label); font-weight:700; margin-bottom:7px; }
+.mpresult .mpr-opts{ display:flex; gap:6px; flex-wrap:wrap; }
+.mpresult .mpr-opt{ flex:1; min-width:46px; padding:6px 8px; border-radius:7px; border:1px solid var(--gen-pill-line); background:rgba(255,255,255,.04);
+  color:var(--gen-text); cursor:pointer; font-family:var(--gen-font-display); font-weight:700; font-size:11px; }
+.mpresult .mpr-opt:hover{ border-color:var(--gen-brass); }
+.mpresult .mpr-opt.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
 .noowner{ text-align:center; padding:16px 12px; color:var(--gen-muted); font-size:12.5px; line-height:1.5; }
 .noowner .nohd{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:14px; margin-bottom:6px; }
 .histgame{ position:relative; display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
@@ -1371,6 +1383,17 @@ body.modal-open{ overflow:hidden; }
     </div>
     <div id="winHeadline" class="winhead"></div>
     <div id="winBadges" class="winbadges"></div>
+    <!-- manual games: was it multiplayer + your placement? (drives victories / win-rate) -->
+    <div id="mpResultBox" class="mpresult hidden">
+      <span class="mpr-q">Тази игра беше с други? Класиране:</span>
+      <div class="mpr-opts">
+        <button type="button" class="mpr-opt" data-mp="solo">сам</button>
+        <button type="button" class="mpr-opt" data-mp="1">1ви 👑</button>
+        <button type="button" class="mpr-opt" data-mp="2">2ри</button>
+        <button type="button" class="mpr-opt" data-mp="3">3ти</button>
+        <button type="button" class="mpr-opt" data-mp="4">4+</button>
+      </div>
+    </div>
     <div class="tabs tabs4">
       <button id="tabStand" class="tab on">Точки</button>
       <button id="tabSkill" class="tab">Умение</button>
@@ -1821,7 +1844,8 @@ body.modal-open{ overflow:hidden; }
     while (arr.length) { if (lsSet(HISTORY_KEY, JSON.stringify(arr))) return true; arr.shift(); }
     lsDel(HISTORY_KEY); return false;
   }
-  function archiveGame(rec) { var arr = loadHistory(); arr.push(rec); persistHistory(arr); }
+  var lastGameRec = null;   // the most recently archived record (so a live summary can annotate it)
+  function archiveGame(rec) { var arr = loadHistory(); arr.push(rec); persistHistory(arr); lastGameRec = rec; return rec; }
 
   // serialise the live players (shared by the archive and the resume snapshot)
   function serializePlayers() {
@@ -4424,17 +4448,42 @@ body.modal-open{ overflow:hidden; }
   function setOverTitle() {
     var rec = viewingHistory ? currentHistRec : null;
     var head = $('overHead'), title = $('overTitle'), sub = $('overSubdate');
+    var mode = (rec ? rec.manualMode : manualMode) ? 'отчет' : 'игра';   // manual vs regular
     if (!rec) {
-      head.classList.remove('editable'); sub.classList.add('hidden');
+      head.classList.remove('editable');
       title.textContent = '🏆 Край на битката'; title.onclick = null;
+      sub.textContent = mode; sub.classList.remove('hidden');
+      renderMpResult();
       return;
     }
     // history: the title doubles as a rename box on tap (no pencil — the box itself implies it)
     head.classList.add('editable');
     title.textContent = rec.name || 'Край на битката';
-    sub.textContent = fmtDate(rec.ts) + ' · ' + fmtTime(rec.ts); sub.classList.remove('hidden');
+    sub.textContent = fmtDate(rec.ts) + ' · ' + fmtTime(rec.ts) + ' · ' + mode; sub.classList.remove('hidden');
     title.onclick = function () { startRename(rec); };
+    renderMpResult();
   }
+  // which archived record the current summary is annotating (history vs the just-finished game)
+  function summaryRec() { return viewingHistory ? currentHistRec : lastGameRec; }
+  function setMpResult(val) {
+    var rec = summaryRec(); if (!rec) return;
+    rec.mpResult = val;
+    var arr = loadHistory(), r = arr.filter(function (x) { return x.id === rec.id; })[0];
+    if (r) { r.mpResult = val; persistHistory(arr); }
+    renderMpResult();
+  }
+  // manual games: a control to declare it was multiplayer + the owner's placement (else it's
+  // unranked and won't count toward victories / win-rate)
+  function renderMpResult() {
+    var rec = summaryRec(), show = !!(rec && rec.manualMode);
+    $('mpResultBox').classList.toggle('hidden', !show);
+    if (!show) return;
+    var mp = rec.mpResult, cur = mp ? (mp.solo ? 'solo' : (typeof mp.place === 'number' ? String(mp.place > 4 ? 4 : mp.place) : '')) : '';
+    $('mpResultBox').querySelectorAll('.mpr-opt').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-mp') === cur); });
+  }
+  $('mpResultBox').querySelectorAll('.mpr-opt').forEach(function (b) {
+    b.onclick = function () { var v = b.getAttribute('data-mp'); setMpResult(v === 'solo' ? { solo: true } : { place: +v }); };
+  });
   function startRename(rec) {
     var title = $('overTitle');
     if ($('overHead').querySelector('.titlerename')) return;   // already editing
@@ -5205,6 +5254,17 @@ body.modal-open{ overflow:hidden; }
   function recTotal(sp) { if (typeof sp.pts === 'number') return sp.pts; var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
   function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
   function recOwnerIdx(rec) { if (rec.ownerSkipped) return -1; for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // -1: owner skipped; legacy: seat 0
+  // a game counts toward victories / win-rate only when it had MORE THAN ONE player and a
+  // known placement. Single-player games (regular or manual) are unranked — they still feed
+  // the averages (personal best, playstyle), just not the win stats. A manual game can be
+  // annotated by the owner (rec.mpResult) to declare it was multiplayer + their placement.
+  function gameRanking(rec) {
+    var oi = recOwnerIdx(rec), mp = rec.mpResult;
+    if (mp && typeof mp.place === 'number') return { ranked: true, place: mp.place };
+    if (mp && mp.solo) return { ranked: false, place: null };
+    if (oi >= 0 && rec.players.length > 1) return { ranked: true, place: recPlacement(rec, oi) };
+    return { ranked: false, place: null };
+  }
   function analyzeRec(rec, i) {
     if (rec.ruleset === 'experimental') return null;     // analysed separately (analyzeGameExp), never by the standard engine
     var log = rec.moveLog && rec.moveLog[i];
@@ -5470,7 +5530,8 @@ body.modal-open{ overflow:hidden; }
     var data = owned.map(function (r) {
       var oi = recOwnerIdx(r), o = r.players[oi];
       var ana = isExp ? ((r.moveLog && r.moveLog[oi]) ? (r.manualMode ? analyzeManualGameExp(r.moveLog[oi]) : analyzeGameExp(r.moveLog[oi])) : null) : analyzeRec(r, oi);
-      var item = { rec: r, ana: ana, total: recTotal(o), place: recPlacement(r, oi), n: r.players.length,
+      var rk = gameRanking(r);
+      var item = { rec: r, ana: ana, total: recTotal(o), ranked: rk.ranked, place: rk.place, n: r.players.length,
                general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
       if (isExp) { item.secUpper = G.upperStateExp(o.scores).contribution; item.secLower = 0; CATS.forEach(function (c) { if (c.group === 'lower' && typeof o.scores[c.key] === 'number') item.secLower += o.scores[c.key]; }); }
       return item;
@@ -5509,12 +5570,15 @@ body.modal-open{ overflow:hidden; }
       luckFirst: mean(function (d) { return d.ana.luckFirst; }, true), luckRerolls: mean(function (d) { return d.ana.luckRerolls; }, true), clutch: mean(function (d) { return d.ana.clutch; }, true),
       stageEarly: mean(function (d) { return stageLoss(d.ana.stages.early); }), stageMid: mean(function (d) { return stageLoss(d.ana.stages.mid); }), stageLate: mean(function (d) { return stageLoss(d.ana.stages.late); }),
     };
+    // victories / win-rate / average place are over RANKED games only (>1 player, known place)
+    var rankedPlaces = data.filter(function (d) { return d.ranked; }).map(function (d) { return d.place; });
+    var rankedN = rankedPlaces.length;
     return {
       data: data, n: n, dice: diceData.length, scores: scores, avgScore: avgScore, scoreSd: stdev(scores, avgScore),
       avgAcc: avgAcc, accSd: stdev(data.map(function (d) { return d.ana.accuracy * 100; }), avgAcc * 100),
       accSlope: trendSlope(data.map(function (d) { return d.ana.accuracy * 100; })),
-      wins: data.filter(function (d) { return d.place === 1; }).length,
-      best: Math.max.apply(null, scores), avgPlace: data.reduce(function (s, d) { return s + d.place; }, 0) / n,
+      wins: rankedPlaces.filter(function (p) { return p === 1; }).length, rankedN: rankedN,
+      best: Math.max.apply(null, scores), avgPlace: rankedN ? rankedPlaces.reduce(function (s, p) { return s + p; }, 0) / rankedN : null,
       generals: data.filter(function (d) { return d.general; }).length,
       avgLuck: diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null,
       catList: catList, report: report, ruleset: rs,
@@ -5656,18 +5720,21 @@ body.modal-open{ overflow:hidden; }
     // last 10 battles, MOST RECENT LEFT, placement colour-coded (gold/silver/bronze/grey)
     var recent = data.slice(-10).reverse();
     var form = recent.map(function (d) {
-      var cls = d.place === 1 ? 'r1' : d.place === 2 ? 'r2' : d.place === 3 ? 'r3' : 'r4';
-      return '<i class="rk ' + cls + '">' + d.place + '</i>';
+      var cls = d.place === 1 ? 'r1' : d.place === 2 ? 'r2' : d.place === 3 ? 'r3' : d.place == null ? 'rx' : 'r4';
+      return '<i class="rk ' + cls + '">' + (d.place != null ? d.place : '–') + '</i>';
     }).join('');
 
     // collapsed: name, a win/lose ratio bar, then the averages trio. Everything else
     // lives in the expandable body. The owner name carries the старшина's default colour.
-    var losses = Math.max(0, n - c.wins);
+    // wins / win-bar are over RANKED games only (>1 player); the bar hides when there are none.
+    var rankedN = c.rankedN, losses = Math.max(0, rankedN - c.wins);
+    var bar = rankedN ? '<span class="ho-winbar" title="' + Math.round(100 * c.wins / rankedN) + '% победи · ' + Math.round(100 * losses / rankedN) + '% загуби">'
+      + '<i class="wb-win" style="flex:' + c.wins + '"></i><i class="wb-lose" style="flex:' + losses + '"></i></span>'
+      : '<span class="ho-noranked">няма игри с класиране</span>';
     var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
       + '<span class="oname" style="color:' + (settings.ownerColor || 'var(--gen-brass)') + '">' + esc(name) + '</span>'
       + '<span class="ho-avgwrap">'
-      + '<span class="ho-winbar" title="' + Math.round(100 * c.wins / n) + '% победи · ' + Math.round(100 * losses / n) + '% загуби">'
-      + '<i class="wb-win" style="flex:' + c.wins + '"></i><i class="wb-lose" style="flex:' + losses + '"></i></span>'
+      + bar
       + '<span class="ho-mini">'
       + '<span class="hom-cell"><b>' + n + '</b><i>битки</i></span>'
       + '<span class="hom-cell"><b>' + c.wins + '</b><i>победи</i></span>'
@@ -5680,7 +5747,10 @@ body.modal-open{ overflow:hidden; }
     h += careerAverages(c.report, { biggest: favBl ? { key: favBl, n: favN } : null, achievements: topGood }, rs);
     h += '<div class="histline">Последни битки:</div><div class="histform' + (recent.length >= 10 ? ' full' : '') + '">' + (form || '—') + '</div>';
     // career stat lines — each starts with a colour-coded term, its parts split onto their own rows
-    h += statRows('Чин', RC.skill, ['по средно умение <b>' + esc(rank) + '</b>', 'процент победи <b>' + Math.round(100 * c.wins / n) + '%</b>', 'средно място <b>' + c.avgPlace.toFixed(1) + '</b>']);
+    var chinRows = ['по средно умение <b>' + esc(rank) + '</b>'];
+    if (c.rankedN) chinRows.push('процент победи <b>' + Math.round(100 * c.wins / c.rankedN) + '%</b> <span class="hmuted">(' + c.rankedN + ' с класиране)</span>', 'средно място <b>' + c.avgPlace.toFixed(1) + '</b>');
+    else chinRows.push('<span class="hmuted">няма игри с класиране за победи</span>');
+    h += statRows('Чин', RC.skill, chinRows);
     h += statRows('Личен рекорд', RC.upper, ['<b>' + c.best + '</b> т.', 'среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'].concat(c.avgLuck != null ? ['среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>'] : []));
     h += stat('Генерали', RC.gen, '<b>' + c.generals + '</b> от ' + n + ' битки');   // single line, no blunder here
     var consTag = c.scoreSd < 18 ? 'стабилен' : c.scoreSd > 32 ? 'нестабилен' : 'умерен';
@@ -5805,7 +5875,8 @@ body.modal-open{ overflow:hidden; }
       var oi = recOwnerIdx(rec), skipped = oi < 0, excluded = !!rec.excluded;
       var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
       var ptsPlayer = skipped ? top : rec.players[oi];
-      var oTotal = recTotal(ptsPlayer), place = skipped ? null : recPlacement(rec, oi), winR = place === 1;
+      var rk = gameRanking(rec);                                  // single-player games are unranked (no place / crown)
+      var oTotal = recTotal(ptsPlayer), place = rk.ranked ? rk.place : null, winR = place === 1;
       var pct = !excluded && !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
       // only flag genuinely standout games: top 5 / 10 / 15 % (bucketed); nothing below that
       var topPct = pct == null ? null : 100 - pct;
@@ -5826,7 +5897,7 @@ body.modal-open{ overflow:hidden; }
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + subDate + (rec.manualMode ? ' · отчет' : '') + pctTag + '</span></span>'
+        + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode">' + (rec.manualMode ? 'отчет' : 'игра') + '</span>' + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
