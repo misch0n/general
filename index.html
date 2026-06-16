@@ -1272,6 +1272,27 @@ body.modal-open{ overflow:hidden; }
 .devbadge.add{ background:rgba(75,140,60,.25); color:#9bd17e; } .devbadge.mod{ background:rgba(200,166,75,.22); color:var(--gen-brass-bright); } .devbadge.rem{ background:rgba(178,58,46,.22); color:#e88; }
 .deveditbox{ padding:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.2); }
 .deveditbox .devfields{ margin-bottom:8px; }
+/* placeholder template editor: contenteditable with inline variable chips */
+.tmpl-ed{ display:block; }
+.tmpl-box{ min-height:30px; padding:7px 9px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.25);
+  color:var(--gen-ink-bright,#f0ead6); font-size:14px; line-height:1.7; outline:none; white-space:pre-wrap; word-break:break-word; }
+.tmpl-box:focus{ border-color:var(--gen-brass); }
+.tmpl-box:empty::before{ content:'текст…'; color:var(--gen-muted); }
+.ph-chip{ display:inline-block; padding:1px 8px; margin:0 1px; border-radius:11px; background:rgba(212,160,46,.22);
+  border:1px solid var(--gen-brass-stroke,rgba(212,160,46,.6)); color:var(--gen-brass-bright); font-size:12px; font-weight:700;
+  white-space:nowrap; cursor:pointer; -webkit-user-select:none; user-select:none; vertical-align:1px; }
+.ph-chip::before{ content:'⌗ '; opacity:.6; font-weight:400; }
+.tmpl-bar{ display:flex; gap:6px; align-items:center; margin-top:6px; }
+.tmpl-varsel{ flex:1; min-width:0; font-size:12px; padding:5px 6px; border-radius:7px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); color:inherit; }
+/* the variable picker popup (anchored to a tapped chip) */
+.varpop{ position:fixed; z-index:90; max-width:230px; max-height:50vh; overflow:auto; padding:5px; border-radius:10px;
+  background:var(--gen-ink,#16160e); border:1px solid var(--gen-brass-stroke,rgba(212,160,46,.6)); box-shadow:0 8px 22px rgba(0,0,0,.5); }
+.varpop .varopt{ display:flex; flex-direction:column; align-items:flex-start; gap:1px; width:100%; text-align:left;
+  padding:7px 9px; border:none; border-radius:7px; background:transparent; color:var(--gen-ink-bright,#f0ead6); cursor:pointer; }
+.varpop .varopt:hover{ background:rgba(255,255,255,.06); }
+.varpop .varopt.on{ background:rgba(212,160,46,.2); }
+.varpop .varopt b{ font-size:13px; color:var(--gen-brass-bright); }
+.varpop .varopt span{ font-size:10.5px; color:var(--gen-muted); }
 /* dev cog + modal (in-place string editor) */
 .devcog{ display:grid; place-items:center; color:var(--gen-brass); }
 .devcog:hover{ color:var(--gen-brass-bright); }
@@ -1915,7 +1936,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.6.0';
+  var APP_VERSION = '1.7.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4219,6 +4240,8 @@ body.modal-open{ overflow:hidden; }
     if (!fun()) return false;                      // roasts off outside казарма mode
     // combo-dependent floor shame (names the combo + the rock-bottom value)
     var line = G.floorShame(key, value, G.currentPlayer(game).gender);
+    // fill any extra metadata placeholders a dev added (%name%, %turn%, %total%, …)
+    line = fillTemplate(line, gameVarCtx({ combo: G.ORDER_NAMES[key] || 'комбинация', val: value, catval: value, catmax: catMaxFor(key) }));
     var box = $('roast');
     box.className = 'roast show';
     box.innerHTML = '<span class="bubble">' + esc(line) + '</span>';
@@ -4612,6 +4635,118 @@ body.modal-open{ overflow:hidden; }
     setTimeout(grow, 0);
     return t;
   }
+  // ===================== placeholder template editor (chips + variable picker) =====================
+  // In-game strings carry placeholder tokens (e.g. %combo%, %val%). In the editor they render as
+  // tappable LABELS — a chip per token — while the stored/exported string keeps the real token.
+  // Available variables come from the live game metadata; tapping a chip switches its variable.
+  var DEV_VARS = [
+    { token: '%name%', label: 'име', desc: 'името на играча' },
+    { token: '%combo%', label: 'комбо', desc: 'име на комбинацията' },
+    { token: '%val%', label: 'точки', desc: 'точки от хода' },
+    { token: '%catmax%', label: 'макс точки', desc: 'максимум за категорията' },
+    { token: '%catval%', label: 'вписани', desc: 'вписани точки в категорията' },
+    { token: '%turn%', label: 'рунд', desc: 'номер на текущия рунд' },
+    { token: '%total%', label: 'сбор', desc: 'общ резултат на играча' },
+    { token: '%players%', label: 'играчи', desc: 'брой играчи' },
+    { token: '%dice%', label: 'зарове', desc: 'хвърлените зарове' },
+    { token: '%same%', label: 'еднакви', desc: 'брой еднакви зарове' },
+    { token: '%rerolls%', label: 'презамятания', desc: 'използвани презамятания' },
+    { token: '%ps%', label: 'негово/нейно', desc: 'притежателно за комбото' },
+    { token: '%po%', label: 'го/я', desc: 'кратко местоимение' },
+  ];
+  // legacy tokens (older syntax) still recognised so existing strings show as chips
+  var VAR_LABEL = { '{c}': 'комбо (фраза)', '{ps}': 'негово/нейно', '{po}': 'го/я', '%combo%': 'комбо', '%val%': 'точки' };
+  DEV_VARS.forEach(function (v) { VAR_LABEL[v.token] = v.label; });
+  function varLabelFor(tok) { return VAR_LABEL[tok] || tok.replace(/[%{}]/g, ''); }
+  // split a template string into text / variable segments
+  function parseTemplate(str) {
+    var re = /%[a-zA-Z]+%|\{[a-zA-Z]+\}/g, segs = [], last = 0, m;
+    while ((m = re.exec(str)) !== null) {
+      if (m.index > last) segs.push({ t: 'text', v: str.slice(last, m.index) });
+      segs.push({ t: 'var', token: m[0] }); last = m.index + m[0].length;
+    }
+    if (last < str.length) segs.push({ t: 'text', v: str.slice(last) });
+    return segs;
+  }
+  function devChip(token) {
+    var c = document.createElement('span'); c.className = 'ph-chip'; c.contentEditable = 'false';
+    c.setAttribute('data-token', token); c.textContent = varLabelFor(token); c.title = token;
+    return c;
+  }
+  // serialise a contenteditable back to a token string (chips → their real token)
+  function serializeEditable(box) {
+    var out = '';
+    (function walk(node) {
+      for (var i = 0; i < node.childNodes.length; i++) {
+        var n = node.childNodes[i];
+        if (n.nodeType === 3) out += n.textContent;
+        else if (n.nodeType === 1) {
+          if (n.classList && n.classList.contains('ph-chip')) out += n.getAttribute('data-token');
+          else if (n.tagName === 'BR') out += '\n';
+          else { if (out && !/\n$/.test(out) && /^(DIV|P)$/.test(n.tagName)) out += '\n'; walk(n); }
+        }
+      }
+    })(box);
+    return out.replace(/ /g, ' ');
+  }
+  function devTemplateEditor(initial, onChange) {
+    var wrap = document.createElement('div'); wrap.className = 'tmpl-ed';
+    var box = document.createElement('div'); box.className = 'tmpl-box'; box.contentEditable = 'true';
+    box.setAttribute('role', 'textbox'); box.setAttribute('aria-label', 'текст със заместители');
+    parseTemplate(initial || '').forEach(function (s) { box.appendChild(s.t === 'text' ? document.createTextNode(s.v) : devChip(s.token)); });
+    function emit() { onChange(serializeEditable(box).replace(/^\s+|\s+$/g, '')); }
+    box.addEventListener('input', emit);
+    box.addEventListener('click', function (e) {
+      var chip = e.target && e.target.closest ? e.target.closest('.ph-chip') : null;
+      if (chip) { e.preventDefault(); devVarPop(chip, chip.getAttribute('data-token'), function (tok) { chip.setAttribute('data-token', tok); chip.textContent = varLabelFor(tok); chip.title = tok; emit(); }); }
+    });
+    wrap.appendChild(box);
+    var bar = document.createElement('div'); bar.className = 'tmpl-bar';
+    var sel = document.createElement('select'); sel.className = 'tmpl-varsel';
+    DEV_VARS.forEach(function (v) { var o = document.createElement('option'); o.value = v.token; o.textContent = v.label + ' — ' + v.desc; sel.appendChild(o); });
+    var add = el('button', 'btn small', '+ заместител');
+    add.onclick = function () {
+      var cur = serializeEditable(box);
+      if (cur && !/\s$/.test(cur)) box.appendChild(document.createTextNode(' '));   // keep a space before the new chip
+      box.appendChild(devChip(sel.value)); box.appendChild(document.createTextNode(' ')); emit();
+    };
+    bar.appendChild(sel); bar.appendChild(add);
+    wrap.appendChild(bar);
+    return wrap;
+  }
+  // floating variable picker (anchored to the tapped chip)
+  function devVarPop(anchor, current, onPick) {
+    closeVarPop();
+    var pop = document.createElement('div'); pop.className = 'varpop'; pop.id = 'varPop';
+    DEV_VARS.forEach(function (v) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'varopt' + (v.token === current ? ' on' : '');
+      b.innerHTML = '<b>' + esc(v.label) + '</b><span>' + esc(v.desc) + '</span>';
+      b.onclick = function () { onPick(v.token); closeVarPop(); };
+      pop.appendChild(b);
+    });
+    document.body.appendChild(pop);
+    var r = anchor.getBoundingClientRect();
+    pop.style.left = Math.min(Math.max(8, r.left), window.innerWidth - pop.offsetWidth - 8) + 'px';
+    pop.style.top = (r.bottom + 4) + 'px';
+    setTimeout(function () { document.addEventListener('pointerdown', varPopOutside, true); }, 0);
+  }
+  function varPopOutside(e) { var p = $('varPop'); if (p && !p.contains(e.target)) closeVarPop(); }
+  function closeVarPop() { var p = $('varPop'); if (p) p.remove(); document.removeEventListener('pointerdown', varPopOutside, true); }
+  // fill a template's variables from the live game (used at render time so the new vars actually show)
+  function maxSameCount(d) { if (!d || !d.length) return 0; var c = {}, best = 0; d.forEach(function (v) { c[v] = (c[v] || 0) + 1; if (c[v] > best) best = c[v]; }); return best; }
+  var CAT_MAX = { ones: 5, twos: 10, threes: 15, fours: 20, fives: 25, sixes: 30, twoKind: 30, threeKind: 30, fourKind: 30, fullHouse: 28, smallStraight: 15, largeStraight: 20, general: 80, chance: 30 };
+  function catMaxFor(key) { return CAT_MAX[key] != null ? CAT_MAX[key] : 0; }
+  function gameVarCtx(extra) {
+    var p = (game && G.currentPlayer(game)) || {};
+    var ctx = {
+      name: ((p.name || '') + '').trim(), players: game ? game.players.length : 0, turn: game ? game.round : 0,
+      total: game ? total(p) : 0, dice: (dice || []).join(' '), same: maxSameCount(dice),
+      rerolls: (typeof throwsLeft === 'number') ? Math.max(0, (ROLLS - 1) - throwsLeft) : 0,
+    };
+    if (extra) for (var k in extra) ctx[k] = extra[k];
+    return ctx;
+  }
+  function fillTemplate(str, ctx) { return String(str).replace(/%([a-zA-Z]+)%/g, function (m, k) { var v = ctx[k.toLowerCase()]; return v == null ? m : String(v); }); }
 
   function buildDevCats() {
     var src = G.dumpSource();
@@ -4694,7 +4829,7 @@ body.modal-open{ overflow:hidden; }
       var nL = document.createElement('label'); nL.className = 'devchk nsfw'; var nc = document.createElement('input'); nc.type = 'checkbox'; nc.checked = !!d.nsfw; nc.onchange = function () { if (nc.checked) d.nsfw = true; else delete d.nsfw; }; nL.appendChild(nc); nL.appendChild(document.createTextNode('NSFW')); ctr.appendChild(nL);
       box.appendChild(ctr);
     } else {
-      box.appendChild(devArea(d, 'текст…', function (v) { it._draft = v; }));
+      box.appendChild(devTemplateEditor(d, function (v) { it._draft = v; }));
     }
     ed.appendChild(box);
     var bar = document.createElement('div'); bar.className = 'devbar';
