@@ -523,7 +523,9 @@ body.modal-open{ overflow:hidden; }
 .netpp .pp-rdy.ready{ display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#2e9e5b; color:#fff; font-size:11px; font-weight:800; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
 /* the same green-circle tick, inline in the „ГОТОВ!" button — as tall as the label, vertically centred */
 #netReady{ display:inline-flex; align-items:center; justify-content:center; gap:7px; }
-.rdy-ic{ display:inline-grid; place-items:center; width:1.15em; height:1.15em; border-radius:50%; background:#2e9e5b; color:#fff; font-size:.82em; font-weight:800; box-shadow:0 0 0 1px rgba(0,0,0,.3); flex:none; }
+.rdy-ic{ position:relative; display:inline-block; width:1.2em; height:1.2em; border-radius:50%; background:#2e9e5b; box-shadow:0 0 0 1px rgba(0,0,0,.3); flex:none; }
+/* CSS-drawn checkmark — always centred regardless of font */
+.rdy-ic::after{ content:''; position:absolute; left:50%; top:50%; width:.26em; height:.46em; border:solid #fff; border-width:0 .14em .14em 0; transform:translate(-50%,-58%) rotate(45deg); }
 /* still configuring: animated „typing" dots */
 .netpp .pp-cfg{ display:inline-flex; gap:4px; align-items:center; flex:none; padding:0 4px; }
 .netpp .pp-cfg i{ width:5px; height:5px; border-radius:50%; background:var(--gen-muted); animation:cfgdot 1.05s infinite ease-in-out; }
@@ -2024,7 +2026,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.13.0';
+  var APP_VERSION = '1.13.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2782,7 +2784,7 @@ body.modal-open{ overflow:hidden; }
       $('netReady').classList.toggle('on', netMyReady);
       $('netReady').classList.toggle('spur', netMyReady);
       // not ready → „ГОТОВ!" with the same green-circle tick used on the roster rows
-      $('netReady').innerHTML = netMyReady ? '🔥 ДАЙ ЗОР!' : 'ГОТОВ! <span class="rdy-ic">✓</span>';
+      $('netReady').innerHTML = netMyReady ? '🔥 ДАЙ ЗОР!' : 'ГОТОВ! <span class="rdy-ic"></span>';
     }
   }
   function netStartTransport(then) {
