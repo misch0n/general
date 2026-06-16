@@ -424,9 +424,9 @@ test('generated names agree: adjective matches noun gender', function () {
     assert.strictEqual(name.split(' ').length, 3, 'Title + Adj + Noun: ' + name);
   }
   // deterministic check via a forced rng that always picks index 0:
-  //   TITLES[0]=Генерал, ADJS[0]=смотан, NOUNS[0]=Пишка (feminine)
+  //   TITLES[0]=Генерал, ADJS[0]=смотан, NOUNS[0]=Пишон (masculine, primary)
   var zero = function () { return 0; };
-  assert.strictEqual(G.randomHumanName(zero), 'Генерал Смотана Пишка');
+  assert.strictEqual(G.randomHumanName(zero), 'Генерал Смотан Пишон');
 });
 
 test('randomGender returns m or f', function () {
@@ -624,10 +624,10 @@ test('every category has a combo description; shame lines exist', function () {
 
 test('gendered names pick a matching-gender noun + agreeing adjective', function () {
   var zero = function () { return 0; };
-  // female -> first feminine noun (Пишка) + feminine adjective (смотана)
-  assert.strictEqual(G.randomHumanName(zero, 'f'), 'Генерал Смотана Пишка');
-  // male -> first masculine noun (Петел) + masculine adjective (смотан)
-  assert.strictEqual(G.randomHumanName(zero, 'm'), 'Генерал Смотан Петел');
+  // female -> first feminine noun (Краставица) + feminine adjective (смотана)
+  assert.strictEqual(G.randomHumanName(zero, 'f'), 'Генерал Смотана Краставица');
+  // male -> first masculine noun (Пишон) + masculine adjective (смотан)
+  assert.strictEqual(G.randomHumanName(zero, 'm'), 'Генерал Смотан Пишон');
   // a feminine AI name must also resolve to a feminine noun
   assert.strictEqual(G.randomAiName(zero, 'f').split(' ').length, 3);
 });
