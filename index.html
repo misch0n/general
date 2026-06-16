@@ -938,8 +938,21 @@ body.modal-open{ overflow:hidden; }
 .mpresult .mpr-opt.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
 .noowner{ text-align:center; padding:16px 12px; color:var(--gen-muted); font-size:12.5px; line-height:1.5; }
 .noowner .nohd{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:14px; margin-bottom:6px; }
-.histgame{ position:relative; display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 11px; border-radius:9px;
+.histgame{ position:relative; width:100%; text-align:left; border-radius:9px; overflow:hidden; touch-action:pan-y;
   background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:6px; color:var(--gen-text); }
+.histgame .hg-row{ display:flex; align-items:center; gap:9px; padding:9px 11px; transition:filter .16s, opacity .16s; }
+.histgame.menu-open .hg-row{ filter:blur(2.5px); opacity:.5; }    /* swipe menu: contents blurred, NOT displaced */
+.histgame.excl-arm .hg-row{ opacity:.45; }                        /* right-swipe arming the exclude toggle */
+/* swipe-revealed action menu — overlays the row, right-aligned over the blurred body */
+.hg-actions{ position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 13px;
+  opacity:0; pointer-events:none; transition:opacity .16s; background:linear-gradient(90deg, transparent 28%, rgba(18,14,9,.5)); }
+.histgame.menu-open .hg-actions{ opacity:1; }
+.histgame.menu-open .hg-actions button{ pointer-events:auto; }
+/* bolder right edge (a swipe affordance) + the one-time intro pulse on the first row */
+.histgame::after{ content:''; position:absolute; top:0; right:0; bottom:0; width:3px; background:var(--gen-brass-stroke); border-radius:0 9px 9px 0; pointer-events:none; }
+.histgame.confirm-arm::after{ background:var(--gen-alert); width:4px; }
+.histgame.hg-pulse::after{ animation:hgEdgePulse .7s ease-in-out 2; }
+@keyframes hgEdgePulse{ 0%,100%{ width:3px; } 50%{ width:3%; } }
 /* inline delete confirmation over a history row */
 .hg-confirm{ position:absolute; inset:0; display:flex; align-items:center; gap:7px; padding:0 11px; border-radius:9px;
   background:rgba(24,18,12,.96); border:1px solid var(--gen-alert-line); }
@@ -1794,7 +1807,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.0.2';
+  var APP_VERSION = '1.1.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -5854,6 +5867,7 @@ body.modal-open{ overflow:hidden; }
   var histTab = 'standard';   // which ruleset the archive is showing
   var histShown = 5;          // how many battles are listed; grows by 5 via „покажи още“
   var histPlayFilter = 'all'; // 'all' | 'manual' (отчет) | 'engine' (игра) — manual-vs-engine filter
+  var histPulsePending = false; // animate the first row's right edge once, only on a fresh open
   function renderHistory() {
     // paging is NOT reset here — loaded battles stay loaded across tab switches and
     // exclude toggles; histShown only resets on a fresh openHistory() (full close→open)
@@ -5923,14 +5937,18 @@ body.modal-open{ overflow:hidden; }
       var primary = named ? esc(rec.name) : esc(fmtDate(rec.ts));
       var subDate = named ? esc(fmtDate(rec.ts) + ' ' + fmtTime(rec.ts)) : esc(fmtTime(rec.ts));
       html += '<div class="histgame' + (excluded ? ' ex' : '') + '" data-id="' + esc(rec.id) + '">'
+        + '<div class="hg-row">'
         + '<button type="button" class="hg-count ' + rankCls + '" title="' + esc(rankTitle) + '">' + rankNum + '</button>'
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
         + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode">' + (rec.manualMode ? 'отчет' : 'игра') + '</span>' + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
+        + '</div>'
+        + '<div class="hg-actions">'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
-        + '<button class="hg-del" title="Изтрий">✕</button></div>';
+        + '<button class="hg-del" title="Изтрий">✕</button>'
+        + '</div></div>';
     });
     // batch loader: reveal the next 5 until the whole archive is shown
     if (histShown < games.length) {
@@ -5942,11 +5960,11 @@ body.modal-open{ overflow:hidden; }
     $('historyList').querySelectorAll('.histgame').forEach(function (row) {
       var id = row.getAttribute('data-id');
       var find = function () { return loadHistory().filter(function (r) { return r.id === id; })[0]; };
-      row.onclick = function () { var rec = find(); if (rec) openHistoryGame(rec); };
       row.querySelector('.hg-count').onclick = function (e) { e.stopPropagation(); toggleExcludeGame(id); };
       row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
       row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) chooseMethod('Изнеси играта', function () { exportGame(rec); }, function () { acousticSend(rec); }); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); confirmDeleteGame(row, id); };
+      attachSwipe(row, id, find);
     });
     var mb = $('historyList').querySelector('.histmore-btn');
     if (mb) mb.onclick = function () { histShown += 5; renderHistoryList(); };
@@ -5965,6 +5983,54 @@ body.modal-open{ overflow:hidden; }
       histPlayFilter = histPlayFilter === 'all' ? 'manual' : histPlayFilter === 'manual' ? 'engine' : 'all';
       histShown = 5; renderHistoryList();
     };
+  }
+  // ---- swipe gestures on a history row ------------------------------------------------
+  // left → reveal play/export/delete (menu over a blurred body; >80% arms delete-confirm);
+  // right → exclude from stats (>50%); the opposite direction closes an open menu; a plain
+  // tap opens the game. Horizontal is tracked via pointer events while touch-action:pan-y
+  // leaves vertical scrolling to the browser, so a diagonal still scrolls.
+  function attachSwipe(row, id, find) {
+    var sx = 0, sy = 0, w = 0, dx = 0, moved = false, tracking = false, startedOpen = false;
+    function live() {
+      var L = -dx, R = dx;
+      if (startedOpen) row.classList.toggle('menu-open', !(R > 0.06 * w));
+      else row.classList.toggle('menu-open', L >= 0.25 * w);
+      row.classList.toggle('confirm-arm', L >= 0.8 * w);
+      row.classList.toggle('excl-arm', !startedOpen && R >= 0.5 * w);
+    }
+    row.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.hg-actions') || e.target.closest('.hg-count') || e.target.closest('.hg-confirm')) return;
+      sx = e.clientX; sy = e.clientY; w = row.offsetWidth || 300; dx = 0; moved = false; tracking = true;
+      startedOpen = row.classList.contains('menu-open');
+    });
+    row.addEventListener('pointermove', function (e) {
+      if (!tracking) return;
+      dx = e.clientX - sx; var dy = e.clientY - sy;
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
+      live();
+    });
+    function end() {
+      if (!tracking) return; tracking = false;
+      row.classList.remove('confirm-arm', 'excl-arm');
+      var L = -dx, R = dx;
+      if (startedOpen) {
+        if (L >= 0.8 * w) { row.classList.add('menu-open'); confirmDeleteGame(row, id); }
+        else if (R > 0.06 * w || !moved) row.classList.remove('menu-open');
+        else row.classList.add('menu-open');
+      } else {
+        if (L >= 0.8 * w) { row.classList.add('menu-open'); confirmDeleteGame(row, id); }
+        else if (L >= 0.25 * w) row.classList.add('menu-open');
+        else if (R >= 0.5 * w) toggleExcludeGame(id);          // re-renders the whole list
+        else if (!moved) { var rec = find(); if (rec) openHistoryGame(rec); }
+        else row.classList.remove('menu-open');
+      }
+    }
+    row.addEventListener('pointerup', end);
+    row.addEventListener('pointercancel', end);
+  }
+  function pulseFirstRow(row) {
+    row.classList.add('hg-pulse');
+    row.addEventListener('animationend', function h() { row.classList.remove('hg-pulse'); row.removeEventListener('animationend', h); });
   }
 
   // ---------- §ист battle calendar (git-style activity heatmap over ALL rulesets) ----------
@@ -6172,7 +6238,7 @@ body.modal-open{ overflow:hidden; }
     c.innerHTML = '<span>Изтрий тази битка?</span><button class="hgc-no">Не</button><button class="hgc-yes">🔥 Да</button>';
     c.onclick = function (e) { e.stopPropagation(); };
     c.querySelector('.hgc-yes').onclick = function (e) { e.stopPropagation(); deleteGame(id); };
-    c.querySelector('.hgc-no').onclick = function (e) { e.stopPropagation(); c.remove(); };
+    c.querySelector('.hgc-no').onclick = function (e) { e.stopPropagation(); c.remove(); row.classList.remove('menu-open'); };
     row.appendChild(c);
   }
   function deleteGame(id) {
@@ -6427,6 +6493,7 @@ body.modal-open{ overflow:hidden; }
     histDateFilter = null;   // a fresh open clears any calendar date filter
     histShown = 5;           // fresh open starts at the first page
     histPlayFilter = 'all';  // and clears the manual/engine filter
+    histPulsePending = true;  // pulse the first row's right edge once on this open
     showHistory();
   }
   // (re)display the archive WITHOUT touching the tab / paging / date filter — used when
@@ -6436,6 +6503,10 @@ body.modal-open{ overflow:hidden; }
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
     $('historyModal').classList.remove('hidden');
+    if (histPulsePending) {   // first row's right-edge intro animation — only on a fresh open
+      histPulsePending = false;
+      var first = $('historyList').querySelector('.histgame'); if (first) pulseFirstRow(first);
+    }
   }
   $('historyClose').onclick = function () { $('historyModal').classList.add('hidden'); };
   $('historyModal').onclick = function (e) { if (e.target === $('historyModal')) $('historyModal').classList.add('hidden'); };
