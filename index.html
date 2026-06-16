@@ -985,8 +985,8 @@ body.modal-open{ overflow:hidden; }
 .histgame .hg-skip{ font-size:12px; color:var(--gen-muted); }
 .histgame .hg-sub{ font-size:8.5px; color:var(--gen-disabled); margin-top:3px; letter-spacing:.2px; }   /* subtler, finer time line */
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
-.histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:transparent; font-size:11px; }
-.histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-brass); display:grid; place-items:center; }
+.histgame .hg-del{ flex:none; width:24px; height:24px; border-radius:5px; color:var(--gen-alert); border:1px solid var(--gen-alert-line); background:var(--gen-ink); font-size:11px; }
+.histgame .hg-exp{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:var(--gen-ink); color:var(--gen-brass); display:grid; place-items:center; }
 .histgame .hg-exp:hover{ border-color:var(--gen-brass); }
 .histmore{ display:flex; justify-content:center; margin:14px 0 22px; }
 .histmore-btn{ padding:9px 22px; border-radius:9px; font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.4px; text-transform:uppercase;
@@ -1113,7 +1113,7 @@ body.modal-open{ overflow:hidden; }
 .oc-rd-hd{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; letter-spacing:.4px; color:var(--gen-muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
 .oc-rd-v{ font-variant-numeric:tabular-nums; font-weight:700; font-size:14px; color:var(--gen-text); }
-.histgame .hg-play{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:transparent; display:grid; place-items:center; }
+.histgame .hg-play{ flex:none; width:26px; height:26px; border-radius:5px; border:1px solid var(--gen-pill-line); background:var(--gen-ink); display:grid; place-items:center; }
 .histgame .hg-play .gl{ position:relative; width:10px; height:10px; display:block; }
 .histgame .hg-play .gl::before{ content:''; position:absolute; inset:0; background:var(--gen-brass); clip-path:polygon(0 0,0 100%,100% 50%); }
 .histgame .hg-play:hover{ border-color:var(--gen-brass); }
@@ -1816,7 +1816,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.1.1';
+  var APP_VERSION = '1.1.2';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
