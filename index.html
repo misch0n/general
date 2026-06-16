@@ -1262,6 +1262,9 @@ body.modal-open{ overflow:hidden; }
 .dcp-txt{ font-size:13px; color:var(--gen-text); margin-bottom:12px; line-height:1.5; }
 .dcp-btns{ display:flex; flex-direction:column; gap:7px; }
 .dcp-btns .btn{ width:100%; }
+.devctrl-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 9px; font-size:12.5px; color:var(--gen-text); }
+.devctrl-row.hidden{ display:none; }
+.devctrl-row .btn.small{ flex:none; }
 
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 
@@ -1499,7 +1502,7 @@ body.modal-open{ overflow:hidden; }
       </div>
       <div class="ownertog setrow" style="cursor:default">
         <span>Цвят по подразбиране</span>
-        <div class="ownercolors" id="ownerColors"></div>
+        <button type="button" class="cbtn" id="ownerColorBtn" title="Избери цвят" aria-label="Избери цвят по подразбиране"></button>
       </div>
       <div class="ownertog setrow" style="cursor:default">
         <span>Зарове по подразбиране</span>
@@ -1519,10 +1522,6 @@ body.modal-open{ overflow:hidden; }
       </div>
     </div>
     <div id="ruleBubble" class="ownerbubble hidden"></div>
-    <div class="setrow" id="tutRow" style="cursor:default">
-      <span>Обучение <span class="tut-hint-sm">за избраните правила</span></span>
-      <button id="tutStartBtn" class="btn small">📚 Започни</button>
-    </div>
     <div id="settingsRows"></div>
     <div id="clearArchiveRow" style="margin-top:8px">
       <div id="storeInfo" class="storeinfo"></div>
@@ -1848,7 +1847,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.2.0';
+  var APP_VERSION = '1.3.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4138,12 +4137,7 @@ body.modal-open{ overflow:hidden; }
         setupPlayers.forEach(swapCensorName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
-    // Акустична мрежа — reveals every data-over-sound feature (network play + sound transfer);
-    // its hidden sub-toggle „Дебъг" exposes the acoustic test/diagnostics + packet capture.
-    // Pre-game only: a network battle is set up before play, so it's hidden in the in-game menu.
-    { key: 'acoustic', label: 'Акустична мрежа', preGameOnly: true,
-      sub: { key: 'acousticDebug', label: 'Дебъг режим', onChange: function () { syncAcousticUI(); } },
-      onChange: function () { syncAcousticUI(); } },
+    // (Акустична мрежа + Дебъг режим moved to the developer menu — Debug / Experimental)
   ];
   function buildSettingsRows(inGame) {
     var host = $('settingsRows'); host.innerHTML = '';
@@ -4345,9 +4339,38 @@ body.modal-open{ overflow:hidden; }
     list.appendChild(add);
     return sec;
   }
+  // ----- dev control sections (toggles / actions) above the string editor -----
+  function devControlSection(label) {
+    var sec = document.createElement('details'); sec.className = 'devsec'; sec.open = true;
+    var sum = document.createElement('summary'); sum.textContent = label; sec.appendChild(sum);
+    var list = document.createElement('div'); list.className = 'devlist'; sec.appendChild(list);
+    return { sec: sec, list: list };
+  }
+  function devToggleRow(label, key, onChange) {
+    var row = document.createElement('div'); row.className = 'devctrl-row';
+    row.appendChild(el('span', null, label));
+    var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'toggle' + (settings[key] ? ' on' : ''); tog.innerHTML = '<span class="switch"></span>';
+    tog.onclick = function () { settings[key] = !settings[key]; tog.classList.toggle('on', settings[key]); saveSettings(); if (onChange) onChange(); };
+    row.appendChild(tog); return row;
+  }
+  function syncAcousticDebugVis() { var r = $('devAcousticDebugRow'); if (r) r.classList.toggle('hidden', !settings.acoustic); }
+  function renderDevControls(body) {
+    var dbg = devControlSection('Debug');
+    dbg.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
+    body.appendChild(dbg.sec);
+    var exp = devControlSection('Experimental');
+    var tutRow = document.createElement('div'); tutRow.className = 'devctrl-row';
+    tutRow.appendChild(el('span', null, 'Обучение'));
+    var tutBtn = el('button', 'btn small', '📚 Започни'); tutBtn.onclick = function () { closeDevModal(true); tutStart(); };
+    tutRow.appendChild(tutBtn); exp.list.appendChild(tutRow);
+    var adbg = devToggleRow('Акустичен дебъгер', 'acousticDebug', function () { syncAcousticUI(); }); adbg.id = 'devAcousticDebugRow';
+    exp.list.appendChild(adbg); body.appendChild(exp.sec);
+    syncAcousticDebugVis();
+  }
   function renderDevModal() {
     if (!devCats) buildDevCats();
     var body = $('devBody'); body.innerHTML = '';
+    renderDevControls(body);
     DEV_GROUPS.forEach(function (grp) {
       body.appendChild(el('div', 'devgrp', grp.label));
       grp.keys.forEach(function (k) { var cat = devCats.filter(function (c) { return c.key === k; })[0]; if (cat) body.appendChild(buildDevSection(cat)); });
@@ -4413,7 +4436,6 @@ body.modal-open{ overflow:hidden; }
     buildSettingsRows(inGame);
     $('ownerBox').classList.toggle('hidden', inGame);
     $('ruleBox').classList.toggle('hidden', inGame);          // ruleset is chosen before a battle
-    $('tutRow').classList.toggle('hidden', inGame);           // tutorial starts a fresh game → pre-game only
     $('clearArchiveRow').classList.toggle('hidden', inGame);
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
@@ -6339,8 +6361,6 @@ body.modal-open{ overflow:hidden; }
     clearResume();
     $('game').classList.add('hidden'); $('overModal').classList.add('hidden'); $('setup').classList.remove('hidden');
   }
-  var tb = $('tutStartBtn'); if (tb) tb.onclick = tutStart;
-
   function confirmDeleteGame(row, id) {
     if (row.querySelector('.hg-confirm')) return;
     var c = document.createElement('div'); c.className = 'hg-confirm';
@@ -6698,17 +6718,16 @@ body.modal-open{ overflow:hidden; }
       renderSetup();
     }
   };
-  // default colour for the старшина (swatches; applied to the owner seat, others bump)
-  (function () {
-    $('ownerColors').innerHTML = PRESET_COLORS.map(function (c) { return '<button class="oswatch" data-c="' + c + '" style="background:' + c + '"></button>'; }).join('');
-    $('ownerColors').querySelectorAll('.oswatch').forEach(function (b) {
-      b.onclick = function () {
-        settings.ownerColor = b.getAttribute('data-c'); syncOwnerColor(); saveSettings();
-        if (setupPlayers.length) { ownerOf(setupPlayers).color = settings.ownerColor; dedupeColors(); if (!$('setup').classList.contains('hidden')) renderSetup(); }
-      };
-    });
-  })();
-  function syncOwnerColor() { $('ownerColors').querySelectorAll('.oswatch').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-c') || '').toLowerCase() === (settings.ownerColor || '').toLowerCase()); }); }
+  // default colour for the старшина — a single swatch opening the SAME popover as player seats
+  $('ownerColorBtn').onclick = function (e) {
+    e.stopPropagation();
+    var used = setupPlayers.filter(function (p) { return !p.owner; }).map(function (p) { return (p.color || '').toLowerCase(); });
+    openColorPop($('ownerColorBtn'), settings.ownerColor, 'owner', function (c) {
+      settings.ownerColor = c; syncOwnerColor(); saveSettings();
+      if (setupPlayers.length) { ownerOf(setupPlayers).color = c; dedupeColors(); if (!$('setup').classList.contains('hidden')) renderSetup(); }
+    }, freeSwatches(settings.ownerColor, used));
+  };
+  function syncOwnerColor() { $('ownerColorBtn').style.background = settings.ownerColor || PRESET_COLORS[0]; }
   // ---- ruleset picker (Стандартен / Експериментален) ----
   function syncRuleset() { $('ruleSeg').querySelectorAll('.rlabel').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === (settings.ruleset || 'standard')); }); }
   $('ruleSeg').querySelectorAll('.rlabel').forEach(function (b) {
