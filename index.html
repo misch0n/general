@@ -1853,7 +1853,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.3.3';
+  var APP_VERSION = '1.3.4';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4318,16 +4318,22 @@ body.modal-open{ overflow:hidden; }
   function devRemove(cat, it) { it.status = 'removed'; collapseDevEdit(it); refreshDevHead(cat, it); refreshDevSecBadge(cat); devApplyAll(); }
   // swipe a row left to mark removed (right to restore) — reversible, part of the diff
   function attachDevSwipe(cat, it, head, wrap) {
-    var sx = 0, w = 0, dx = 0, tracking = false;
-    head.addEventListener('pointerdown', function (e) { if (e.target.closest('.di-edit')) return; sx = e.clientX; w = wrap.offsetWidth || 300; dx = 0; tracking = true; it._swiping = false; });
+    var sx = 0, sy = 0, w = 0, dx = 0, tracking = false;
+    head.addEventListener('pointerdown', function (e) { if (e.target.closest('.di-edit')) return; sx = e.clientX; sy = e.clientY; w = wrap.offsetWidth || 300; dx = 0; tracking = true; it._swiping = false; });
     head.addEventListener('pointermove', function (e) {
       if (!tracking) return;
-      dx = e.clientX - sx;   // gesture is driven by the HORIZONTAL delta only — vertical drift never affects it
-      // once a real horizontal swipe starts, capture the pointer so vertical movement can't disrupt it
-      if (!it._swiping && Math.abs(dx) > 8) { it._swiping = true; try { head.setPointerCapture(e.pointerId); } catch (x) {} }
+      dx = e.clientX - sx; var dy = e.clientY - sy;
+      if (!it._swiping) {
+        // decide the gesture: horizontal-dominant → swipe; clearly vertical → let the list scroll
+        if (Math.abs(dx) > 6 && Math.abs(dx) >= Math.abs(dy)) { it._swiping = true; try { head.setPointerCapture(e.pointerId); } catch (x) {} }
+        else if (Math.abs(dy) > 10) { tracking = false; return; }
+        else return;
+      }
+      // claimed as a swipe: stop the browser from scrolling/cancelling, and ignore vertical drift entirely
+      if (e.cancelable) e.preventDefault();
       wrap.style.transform = dx < 0 ? 'translateX(' + Math.max(dx, -0.5 * w) + 'px)' : 'none';
       head.classList.toggle('del-arm', -dx >= 0.4 * w);
-    });
+    }, { passive: false });
     function end() {
       if (!tracking) return; tracking = false; wrap.style.transform = 'none'; head.classList.remove('del-arm');
       if (-dx >= 0.4 * w) { it.status = it.status === 'removed' ? recomputeStatus(it) : 'removed'; devApplyAll(); refreshDevHead(cat, it); refreshDevSecBadge(cat); }
