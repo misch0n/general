@@ -445,6 +445,10 @@ body.modal-open{ overflow:hidden; }
   background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); }
 .nethostcode{ margin:10px 0; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; opacity:.85; }
 .nethostcode .netcode-show{ display:block; margin-top:4px; font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright); }
+.wrcap{ margin-top:12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:left; }
+.wrcap-hd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:6px; }
+.devrow-disabled{ opacity:.4; }
+.devrow-disabled .toggle{ pointer-events:none; }
 .netp{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line);
   font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:13px; }
 .netp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
@@ -1707,6 +1711,18 @@ body.modal-open{ overflow:hidden; }
       <div class="setup-actions">
         <button id="netDiagBtn" class="btn small hidden">🔧 Тест на звука (диагностика)</button>
       </div>
+      <div id="netChooseMsg" class="netstatus netflavour"></div>
+    </div>
+    <!-- WebRTC packet/event capture: record every connection event + frame, export base64 JSON -->
+    <div id="wrCap" class="wrcap hidden">
+      <div class="wrcap-hd">🛰 WebRTC дебъг</div>
+      <div id="wrCapStatus" class="nd-capstat">записва се…</div>
+      <div class="setup-actions">
+        <button id="wrCapCopy" class="btn small">📋 Копирай WebRTC лог</button>
+        <button id="wrCapClear" class="btn small">🗑 Изчисти</button>
+      </div>
+      <textarea id="wrCapOut" class="nd-capout hidden" readonly></textarea>
+      <div class="nd-hint">Записва всичко: PeerJS събития, грешки, рамки. Направи опит за свързване, после <b>Копирай</b> и прати записа от <b>двете</b> устройства.</div>
     </div>
     <!-- acoustic diagnostics: live tone meters + test tones, to debug the link on real devices -->
     <div id="netDiag" class="netdiag hidden">
@@ -1869,7 +1885,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.4.0';
+  var APP_VERSION = '1.4.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -1878,7 +1894,7 @@ body.modal-open{ overflow:hidden; }
   // true = tap the ones to KEEP (ДРЪЖ!). Default „keep". This is the owner's/default
   // preference (set in owner customisation); each HUMAN player carries their own copy
   // (p.selectKeep) so several humans in one game can play in different flavours.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: false, selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: false, webrtcDebug: false, selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1913,14 +1929,14 @@ body.modal-open{ overflow:hidden; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
+              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -2567,9 +2583,39 @@ body.modal-open{ overflow:hidden; }
   function genGameCode() { var a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', s = ''; for (var i = 0; i < 6; i++) s += a.charAt(Math.floor(Math.random() * a.length)); return s; }
   function loadPeerJS(cb) {
     if (window.Peer) { cb(true); return; }
+    var t0 = Date.now();
     var s = document.createElement('script'); s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-    s.onload = function () { cb(!!window.Peer); }; s.onerror = function () { cb(false); };
+    s.onload = function () { wrlog('peerjs-load', { ok: !!window.Peer, ms: Date.now() - t0 }); cb(!!window.Peer); };
+    s.onerror = function () { wrlog('peerjs-load', { ok: false, error: 'script-load-failed', ms: Date.now() - t0 }); cb(false); };
     document.head.appendChild(s);
+  }
+  // ---------- WebRTC capture (records every connection event + frame for offline debugging) ----------
+  var wrLog = [], wrT0 = Date.now(), wrRole = '', wrCode = '';
+  function wrTypeName(t) { if (window.MP && MP.T) { for (var k in MP.T) if (MP.T[k] === t) return k; } return String(t); }
+  function wrlog(ev, data) {
+    if (!settings.webrtcDebug) return;
+    var e = { t: Date.now() - wrT0, ev: ev };
+    if (data) for (var k in data) e[k] = data[k];
+    wrLog.push(e); if (wrLog.length > 3000) wrLog.shift();
+    syncWrCapStatus();
+  }
+  function wrCapReset(role, code) {
+    wrT0 = Date.now(); wrLog = []; wrRole = role || wrRole || ''; wrCode = code || wrCode || '';
+    wrlog('env', { app: APP_VERSION, role: wrRole, code: wrCode, ua: navigator.userAgent, online: navigator.onLine,
+      proto: location.protocol, hasPeer: !!window.Peer,
+      hasRTC: !!(window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection) });
+  }
+  function wrFrame(bytes) {
+    var info = { len: (bytes && bytes.length) || 0 };
+    try { var u = MP.unframe(bytes); if (u) { info.type = wrTypeName(u.type); info.from = u.sender; info.seq = u.seq; info.plen = u.payload ? u.payload.length : 0; } else info.type = '∅unframed'; } catch (e) { info.type = '∅err'; }
+    return info;
+  }
+  function wrPeerErr(e) { return { type: (e && e.type) || null, message: (e && e.message) || String(e) }; }
+  function syncWrCapStatus() { var el = $('wrCapStatus'); if (el) el.textContent = settings.webrtcDebug ? (wrLog.length + ' събития записани') : 'дебъгът е изключен'; }
+  function syncWrCapVis() {
+    var box = $('wrCap'); if (!box) return;
+    var show = !$('netModal').classList.contains('hidden') && netKind === 'webrtc' && settings.webrtc && settings.webrtcDebug;
+    box.classList.toggle('hidden', !show); syncWrCapStatus();
   }
   function PeerBus(opts) {
     this.isHost = !!opts.isHost; this.code = opts.code;
@@ -2580,38 +2626,56 @@ body.modal-open{ overflow:hidden; }
   PeerBus.prototype.onReceive = function (cb) { this._rx = cb; };   // MP.Session transport interface
   PeerBus.prototype.send = function (bytes) {
     var arr = bytes;                                                  // BinaryPack ships the typed array as-is
-    this.conns.forEach(function (c) { if (c && c.open) { try { c.send(arr); } catch (e) {} } });
+    var n = 0; this.conns.forEach(function (c) { if (c && c.open) { try { c.send(arr); n++; } catch (e) { wrlog('tx-error', { message: e.message }); } } });
+    if (settings.webrtcDebug) { var f = wrFrame(bytes); f.to = n; wrlog('tx', f); }
     return Promise.resolve();
   };
   PeerBus.prototype._addConn = function (conn) {
     var self = this; this.conns.push(conn);
-    conn.on('data', function (data) { if (!self._rx) return; self._rx(data instanceof Uint8Array ? data : new Uint8Array(data)); });
-    conn.on('close', function () { self.conns = self.conns.filter(function (c) { return c !== conn; }); self.onPeers(self.conns.length); self.onLost(conn); });
+    wrlog('conn-add', { peer: conn.peer, n: this.conns.length });
+    conn.on('data', function (data) {
+      var b = data instanceof Uint8Array ? data : new Uint8Array(data);
+      if (settings.webrtcDebug) wrlog('rx', wrFrame(b));
+      if (self._rx) self._rx(b);
+    });
+    conn.on('close', function () { wrlog('conn-close', { peer: conn.peer }); self.conns = self.conns.filter(function (c) { return c !== conn; }); self.onPeers(self.conns.length); self.onLost(conn); });
+    conn.on('error', function (e) { wrlog('conn-error', wrPeerErr(e)); });
     self.onPeers(self.conns.length);
   };
   PeerBus.prototype.start = function () {
     var self = this;
+    wrlog('bus-start', { role: self.isHost ? 'host' : 'client', code: self.code });
     return new Promise(function (resolve, reject) {
-      if (!window.Peer) { reject(new Error('no-peerjs')); return; }
-      var done = false, fail = function (e) { if (!done) { done = true; reject(e); } };
+      if (!window.Peer) { wrlog('start-fail', { reason: 'no-peerjs' }); reject(new Error('no-peerjs')); return; }
+      var done = false, fail = function (e) { wrlog('start-fail', wrPeerErr(e)); if (!done) { done = true; reject(e); } };
       if (self.isHost) {
         self.peer = new window.Peer(PEER_PREFIX + self.code);
-        self.peer.on('open', function () { if (!done) { done = true; resolve(); } });
-        self.peer.on('connection', function (conn) { conn.on('open', function () { self._addConn(conn); }); });
-        self.peer.on('error', function (e) { if (!done) fail(e); });
+        self.peer.on('open', function (id) { wrlog('peer-open', { id: id }); if (!done) { done = true; resolve(); } });
+        self.peer.on('connection', function (conn) {
+          wrlog('host-incoming', { peer: conn.peer });
+          conn.on('open', function () { wrlog('host-conn-open', { peer: conn.peer }); self._addConn(conn); });
+          conn.on('error', function (e) { wrlog('host-conn-error', wrPeerErr(e)); });
+        });
+        self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); });
+        self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); if (!done) fail(e); });
       } else {
         self.peer = new window.Peer();
-        self.peer.on('open', function () {
+        self.peer.on('open', function (id) {
+          wrlog('peer-open', { id: id });
+          wrlog('conn-attempt', { target: PEER_PREFIX + self.code });
           var conn = self.peer.connect(PEER_PREFIX + self.code, { reliable: true });
-          var t = setTimeout(function () { fail(new Error('timeout')); }, 15000);
-          conn.on('open', function () { clearTimeout(t); self._addConn(conn); if (!done) { done = true; resolve(); } });
-          conn.on('error', function (e) { clearTimeout(t); fail(e); });
+          var t = setTimeout(function () { wrlog('conn-timeout', {}); fail(new Error('timeout')); }, 15000);
+          conn.on('open', function () { wrlog('client-conn-open', { peer: conn.peer }); clearTimeout(t); self._addConn(conn); if (!done) { done = true; resolve(); } });
+          conn.on('error', function (e) { wrlog('client-conn-error', wrPeerErr(e)); clearTimeout(t); fail(e); });
+          conn.on('close', function () { wrlog('client-conn-close', {}); });
         });
-        self.peer.on('error', function (e) { fail(e); });
+        self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); });
+        self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); fail(e); });
       }
     });
   };
   PeerBus.prototype.stop = function () {
+    wrlog('bus-stop', {});
     this.conns.forEach(function (c) { try { c.close(); } catch (e) {} }); this.conns = [];
     if (this.peer) { try { this.peer.destroy(); } catch (e) {} } this.peer = null;
   };
@@ -2626,11 +2690,15 @@ body.modal-open{ overflow:hidden; }
     netShow('choose');
     $('netJoinCode').classList.add('hidden'); $('netCodeInput').value = '';
     $('netHostCode').classList.add('hidden'); $('netHostCode').textContent = '';
-    $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay('');
+    $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay(''); netChooseMsg('');
     // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
     $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
+    if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
     $('netModal').classList.remove('hidden');
+    syncWrCapVis();
   }
+  // a status line that is visible during the CHOOSE phase (netStatus lives inside the hidden lobby)
+  function netChooseMsg(s) { var el = $('netChooseMsg'); if (el) el.innerHTML = s; }
   $('netBtn').onclick = function () { openNetModal('acoustic'); };
   $('webrtcBtn').onclick = function () { openNetModal('webrtc'); };
   $('netHost').onclick = function () {
@@ -2656,36 +2724,38 @@ body.modal-open{ overflow:hidden; }
   $('netCodeInput').onkeydown = function (e) { if (e.key === 'Enter') $('netCodeJoin').onclick(); };
   // ---- WebRTC host: mint a code, open the PeerJS link, then run the normal lobby ----
   function webrtcHost() {
-    netSay('Свързвам се…');
+    wrCapReset('host', ''); wrlog('action', { tap: 'host' }); syncWrCapVis();
+    netChooseMsg('Свързвам се със сървъра…');
     loadPeerJS(function (ok) {
-      if (!ok) { netSay('Няма връзка с интернет сървъра. Опитай пак.'); return; }
-      var code = genGameCode();
+      if (!ok) { netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
+      var code = genGameCode(); wrCode = code;
       netBus = new PeerBus({ isHost: true, code: code,
         onPeers: function () {}, onLost: function (conn) { netHostLost(conn); } });
       netBus.start().then(function () {
         net = newSessionWith(netBus, true); localPid = MP.HOST_ID;
-        netShow('scan'); $('netToPrep').classList.add('hidden');
+        netShow('scan'); $('netToPrep').classList.add('hidden'); netChooseMsg('');
         $('netHostCode').innerHTML = 'Код за играта<br><b class="netcode-show">' + code + '</b>';
         $('netHostCode').classList.remove('hidden');
         net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
-      }).catch(function () { netSay('Неуспешно свързване със сървъра. Опитай пак.'); netBus = null; });
+      }).catch(function (e) { netChooseMsg('⚠ Неуспешно свързване със сървъра: ' + ((e && (e.type || e.message)) || 'грешка') + '. Опитай пак.'); netBus = null; });
     });
   }
   // ---- WebRTC client: dial the host's code, then ask to join the lobby ----
   $('netCodeJoin').onclick = function () {
     if (netKind !== 'webrtc') return;
     var code = ($('netCodeInput').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (code.length < 4) { netSay('Въведи валиден код.'); return; }
-    $('netCodeJoin').disabled = true; netSay('Свързвам се…');
+    if (code.length < 4) { netChooseMsg('⚠ Въведи валиден код (поне 4 знака).'); return; }
+    wrCapReset('client', code); wrlog('action', { tap: 'joinCode', code: code }); syncWrCapVis();
+    $('netCodeJoin').disabled = true; netChooseMsg('Свързвам се с код ' + code + '…');
     loadPeerJS(function (ok) {
-      if (!ok) { $('netCodeJoin').disabled = false; netSay('Няма връзка с интернет сървъра. Опитай пак.'); return; }
+      if (!ok) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
       netBus = new PeerBus({ isHost: false, code: code, onLost: function () { netClientLost(); } });
       netBus.start().then(function () {
         net = newSessionWith(netBus, false);
-        $('netJoinCode').classList.add('hidden'); $('netCodeJoin').disabled = false;
+        $('netJoinCode').classList.add('hidden'); $('netCodeJoin').disabled = false; netChooseMsg('');
         netShow('scan'); $('netToPrep').classList.add('hidden');
         net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
-      }).catch(function () { $('netCodeJoin').disabled = false; netSay('Кодът не е намерен или връзката се провали.'); netBus = null; });
+      }).catch(function (e) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Връзката се провали: ' + ((e && (e.type || e.message)) || 'кодът не е намерен') + '. Провери кода и опитай пак.'); netBus = null; });
     });
   };
   // connection loss handlers (full drop/reconnect handling lands in a later slice)
@@ -2727,6 +2797,16 @@ body.modal-open{ overflow:hidden; }
   }
   $('netLeave').onclick = leaveNet;
   $('netClose').onclick = leaveNet;
+  // ---- WebRTC capture export (mirrors the acoustic ndCopy: base64 JSON of every logged event) ----
+  $('wrCapCopy').onclick = function () {
+    var payload = { v: 1, app: APP_VERSION, role: wrRole, code: wrCode, ts: Date.now(), log: wrLog };
+    var b64; try { b64 = 'GENWRCAP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload)))); } catch (e) { b64 = 'грешка: ' + e.message; }
+    var ta = $('wrCapOut'); ta.value = b64; ta.classList.remove('hidden'); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(b64).then(function () {}, function () {});
+    $('wrCapStatus').textContent = (ok ? '✓ копирано · ' : '') + b64.length + ' знака · ' + wrLog.length + ' събития (избери и копирай ръчно ако трябва)';
+  };
+  $('wrCapClear').onclick = function () { wrCapReset(wrRole, wrCode); $('wrCapOut').classList.add('hidden'); $('wrCapOut').value = ''; syncWrCapStatus(); };
 
   function startNetGame(roster, order) {
     clearAllPenalties();
@@ -4508,13 +4588,21 @@ body.modal-open{ overflow:hidden; }
     var row = document.createElement('div'); row.className = 'devctrl-row';
     row.appendChild(el('span', null, label));
     var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'toggle' + (settings[key] ? ' on' : ''); tog.innerHTML = '<span class="switch"></span>';
-    tog.onclick = function () { settings[key] = !settings[key]; tog.classList.toggle('on', settings[key]); saveSettings(); if (onChange) onChange(); };
+    tog.onclick = function () { if (tog.disabled) return; settings[key] = !settings[key]; tog.classList.toggle('on', settings[key]); saveSettings(); if (onChange) onChange(); };
     row.appendChild(tog); return row;
   }
   function syncAcousticDebugVis() { var r = $('devAcousticDebugRow'); if (r) r.classList.toggle('hidden', !settings.acoustic); }
+  // the WebRTC debug toggle stays visible but is greyed/inert until the WebRTC feature is on
+  function syncWebrtcDebugRow() {
+    var r = $('devWebrtcDebugRow'); if (!r) return;
+    var off = !settings.webrtc; r.classList.toggle('devrow-disabled', off);
+    var tog = r.querySelector('.toggle'); if (tog) tog.disabled = off;
+  }
   function renderDevControls(body) {
     var dbg = devControlSection('Debug');
     dbg.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
+    var wrd = devToggleRow('Дебъг WebRTC', 'webrtcDebug', function () { syncWrCapVis(); }); wrd.id = 'devWebrtcDebugRow';
+    dbg.list.appendChild(wrd);
     body.appendChild(dbg.sec);
     var exp = devControlSection('Experimental');
     var tutRow = document.createElement('div'); tutRow.className = 'devctrl-row';
@@ -4523,9 +4611,9 @@ body.modal-open{ overflow:hidden; }
     tutRow.appendChild(tutBtn); exp.list.appendChild(tutRow);
     var adbg = devToggleRow('Акустичен дебъгер', 'acousticDebug', function () { syncAcousticUI(); }); adbg.id = 'devAcousticDebugRow';
     exp.list.appendChild(adbg);
-    exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); }));
+    exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); syncWebrtcDebugRow(); }));
     body.appendChild(exp.sec);
-    syncAcousticDebugVis();
+    syncAcousticDebugVis(); syncWebrtcDebugRow();
   }
   function renderDevModal() {
     if (!devCats) buildDevCats();
