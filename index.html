@@ -92,7 +92,10 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   font-variant-numeric:tabular-nums; transition:transform .12s ease; }   /* background is the player's own colour; sized to hold 3 digits without resizing */
 .ppill .pdot{ width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
 .ppill.on{ transform:scale(1.22); font-weight:800; box-shadow:0 0 0 2px var(--gen-brass), 0 3px 9px rgba(0,0,0,.45); z-index:2; }   /* current player: bigger, not recoloured */
-.ppill.dropped{ opacity:.4; filter:grayscale(.8); }   /* a disconnected player (turns skipped) */
+/* a disconnected player (turns skipped): desaturated, with a fashionable pulsing amber ring */
+.ppill.dropped{ filter:grayscale(.7); opacity:.7; animation:droppulse 1.6s ease-in-out infinite; }
+@keyframes droppulse{ 0%,100%{ box-shadow:0 0 0 1px rgba(224,122,46,.5), 0 0 7px rgba(224,122,46,.35); opacity:.55; }
+  50%{ box-shadow:0 0 0 2px rgba(224,122,46,.95), 0 0 13px rgba(224,122,46,.6); opacity:.9; } }
 
 /* ===== scoreboard ===== */
 .sheet{ padding:10px 16px 2px; display:flex; flex-direction:column; gap:4px; }
@@ -445,7 +448,13 @@ body.modal-open{ overflow:hidden; }
   font-family:var(--gen-font-display); font-weight:700; font-size:20px; padding:8px 10px; border-radius:8px;
   background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); }
 .nethostcode{ margin:10px 0; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; opacity:.85; }
-.nethostcode .netcode-show{ display:block; margin-top:4px; font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright); }
+.nethostcode .netcode-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; }
+.nethostcode .netcode-show{ font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:pointer; }
+.codecopy{ font-family:var(--gen-font-display); font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase;
+  padding:5px 9px; border-radius:7px; background:rgba(255,255,255,.06); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); cursor:pointer; white-space:nowrap; }
+.codecopy.copied{ background:rgba(46,158,91,.25); border-color:#2e9e5b; color:#bfe8cf; }
+.netjoinview{ margin:6px 0; }
 .wrcap{ margin-top:12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:left; }
 .wrcap-hd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:6px; }
 .devrow-disabled{ opacity:.4; }
@@ -1703,19 +1712,31 @@ body.modal-open{ overflow:hidden; }
     <h2 id="netTitle">🔊 Акустична игра</h2>
     <p class="ht ac-only">Играй на няколко телефона наблизо — звукът пренася ходовете. Дръж телефоните на ~1 м, със звук нагоре.</p>
     <p class="ht wr-only hidden">Играй на няколко телефона по интернет. Хостът дава код, останалите го въвеждат.</p>
-    <div class="acwarn wr-only hidden"><span class="acw-ic">📱</span><span><b>Две отделни устройства!</b> На iPhone фоновият раздел се спира — два прозореца на един телефон няма да се свържат. Дръж и двата екрана активни.</span></div>
     <div class="acwarn ac-only"><span class="acw-ic">🎧</span><span><b>Без слушалки!</b> Звукът трябва да минава през високоговорителя и микрофона — със слушалки преносът не работи.</span></div>
     <div id="netChoose">
       <p class="ht">Ти играеш като <b id="netMeName">—</b>.</p>
-      <div class="setup-actions">
-        <button id="netHost" class="btn primary">📡 Бъди старшина (хост)</button>
+      <!-- pick a role: host or join -->
+      <div id="netPickRole">
+        <div class="setup-actions">
+          <button id="netHost" class="btn primary">📡 Бъди старшина (хост)</button>
+        </div>
+        <div class="setup-actions">
+          <button id="netJoin" class="btn">🎧 Влез в игра</button>
+        </div>
       </div>
-      <div class="setup-actions">
-        <button id="netJoin" class="btn">🎧 Влез в игра</button>
-      </div>
-      <div id="netJoinCode" class="netjoincode hidden">
-        <input id="netCodeInput" class="netcode-in" maxlength="6" placeholder="КОД" autocomplete="off" autocapitalize="characters" />
-        <button id="netCodeJoin" class="btn primary">Влез с кода</button>
+      <!-- join sub-view: explainer + code entry + join/cancel -->
+      <div id="netJoinCode" class="netjoinview hidden">
+        <p class="ht wr-only hidden">Въведи кода, който старшината ти даде, и натисни „Влез с кода“.</p>
+        <p class="ht ac-only">Слушам за игра наблизо…</p>
+        <div class="netjoincode">
+          <input id="netCodeInput" class="netcode-in" maxlength="6" placeholder="КОД" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" />
+        </div>
+        <div class="setup-actions">
+          <button id="netCodeJoin" class="btn primary">Влез с кода</button>
+        </div>
+        <div class="setup-actions">
+          <button id="netJoinCancel" class="btn small">↩ Назад</button>
+        </div>
       </div>
       <div class="setup-actions">
         <button id="netDiagBtn" class="btn small hidden">🔧 Тест на звука (диагностика)</button>
@@ -1894,7 +1915,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.5.0';
+  var APP_VERSION = '1.6.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2628,6 +2649,16 @@ body.modal-open{ overflow:hidden; }
   // It emulates the acoustic BROADCAST bus: the host sends to every client connection, a client
   // sends to the host, and the host re-broadcasts state — so the session needs no topology change.
   var PEER_PREFIX = 'genrl1-';                 // namespaces our peer ids on the shared PeerJS cloud
+  // ICE servers for NAT traversal. The PeerJS cloud only gives STUN; without a TURN relay the
+  // P2P negotiation fails on many real networks (cellular / symmetric NAT) — which is exactly the
+  // „negotiation-failed" we saw. Add public STUN + a free TURN relay so a relayed path exists.
+  var PEER_OPTS = { config: { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ] } };
   function genGameCode() { var a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', s = ''; for (var i = 0; i < 6; i++) s += a.charAt(Math.floor(Math.random() * a.length)); return s; }
   function loadPeerJS(cb) {
     if (window.Peer) { cb(true); return; }
@@ -2745,7 +2776,7 @@ body.modal-open{ overflow:hidden; }
       if (!window.Peer) { wrlog('start-fail', { reason: 'no-peerjs' }); reject(new Error('no-peerjs')); return; }
       var done = false, fail = function (e) { wrlog('start-fail', wrPeerErr(e)); if (!done) { done = true; reject(e); } };
       if (self.isHost) {
-        self.peer = new window.Peer(PEER_PREFIX + self.code);
+        self.peer = new window.Peer(PEER_PREFIX + self.code, PEER_OPTS);
         self.peer.on('open', function (id) { wrlog('peer-open', { id: id }); self._recon = 0; if (!done) { done = true; resolve(); } });
         self.peer.on('connection', function (conn) {
           wrlog('host-incoming', { peer: conn.peer });
@@ -2756,7 +2787,7 @@ body.modal-open{ overflow:hidden; }
         // a 'network'/socket error after we're open is a transient broker drop — keep the lobby alive
         self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); if (!done) fail(e); });
       } else {
-        self.peer = new window.Peer();
+        self.peer = new window.Peer(undefined, PEER_OPTS);
         self.peer.on('open', function (id) {
           wrlog('peer-open', { id: id }); self._recon = 0;
           if (!self._opened) { self._opened = true; self._dialHost({ ok: function () { if (!done) { done = true; resolve(); } }, fail: function (e) { fail(e); } }); }
@@ -2781,8 +2812,9 @@ body.modal-open{ overflow:hidden; }
     document.querySelectorAll('#netModal .wr-only').forEach(function (e) { e.classList.toggle('hidden', !wr); });
     $('netMeName').textContent = localMeta().name;
     netShow('choose');
+    $('netPickRole').classList.remove('hidden');                       // back to the role picker
     $('netJoinCode').classList.add('hidden'); $('netCodeInput').value = '';
-    $('netHostCode').classList.add('hidden'); $('netHostCode').textContent = '';
+    $('netHostCode').classList.add('hidden'); $('netHostCode').innerHTML = '';
     $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay(''); netChooseMsg('');
     // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
     $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
@@ -2803,12 +2835,23 @@ body.modal-open{ overflow:hidden; }
     });
   };
   $('netJoin').onclick = function () {
-    if (netKind === 'webrtc') { $('netJoinCode').classList.remove('hidden'); $('netCodeInput').focus(); return; }
+    if (netKind === 'webrtc') {
+      // switch to the join sub-view; deliberately DON'T focus the field (no keyboard until tapped)
+      $('netPickRole').classList.add('hidden'); $('netJoinCode').classList.remove('hidden'); netChooseMsg('');
+      return;
+    }
     netStartTransport(function () {
       net = newSession(false);
       netShow('scan'); $('netToPrep').classList.add('hidden');
       net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
     });
+  };
+  // leave the join sub-view, back to the host/join picker
+  $('netJoinCancel').onclick = function () {
+    $('netJoinCode').classList.add('hidden'); $('netPickRole').classList.remove('hidden');
+    $('netCodeInput').value = ''; netChooseMsg('');
+    if (netBus) { netBus.stop(); netBus = null; }
+    if (net) { net.dispose(); net = null; }
   };
   // keep the code input upper-cased and limited to our alphabet
   $('netCodeInput').oninput = function () {
@@ -2816,6 +2859,25 @@ body.modal-open{ overflow:hidden; }
   };
   $('netCodeInput').onkeydown = function (e) { if (e.key === 'Enter') $('netCodeJoin').onclick(); };
   // ---- WebRTC host: mint a code, open the PeerJS link, then run the normal lobby ----
+  // host code display: the code is NOT selectable; a copy button next to it flips to a „copied" state.
+  function renderHostCode(code) {
+    var box = $('netHostCode');
+    box.innerHTML = 'Код за играта'
+      + '<div class="netcode-line"><b class="netcode-show">' + code + '</b>'
+      + '<button type="button" id="netCodeCopy" class="codecopy" title="Копирай кода" aria-label="Копирай кода">📋</button></div>';
+    box.classList.remove('hidden');
+    var btn = $('netCodeCopy');
+    btn.onclick = function () { copyGameCode(code, btn); };
+    // long-press over the code also copies (mirrors the “hold to copy” gesture)
+    var hold = box.querySelector('.netcode-show');
+    if (hold) hold.addEventListener('pointerdown', function () { copyGameCode(code, btn); });
+  }
+  function copyGameCode(code, btn) {
+    var ok = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(code); ok = true; } catch (e) {} }
+    if (!ok) { try { var ta = document.createElement('textarea'); ta.value = code; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); document.body.removeChild(ta); } catch (e) {} }
+    if (btn) { btn.classList.add('copied'); btn.textContent = '✓ копирано'; clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); btn.textContent = '📋'; }, 1600); }
+  }
   function webrtcHost() {
     wrCapReset('host', ''); wrlog('action', { tap: 'host' }); syncWrCapVis();
     netChooseMsg('Свързвам се със сървъра…');
@@ -2827,8 +2889,7 @@ body.modal-open{ overflow:hidden; }
       netBus.start().then(function () {
         net = newSessionWith(netBus, true); localPid = MP.HOST_ID;
         netShow('scan'); $('netToPrep').classList.add('hidden'); netChooseMsg('');
-        $('netHostCode').innerHTML = 'Код за играта<br><b class="netcode-show">' + code + '</b>';
-        $('netHostCode').classList.remove('hidden');
+        renderHostCode(code);
         net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
       }).catch(function (e) { netChooseMsg('⚠ Неуспешно свързване със сървъра: ' + ((e && (e.type || e.message)) || 'грешка') + '. Опитай пак.'); netBus = null; });
     });
@@ -2886,7 +2947,13 @@ body.modal-open{ overflow:hidden; }
   };
   $('netStart').onclick = function () {
     if (!net || !net.isHost) return;
-    if (!net.allReady()) { setFlavour($('netStatus'), 'lobbyWait'); return; }
+    // never leave the host staring: spell out exactly what's blocking the start
+    if (net.roster.length < net.minPlayers) { netSay('⚠ Трябват поне ' + net.minPlayers + ' бойци, за да започнеш.'); return; }
+    if (!net.allReady()) {
+      var notReady = net.roster.filter(function (m) { return m.id !== MP.HOST_ID && !m.isAI && !m.ready && !m.dropped; });
+      netSay('⏳ Чакам да са готови: ' + (notReady.length ? notReady.map(function (m) { return esc(m.name); }).join(', ') : 'бойците'));
+      return;
+    }
     $('netStart').disabled = true; setFlavour($('netStatus'), 'lobbyWait');
     if (netKind === 'webrtc') { net.startGame(); return; }   // data channels need no link calibration
     // §3 calibrate (best-effort — picks the gameplay profile if the modem can't measure)
@@ -4503,18 +4570,19 @@ body.modal-open{ overflow:hidden; }
       }
     });
   }
-  // secret developer unlock: press-and-hold the ГЕНЕРАЛ title on the start screen for 5s
+  // secret developer unlock: press-and-hold the ГЕНЕРАЛ title on the start screen for 3s
   (function () {
     var t = $('setupTitle'); if (!t) return;
     var timer = null, sx = 0, sy = 0;
-    function start(e) { if (settings.dev) return; sx = e.clientX; sy = e.clientY; clearTimeout(timer); timer = setTimeout(activateDev, 5000); }   // 5s STATIC hold
+    function start(e) { if (settings.dev) return; sx = e.clientX; sy = e.clientY; clearTimeout(timer); timer = setTimeout(activateDev, 3000); }   // 3s STATIC hold
     function cancel() { clearTimeout(timer); timer = null; }
     function move(e) { if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel(); }   // moving cancels — must stay still
     t.addEventListener('pointerdown', start);
     t.addEventListener('pointermove', move);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { t.addEventListener(ev, cancel); });
   })();
-  function activateDev() { settings.dev = true; devCats = null; $('devCogBtn').classList.remove('hidden'); }   // just reveal the cog — open on tap
+  // reveal the cog AND build the editor data up front, so the very first tap on the cog opens it
+  function activateDev() { settings.dev = true; buildDevCats(); $('devCogBtn').classList.remove('hidden'); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   // dev cog (shown beside the hamburger once unlocked) + dev modal controls
   $('devCogBtn').onclick = openDevModal;
@@ -4706,26 +4774,29 @@ body.modal-open{ overflow:hidden; }
     tog.onclick = function () { if (tog.disabled) return; settings[key] = !settings[key]; tog.classList.toggle('on', settings[key]); saveSettings(); if (onChange) onChange(); };
     row.appendChild(tog); return row;
   }
-  function syncAcousticDebugVis() { var r = $('devAcousticDebugRow'); if (r) r.classList.toggle('hidden', !settings.acoustic); }
-  // the WebRTC debug toggle stays visible but is greyed/inert until the WebRTC feature is on
-  function syncWebrtcDebugRow() {
-    var r = $('devWebrtcDebugRow'); if (!r) return;
-    var off = !settings.webrtc; r.classList.toggle('devrow-disabled', off);
-    var tog = r.querySelector('.toggle'); if (tog) tog.disabled = off;
+  // a debug toggle stays visible but is greyed/inert until its parent feature is enabled
+  function greyDevRow(rowId, on) {
+    var r = $(rowId); if (!r) return;
+    r.classList.toggle('devrow-disabled', !on);
+    var tog = r.querySelector('.toggle'); if (tog) tog.disabled = !on;
   }
+  function syncAcousticDebugVis() { greyDevRow('devAcousticDebugRow', settings.acoustic); }
+  function syncWebrtcDebugRow() { greyDevRow('devWebrtcDebugRow', settings.webrtc); }
   function renderDevControls(body) {
+    // ---- Debug: the diagnostic sub-switches, each greyed until its feature is on ----
     var dbg = devControlSection('Debug');
-    dbg.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
+    var adbg = devToggleRow('Акустичен дебъгер', 'acousticDebug', function () { syncAcousticUI(); }); adbg.id = 'devAcousticDebugRow';
+    dbg.list.appendChild(adbg);
     var wrd = devToggleRow('Дебъг WebRTC', 'webrtcDebug', function () { syncWrCapVis(); }); wrd.id = 'devWebrtcDebugRow';
     dbg.list.appendChild(wrd);
     body.appendChild(dbg.sec);
+    // ---- Experimental: the features themselves ----
     var exp = devControlSection('Experimental');
     var tutRow = document.createElement('div'); tutRow.className = 'devctrl-row';
     tutRow.appendChild(el('span', null, 'Обучение'));
     var tutBtn = el('button', 'btn small', '📚 Започни'); tutBtn.onclick = function () { closeDevModal(true); tutStart(); };
     tutRow.appendChild(tutBtn); exp.list.appendChild(tutRow);
-    var adbg = devToggleRow('Акустичен дебъгер', 'acousticDebug', function () { syncAcousticUI(); }); adbg.id = 'devAcousticDebugRow';
-    exp.list.appendChild(adbg);
+    exp.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
     exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); syncWebrtcDebugRow(); }));
     body.appendChild(exp.sec);
     syncAcousticDebugVis(); syncWebrtcDebugRow();
