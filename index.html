@@ -504,8 +504,15 @@ body.modal-open{ overflow:hidden; }
 .netpp .pp-spur{ position:absolute; right:10px; top:-11px; font-family:var(--gen-font-display); font-weight:800; font-size:12px; letter-spacing:.5px; color:#fff;
   background:#c0392b; padding:2px 9px; border-radius:11px; white-space:nowrap; pointer-events:none; opacity:0; box-shadow:0 2px 7px rgba(0,0,0,.45); transition:opacity .1s; }
 .netpp .pp-tag{ font-size:9px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); flex:none; }
-.netpp .pp-rdy{ flex:none; font-size:12px; }
-.netpp .pp-rdy.on{ color:#7bb85a; } .netpp .pp-rdy.off{ color:var(--gen-muted); }
+.netpp .pp-rdy{ flex:none; }
+/* readied: a green circle with a white tick */
+.netpp .pp-rdy.ready{ display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#2e9e5b; color:#fff; font-size:11px; font-weight:800; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+/* still configuring: animated „typing" dots */
+.netpp .pp-cfg{ display:inline-flex; gap:4px; align-items:center; flex:none; padding:0 4px; }
+.netpp .pp-cfg i{ width:5px; height:5px; border-radius:50%; background:var(--gen-muted); animation:cfgdot 1.05s infinite ease-in-out; }
+.netpp .pp-cfg i:nth-child(2){ animation-delay:.18s; }
+.netpp .pp-cfg i:nth-child(3){ animation-delay:.36s; }
+@keyframes cfgdot{ 0%,70%,100%{ opacity:.25; transform:translateY(0); } 35%{ opacity:1; transform:translateY(-3px); } }
 .netpp .pp-kick{ flex:none; width:22px; height:22px; border-radius:6px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:13px; line-height:1; }
 /* the spammable „ДАЙ ЗОР" button (client ready→spur, host pre-start) */
 .btn.spur{ background:linear-gradient(180deg,#e0552e,#c0392b); color:#fff; border-color:#7a2018; box-shadow:0 3px 0 #7a2018; letter-spacing:1px; }
@@ -1995,7 +2002,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.10.1';
+  var APP_VERSION = '1.11.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2614,6 +2621,7 @@ body.modal-open{ overflow:hidden; }
       var used = net.roster.filter(function (m) { return m.id !== localPid; }).map(function (m) { return (m.color || '').toLowerCase(); });
       openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); markEdited(); }, freeSwatches(netMe.color, used));
     };
+    $('netMeNameInput').onfocus = function () { touchedField(); };   // even touching the box reverts a ready client
     $('netMeNameInput').oninput = function () { netMe.name = $('netMeNameInput').value; pushMyMeta(false); markEdited(); };  // debounced
     $('netMeGender').querySelectorAll('.glabel').forEach(function (gb) {
       gb.onclick = function () { netMe.gender = gb.getAttribute('data-g'); renderNetMeCard(); pushMyMeta(true); markEdited(); };
@@ -2621,7 +2629,14 @@ body.modal-open{ overflow:hidden; }
   }
   // host has no „ready" — but editing a field arms a „ГОТОВ!" confirm on the action button
   var netEditing = false;
-  function markEdited() { if (net && net.isHost) { netEditing = true; renderNetPrep(); } }
+  function setMyReady(v) { netMyReady = v; if (net) net.setReady(v); var e = netMyEntry(); if (e) e.ready = v; }   // optimistic local marker
+  // a client editing (or even touching) a field cancels their ready; the host arms „ГОТОВ!"
+  function markEdited() {
+    if (!net) return;
+    if (net.isHost) { netEditing = true; renderNetPrep(); }
+    else if (netMyReady) { setMyReady(false); renderNetPrep(); }
+  }
+  function touchedField() { if (net && !net.isHost && netMyReady) { setMyReady(false); renderNetPrep(); } }   // focus alone reverts a ready client
   // send my edited meta to the host; debounce typing, fire colour/gender at once
   function pushMyMeta(immediate) {
     clearTimeout(netMetaTimer);
@@ -2630,17 +2645,29 @@ body.modal-open{ overflow:hidden; }
   }
   // ---------- „ДАЙ ЗОР" lobby cheer: a spammable button that spurs YOUR entry; heat reddens the
   // row + speeds a rotating cheer; it decays when you stop. Broadcast so everyone sees it. ----------
-  var SPUR_MSGS = ['Айде бе!', 'По-бързо!', 'Стегнете се!', 'До кога ще чакам?', 'Бавняри!', 'Кога ще почваме?', 'Айде бе, свине!', 'Мързеливци!', 'Размърдайте се!', 'Хайде де!'];
+  var SPUR_MSGS = ['Айде бе!', 'По-бързо!', 'Стегнете се!', 'До кога ще чакам?', 'Бавняри!', 'Кога ще почваме?', 'Айде бе, свине!', 'Мързеливци!', 'Заспахте ли?', 'Стига сте се мотали!', 'Цял ден ли ще се излежавате?', 'Размърдайте се!'];
   var spurHeat = {}, spurMsgIx = {}, spurAcc = {}, spurRaf = 0, spurLast = 0, spurTxAt = 0;
+  var SPUR_AUTO = 0.35;   // below this, a hit just shows ONE message; above it (spamming), messages auto-cycle
   function nowMs() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
+  // one local hit: pop a (new) message + add heat. The first hit picks a random line; further hits advance.
+  function spurBump(id) {
+    var was = spurHeat[id] || 0;
+    spurHeat[id] = Math.min(1, was + 0.16);
+    spurMsgIx[id] = (was > 0.01) ? (((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length) : Math.floor(Math.random() * SPUR_MSGS.length);
+    spurAcc[id] = 0; applySpurVisual(id); startSpurLoop();
+  }
   function spurMe() {
     if (netPhase !== 'prep' || !net || localPid == null) return;
-    spurHeat[localPid] = Math.min(1, (spurHeat[localPid] || 0) + 0.17);
-    startSpurLoop();
+    spurBump(localPid);
     var t = Date.now();
     if (t - spurTxAt > 110 && net.sendSpur) { spurTxAt = t; net.sendSpur(spurHeat[localPid]); }   // throttle the broadcast
   }
-  function onNetSpur(id, heat) { spurHeat[id] = Math.max(spurHeat[id] || 0, heat); startSpurLoop(); }
+  function onNetSpur(id, heat) {
+    var was = spurHeat[id] || 0;
+    spurHeat[id] = Math.max(was, heat);
+    spurMsgIx[id] = (was > 0.01) ? (((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length) : Math.floor(Math.random() * SPUR_MSGS.length);
+    spurAcc[id] = 0; applySpurVisual(id); startSpurLoop();
+  }
   function startSpurLoop() { if (spurRaf) return; spurLast = nowMs(); spurRaf = requestAnimationFrame(spurTick); }
   function spurTick(t) {
     var n = t || nowMs(), dt = Math.min(120, n - spurLast); spurLast = n; var any = false;
@@ -2650,9 +2677,11 @@ body.modal-open{ overflow:hidden; }
       spurHeat[id] = h;
       if (h > 0) {
         any = true;
-        spurAcc[id] = (spurAcc[id] || 0) + dt * (0.25 + h);
-        var period = 720 - h * 520;                         // hotter → faster message swap
-        if (spurAcc[id] >= period) { spurAcc[id] = 0; spurMsgIx[id] = ((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length; }
+        if (h > SPUR_AUTO) {                                 // only spamming auto-cycles the messages
+          spurAcc[id] = (spurAcc[id] || 0) + dt;
+          var period = Math.max(90, 360 - (h - SPUR_AUTO) * 420);   // hotter → faster (≈360ms…90ms)
+          if (spurAcc[id] >= period) { spurAcc[id] = 0; spurMsgIx[id] = ((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length; }
+        }
       }
       applySpurVisual(id);
     });
@@ -2663,14 +2692,16 @@ body.modal-open{ overflow:hidden; }
     var row = box.querySelector('.netpp[data-id="' + id + '"]'); if (!row) return;
     var h = spurHeat[id] || 0; row.style.setProperty('--heat', h.toFixed(3));
     var sp = row.querySelector('.pp-spur');
-    if (sp) { if (h > 0.08) { sp.textContent = SPUR_MSGS[spurMsgIx[id] || 0]; sp.style.opacity = Math.min(1, h * 1.7); } else { sp.textContent = ''; sp.style.opacity = 0; } }
+    if (sp) { if (h > 0.05) { sp.textContent = SPUR_MSGS[spurMsgIx[id] || 0]; sp.style.opacity = Math.min(1, h * 2.4); } else { sp.textContent = ''; sp.style.opacity = 0; } }
   }
   function resetSpur() { spurHeat = {}; spurMsgIx = {}; spurAcc = {}; if (spurRaf) { cancelAnimationFrame(spurRaf); spurRaf = 0; } }
   function renderNetPrep() {
     if (!net) return;
     $('netPrepRoster').innerHTML = net.roster.map(function (m) {
       var tags = (m.id === MP.HOST_ID ? '<span class="pp-tag">старшина</span>' : '') + (m.isAI ? '<span class="pp-tag">🤖 AI</span>' : '');
-      var rdy = m.id === MP.HOST_ID || m.isAI ? '' : '<span class="pp-rdy ' + (m.ready ? 'on">✔' : 'off">…') + '</span>';
+      var rdy = m.id === MP.HOST_ID || m.isAI ? ''
+        : (m.ready ? '<span class="pp-rdy ready" title="готов">✓</span>'
+                   : '<span class="pp-cfg" title="нагласява се"><i></i><i></i><i></i></span>');
       var kick = (net.isHost && m.isAI) ? '<button class="pp-kick" data-id="' + m.id + '">✕</button>' : '';
       return '<div class="netpp" data-id="' + m.id + '" style="--heat:' + ((spurHeat[m.id] || 0).toFixed(3)) + '"><span class="netdot" style="background:' + m.color + '"></span><span class="pp-nm">' + esc(m.name)
         + (m.id === localPid ? ' (ти)' : '') + '</span>' + tags + rdy + kick + '<span class="pp-spur"></span></div>';
@@ -3350,7 +3381,7 @@ body.modal-open{ overflow:hidden; }
   // client: first tap readies up; once ready the button becomes the spammable „ДАЙ ЗОР"
   $('netReady').onclick = function () {
     if (!net || net.isHost) return;
-    if (!netMyReady) { netMyReady = true; net.setReady(true); renderNetPrep(); }
+    if (!netMyReady) { setMyReady(true); renderNetPrep(); }   // ready → button becomes the spammable ДАЙ ЗОР
     else { spurMe(); }
   };
   $('netStart').onclick = function () {
