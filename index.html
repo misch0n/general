@@ -2033,7 +2033,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.14.0';
+  var APP_VERSION = '1.14.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4291,6 +4291,7 @@ body.modal-open{ overflow:hidden; }
       flashTile(key);
       if (net) net.submitMove({ category: CAT_INDEX[key], score: value, rolls: [dice.slice()], keeps: [] });
       locked = true; renderAll();
+      if (G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming, same as local
       setTimeout(beginManualEntry, END_DELAY);
       return;
     }
@@ -4298,6 +4299,7 @@ body.modal-open{ overflow:hidden; }
       // broadcast my completed turn; the host's STATE + next GRANT drive the rest
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
       netSendAct({ commit: true, category: CAT_INDEX[key], value: value });   // spectators see the category go in
+      if (netAiActiveId == null && G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming on my own commit
       var mv = { category: CAT_INDEX[key], score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
       // hold the committed board a beat (comprehension) before the move propagates and the turn passes
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, AI_VIEW_DELAY); }  // host injects the AI seat's move
