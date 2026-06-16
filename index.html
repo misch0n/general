@@ -1955,7 +1955,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.7.3';
+  var APP_VERSION = '1.7.4';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2689,17 +2689,17 @@ body.modal-open{ overflow:hidden; }
   // It emulates the acoustic BROADCAST bus: the host sends to every client connection, a client
   // sends to the host, and the host re-broadcasts state — so the session needs no topology change.
   var PEER_PREFIX = 'genrl1-';                 // namespaces our peer ids on the shared PeerJS cloud
-  // ICE servers for NAT traversal. The PeerJS cloud only gives STUN; without a TURN RELAY the
-  // P2P path fails across different networks (cellular ↔ Wi-Fi / symmetric NAT). The free
-  // no-signup TURN relays are unreliable, so the relay is user-configurable: paste your own
-  // TURN (e.g. a free Metered/Twilio key) in the WebRTC-debug panel. STUN covers same-network play.
+  // ICE servers for NAT traversal. STUN handles same-network play; a real TURN RELAY is needed
+  // across different networks (cellular ↔ Wi-Fi / symmetric NAT). These are a Metered.ca relay
+  // (free tier) — all transports (udp/tcp/443/turns) so even restrictive firewalls find a path.
+  // The WebRTC-debug panel can override this with a custom iceServers JSON at runtime.
   var DEFAULT_ICE = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'turn:global.relay.metered.ca:80', username: '3e79b3c318986af67e0f9bb1', credential: 'quOGERYHPcVcTY8Q' },
+    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '3e79b3c318986af67e0f9bb1', credential: 'quOGERYHPcVcTY8Q' },
+    { urls: 'turn:global.relay.metered.ca:443', username: '3e79b3c318986af67e0f9bb1', credential: 'quOGERYHPcVcTY8Q' },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '3e79b3c318986af67e0f9bb1', credential: 'quOGERYHPcVcTY8Q' },
   ];
   // custom iceServers (JSON array) override the default when provided + valid
   function customIce() {
