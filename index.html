@@ -5306,7 +5306,7 @@ body.modal-open{ overflow:hidden; }
     $('playAgain').classList.remove('hidden');
     if (histSnapshot) { game = histSnapshot.game; moveLog = histSnapshot.moveLog; manualMode = histSnapshot.manualMode; summary = histSnapshot.summary; undoStack = histSnapshot.undo; histSnapshot = null; }
     viewingHistory = false; dossierCtx = null;
-    if (toArchive) openHistory();
+    if (toArchive) showHistory();   // back to the archive, keeping the tab + loaded games
   }
   // the header ✕ closes the summary: back to the archive when reviewing history,
   // otherwise (a live end screen) back to the muster
@@ -5502,7 +5502,7 @@ body.modal-open{ overflow:hidden; }
     document.querySelectorAll('.overlay').forEach(function (o) { mo.observe(o, { attributes: true, attributeFilter: ['class'] }); });
     syncModalLock();
   })();
-  function closeReplay() { if (replay) rpPause(); $('replayModal').classList.add('hidden'); openHistory(); }
+  function closeReplay() { if (replay) rpPause(); $('replayModal').classList.add('hidden'); showHistory(); }   // keep the tab + loaded games
   $('replayClose').onclick = closeReplay;
   $('replayModal').onclick = function (e) { if (e.target === $('replayModal')) closeReplay(); };
 
@@ -6378,10 +6378,16 @@ body.modal-open{ overflow:hidden; }
   }
   $('methodClose').onclick = function () { $('methodModal').classList.add('hidden'); };
   $('methodModal').onclick = function (e) { if (e.target === $('methodModal')) $('methodModal').classList.add('hidden'); };
+  // a FRESH open (from the start screen / menu) resets to the default ruleset section + page 1
   function openHistory() {
     histTab = (settings.ruleset === 'experimental') ? 'experimental' : 'standard';   // default to the active ruleset
     histDateFilter = null;   // a fresh open clears any calendar date filter
     histShown = 5;           // fresh open starts at the first page
+    showHistory();
+  }
+  // (re)display the archive WITHOUT touching the tab / paging / date filter — used when
+  // returning from a game's details or a replay, so loaded games + section persist
+  function showHistory() {
     $('calModal').classList.add('hidden');
     renderHistory();
     $('settingsModal').classList.add('hidden'); $('menuModal').classList.add('hidden');
