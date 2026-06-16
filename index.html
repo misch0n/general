@@ -465,6 +465,13 @@ body.modal-open{ overflow:hidden; }
 /* tapped: green tint (no text) */
 .codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
 .netjoinview{ margin:6px 0; }
+/* optical (QR) handshake view */
+.netoptical{ margin:6px 0; }
+.optqr{ width:100%; max-width:280px; margin:10px auto; background:#fff; padding:10px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+.optqr svg{ display:block; width:100%; height:auto; }
+.optscan{ position:relative; width:100%; max-width:300px; margin:10px auto; border-radius:12px; overflow:hidden; background:#000; aspect-ratio:1/1; }
+.optscan video{ width:100%; height:100%; object-fit:cover; display:block; }
+.opt-reticle{ position:absolute; inset:14%; border:3px solid rgba(212,160,46,.9); border-radius:14px; box-shadow:0 0 0 9999px rgba(0,0,0,.22); pointer-events:none; }
 .wrcap{ margin-top:12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:left; }
 .wrcap-hd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:6px; }
 .devrow-disabled{ opacity:.4; }
@@ -1780,6 +1787,18 @@ body.modal-open{ overflow:hidden; }
       </div>
       <div id="netChooseMsg" class="netstatus netflavour"></div>
     </div>
+    <!-- optical (QR) handshake: exchange WebRTC offer/answer by camera, no server -->
+    <div id="netOptical" class="netoptical hidden">
+      <div id="optStatus" class="netstatus netflavour"></div>
+      <div id="optQRwrap" class="optqr hidden"><div id="optQR"></div></div>
+      <div id="optScanWrap" class="optscan hidden"><video id="optVideo" playsinline muted></video><div class="opt-reticle"></div></div>
+      <div class="setup-actions">
+        <button id="optNext" class="btn primary hidden"></button>
+      </div>
+      <div class="setup-actions">
+        <button id="optCancel" class="btn small">↩ Назад</button>
+      </div>
+    </div>
     <!-- WebRTC packet/event capture: record every connection event + frame, export base64 JSON -->
     <div id="wrCap" class="wrcap hidden">
       <div class="wrcap-hd">🛰 WebRTC дебъг</div>
@@ -1833,6 +1852,9 @@ body.modal-open{ overflow:hidden; }
       <div id="netScan">
         <div id="netHostCode" class="nethostcode hidden"></div>
         <div id="netRoster" class="netroster"></div>
+        <div class="setup-actions">
+          <button id="netOptAdd" class="btn small hidden">📷 + Добави играч (QR)</button>
+        </div>
         <div class="setup-actions">
           <button id="netToPrep" class="btn primary hidden">✔ Всички са тук — към лобито</button>
         </div>
@@ -1961,7 +1983,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.8.0';
+  var APP_VERSION = '1.9.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -1970,7 +1992,7 @@ body.modal-open{ overflow:hidden; }
   // true = tap the ones to KEEP (ДРЪЖ!). Default „keep". This is the owner's/default
   // preference (set in owner customisation); each HUMAN player carries their own copy
   // (p.selectKeep) so several humans in one game can play in different flavours.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: false, webrtcDebug: false, iceServers: '', selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: false, webrtcDebug: false, opticalHandshake: false, iceServers: '', selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -2005,14 +2027,14 @@ body.modal-open{ overflow:hidden; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, iceServers: settings.iceServers, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
+              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, opticalHandshake: settings.opticalHandshake, iceServers: settings.iceServers, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'iceServers', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'opticalHandshake', 'iceServers', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -2536,6 +2558,7 @@ body.modal-open{ overflow:hidden; }
   function netShow(phase) {
     netPhase = phase;
     $('netDiag').classList.add('hidden'); clearInterval(ndStatsTimer);   // leaving diagnostics
+    if ($('netOptical')) $('netOptical').classList.add('hidden');         // leaving the QR view
     $('netChoose').classList.toggle('hidden', phase !== 'choose');
     $('netLobby').classList.toggle('hidden', phase === 'choose');
     $('netScan').classList.toggle('hidden', phase !== 'scan');
@@ -2901,6 +2924,11 @@ body.modal-open{ overflow:hidden; }
     $('netJoinCode').classList.add('hidden'); $('netCodeInput').value = '';
     $('netHostCode').classList.add('hidden'); $('netHostCode').innerHTML = '';
     $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay(''); netChooseMsg('');
+    $('netOptical').classList.add('hidden'); $('netOptAdd').classList.add('hidden'); stopScan();
+    // optical (QR) pairing replaces the code flow when its toggle is on
+    var opt = wr && settings.opticalHandshake;
+    $('netJoin').textContent = opt ? '📷 Сканирай код' : '🎧 Влез в игра';
+    $('netHost').textContent = opt ? '📡 Бъди старшина (покажи QR)' : '📡 Бъди старшина (хост)';
     // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
     $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
     if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
@@ -2911,7 +2939,9 @@ body.modal-open{ overflow:hidden; }
   function netChooseMsg(s) { var el = $('netChooseMsg'); if (el) el.innerHTML = s; }
   $('netBtn').onclick = function () { openNetModal('acoustic'); };
   $('webrtcBtn').onclick = function () { openNetModal('webrtc'); };
+  function opticalOn() { return netKind === 'webrtc' && settings.opticalHandshake; }
   $('netHost').onclick = function () {
+    if (opticalOn()) { opticalHost(); return; }              // QR pairing instead of the broker
     if (netKind === 'webrtc') { webrtcHost(); return; }
     netStartTransport(function () {
       net = newSession(true); localPid = MP.HOST_ID;
@@ -2920,6 +2950,7 @@ body.modal-open{ overflow:hidden; }
     });
   };
   $('netJoin').onclick = function () {
+    if (opticalOn()) { opticalJoin(); return; }               // scan the host's QR
     if (netKind === 'webrtc') {
       // switch to the join sub-view; deliberately DON'T focus the field (no keyboard until tapped)
       $('netPickRole').classList.add('hidden'); $('netJoinCode').classList.remove('hidden'); netChooseMsg('');
@@ -3053,6 +3084,188 @@ body.modal-open{ overflow:hidden; }
     if (netMode) netSay('Връзката с хоста прекъсна — опитвам да се върна…');
     else netChooseMsg('⚠ Връзката прекъсна. Опитай пак.');
   }
+  // ===================================================== OPTICAL (QR) handshake ==============
+  // A serverless WebRTC pairing: each device generates a trickle-less SDP with EMPTY iceServers
+  // (local host/mDNS candidates only), compresses it, and shows it as a QR; the peer scans it with
+  // the camera. Offer (host) → scan → answer (client) → scan → the data channel opens over the LAN.
+  // The resulting RTCDataChannel(s) feed an RtcBus that plugs into the same MP.Session as PeerBus.
+  function loadScriptOnce(test, src, cb) { if (test()) { cb(true); return; } var s = document.createElement('script'); s.src = src; s.onload = function () { cb(test()); }; s.onerror = function () { cb(false); }; document.head.appendChild(s); }
+  function loadOpticalLibs(cb) {
+    loadScriptOnce(function () { return !!window.LZString; }, 'https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js', function (a) {
+      if (!a) { cb(false); return; }
+      loadScriptOnce(function () { return !!window.qrcode; }, 'https://unpkg.com/qrcode-generator@1.4.4/qrcode.js', function (b) {
+        if (!b) { cb(false); return; }
+        loadScriptOnce(function () { return !!window.jsQR; }, 'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js', function (c) { cb(c); });
+      });
+    });
+  }
+  function rtcPC() { var R = window.RTCPeerConnection || window.webkitRTCPeerConnection; return new R({ iceServers: [] }); }   // empty → local candidates only
+  // resolve once ICE gathering finishes, so the SDP is trickle-less (all candidates baked in)
+  function rtcGather(pc) {
+    return new Promise(function (resolve) {
+      if (pc.iceGatheringState === 'complete') { resolve(); return; }
+      var done = false, fin = function () { if (!done) { done = true; resolve(); } };
+      pc.addEventListener('icegatheringstatechange', function () { if (pc.iceGatheringState === 'complete') fin(); });
+      pc.addEventListener('icecandidate', function (e) { if (!e.candidate) fin(); });
+      setTimeout(fin, 4000);   // local-only gathering is fast; never hang
+    });
+  }
+  function packSdp(tag, sdp) { return tag + window.LZString.compressToEncodedURIComponent(sdp); }
+  function unpackSdp(tag, payload) { return (payload.indexOf(tag) === 0) ? window.LZString.decompressFromEncodedURIComponent(payload.slice(tag.length)) : null; }
+  // host side: build an offer (+ its data channel) for ONE client
+  function rtcMakeOffer() {
+    var pc = rtcPC(), ch = pc.createDataChannel('general', { ordered: true });
+    return pc.createOffer().then(function (o) { return pc.setLocalDescription(o); }).then(function () { return rtcGather(pc); })
+      .then(function () { return { pc: pc, ch: ch, sdp: pc.localDescription.sdp }; });
+  }
+  // client side: accept an offer, produce an answer; the channel arrives via ondatachannel
+  function rtcMakeAnswer(offerSdp) {
+    var pc = rtcPC(), holder = { ch: null };
+    pc.ondatachannel = function (e) { holder.ch = e.channel; };
+    return pc.setRemoteDescription({ type: 'offer', sdp: offerSdp }).then(function () { return pc.createAnswer(); })
+      .then(function (a) { return pc.setLocalDescription(a); }).then(function () { return rtcGather(pc); })
+      .then(function () { return { pc: pc, holder: holder, sdp: pc.localDescription.sdp }; });
+  }
+  // ---- RtcBus: an MP.Session transport over raw RTCDataChannels (mirrors PeerBus semantics) ----
+  function RtcBus(opts) {
+    this.isHost = !!opts.isHost; this.conns = []; this._rx = null;
+    this.onPeers = opts.onPeers || function () {}; this.onLost = opts.onLost || function () {}; this.onReup = function () {};
+    this.maxPayload = 200000;
+  }
+  RtcBus.prototype.onReceive = function (cb) { this._rx = cb; };
+  RtcBus.prototype.send = function (bytes) {
+    this.conns.forEach(function (c) { if (c.ch && c.ch.readyState === 'open') { try { c.ch.send(bytes); } catch (e) {} } });
+    return Promise.resolve();
+  };
+  RtcBus.prototype.addChannel = function (pc, ch) {
+    var self = this, conn = { pc: pc, ch: ch, _pid: null, peer: 'optical' };
+    this.conns.push(conn);
+    ch.binaryType = 'arraybuffer';
+    ch.onmessage = function (e) {
+      var b = (e.data instanceof ArrayBuffer) ? new Uint8Array(e.data) : new Uint8Array(e.data);
+      if (self.isHost) { try { var u = MP.unframe(b); if (u && u.sender > 0 && u.sender < 15) conn._pid = u.sender; } catch (x) {} }
+      if (self._rx) self._rx(b);
+    };
+    ch.onclose = function () { self.conns = self.conns.filter(function (c) { return c !== conn; }); self.onPeers(self.conns.length); self.onLost(conn); };
+    self.onPeers(this.conns.length);
+  };
+  RtcBus.prototype.stop = function () { this.conns.forEach(function (c) { try { c.ch.close(); } catch (e) {} try { c.pc.close(); } catch (e) {} }); this.conns = []; };
+  // ---- optical UI helpers ----
+  function optStatus(s) { var el = $('optStatus'); if (el) el.innerHTML = s; }
+  function optShow(showQR, showScan) {
+    $('netChoose').classList.add('hidden'); $('netLobby').classList.add('hidden'); $('netOptical').classList.remove('hidden');
+    $('optQRwrap').classList.toggle('hidden', !showQR); $('optScanWrap').classList.toggle('hidden', !showScan);
+  }
+  function optHideView() { $('netOptical').classList.add('hidden'); }
+  function optRenderQR(payload) {
+    try { var qr = window.qrcode(0, 'L'); qr.addData(payload); qr.make(); $('optQR').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      var svg = $('optQR').querySelector('svg'); if (svg) { svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto'; }
+      return true;
+    } catch (e) { optStatus('⚠ Кодът е твърде голям за QR (' + payload.length + ' знака).'); return false; }
+  }
+  function optNextBtn(label, fn) { var b = $('optNext'); if (!label) { b.classList.add('hidden'); b.onclick = null; return; } b.textContent = label; b.classList.remove('hidden'); b.onclick = fn; }
+  var optStream = null, optScanning = false;
+  function startScan(onResult) {
+    stopScan();
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { onResult(null, 'no-camera'); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (stream) {
+      optStream = stream; optScanning = true;
+      var video = $('optVideo'); video.srcObject = stream; video.setAttribute('playsinline', ''); video.muted = true;
+      var pr = video.play(); if (pr && pr.catch) pr.catch(function () {});
+      var canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+      (function tick() {
+        if (!optScanning) return;
+        if (video.readyState >= 2 && video.videoWidth) {
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          var img = null; try { img = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch (e) {}
+          if (img && window.jsQR) { var code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' }); if (code && code.data) { stopScan(); onResult(code.data); return; } }
+        }
+        (window.requestAnimationFrame || window.setTimeout)(tick, 60);
+      })();
+    }).catch(function (e) { onResult(null, (e && e.name) || 'camera-denied'); });
+  }
+  function stopScan() { optScanning = false; if (optStream) { optStream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); optStream = null; } var v = $('optVideo'); if (v) v.srcObject = null; }
+  // ---- optical HOST: run the lobby over an RtcBus; pair each client by QR ----
+  var optBus = null, optPending = null, optClient = null;
+  function opticalHost() {
+    netChooseMsg('Зареждам QR библиотеки…');
+    loadOpticalLibs(function (ok) {
+      if (!ok) { netChooseMsg('⚠ Неуспешно зареждане на QR библиотеките (нужен е интернет първия път).'); return; }
+      optBus = new RtcBus({ isHost: true, onLost: function (conn) { netHostLost(conn); } });
+      netBus = optBus; net = newSessionWith(optBus, true); localPid = MP.HOST_ID;
+      net.openLobby();
+      opticalNewOffer();
+    });
+  }
+  function opticalNewOffer() {
+    optShow(false, false); optStatus('Подготвям код…'); optNextBtn(null);
+    rtcMakeOffer().then(function (o) {
+      optPending = o;
+      if (optRenderQR(packSdp('GO1', o.sdp))) { optShow(true, false); optStatus('1) Покажи този код на госта. 2) После сканирай неговия отговор.'); }
+      o.ch.onopen = function () { optBus.addChannel(o.pc, o.ch); optPending = null; opticalHostConnected(); };
+      optNextBtn('📷 Сканирай отговора', opticalScanAnswer);
+    }).catch(function (e) { optStatus('⚠ Грешка при създаване на офертата: ' + ((e && e.message) || e)); });
+  }
+  function opticalScanAnswer() {
+    optShow(false, true); optStatus('Сканирай ОТГОВОРА от екрана на госта…'); optNextBtn(null);
+    startScan(function (data, err) {
+      if (!data) { optStatus('⚠ Камерата отказа (' + (err || '') + '). Дай ѝ достъп и опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanAnswer); return; }
+      var sdp = unpackSdp('GA1', data);
+      if (!sdp) { optStatus('⚠ Това не е отговор-код. Опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanAnswer); return; }
+      if (!optPending) { optStatus('⚠ Няма активна оферта.'); return; }
+      optStatus('Свързвам по локалната мрежа…');
+      optPending.pc.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function (e) { optStatus('⚠ Невалиден отговор: ' + ((e && e.message) || e)); optNextBtn('📷 Опитай пак', opticalScanAnswer); });
+    });
+  }
+  function opticalHostConnected() {
+    stopScan(); optHideView();
+    netShow('scan'); $('netToPrep').classList.add('hidden'); $('netHostCode').classList.add('hidden');
+    $('netOptAdd').classList.remove('hidden');   // pair more players from the lobby
+    renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
+  }
+  // ---- optical CLIENT: scan the host's offer, show an answer, join over the channel ----
+  function opticalJoin() {
+    netChooseMsg('Зареждам QR библиотеки…');
+    loadOpticalLibs(function (ok) {
+      if (!ok) { netChooseMsg('⚠ Неуспешно зареждане на QR библиотеките (нужен е интернет първия път).'); return; }
+      opticalScanOffer();
+    });
+  }
+  function opticalScanOffer() {
+    optShow(false, true); optStatus('Сканирай кода на СТАРШИНАТА…'); optNextBtn(null);
+    startScan(function (data, err) {
+      if (!data) { optStatus('⚠ Камерата отказа (' + (err || '') + '). Дай ѝ достъп и опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanOffer); return; }
+      var sdp = unpackSdp('GO1', data);
+      if (!sdp) { optStatus('⚠ Това не е код за игра. Опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanOffer); return; }
+      optStatus('Подготвям отговор…');
+      rtcMakeAnswer(sdp).then(function (a) {
+        optClient = a;
+        if (optRenderQR(packSdp('GA1', a.sdp))) { optShow(true, false); optStatus('Покажи ТОЗИ код на старшината — после изчакай.'); }
+        optNextBtn(null);
+        opticalAwaitClientChannel();
+      }).catch(function (e) { optStatus('⚠ Грешка: ' + ((e && e.message) || e)); optNextBtn('📷 Опитай пак', opticalScanOffer); });
+    });
+  }
+  function opticalAwaitClientChannel() {
+    optBus = new RtcBus({ isHost: false, onLost: function () { netClientLost(); } });
+    var tries = 0, poll = setInterval(function () {
+      var ch = optClient && optClient.holder.ch;
+      if (ch) {
+        clearInterval(poll);
+        var go = function () { optBus.addChannel(optClient.pc, ch); opticalClientConnected(); };
+        if (ch.readyState === 'open') go(); else ch.onopen = go;
+      } else if (++tries > 600) { clearInterval(poll); }   // ~60s
+    }, 100);
+  }
+  function opticalClientConnected() {
+    stopScan(); optHideView(); netBus = optBus;
+    net = newSessionWith(optBus, false);
+    netShow('scan'); $('netToPrep').classList.add('hidden');
+    net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
+  }
+  $('optCancel').onclick = function () { stopScan(); optHideView(); if (net && net.isHost && optBus && optBus.conns.length) { opticalHostConnected(); } else { leaveNet(); } };
+  $('netOptAdd').onclick = function () { if (net && net.isHost) { optShow(false, false); opticalNewOffer(); } };
   // host closes the scan and moves everyone into preparation
   $('netToPrep').onclick = function () { if (net && net.isHost) net.startPrep(settingsBits()); };
   // host adds an AI seat (generated boец); clients can't
@@ -3086,11 +3299,13 @@ body.modal-open{ overflow:hidden; }
   };
   function leaveNet() {
     stopFlavour(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
+    stopScan(); if (optBus) { try { optBus.stop(); } catch (e) {} } optBus = null; optPending = null; optClient = null;
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop(); if (netBus) netBus.stop();
     net = null; netFSK = null; netBus = null; netMode = false; localPid = null;
     netPhase = 'choose'; netMe = null; netMyReady = false; netAiActiveId = null; netSettCtx = false;
     $('netBars').innerHTML = ''; $('netLink').classList.add('hidden'); $('netDiag').classList.add('hidden');
     if ($('netCodeJoin')) $('netCodeJoin').disabled = false;
+    if ($('netOptical')) $('netOptical').classList.add('hidden'); if ($('netOptAdd')) $('netOptAdd').classList.add('hidden');
     $('netModal').classList.add('hidden');
   }
   $('netLeave').onclick = leaveNet;
@@ -5154,10 +5369,13 @@ body.modal-open{ overflow:hidden; }
     var mlBtn = el('button', 'btn small', '🧪 Отвори'); mlBtn.onclick = function () { closeDevModal(true); devMockLobby(); };
     mlRow.appendChild(mlBtn); exp.list.appendChild(mlRow);
     exp.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
-    exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); syncWebrtcDebugRow(); }));
+    exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); syncWebrtcDebugRow(); syncOpticalRow(); }));
+    var optr = devToggleRow('Оптично сдвояване (QR)', 'opticalHandshake', function () {}); optr.id = 'devOpticalRow';
+    exp.list.appendChild(optr);
     body.appendChild(exp.sec);
-    syncAcousticDebugVis(); syncWebrtcDebugRow();
+    syncAcousticDebugVis(); syncWebrtcDebugRow(); syncOpticalRow();
   }
+  function syncOpticalRow() { greyDevRow('devOpticalRow', settings.webrtc); }
   function renderDevModal() {
     if (!devCats) buildDevCats();
     var body = $('devBody'); body.innerHTML = '';
