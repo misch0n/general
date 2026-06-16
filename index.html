@@ -1246,8 +1246,14 @@ body.modal-open{ overflow:hidden; }
 .deveditbox{ padding:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.2); }
 .deveditbox .devfields{ margin-bottom:8px; }
 /* dev cog + modal (in-place string editor) */
-.devcog{ display:grid; place-items:center; font-size:15px; color:var(--gen-brass); }
+.devcog{ display:grid; place-items:center; color:var(--gen-brass); }
 .devcog:hover{ color:var(--gen-brass-bright); }
+/* CSS-drawn cogwheel: 8 teeth (repeating-conic ring) + a hub ring with a centre hole */
+.cog-ic{ position:relative; width:18px; height:18px; display:block; color:inherit; }
+.cog-ic::before{ content:''; position:absolute; inset:0; border-radius:50%;
+  background:repeating-conic-gradient(currentColor 0deg 23deg, transparent 23deg 45deg);
+  -webkit-mask:radial-gradient(circle, transparent 0 34%, #000 36%); mask:radial-gradient(circle, transparent 0 34%, #000 36%); }
+.cog-ic::after{ content:''; position:absolute; inset:24%; border-radius:50%; border:2px solid currentColor; box-sizing:border-box; }
 .devmodal{ max-width:382px; }
 .devmodal .devnote{ font-size:11px; color:var(--gen-muted); line-height:1.45; margin-bottom:10px; }
 .devbody{ max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1281,7 +1287,7 @@ body.modal-open{ overflow:hidden; }
     <div class="setup-titlerow">
       <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
       <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
-      <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик">⚙</button>
+      <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
     </div>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
@@ -1847,7 +1853,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.3.0';
+  var APP_VERSION = '1.3.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4168,13 +4174,15 @@ body.modal-open{ overflow:hidden; }
   // secret developer unlock: press-and-hold the ГЕНЕРАЛ title on the start screen for 5s
   (function () {
     var t = $('setupTitle'); if (!t) return;
-    var timer = null;
-    function start() { if (settings.dev) return; clearTimeout(timer); timer = setTimeout(activateDev, 5000); }
+    var timer = null, sx = 0, sy = 0;
+    function start(e) { if (settings.dev) return; sx = e.clientX; sy = e.clientY; clearTimeout(timer); timer = setTimeout(activateDev, 5000); }   // 5s STATIC hold
     function cancel() { clearTimeout(timer); timer = null; }
+    function move(e) { if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel(); }   // moving cancels — must stay still
     t.addEventListener('pointerdown', start);
+    t.addEventListener('pointermove', move);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { t.addEventListener(ev, cancel); });
   })();
-  function activateDev() { settings.dev = true; devCats = null; $('devCogBtn').classList.remove('hidden'); openDevModal(); }
+  function activateDev() { settings.dev = true; devCats = null; $('devCogBtn').classList.remove('hidden'); }   // just reveal the cog — open on tap
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   // dev cog (shown beside the hamburger once unlocked) + dev modal controls
   $('devCogBtn').onclick = openDevModal;
