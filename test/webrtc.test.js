@@ -220,6 +220,49 @@ test('reconnect: a dropped player rejoins by eph, catches up, and finishes', fun
   assert.strictEqual(host.state, 'GAME_OVER', 'game ended cleanly with everyone done');
 });
 
+test('manual game: a manual client is rejected from a regular (turn) host', function () {
+  var bus = new StarBus();
+  var rejected = { reason: null };
+  var host = new MP.Session({ transport: bus.transport(true), isHost: true, manual: false, me: { name: 'H', color: '#ee0055', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  var cli = new MP.Session({ transport: bus.transport(false), isHost: false, manual: true, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+    callbacks: { onReject: function (r) { rejected.reason = r; }, onJoined: function () { rejected.joined = true; } } });
+  host.openLobby(); cli.requestJoin(); bus.drain();
+  assert.strictEqual(rejected.reason, 1, 'client got a mode-mismatch rejection');
+  assert.ok(!rejected.joined, 'client was NOT seated');
+  assert.strictEqual(host.roster.length, 1, 'host roster still only itself');
+});
+
+test('manual game: free-for-all — players fill their own boards in any order, ends when all done', function () {
+  var bus = new StarBus();
+  var ended = {};
+  function mk(isHost, me) {
+    return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, manual: true, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onEnd: function () { ended[me.name] = true; } } });
+  }
+  var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' });
+  var c1 = mk(false, { name: 'A', color: '#00aa55', gender: 'm' });
+  var c2 = mk(false, { name: 'B', color: '#5566ff', gender: 'f' });
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  assert.ok(host.startGame());
+  bus.drain();
+  assert.ok(host.activeId == null, 'no turn token in a manual game');
+
+  var N = General.CATEGORIES.length, nodes = [host, c1, c2];
+  // interleave: each round, every player fills their NEXT category (any order works)
+  for (var cat = 0; cat < N; cat++) {
+    nodes.forEach(function (n) {
+      n.submitMove({ category: cat, score: cat + 1, rolls: [[1, 2, 3, 4, 5]], keeps: [] });
+      bus.drain();
+    });
+  }
+  assert.ok(ended['H'] && ended['A'] && ended['B'], 'game ended for everyone once all boards were full');
+  [c1, c2].forEach(function (n) { assert.deepStrictEqual(n.scores, host.scores, 'every device converged on the full scoreboard'); });
+  assert.strictEqual(host._filled(c1.myId), N, 'a client board is complete');
+});
+
 test('lobby cheer (SPUR): a client\'s ДАЙ ЗОР reaches the host + the other client, not itself', function () {
   var bus = new StarBus();
   var got = { host: [], c1: [], c2: [] };

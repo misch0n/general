@@ -18,6 +18,7 @@
     META: 13, READY: 14, PREP: 15, AICTRL: 16,              // lobby preparation + AI takeover
     TACT: 17,                                               // live turn action (spectating: roll/reroll/commit)
     SPUR: 18,                                               // lobby „ДАЙ ЗОР" cheer (player id + heat)
+    JOIN_NAK: 19,                                           // host rejects a join (e.g. game-mode mismatch)
     XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
     // adaptive link & resilience (reserved 30-39)
     CAL_PROBE: 30, CAL_REPORT: 31, CAL_SELECT: 32, CAL_CONFIRM: 33, PROFILE_SWITCH: 34, QUALITY: 35, RELAY: 36, GOSSIP: 37,
@@ -127,9 +128,11 @@
   // ---- [GAME-SPECIFIC] payload schemas ----
   function packBeacon(sessionId, slotsFree) { return new Writer().u8(sessionId).u8(slotsFree).out(); }
   function unpackBeacon(p) { var r = new Reader(p); return { sessionId: r.u8(), slotsFree: r.u8() }; }
-  function packJoinReq(eph, meta) { var w = new Writer().u16(eph); writeMeta(w, { id: 0, name: meta.name, color: meta.color, gender: meta.gender }); return w.out(); }
-  function unpackJoinReq(p) { var r = new Reader(p); return { eph: r.u16(), meta: readMeta(r) }; }
+  function packJoinReq(eph, meta, manual) { var w = new Writer().u16(eph).u8(manual ? 1 : 0); writeMeta(w, { id: 0, name: meta.name, color: meta.color, gender: meta.gender }); return w.out(); }
+  function unpackJoinReq(p) { var r = new Reader(p), eph = r.u16(), manual = !!(r.u8() & 1); return { eph: eph, manual: manual, meta: readMeta(r) }; }
   function packJoinAck(eph, assignedId) { return new Writer().u16(eph).u8(assignedId).out(); }
+  function packJoinNak(eph, reason) { return new Writer().u16(eph).u8(reason || 0).out(); }
+  function unpackJoinNak(p) { var r = new Reader(p); return { eph: r.u16(), reason: r.u8() }; }
   function unpackJoinAck(p) { var r = new Reader(p); return { eph: r.u16(), id: r.u8() }; }
   function packRoster(players) { var w = new Writer().u8(players.length); players.forEach(function (p) { writeMeta(w, p); }); return w.out(); }
   function unpackRoster(p) { var r = new Reader(p), n = r.u8(), a = []; for (var i = 0; i < n; i++) a.push(readMeta(r)); return a; }
@@ -178,6 +181,7 @@
     this.maxPlayers = opts.maxPlayers || 6;
     this.minPlayers = opts.minPlayers || 2;
     this.rounds = opts.rounds || 14;             // categories per player (General = 14)
+    this.manual = !!opts.manual;                 // manual (ОТЧЕТ) game: free-for-all, no turn order/spectating
     this.cb = opts.callbacks || {};
     this._st = opts.setTimeout || function (f, ms) { return setTimeout(f, ms); };
     this._ct = opts.clearTimeout || function (id) { clearTimeout(id); };
@@ -376,10 +380,9 @@
     this.state = 'IN_GAME';
     this.order = this.roster.map(function (p) { return p.id; });
     this.version = 0; this.turnIx = 0;
-    this.roster.forEach(function (p) { });
     this._send(T.START, packStart(this.version, this.order[0], this.roster));
     if (this.cb.onStart) this.cb.onStart(this.roster.slice(), this.order.slice());
-    this._grant();
+    if (!this.manual) this._grant();   // manual = free-for-all: no turn token
     return true;
   };
   Session.prototype._grant = function () {
@@ -434,11 +437,16 @@
   Session.prototype.submitMove = function (mv) {
     mv.playerId = this.myId; mv.ackVersion = this.version;
     if (this.isHost) {
-      if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); this._advance(); }
+      // manual = free-for-all: apply my own move and broadcast, no turn advance (just maybe end)
+      if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); if (this.manual) this._maybeEnd(); else this._advance(); }
     } else {
       this._pendingMove = mv;
       this._sendMove();
     }
+  };
+  // manual end-check: when every (non-dropped) board is complete, the game is over
+  Session.prototype._maybeEnd = function () {
+    if (this._allDone()) { this.state = 'GAME_OVER'; this._send(T.END, new Uint8Array(0)); if (this.cb.onEnd) this.cb.onEnd(); }
   };
   Session.prototype._sendMove = function () {
     if (!this._pendingMove) return;
@@ -472,8 +480,9 @@
     this._send(T.ROSTER, packRoster(this.roster));
     if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
     if (this.cb.onDrop) this.cb.onDrop(id, !!on);
-    if (on && this.state === 'IN_GAME' && this.activeId === id && !this.isAIControlled(id)) {
-      this._ct(this._timers.move); this._advance();   // skip the seat that just vanished mid-turn
+    if (on && this.state === 'IN_GAME') {
+      if (this.manual) { this._maybeEnd(); }   // a dropped player no longer blocks the finish
+      else if (this.activeId === id && !this.isAIControlled(id)) { this._ct(this._timers.move); this._advance(); }   // skip the seat that just vanished mid-turn
     }
   };
   Session.prototype.submitMoveFor = function (playerId, mv) {
@@ -498,7 +507,7 @@
   Session.prototype._sendJoin = function () {
     if (this.isHost || this._acked || !this._wantJoin || this.state === 'IN_GAME') return;
     this.state = 'JOINING';
-    this._send(T.JOIN_REQ, packJoinReq(this.eph, this.me));
+    this._send(T.JOIN_REQ, packJoinReq(this.eph, this.me, this.manual));
     this._status('🔊 Искам да вляза…');
     var self = this, backoff = this.p.joinRetry + Math.floor(this.rand() * this.p.joinRetry); // ALOHA backoff
     this._timers.join = this._st(function () { self._sendJoin(); }, backoff);
@@ -507,7 +516,7 @@
   // catches us up. Works mid-game (same eph identifies us); the host answers ACK+ROSTER+STATE.
   Session.prototype.rejoin = function () {
     if (this.isHost) return;
-    this._send(T.JOIN_REQ, packJoinReq(this.eph, this.me));
+    this._send(T.JOIN_REQ, packJoinReq(this.eph, this.me, this.manual));
   };
 
   // ---------- receive / dispatch ----------
@@ -525,6 +534,7 @@
   Session.prototype._rxHost = function (pkt) {
     if (pkt.type === T.JOIN_REQ && this.state === 'LOBBY') {
       var jr = unpackJoinReq(pkt.payload);
+      if (jr.manual !== this.manual) { this._send(T.JOIN_NAK, packJoinNak(jr.eph, 1)); return; }   // game-mode mismatch
       var existing = null; this.roster.forEach(function (p) { if (p.eph === jr.eph) existing = p; });
       if (!existing) {
         if (this.roster.length >= this.maxPlayers) return;
@@ -562,8 +572,10 @@
       if (ta.playerId === this.activeId) { this._send(T.TACT, packAct(ta)); if (this.cb.onAction) this.cb.onAction(ta); }   // relay to all + render locally
     } else if (pkt.type === T.MOVE && this.state === 'IN_GAME') {
       var mv = unpackMove(pkt.payload);
-      if (mv.playerId === this.activeId && (this.scores[mv.playerId] || {})[mv.category] == null) {
-        if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); this._advance(); }
+      // turn game: only the active player may move. manual game: any player may fill their OWN board.
+      var ok = this.manual ? (mv.playerId === pkt.sender) : (mv.playerId === this.activeId);
+      if (ok && (this.scores[mv.playerId] || {})[mv.category] == null) {
+        if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); if (this.manual) this._maybeEnd(); else this._advance(); }
       } else {
         this._send(T.STATE, packStateDelta(this.version, { playerId: mv.playerId, category: mv.category, score: (this.scores[mv.playerId] || {})[mv.category] || 0 }));
       }
@@ -601,6 +613,9 @@
     } else if (pkt.type === T.JOIN_ACK) {
       var ja = unpackJoinAck(pkt.payload);
       if (ja.eph === this.eph) { this.myId = ja.id; this._acked = true; this.state = 'IN_LOBBY'; this._ct(this._timers.join); if (this.cb.onJoined) this.cb.onJoined(ja.id); }
+    } else if (pkt.type === T.JOIN_NAK) {
+      var jn = unpackJoinNak(pkt.payload);
+      if (jn.eph === this.eph && !this._acked) { this._wantJoin = false; this._ct(this._timers.join); this.state = 'SEARCHING'; if (this.cb.onReject) this.cb.onReject(jn.reason); }
     } else if (pkt.type === T.ROSTER) {
       this.roster = unpackRoster(pkt.payload);
       if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());

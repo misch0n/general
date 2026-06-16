@@ -465,6 +465,11 @@ body.modal-open{ overflow:hidden; }
 /* tapped: green tint (no text) */
 .codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
 .netjoinview{ margin:6px 0; }
+/* regular vs manual network-game switcher */
+.netmodeswitch{ display:flex; gap:0; margin:4px 0 12px; border:1px solid var(--gen-pill-line); border-radius:9px; overflow:hidden; background:rgba(0,0,0,.25); }
+.netmodeswitch .nms-opt{ flex:1; padding:9px 6px; font-family:var(--gen-font-display); font-weight:700; font-size:12.5px; letter-spacing:.4px; text-transform:uppercase;
+  background:transparent; color:var(--gen-muted); border:none; cursor:pointer; }
+.netmodeswitch .nms-opt.on{ background:var(--gen-brass); color:var(--gen-ink); }
 /* optical (QR) handshake view */
 .netoptical{ margin:6px 0; }
 .optqr{ width:100%; max-width:280px; margin:10px auto; background:#fff; padding:10px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
@@ -1778,6 +1783,11 @@ body.modal-open{ overflow:hidden; }
     <div class="acwarn ac-only"><span class="acw-ic">🎧</span><span><b>Без слушалки!</b> Звукът трябва да минава през високоговорителя и микрофона — със слушалки преносът не работи.</span></div>
     <div id="netChoose">
       <p class="ht">Ти играеш като <b id="netMeName">—</b>.</p>
+      <!-- regular (dice) vs manual (ОТЧЕТ) network game -->
+      <div id="netModeSwitch" class="netmodeswitch">
+        <button type="button" class="nms-opt on" data-manual="0">🎲 Със зарове</button>
+        <button type="button" class="nms-opt" data-manual="1">✍ Ръчно</button>
+      </div>
       <!-- pick a role: host or join -->
       <div id="netPickRole">
         <div class="setup-actions">
@@ -2002,7 +2012,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.11.0';
+  var APP_VERSION = '1.12.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2505,6 +2515,20 @@ body.modal-open{ overflow:hidden; }
     if (nl) { nl.innerHTML = barsHTML(link.bars, st) + (st !== 'GOOD' ? ' <span class="netwarn">слаба връзка</span>' : ''); nl.classList.toggle('hidden', !netMode); }
   }
 
+  // host rejected our join (e.g. we picked the wrong game mode) → explain + back to the chooser
+  function netOnReject(reason) {
+    var msg = (reason === 1)
+      ? (netManual ? '⚠ Това е игра <b>със зарове</b>, а ти избра <b>ръчна</b>. Превключи режима горе и опитай пак.'
+                   : '⚠ Това е <b>ръчна</b> игра, а ти избра <b>със зарове</b>. Превключи режима горе и опитай пак.')
+      : '⚠ Хостът отказа връзката.';
+    if (net) { try { net.dispose(); } catch (e) {} net = null; }
+    if (netBus) { try { netBus.stop(); } catch (e) {} netBus = null; }
+    if (optBus) { try { optBus.stop(); } catch (e) {} optBus = null; }
+    if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} netFSK = null; }
+    stopScan(); stopFlavour();
+    netShow('choose'); $('netPickRole').classList.remove('hidden'); $('netJoinCode').classList.add('hidden'); $('netOptical').classList.add('hidden');
+    netChooseMsg(msg);
+  }
   function netSay(s) { var el = $('netStatus'); if (el) el.innerHTML = s; }
   function localMeta() {
     applyOwnerName();
@@ -2528,6 +2552,7 @@ body.modal-open{ overflow:hidden; }
         else if (net.isHost) setFlavour($('netStatus'), 'hostSearch');
       },
       onJoined: function (id) { localPid = id; renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait'); },
+      onReject: function (reason) { netOnReject(reason); },
       onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
       onPrep: function () { enterNetPrep(); },
       onSpur: function (id, heat) { onNetSpur(id, heat); },
@@ -2603,6 +2628,7 @@ body.modal-open{ overflow:hidden; }
     netShow('prep');
     renderSettSummary(net.settingsBits);
     $('netHostTools').classList.toggle('hidden', !net.isHost);
+    $('netAddAI').classList.toggle('hidden', net.manual);   // no AI seats in a manual game
     $('netReady').classList.toggle('hidden', net.isHost);   // host has no ready button — it starts
     $('netStart').classList.toggle('hidden', !net.isHost);
     renderNetMeCard(); renderNetPrep();
@@ -2804,10 +2830,10 @@ body.modal-open{ overflow:hidden; }
     $('ndCapStatus').textContent = b64.length + ' знака' + (ok ? '' : ' — копирай ръчно ⬇');
   };
   function newSession(isHost) {
-    return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
+    return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), manual: netManual, minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
   }
   function newSessionWith(transport, isHost, eph) {
-    return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), eph: eph, minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
+    return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), eph: eph, manual: netManual, minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
   }
   // a client persists its eph (player identity) per game code, so a reconnect/reload rejoins
   // the same seat the host already knows — rather than seating a brand-new boец.
@@ -3033,9 +3059,17 @@ body.modal-open{ overflow:hidden; }
     // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
     $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
     if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
+    syncNetMode();
     $('netModal').classList.remove('hidden');
     syncWrCapVis();
   }
+  // regular (dice) vs manual (ОТЧЕТ) network game
+  function syncNetMode() {
+    $('netModeSwitch').querySelectorAll('.nms-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-manual') === '1') === netManual); });
+  }
+  $('netModeSwitch').querySelectorAll('.nms-opt').forEach(function (b) {
+    b.onclick = function () { netManual = (b.getAttribute('data-manual') === '1'); syncNetMode(); };
+  });
   // a status line that is visible during the CHOOSE phase (netStatus lives inside the hidden lobby)
   function netChooseMsg(s) { var el = $('netChooseMsg'); if (el) el.innerHTML = s; }
   $('netBtn').onclick = function () { openNetModal('acoustic'); };
@@ -3443,15 +3477,31 @@ body.modal-open{ overflow:hidden; }
       return pl;
     });
     game = G.createGame(players); game.ownerSkipped = false;
-    manualMode = false; netMode = true; undoStack = []; viewingHistory = false;
+    manualMode = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
     moveLog = players.map(function () { return []; });
     $('netModal').classList.add('hidden'); $('setup').classList.add('hidden');
     $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     syncHintBtn();
-    setDockUI(false);
-    // the first GRANT (onTurn) drives beginTurn
+    setDockUI(manualMode);
+    if (manualMode) {
+      // FREE-FOR-ALL: I always fill MY OWN sheet at my own pace; others' boards update for peeking
+      var mySeat = netOrder.indexOf(localPid); game.current = mySeat >= 0 ? mySeat : 0;
+      netMyTurn = true; $('undoBottom').classList.add('hidden');   // no ОПА: entries are broadcast immediately
+      beginManualEntry();
+    }
+    // (regular) the first GRANT (onTurn) drives beginTurn
   }
+  // manual net: reset the dock for my next category entry (stay on my own sheet)
+  function beginManualEntry() {
+    var p = game.players[game.current];
+    var filled = G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length;
+    game.round = Math.min(G.CATEGORIES.length, filled + 1);
+    if (G.isGameOver(game) || myManualDone()) { locked = true; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; renderAll(); netSay('✔ Готов! Чакам останалите да попълнят…'); return; }
+    locked = false; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; throwsLeft = 0; curLog = null;
+    renderAll();
+  }
+  function myManualDone() { var p = game && game.players[game.current]; return p && G.CATEGORIES.every(function (c) { return G.isCategoryFilled(p, c.key); }); }
   function netSetTurn(activeId) {
     if (!netMode || !game) return;
     var seat = netOrder.indexOf(activeId); if (seat < 0) return;
@@ -3610,7 +3660,7 @@ body.modal-open{ overflow:hidden; }
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
   var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
-  var netKind = 'acoustic', netBus = null;   // 'acoustic' (sound FSK) | 'webrtc' (PeerJS) — selects the transport
+  var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var netActiveId = null, specSelf = false, specAct = null;   // spectating: who's playing, am I previewing my own board, last action
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
@@ -4174,6 +4224,15 @@ body.modal-open{ overflow:hidden; }
     if (tut) tutEvent('commit');
     var log = curLog;
     if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
+    if (netMode && manualMode) {
+      // FREE-FOR-ALL: record + broadcast my entry, then reset for my next category (no turn handover)
+      if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: dice.slice(), category: key });
+      flashTile(key);
+      if (net) net.submitMove({ category: CAT_INDEX[key], score: value, rolls: [dice.slice()], keeps: [] });
+      locked = true; renderAll();
+      setTimeout(beginManualEntry, END_DELAY);
+      return;
+    }
     if (netMode) {
       // broadcast my completed turn; the host's STATE + next GRANT drive the rest
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
