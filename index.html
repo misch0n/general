@@ -960,7 +960,6 @@ body.modal-open{ overflow:hidden; }
 .histgame .hg-count.ex{ border-color:var(--gen-muted); color:var(--gen-muted); }
 .histgame .hg-main{ flex:1; min-width:0; }
 .histgame .hg-top{ font-family:var(--gen-font-display); font-weight:600; letter-spacing:.3px; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:5px; }
-.histgame .hg-crown{ flex:none; font-size:10px; line-height:1; }   /* smaller than the title, vertically centred on the row */
 .histgame .hg-skip{ font-size:12px; color:var(--gen-muted); }
 .histgame .hg-sub{ font-size:10px; color:var(--gen-muted); margin-top:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
@@ -1786,7 +1785,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.0.0';
+  var APP_VERSION = '1.0.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -5894,7 +5893,7 @@ body.modal-open{ overflow:hidden; }
       var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
       var ptsPlayer = skipped ? top : rec.players[oi];
       var rk = gameRanking(rec);                                  // single-player games are unranked (no place / crown)
-      var oTotal = recTotal(ptsPlayer), place = rk.ranked ? rk.place : null, winR = place === 1;
+      var oTotal = recTotal(ptsPlayer), place = rk.ranked ? rk.place : null;
       var pct = !excluded && !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
       // only flag genuinely standout games: top 5 / 10 / 15 % (bucketed); nothing below that
       var topPct = pct == null ? null : 100 - pct;
@@ -5915,7 +5914,6 @@ body.modal-open{ overflow:hidden; }
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
         + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode">' + (rec.manualMode ? 'отчет' : 'игра') + '</span>' + pctTag + '</span></span>'
-        + (winR ? '<span class="hg-crown" title="Победа">👑</span>' : '')
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
