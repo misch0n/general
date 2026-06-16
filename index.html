@@ -451,9 +451,14 @@ body.modal-open{ overflow:hidden; }
 .nethostcode .netcode-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; }
 .nethostcode .netcode-show{ font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright);
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:pointer; }
-.codecopy{ font-family:var(--gen-font-display); font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase;
-  padding:5px 9px; border-radius:7px; background:rgba(255,255,255,.06); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); cursor:pointer; white-space:nowrap; }
-.codecopy.copied{ background:rgba(46,158,91,.25); border-color:#2e9e5b; color:#bfe8cf; }
+.codecopy{ display:inline-grid; place-items:center; width:30px; height:30px; flex:none;
+  border-radius:7px; background:rgba(255,255,255,.06); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); cursor:pointer; transition:background .15s, border-color .15s, color .15s; }
+/* CSS-drawn copy glyph: two overlapping document sheets */
+.copy-ic{ position:relative; width:13px; height:14px; display:block; color:inherit; }
+.copy-ic::before{ content:''; position:absolute; top:0; right:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; }
+.copy-ic::after{ content:''; position:absolute; bottom:0; left:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; background:var(--gen-ink,#16160e); }
+/* tapped: green tint (no text) */
+.codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
 .netjoinview{ margin:6px 0; }
 .wrcap{ margin-top:12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:left; }
 .wrcap-hd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:6px; }
@@ -1950,7 +1955,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.7.2';
+  var APP_VERSION = '1.7.3';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2909,23 +2914,45 @@ body.modal-open{ overflow:hidden; }
   $('netCodeInput').onkeydown = function (e) { if (e.key === 'Enter') $('netCodeJoin').onclick(); };
   // ---- WebRTC host: mint a code, open the PeerJS link, then run the normal lobby ----
   // host code display: the code is NOT selectable; a copy button next to it flips to a „copied" state.
-  function renderHostCode(code) {
-    var box = $('netHostCode');
-    box.innerHTML = 'Код за играта'
-      + '<div class="netcode-line"><b class="netcode-show">' + code + '</b>'
-      + '<button type="button" id="netCodeCopy" class="codecopy" title="Копирай кода" aria-label="Копирай кода">📋</button></div>';
-    box.classList.remove('hidden');
-    var btn = $('netCodeCopy');
-    btn.onclick = function () { copyGameCode(code, btn); };
-    // long-press over the code also copies (mirrors the “hold to copy” gesture)
-    var hold = box.querySelector('.netcode-show');
+  // shared markup + wiring for a game code with a CSS copy icon
+  function codeCopyHTML(code) {
+    return '<div class="netcode-line"><b class="netcode-show">' + code + '</b>'
+      + '<button type="button" class="codecopy" title="Копирай кода" aria-label="Копирай кода"><i class="copy-ic"></i></button></div>';
+  }
+  function wireCodeCopy(container, code) {
+    var btn = container.querySelector('.codecopy');
+    if (btn) btn.onclick = function () { copyGameCode(code, btn); };
+    var hold = container.querySelector('.netcode-show');   // touching the code copies too
     if (hold) hold.addEventListener('pointerdown', function () { copyGameCode(code, btn); });
   }
-  function copyGameCode(code, btn) {
+  function renderHostCode(code) {
+    var box = $('netHostCode');
+    box.innerHTML = 'Код за играта' + codeCopyHTML(code);
+    box.classList.remove('hidden');
+    wireCodeCopy(box, code);
+  }
+  // robust clipboard copy: a synchronous execCommand path (works inside the tap gesture on iOS
+  // Safari, where navigator.clipboard often rejects), with the async Clipboard API as a backup.
+  function copyToClipboard(text) {
     var ok = false;
-    if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(code); ok = true; } catch (e) {} }
-    if (!ok) { try { var ta = document.createElement('textarea'); ta.value = code; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); document.body.removeChild(ta); } catch (e) {} }
-    if (btn) { btn.classList.add('copied'); btn.textContent = '✓ копирано'; clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); btn.textContent = '📋'; }, 1600); }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.readOnly = true; ta.contentEditable = 'true';
+      ta.style.position = 'fixed'; ta.style.left = '0'; ta.style.top = '0';
+      ta.style.width = '1px'; ta.style.height = '1px'; ta.style.opacity = '0'; ta.style.fontSize = '16px';
+      document.body.appendChild(ta);
+      var range = document.createRange(); range.selectNodeContents(ta);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(text); ok = true; } catch (e) {} }
+    return ok;
+  }
+  function copyGameCode(code, btn) {
+    copyToClipboard(code);   // best-effort; the green tint confirms the action either way
+    if (btn) { btn.classList.add('copied'); clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); }, 1600); }
   }
   function webrtcHost() {
     wrCapReset('host', ''); wrlog('action', { tap: 'host' }); syncWrCapVis();
@@ -3124,7 +3151,8 @@ body.modal-open{ overflow:hidden; }
     var box = $('menuNetCode'); if (!box) return;
     if (!netMode || !net || !net.isHost || netKind !== 'webrtc' || !wrCode) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     box.classList.remove('hidden');
-    box.innerHTML = 'Код за връщане в играта<br><b class="netcode-show">' + wrCode + '</b><div class="mnc-hint">Разпаднал се боец може да влезе пак с този код.</div>';
+    box.innerHTML = 'Код за връщане в играта' + codeCopyHTML(wrCode) + '<div class="mnc-hint">Разпаднал се боец може да влезе пак с този код.</div>';
+    wireCodeCopy(box, wrCode);
   }
 
   loadSettings();   // restore censor + owner name/toggle before the first muster
