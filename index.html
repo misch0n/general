@@ -4651,6 +4651,15 @@ body.modal-open{ overflow:hidden; }
     g.style.top = (below + g.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - g.offsetHeight - 8)) + 'px';
   }
   $('medalTip').onclick = function () { $('medalTip').classList.add('hidden'); };
+  // tap the win/lose ratio bar → a small temporary bubble with the exact rates
+  var winTipTimer = null;
+  function showWinTip(el) {
+    var g = $('medalTip'); g._for = null;   // always (re)show, never toggle off
+    showMedalTip(el, '<span style="color:rgba(138,162,108,1)">●</span> <b>' + el.getAttribute('data-win') + '%</b> победи'
+      + ' &nbsp; <span style="color:rgba(176,104,90,1)">●</span> <b>' + el.getAttribute('data-lose') + '%</b> загуби');
+    clearTimeout(winTipTimer);
+    winTipTimer = setTimeout(function () { if ($('medalTip')._for === el) $('medalTip').classList.add('hidden'); }, 2400);
+  }
   // tap any underlined term (section label / EV reference) → a dismissible „how to read it" bubble
   document.addEventListener('click', function (e) {
     var t = e.target.closest && e.target.closest('.xterm'); if (!t) return;
@@ -5728,7 +5737,8 @@ body.modal-open{ overflow:hidden; }
     // lives in the expandable body. The owner name carries the старшина's default colour.
     // wins / win-bar are over RANKED games only (>1 player); the bar hides when there are none.
     var rankedN = c.rankedN, losses = Math.max(0, rankedN - c.wins);
-    var bar = rankedN ? '<span class="ho-winbar" title="' + Math.round(100 * c.wins / rankedN) + '% победи · ' + Math.round(100 * losses / rankedN) + '% загуби">'
+    var winPct = rankedN ? Math.round(100 * c.wins / rankedN) : 0, losePct = rankedN ? Math.round(100 * losses / rankedN) : 0;
+    var bar = rankedN ? '<span class="ho-winbar" data-win="' + winPct + '" data-lose="' + losePct + '" title="' + winPct + '% победи · ' + losePct + '% загуби">'
       + '<i class="wb-win" style="flex:' + c.wins + '"></i><i class="wb-lose" style="flex:' + losses + '"></i></span>'
       : '<span class="ho-noranked">няма игри с класиране</span>';
     var h = '<details class="histover"><summary class="ho-sum"><span class="ho-head">'
@@ -5838,6 +5848,8 @@ body.modal-open{ overflow:hidden; }
       + '<button class="histtab' + (histTab === 'experimental' ? ' on' : '') + '" data-rs="experimental">с минуси</button></div>';
     $('historyOverview').innerHTML = tabs + ownerOverview(histTab);
     $('historyOverview').querySelectorAll('.histtab').forEach(function (b) { b.onclick = function () { histTab = b.getAttribute('data-rs'); renderHistory(); }; });
+    var wbar = $('historyOverview').querySelector('.ho-winbar');
+    if (wbar) wbar.onclick = function (e) { e.preventDefault(); e.stopPropagation(); showWinTip(wbar); };   // tap → temporary rate bubble (don't toggle the <details>)
     wireOwnerCharts();   // attach the scrub readers to the per-battle career charts
     // the bar opens/closes the board; the ? toggles the read-tips on its own (no fold needed)
     var fold = $('historyOverview').querySelector('.catfold');
