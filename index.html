@@ -510,6 +510,9 @@ body.modal-open{ overflow:hidden; }
 /* the spammable „ДАЙ ЗОР" button (client ready→spur, host pre-start) */
 .btn.spur{ background:linear-gradient(180deg,#e0552e,#c0392b); color:#fff; border-color:#7a2018; box-shadow:0 3px 0 #7a2018; letter-spacing:1px; }
 .btn.spur:active{ transform:translateY(2px); box-shadow:0 1px 0 #7a2018; }
+/* host „ГОТОВ!" confirm (armed by editing a field) */
+.btn.confirm{ background:linear-gradient(180deg,#3fae66,#2e9e5b); color:#fff; border-color:#1f6b3c; box-shadow:0 3px 0 #1f6b3c; letter-spacing:1px; }
+.btn.confirm:active{ transform:translateY(2px); box-shadow:0 1px 0 #1f6b3c; }
 .netsett{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-bottom:10px; }
 .netsett .sc{ font-size:10px; letter-spacing:.3px; padding:3px 8px; border-radius:999px; background:rgba(201,166,75,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
 .netsett .sc.none{ background:transparent; border-color:var(--gen-pill-line); color:var(--gen-muted); }
@@ -1992,7 +1995,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.10.0';
+  var APP_VERSION = '1.10.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2586,7 +2589,7 @@ body.modal-open{ overflow:hidden; }
   function netMyEntry() { return net ? net.roster.filter(function (m) { return m.id === localPid; })[0] : null; }
   // host opens prep; clients are pulled in by the PREP message
   function enterNetPrep() {
-    resetSpur();
+    resetSpur(); netEditing = false;
     var me = netMyEntry() || {};
     netMe = { name: me.name || localMeta().name, color: me.color || '#d4a02e', gender: me.gender || 'm' };
     netMyReady = !!me.ready;
@@ -2609,13 +2612,16 @@ body.modal-open{ overflow:hidden; }
       e.stopPropagation();
       // offer only colours no other device is using (the host dedupes anyway, but show free ones)
       var used = net.roster.filter(function (m) { return m.id !== localPid; }).map(function (m) { return (m.color || '').toLowerCase(); });
-      openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); }, freeSwatches(netMe.color, used));
+      openColorPop($('netMeColor'), netMe.color, 'netme', function (c) { netMe.color = c; $('netMeColor').style.background = c; pushMyMeta(true); markEdited(); }, freeSwatches(netMe.color, used));
     };
-    $('netMeNameInput').oninput = function () { netMe.name = $('netMeNameInput').value; pushMyMeta(false); };  // debounced
+    $('netMeNameInput').oninput = function () { netMe.name = $('netMeNameInput').value; pushMyMeta(false); markEdited(); };  // debounced
     $('netMeGender').querySelectorAll('.glabel').forEach(function (gb) {
-      gb.onclick = function () { netMe.gender = gb.getAttribute('data-g'); renderNetMeCard(); pushMyMeta(true); };
+      gb.onclick = function () { netMe.gender = gb.getAttribute('data-g'); renderNetMeCard(); pushMyMeta(true); markEdited(); };
     });
   }
+  // host has no „ready" — but editing a field arms a „ГОТОВ!" confirm on the action button
+  var netEditing = false;
+  function markEdited() { if (net && net.isHost) { netEditing = true; renderNetPrep(); } }
   // send my edited meta to the host; debounce typing, fire colour/gender at once
   function pushMyMeta(immediate) {
     clearTimeout(netMetaTimer);
@@ -2624,7 +2630,7 @@ body.modal-open{ overflow:hidden; }
   }
   // ---------- „ДАЙ ЗОР" lobby cheer: a spammable button that spurs YOUR entry; heat reddens the
   // row + speeds a rotating cheer; it decays when you stop. Broadcast so everyone sees it. ----------
-  var SPUR_MSGS = ['ДАЙ ЗОР!', 'ХАЙДЕ!', 'НАПРЕД!', 'ПО-ЖИВО!', 'СТЕГНИ СЕ!', 'ГАЗ!', 'РАЗДАЙ!', 'ТУПУРДИЯ!', 'ДЪРЖАЙ!', 'НЕ СПИРАЙ!'];
+  var SPUR_MSGS = ['Айде бе!', 'По-бързо!', 'Стегнете се!', 'До кога ще чакам?', 'Бавняри!', 'Кога ще почваме?', 'Айде бе, свине!', 'Мързеливци!', 'Размърдайте се!', 'Хайде де!'];
   var spurHeat = {}, spurMsgIx = {}, spurAcc = {}, spurRaf = 0, spurLast = 0, spurTxAt = 0;
   function nowMs() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
   function spurMe() {
@@ -2679,10 +2685,15 @@ body.modal-open{ overflow:hidden; }
     if (mine && mine.color && mine.color.toLowerCase() !== (netMe.color || '').toLowerCase()) { netMe.color = mine.color; if ($('netMeColor')) $('netMeColor').style.background = mine.color; }
     $('netMeCard').classList.toggle('ready', netMyReady);   // green tint when ready (fields stay editable)
     if (net.isHost) {
-      var allRdy = net.allReady();
       $('netStart').disabled = false;
-      $('netStart').classList.toggle('spur', !allRdy);
-      $('netStart').textContent = allRdy ? '⚔ Започни битката' : '🔥 ДАЙ ЗОР!';
+      if (netEditing) {
+        $('netStart').classList.remove('spur'); $('netStart').classList.add('confirm'); $('netStart').textContent = '✔ ГОТОВ!';
+      } else {
+        var allRdy = net.allReady();
+        $('netStart').classList.remove('confirm');
+        $('netStart').classList.toggle('spur', !allRdy);
+        $('netStart').textContent = allRdy ? '⚔ Започни битката' : '🔥 ДАЙ ЗОР!';
+      }
     } else {
       $('netReady').classList.toggle('on', netMyReady);
       $('netReady').classList.toggle('spur', netMyReady);
@@ -3344,6 +3355,7 @@ body.modal-open{ overflow:hidden; }
   };
   $('netStart').onclick = function () {
     if (!net || !net.isHost) return;
+    if (netEditing) { netEditing = false; renderNetPrep(); return; }   // confirm my customisation → back to ДАЙ ЗОР/старт
     // until everyone's ready this button is „ДАЙ ЗОР"; it only starts the game once all are ready
     if (!net.allReady()) {
       if (net.roster.length < net.minPlayers) { netSay('⚠ Трябват поне ' + net.minPlayers + ' бойци.'); }
