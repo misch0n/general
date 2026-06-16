@@ -487,20 +487,29 @@ body.modal-open{ overflow:hidden; }
 .netp .netdrop{ font-size:11px; color:#c0392b; }
 /* lobby preparation */
 .netprep-hd{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; font-size:11px; color:var(--gen-brass); margin:4px 0 8px; }
-.netmecard{ padding:11px; border-radius:10px; border:1px solid var(--gen-brass-stroke); background:rgba(0,0,0,.22); margin-bottom:10px; }
+.netmecard{ padding:11px; border-radius:10px; border:1px solid var(--gen-brass-stroke); background:rgba(0,0,0,.22); margin-bottom:10px; transition:border-color .2s, background .2s, box-shadow .2s; }
+/* readied: fields stay editable but the card gets a calm green tint */
+.netmecard.ready{ border-color:#3f9e5b; background:rgba(46,158,91,.12); box-shadow:0 0 0 1px rgba(46,158,91,.35); }
 .netmecard .nm-row{ display:flex; align-items:center; gap:8px; }
 .netmecard .nm-name{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
   background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
 .netmecard .nm-name:focus{ outline:none; border-color:var(--gen-brass); }
 .netmecard .gender{ margin-top:9px; }
 .netproster{ display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
-.netpp{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line); font-size:12.5px; }
-.netpp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
-.netpp .pp-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.netpp{ position:relative; display:flex; align-items:center; gap:14px; padding:8px 11px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line); font-size:12.5px;
+  --heat:0; box-shadow:inset 0 0 0 200px rgba(201,52,40,calc(var(--heat)*0.45)), 0 0 calc(var(--heat)*13px) rgba(224,80,60,calc(var(--heat)*0.75)); }
+.netpp .netdot{ width:13px; height:13px; border-radius:50%; flex:none; }
+.netpp .pp-nm{ flex:1; min-width:0; text-align:left; padding-left:2px; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* „ДАЙ ЗОР" cheer bubble that pops over the spurred player's row */
+.netpp .pp-spur{ position:absolute; right:10px; top:-11px; font-family:var(--gen-font-display); font-weight:800; font-size:12px; letter-spacing:.5px; color:#fff;
+  background:#c0392b; padding:2px 9px; border-radius:11px; white-space:nowrap; pointer-events:none; opacity:0; box-shadow:0 2px 7px rgba(0,0,0,.45); transition:opacity .1s; }
 .netpp .pp-tag{ font-size:9px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); flex:none; }
 .netpp .pp-rdy{ flex:none; font-size:12px; }
 .netpp .pp-rdy.on{ color:#7bb85a; } .netpp .pp-rdy.off{ color:var(--gen-muted); }
 .netpp .pp-kick{ flex:none; width:22px; height:22px; border-radius:6px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:13px; line-height:1; }
+/* the spammable „ДАЙ ЗОР" button (client ready→spur, host pre-start) */
+.btn.spur{ background:linear-gradient(180deg,#e0552e,#c0392b); color:#fff; border-color:#7a2018; box-shadow:0 3px 0 #7a2018; letter-spacing:1px; }
+.btn.spur:active{ transform:translateY(2px); box-shadow:0 1px 0 #7a2018; }
 .netsett{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-bottom:10px; }
 .netsett .sc{ font-size:10px; letter-spacing:.3px; padding:3px 8px; border-radius:999px; background:rgba(201,166,75,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
 .netsett .sc.none{ background:transparent; border-color:var(--gen-pill-line); color:var(--gen-muted); }
@@ -1983,7 +1992,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.9.0';
+  var APP_VERSION = '1.10.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2463,7 +2472,7 @@ body.modal-open{ overflow:hidden; }
     stopFlavour(); flavKey = key; flavEl = el;
     var lines = FLAV[key] || []; if (!lines.length || !el) return;
     var i = 0; el.textContent = lines[0];
-    flavTimer = setInterval(function () { i = (i + 1) % lines.length; if (flavEl) flavEl.textContent = lines[i]; }, 2300);
+    flavTimer = setInterval(function () { i = (i + 1) % lines.length; if (flavEl) flavEl.textContent = lines[i]; }, 4200);   // slower, calmer rotation
   }
   function stopFlavour() { if (flavTimer) clearInterval(flavTimer); flavTimer = null; flavEl = null; flavKey = null; }
 
@@ -2511,6 +2520,7 @@ body.modal-open{ overflow:hidden; }
       onJoined: function (id) { localPid = id; renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait'); },
       onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
       onPrep: function () { enterNetPrep(); },
+      onSpur: function (id, heat) { onNetSpur(id, heat); },
       onStart: function (roster, order) { stopFlavour(); startNetGame(roster, order); },
       onTurn: function (activeId) { netSetTurn(activeId); },
       onMove: function (mv) { netApplyRemote(mv); },
@@ -2564,8 +2574,8 @@ body.modal-open{ overflow:hidden; }
     $('netScan').classList.toggle('hidden', phase !== 'scan');
     $('netPrep').classList.toggle('hidden', phase !== 'prep');
   }
-  // bitmask of enabled pre-game settings (shown to clients as a read-only summary)
-  var SETT_BITS = [['barracks', 'КАЗАРМА'], ['titles', 'Титли'], ['titlePoints', 'Бонус точки'], ['advice', 'Съвети'], ['glupost', 'Глупости'], ['bets', 'Облози']];
+  // bitmask of enabled pre-game settings — only the GAMEPLAY-modifying ones (shown to all in the lobby)
+  var SETT_BITS = [['titles', 'Редки титли'], ['titlePoints', 'Бонус точки'], ['bets', 'Облози']];
   function settingsBits() { var b = 0; SETT_BITS.forEach(function (s, i) { if (settings[s[0]]) b |= (1 << i); }); return b; }
   function renderSettSummary(bits) {
     var on = SETT_BITS.filter(function (s, i) { return bits & (1 << i); });
@@ -2576,6 +2586,7 @@ body.modal-open{ overflow:hidden; }
   function netMyEntry() { return net ? net.roster.filter(function (m) { return m.id === localPid; })[0] : null; }
   // host opens prep; clients are pulled in by the PREP message
   function enterNetPrep() {
+    resetSpur();
     var me = netMyEntry() || {};
     netMe = { name: me.name || localMeta().name, color: me.color || '#d4a02e', gender: me.gender || 'm' };
     netMyReady = !!me.ready;
@@ -2611,24 +2622,72 @@ body.modal-open{ overflow:hidden; }
     var send = function () { if (net) net.setMyMeta({ name: (netMe.name || 'Боец').trim() || 'Боец', color: netMe.color, gender: netMe.gender }); };
     if (immediate) send(); else netMetaTimer = setTimeout(send, 550);
   }
+  // ---------- „ДАЙ ЗОР" lobby cheer: a spammable button that spurs YOUR entry; heat reddens the
+  // row + speeds a rotating cheer; it decays when you stop. Broadcast so everyone sees it. ----------
+  var SPUR_MSGS = ['ДАЙ ЗОР!', 'ХАЙДЕ!', 'НАПРЕД!', 'ПО-ЖИВО!', 'СТЕГНИ СЕ!', 'ГАЗ!', 'РАЗДАЙ!', 'ТУПУРДИЯ!', 'ДЪРЖАЙ!', 'НЕ СПИРАЙ!'];
+  var spurHeat = {}, spurMsgIx = {}, spurAcc = {}, spurRaf = 0, spurLast = 0, spurTxAt = 0;
+  function nowMs() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
+  function spurMe() {
+    if (netPhase !== 'prep' || !net || localPid == null) return;
+    spurHeat[localPid] = Math.min(1, (spurHeat[localPid] || 0) + 0.17);
+    startSpurLoop();
+    var t = Date.now();
+    if (t - spurTxAt > 110 && net.sendSpur) { spurTxAt = t; net.sendSpur(spurHeat[localPid]); }   // throttle the broadcast
+  }
+  function onNetSpur(id, heat) { spurHeat[id] = Math.max(spurHeat[id] || 0, heat); startSpurLoop(); }
+  function startSpurLoop() { if (spurRaf) return; spurLast = nowMs(); spurRaf = requestAnimationFrame(spurTick); }
+  function spurTick(t) {
+    var n = t || nowMs(), dt = Math.min(120, n - spurLast); spurLast = n; var any = false;
+    Object.keys(spurHeat).forEach(function (id) {
+      var h = spurHeat[id]; if (!h) return;
+      h *= Math.pow(0.90, dt / 100); if (h < 0.02) h = 0;   // decay ~10%/100ms
+      spurHeat[id] = h;
+      if (h > 0) {
+        any = true;
+        spurAcc[id] = (spurAcc[id] || 0) + dt * (0.25 + h);
+        var period = 720 - h * 520;                         // hotter → faster message swap
+        if (spurAcc[id] >= period) { spurAcc[id] = 0; spurMsgIx[id] = ((spurMsgIx[id] || 0) + 1) % SPUR_MSGS.length; }
+      }
+      applySpurVisual(id);
+    });
+    spurRaf = any ? requestAnimationFrame(spurTick) : 0;
+  }
+  function applySpurVisual(id) {
+    var box = $('netPrepRoster'); if (!box) return;
+    var row = box.querySelector('.netpp[data-id="' + id + '"]'); if (!row) return;
+    var h = spurHeat[id] || 0; row.style.setProperty('--heat', h.toFixed(3));
+    var sp = row.querySelector('.pp-spur');
+    if (sp) { if (h > 0.08) { sp.textContent = SPUR_MSGS[spurMsgIx[id] || 0]; sp.style.opacity = Math.min(1, h * 1.7); } else { sp.textContent = ''; sp.style.opacity = 0; } }
+  }
+  function resetSpur() { spurHeat = {}; spurMsgIx = {}; spurAcc = {}; if (spurRaf) { cancelAnimationFrame(spurRaf); spurRaf = 0; } }
   function renderNetPrep() {
     if (!net) return;
     $('netPrepRoster').innerHTML = net.roster.map(function (m) {
       var tags = (m.id === MP.HOST_ID ? '<span class="pp-tag">старшина</span>' : '') + (m.isAI ? '<span class="pp-tag">🤖 AI</span>' : '');
       var rdy = m.id === MP.HOST_ID || m.isAI ? '' : '<span class="pp-rdy ' + (m.ready ? 'on">✔' : 'off">…') + '</span>';
       var kick = (net.isHost && m.isAI) ? '<button class="pp-kick" data-id="' + m.id + '">✕</button>' : '';
-      return '<div class="netpp"><span class="netdot" style="background:' + m.color + '"></span><span class="pp-nm">' + esc(m.name)
-        + (m.id === localPid ? ' (ти)' : '') + '</span>' + tags + rdy + kick + '</div>';
+      return '<div class="netpp" data-id="' + m.id + '" style="--heat:' + ((spurHeat[m.id] || 0).toFixed(3)) + '"><span class="netdot" style="background:' + m.color + '"></span><span class="pp-nm">' + esc(m.name)
+        + (m.id === localPid ? ' (ти)' : '') + '</span>' + tags + rdy + kick + '<span class="pp-spur"></span></div>';
     }).join('');
     $('netPrepRoster').querySelectorAll('.pp-kick').forEach(function (b) {
       b.onclick = function () { net.removeAI(+b.getAttribute('data-id')); };
     });
+    Object.keys(spurHeat).forEach(applySpurVisual);
     // keep my own name input in sync if the host renamed me on a collision (don't fight the cursor)
     var mine = netMyEntry(), inp = $('netMeNameInput');
     if (mine && inp && document.activeElement !== inp && mine.name !== netMe.name) { netMe.name = mine.name; inp.value = mine.name; }
     if (mine && mine.color && mine.color.toLowerCase() !== (netMe.color || '').toLowerCase()) { netMe.color = mine.color; if ($('netMeColor')) $('netMeColor').style.background = mine.color; }
-    if (net.isHost) { $('netStart').disabled = !net.allReady(); $('netStart').classList.toggle('hidden', false); }
-    else { $('netReady').classList.toggle('on', netMyReady); $('netReady').textContent = netMyReady ? 'Готов ✔' : 'Готов съм'; }
+    $('netMeCard').classList.toggle('ready', netMyReady);   // green tint when ready (fields stay editable)
+    if (net.isHost) {
+      var allRdy = net.allReady();
+      $('netStart').disabled = false;
+      $('netStart').classList.toggle('spur', !allRdy);
+      $('netStart').textContent = allRdy ? '⚔ Започни битката' : '🔥 ДАЙ ЗОР!';
+    } else {
+      $('netReady').classList.toggle('on', netMyReady);
+      $('netReady').classList.toggle('spur', netMyReady);
+      $('netReady').textContent = netMyReady ? '🔥 ДАЙ ЗОР!' : 'Готов съм ✔';
+    }
   }
   function netStartTransport(then) {
     if (netFSK && netFSK.ctx) { then(); return; }   // reuse an already-open mic (e.g. diagnostics)
@@ -3277,18 +3336,19 @@ body.modal-open{ overflow:hidden; }
   // host edits pre-game settings in the lobby (broadcast as a summary)
   $('netPrepSettings').onclick = function () { if (net && net.isHost) { netSettCtx = true; openSettings(); } };
   var netSettCtx = false;
-  // client ready toggle
+  // client: first tap readies up; once ready the button becomes the spammable „ДАЙ ЗОР"
   $('netReady').onclick = function () {
     if (!net || net.isHost) return;
-    netMyReady = !netMyReady; net.setReady(netMyReady); renderNetPrep();
+    if (!netMyReady) { netMyReady = true; net.setReady(true); renderNetPrep(); }
+    else { spurMe(); }
   };
   $('netStart').onclick = function () {
     if (!net || !net.isHost) return;
-    // never leave the host staring: spell out exactly what's blocking the start
-    if (net.roster.length < net.minPlayers) { netSay('⚠ Трябват поне ' + net.minPlayers + ' бойци, за да започнеш.'); return; }
+    // until everyone's ready this button is „ДАЙ ЗОР"; it only starts the game once all are ready
     if (!net.allReady()) {
-      var notReady = net.roster.filter(function (m) { return m.id !== MP.HOST_ID && !m.isAI && !m.ready && !m.dropped; });
-      netSay('⏳ Чакам да са готови: ' + (notReady.length ? notReady.map(function (m) { return esc(m.name); }).join(', ') : 'бойците'));
+      if (net.roster.length < net.minPlayers) { netSay('⚠ Трябват поне ' + net.minPlayers + ' бойци.'); }
+      else { var notReady = net.roster.filter(function (m) { return m.id !== MP.HOST_ID && !m.isAI && !m.ready && !m.dropped; }); if (notReady.length) netSay('⏳ Чакам: ' + notReady.map(function (m) { return esc(m.name); }).join(', ')); }
+      spurMe();
       return;
     }
     $('netStart').disabled = true; setFlavour($('netStatus'), 'lobbyWait');
@@ -3298,7 +3358,7 @@ body.modal-open{ overflow:hidden; }
     net.calibrate(function () { net.startGame(); });
   };
   function leaveNet() {
-    stopFlavour(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
+    stopFlavour(); resetSpur(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
     stopScan(); if (optBus) { try { optBus.stop(); } catch (e) {} } optBus = null; optPending = null; optClient = null;
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop(); if (netBus) netBus.stop();
     net = null; netFSK = null; netBus = null; netMode = false; localPid = null;
@@ -3421,6 +3481,22 @@ body.modal-open{ overflow:hidden; }
     net.addAI({ name: 'Сержант Болт', color: '#e07a2e', gender: 'n' });
     netShow('scan'); renderNetRoster();
     net.startPrep(settingsBits());   // → onPrep → enterNetPrep (the preparation screen)
+  }
+  // dev-only: preview the CLIENT's preparation screen (ready button, no host tools, settings summary)
+  function devMockLobbyClient() {
+    try { leaveNet(); } catch (e) {}
+    var nullTp = { maxPayload: 60000, onReceive: function () {}, send: function () { return Promise.resolve(); } };
+    netKind = 'webrtc';
+    openNetModal('webrtc');
+    net = newSessionWith(nullTp, false); localPid = 3; net.myId = 3; net._acked = true; net.state = 'PREP';
+    net.settingsBits = settingsBits() || 0b011;   // pretend a couple of gameplay settings are on
+    net.roster = [
+      { id: 0, name: 'Старшина Желязков', color: '#d4a02e', gender: 'm', ready: true },
+      { id: 1, name: 'Редник Тъпан', color: '#2e9e5b', gender: 'm', ready: true },
+      { id: 3, name: localMeta().name, color: '#6a52c0', gender: 'f', ready: false },
+      { id: 4, name: 'Сержант Болт', color: '#e07a2e', gender: 'n', isAI: true },
+    ];
+    enterNetPrep();
   }
   // pick a bot strength matching the (dropped) player's optimal-decision rate so far
   function netAiPolicy(seat) {
@@ -5366,8 +5442,9 @@ body.modal-open{ overflow:hidden; }
     tutRow.appendChild(tutBtn); exp.list.appendChild(tutRow);
     var mlRow = document.createElement('div'); mlRow.className = 'devctrl-row';
     mlRow.appendChild(el('span', null, 'Мок лоби'));
-    var mlBtn = el('button', 'btn small', '🧪 Отвори'); mlBtn.onclick = function () { closeDevModal(true); devMockLobby(); };
-    mlRow.appendChild(mlBtn); exp.list.appendChild(mlRow);
+    var mlBtn = el('button', 'btn small', '🧪 Хост'); mlBtn.onclick = function () { closeDevModal(true); devMockLobby(); };
+    var mlcBtn = el('button', 'btn small', '🧪 Гост'); mlcBtn.onclick = function () { closeDevModal(true); devMockLobbyClient(); };
+    mlRow.appendChild(mlBtn); mlRow.appendChild(mlcBtn); exp.list.appendChild(mlRow);
     exp.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
     exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); syncWebrtcDebugRow(); syncOpticalRow(); }));
     var optr = devToggleRow('Оптично сдвояване (QR)', 'opticalHandshake', function () {}); optr.id = 'devOpticalRow';

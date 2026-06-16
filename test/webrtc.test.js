@@ -220,6 +220,28 @@ test('reconnect: a dropped player rejoins by eph, catches up, and finishes', fun
   assert.strictEqual(host.state, 'GAME_OVER', 'game ended cleanly with everyone done');
 });
 
+test('lobby cheer (SPUR): a client\'s ДАЙ ЗОР reaches the host + the other client, not itself', function () {
+  var bus = new StarBus();
+  var got = { host: [], c1: [], c2: [] };
+  function mk(isHost, me, key) {
+    return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onSpur: function (id, heat) { got[key].push({ id: id, heat: heat }); } } });
+  }
+  var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' }, 'host');
+  var c1 = mk(false, { name: 'A', color: '#00aa55', gender: 'm' }, 'c1');
+  var c2 = mk(false, { name: 'B', color: '#5566ff', gender: 'f' }, 'c2');
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  host.startPrep(0); bus.drain();
+
+  c1.sendSpur(0.6); bus.drain();
+  assert.strictEqual(got.host.length, 1, 'host saw the cheer');
+  assert.strictEqual(got.c2.length, 1, 'other client saw the relayed cheer');
+  assert.strictEqual(got.c1.length, 0, 'the cheerer does not get its own echo');
+  assert.strictEqual(got.host[0].id, c1.myId, 'attributed to the cheering player');
+  assert.ok(Math.abs(got.host[0].heat - 0.6) < 0.02, 'heat carried (quantised)');
+});
+
 test('live spectating: the active player\'s action reaches the host AND the other client (relay)', function () {
   var bus = new StarBus();
   var got = { host: [], c1: [], c2: [] };

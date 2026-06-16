@@ -17,6 +17,7 @@
     GRANT: 6, MOVE: 7, STATE: 8, RESYNC_REQ: 9, PING: 10, PONG: 11, END: 12,
     META: 13, READY: 14, PREP: 15, AICTRL: 16,              // lobby preparation + AI takeover
     TACT: 17,                                               // live turn action (spectating: roll/reroll/commit)
+    SPUR: 18,                                               // lobby „ДАЙ ЗОР" cheer (player id + heat)
     XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
     // adaptive link & resilience (reserved 30-39)
     CAL_PROBE: 30, CAL_REPORT: 31, CAL_SELECT: 32, CAL_CONFIRM: 33, PROFILE_SWITCH: 34, QUALITY: 35, RELAY: 36, GOSSIP: 37,
@@ -106,6 +107,8 @@
   function unpackPrep(p) { return new Reader(p).u8(); }
   function packAICtrl(id, on) { return new Writer().u8(id).u8(on ? 1 : 0).out(); }              // host → all: a seat is now AI-driven (display)
   function unpackAICtrl(p) { var r = new Reader(p); return { id: r.u8(), on: !!r.u8() }; }
+  function packSpur(id, heat) { return new Writer().u8(id).u8(Math.max(0, Math.min(255, Math.round(heat * 255)))).out(); }
+  function unpackSpur(p) { var r = new Reader(p); return { id: r.u8(), heat: r.u8() / 255 }; }
   // TACT — the active player's live turn action so everyone else can WATCH (display-only):
   // a roll/reroll (dice + remaining throws + which dice are freshly rolled) or a commit (category+value).
   function packAct(a) {
@@ -418,6 +421,8 @@
     return true;
   };
 
+  // lobby cheer: broadcast my „ДАЙ ЗОР" heat so everyone sees it on my entry (host relays)
+  Session.prototype.sendSpur = function (heat) { if (this.state.indexOf('PREP') < 0 && this.state.indexOf('LOBBY') < 0) return; this._send(T.SPUR, packSpur(this.myId, heat)); };
   // the local active player broadcasts a live turn action (display-only; spectators render it).
   // host → all clients; a client → host, which relays to the rest.
   Session.prototype.sendAction = function (a) {
@@ -549,6 +554,9 @@
         if (was && this.cb.onDrop) this.cb.onDrop(back.id, false);
         if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
       }
+    } else if (pkt.type === T.SPUR && this.state === 'PREP') {
+      var sp = unpackSpur(pkt.payload);
+      if (this._byId(sp.id)) { this._send(T.SPUR, packSpur(sp.id, sp.heat)); if (this.cb.onSpur) this.cb.onSpur(sp.id, sp.heat); }   // relay + show
     } else if (pkt.type === T.TACT && this.state === 'IN_GAME') {
       var ta = unpackAct(pkt.payload);
       if (ta.playerId === this.activeId) { this._send(T.TACT, packAct(ta)); if (this.cb.onAction) this.cb.onAction(ta); }   // relay to all + render locally
@@ -604,6 +612,9 @@
       var ac = unpackAICtrl(pkt.payload);
       if (ac.on) this.takeover[ac.id] = true; else delete this.takeover[ac.id];
       if (this.cb.onTakeover) this.cb.onTakeover(ac.id, ac.on);
+    } else if (pkt.type === T.SPUR) {
+      var csp = unpackSpur(pkt.payload);
+      if (csp.id !== this.myId && this.cb.onSpur) this.cb.onSpur(csp.id, csp.heat);   // someone else's cheer
     } else if (pkt.type === T.TACT) {
       var cta = unpackAct(pkt.payload);
       if (cta.playerId !== this.myId && this.cb.onAction) this.cb.onAction(cta);   // watch the active player live
