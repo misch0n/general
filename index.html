@@ -1245,6 +1245,23 @@ body.modal-open{ overflow:hidden; }
 .devbadge.add{ background:rgba(75,140,60,.25); color:#9bd17e; } .devbadge.mod{ background:rgba(200,166,75,.22); color:var(--gen-brass-bright); } .devbadge.rem{ background:rgba(178,58,46,.22); color:#e88; }
 .deveditbox{ padding:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.2); }
 .deveditbox .devfields{ margin-bottom:8px; }
+/* dev cog + modal (in-place string editor) */
+.devcog{ display:grid; place-items:center; font-size:15px; color:var(--gen-brass); }
+.devcog:hover{ color:var(--gen-brass-bright); }
+.devmodal{ max-width:382px; }
+.devmodal .devnote{ font-size:11px; color:var(--gen-muted); line-height:1.45; margin-bottom:10px; }
+.devbody{ max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.devgrp{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.2px; color:var(--gen-brass-bright); font-size:10px; margin:13px 0 6px; opacity:.85; }
+.devitem-wrap{ position:relative; margin-bottom:5px; overflow:hidden; border-radius:7px; }
+.devitem{ cursor:pointer; transition:transform .04s; }
+.devitem.del-arm{ background:rgba(178,58,46,.28); border-color:var(--gen-alert-line); }
+.di-edit{ margin:6px 0 2px; }
+.devbar-sticky{ position:sticky; bottom:0; background:var(--gen-ink); padding-top:10px; }
+.devcloseprompt{ position:absolute; inset:0; background:rgba(8,10,5,.86); display:grid; place-items:center; border-radius:14px; z-index:5; }
+.dcp-box{ width:84%; max-width:300px; padding:16px; border-radius:12px; background:var(--gen-ink); border:2px solid var(--gen-brass); }
+.dcp-txt{ font-size:13px; color:var(--gen-text); margin-bottom:12px; line-height:1.5; }
+.dcp-btns{ display:flex; flex-direction:column; gap:7px; }
+.dcp-btns .btn{ width:100%; }
 
 @media (prefers-reduced-motion: reduce){ .shake,.tile.flash,.roast.show .bubble,.die.ghost{ animation:none; } }
 
@@ -1261,6 +1278,7 @@ body.modal-open{ overflow:hidden; }
     <div class="setup-titlerow">
       <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
       <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
+      <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик">⚙</button>
     </div>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
@@ -1520,9 +1538,22 @@ body.modal-open{ overflow:hidden; }
       </div>
       <div class="setup-actions"><button id="cpDelete" class="btn">🔥 Изтрий избраните</button><button id="cpCancel" class="btn primary">Отказ</button></div>
     </div>
-    <div id="devPanel" class="devpanel hidden"></div>
     <div class="setup-actions"><button id="settingsClose" class="btn primary">Готово</button></div>
   </div>
+</div>
+
+<!-- developer string editor (opened from the ⚙ cog beside the hamburger when unlocked) -->
+<div id="devModal" class="overlay hidden">
+  <div class="modal devmodal">
+    <button class="x-close" id="devClose">✕</button>
+    <h2>🔧 Разработчик</h2>
+    <div class="devnote">Докосни запис, за да го отвориш за редакция тук. „Приложи" зарежда промяната в играта за тест и свива записа. Свайп наляво маркира за изтриване. Отворени записи остават отворени.</div>
+    <div id="devBody" class="devbody"></div>
+    <div class="devbar devbar-sticky">
+      <button id="devApplyAll" class="btn">↻ Приложи всичко</button>
+      <button id="devCopy" class="btn primary">📋 Копирай diff</button>
+    </div>
+    <textarea id="devOut" class="devout hidden" readonly></textarea>
 </div>
 
 <!-- military archive (history) -->
@@ -1816,7 +1847,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.1.2';
+  var APP_VERSION = '1.2.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4148,14 +4179,25 @@ body.modal-open{ overflow:hidden; }
     t.addEventListener('pointerdown', start);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { t.addEventListener(ev, cancel); });
   })();
-  function activateDev() { settings.dev = true; devCats = null; renderDevPanel(); $('devPanel').classList.remove('hidden'); }
+  function activateDev() { settings.dev = true; devCats = null; $('devCogBtn').classList.remove('hidden'); openDevModal(); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  // dev cog (shown beside the hamburger once unlocked) + dev modal controls
+  $('devCogBtn').onclick = openDevModal;
+  $('devClose').onclick = function () { closeDevModal(); };
+  $('devModal').onclick = function (e) { if (e.target === $('devModal')) closeDevModal(); };
+  $('devApplyAll').onclick = function () { devApplyAllBtn(); var b = $('devApplyAll'); b.textContent = '↻ Приложено!'; setTimeout(function () { b.textContent = '↻ Приложи всичко'; }, 1300); };
+  $('devCopy').onclick = function () {
+    var txt = serializeDevDiff(), out = $('devOut'); out.value = txt; out.classList.remove('hidden'); try { out.focus(); out.select(); } catch (e) {}
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(txt); ok = true; } catch (e) {} }
+    var b = $('devCopy'); b.textContent = ok ? '📋 Копирано!' : '📋 Маркирай ⬇'; setTimeout(function () { b.textContent = '📋 Копирай diff'; }, 1500);
+  };
 
   // ---- dev-mode editor: ALL game strings, edit-on-touch, diff-only copy ----
   // Every item tracks its original, so „Копирай“ emits only the CHANGES (modified
   // / added / removed) with an executable identifier. Touching an item opens an
   // edit panel with Приложи / Отказ / Възстанови.
-  var devCats = null, devEditing = null;
+  var devCats = null;
   function bracketRank(b) { var i = G.BRACKETS.indexOf(b || '10+'); return i < 0 ? G.BRACKETS.length : i; }
   function cloneVal(v) { return v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v; }
   // a text box that grows to show ALL of its content (no sideways scroll)
@@ -4205,57 +4247,33 @@ body.modal-open{ overflow:hidden; }
     if (st === 'removed') return '<span class="devbadge rem">− премахнато</span>';
     return '';
   }
-  function renderDevPanel() {
-    devEditing = null;
-    if (!devCats) buildDevCats();
-    var host = $('devPanel'); host.innerHTML = '';
-    host.appendChild(el('div', 'devhdr', '🔧 РЕЖИМ РАЗРАБОТЧИК — редактор'));
-    host.appendChild(el('div', 'devnote', 'Докосни запис, за да го редактираш (Приложи / Отказ / Възстанови). „Копирай“ дава само промените за подаване обратно. „Приложи всичко“ зарежда наличните за преглед.'));
-    devCats.forEach(function (cat) {
-      var changed = cat.items.filter(function (i) { return i.status !== 'unchanged'; }).length;
-      var sec = document.createElement('details'); sec.className = 'devsec';
-      var sum = document.createElement('summary');
-      sum.innerHTML = esc(cat.label) + ' (' + cat.items.length + ')' + (changed ? ' <span class="devbadge mod">' + changed + ' промени</span>' : '');
-      sec.appendChild(sum);
-      var body = document.createElement('div'); body.className = 'devlist'; sec.appendChild(body);
-      var items = cat.kind === 'word' ? cat.items.slice().sort(function (a, b) { return bracketRank(a.val.b) - bracketRank(b.val.b); }) : cat.items;
-      items.forEach(function (it) {
-        var row = document.createElement('button'); row.className = 'devitem st-' + it.status;
-        row.innerHTML = '<span class="diword">' + esc(devItemText(cat, it)) + '</span>'
-          + (cat.kind === 'word' && it.val.b && it.val.b !== '10+' ? '<span class="devbk r' + bracketRank(it.val.b) + '" style="pointer-events:none">' + it.val.b + '</span>' : '')
-          + (cat.kind === 'word' && it.val.nsfw ? '<span class="dinsfw">NSFW</span>' : '')
-          + devBadge(it.status);
-        row.onclick = function () { openDevEdit(cat, it, false); };
-        body.appendChild(row);
-      });
-      var add = el('button', 'devadd', '+ добави'); add.onclick = function () { addDevItem(cat); }; body.appendChild(add);
-      host.appendChild(sec);
-    });
-    var bar = document.createElement('div'); bar.className = 'devbar';
-    var apply = el('button', 'btn', '↻ Приложи всичко');
-    apply.onclick = function () { devApplyAll(); apply.textContent = '↻ Приложено!'; setTimeout(function () { apply.textContent = '↻ Приложи всичко'; }, 1400); };
-    var copy = el('button', 'btn primary', '📋 Копирай промените');
-    var out = document.createElement('textarea'); out.className = 'devout hidden'; out.readOnly = true;
-    copy.onclick = function () {
-      var txt = serializeDevDiff(); out.value = txt; out.classList.remove('hidden'); out.focus(); out.select();
-      var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-      if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(txt); ok = true; } catch (e) {} }
-      copy.textContent = ok ? '📋 Копирано!' : '📋 Маркирай и копирай ⬇'; setTimeout(function () { copy.textContent = '📋 Копирай промените'; }, 1600);
-    };
-    bar.appendChild(apply); bar.appendChild(copy);
-    host.appendChild(bar); host.appendChild(out);
+  // ----- developer string editor (its own modal; in-place expand/collapse editing) -----
+  var DEV_GROUPS = [
+    { label: 'Имена', keys: ['titles', 'adjs', 'nouns', 'aiAdjs', 'aiNouns'] },
+    { label: 'Закачки', keys: ['roasts.flop', 'roasts.risk', 'roasts.fail', 'shames', 'bets'] },
+    { label: 'Игра', keys: ['combos', 'orders', 'ranks', 'excl'] },
+    { label: 'AI', keys: ['personas', 'playstyles'] },
+  ];
+  function valEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function recomputeStatus(it) { return it._isNew ? 'added' : (valEqual(it.val, it.orig) ? 'unchanged' : 'modified'); }
+  function devSecLabelHTML(cat) {
+    var changed = cat.items.filter(function (i) { return i.status !== 'unchanged'; }).length;
+    return esc(cat.label) + ' (' + cat.items.length + ')' + (changed ? ' <span class="devbadge mod">' + changed + ' промени</span>' : '');
   }
-  function addDevItem(cat) {
-    var it = { id: 'new', orig: null, val: cat.kind === 'word' ? { b: '10+' } : '', status: 'added' };
-    cat.items.push(it); openDevEdit(cat, it, true);
+  function devItemHeadHTML(cat, it) {
+    return '<span class="diword">' + esc(devItemText(cat, it)) + '</span>'
+      + (cat.kind === 'word' && it.val.b && it.val.b !== '10+' ? '<span class="devbk r' + bracketRank(it.val.b) + '" style="pointer-events:none">' + it.val.b + '</span>' : '')
+      + (cat.kind === 'word' && it.val.nsfw ? '<span class="dinsfw">NSFW</span>' : '')
+      + devBadge(it.status);
   }
-  // ----- the edit panel (replaces the list while editing) -----
-  function openDevEdit(cat, it, isNew) {
-    devEditing = { cat: cat, item: it, isNew: isNew, draft: cloneVal(it.val) };
-    var host = $('devPanel'); host.innerHTML = '';
-    host.appendChild(el('div', 'devhdr', '✎ ' + cat.label + (cat.kind === 'keyed' ? ' · ' + it.id : '')));
-    var box = document.createElement('div'); box.className = 'deveditbox';
-    var d = devEditing.draft;
+  function itemsSorted(cat) { return cat.kind === 'word' ? cat.items.slice().sort(function (a, b) { return bracketRank(a.val.b) - bracketRank(b.val.b); }) : cat.items; }
+  function refreshDevHead(cat, it) { if (it._head) { it._head.className = 'devitem st-' + it.status; it._head.innerHTML = devItemHeadHTML(cat, it); } }
+  function refreshDevSecBadge(cat) { if (cat._sum) cat._sum.innerHTML = devSecLabelHTML(cat); }
+  function addDevItem(cat) { var it = { id: 'new', orig: null, val: cat.kind === 'word' ? { b: '10+' } : '', status: 'added', _isNew: true }; cat.items.push(it); return it; }
+  function collapseDevEdit(it) { if (it._editEl) { it._editEl.remove(); it._editEl = null; } it._open = false; it._draft = null; }
+  function buildDevEditForm(cat, it) {
+    var ed = document.createElement('div'); ed.className = 'di-edit';
+    var box = document.createElement('div'); box.className = 'deveditbox'; var d = it._draft;
     if (cat.kind === 'word') {
       var fields = document.createElement('div'); fields.className = 'devfields';
       [['m', 'м (база)'], ['n', 'ср'], ['f', 'ж']].forEach(function (f) {
@@ -4273,29 +4291,93 @@ body.modal-open{ overflow:hidden; }
       var nL = document.createElement('label'); nL.className = 'devchk nsfw'; var nc = document.createElement('input'); nc.type = 'checkbox'; nc.checked = !!d.nsfw; nc.onchange = function () { if (nc.checked) d.nsfw = true; else delete d.nsfw; }; nL.appendChild(nc); nL.appendChild(document.createTextNode('NSFW')); ctr.appendChild(nL);
       box.appendChild(ctr);
     } else {
-      box.appendChild(devArea(d, 'текст…', function (v) { devEditing.draft = v; }));
+      box.appendChild(devArea(d, 'текст…', function (v) { it._draft = v; }));
     }
-    host.appendChild(box);
+    ed.appendChild(box);
     var bar = document.createElement('div'); bar.className = 'devbar';
-    var apply = el('button', 'btn primary', '✓ Приложи'); apply.onclick = devApplyEdit;
-    var cancel = el('button', 'btn', '✕ Отказ'); cancel.onclick = devCancelEdit;
+    var apply = el('button', 'btn primary', '✓ Приложи'); apply.onclick = function () { devApply(cat, it); };
+    var cancel = el('button', 'btn', '✕ Отказ'); cancel.onclick = function () { devCancel(cat, it); };
     bar.appendChild(apply); bar.appendChild(cancel);
-    if (!isNew && it.status === 'modified') { var rest = el('button', 'btn', '↺ Възстанови'); rest.onclick = devRestoreEdit; bar.appendChild(rest); }
-    if (!isNew) { var rem = el('button', 'btn devrem', '🗑 Премахни'); rem.onclick = devRemoveEdit; bar.appendChild(rem); }
-    host.appendChild(bar);
+    if (!it._isNew && it.status === 'modified') { var rest = el('button', 'btn', '↺ Възстанови'); rest.onclick = function () { devRestore(cat, it); }; bar.appendChild(rest); }
+    if (!it._isNew) { var rem = el('button', 'btn devrem', '🗑 Премахни'); rem.onclick = function () { devRemove(cat, it); }; bar.appendChild(rem); }
+    ed.appendChild(bar);
+    return ed;
   }
-  function valEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
-  function devApplyEdit() {
-    var it = devEditing.item; it.val = devEditing.draft;
-    it.status = devEditing.isNew ? 'added' : (valEqual(it.val, it.orig) ? 'unchanged' : 'modified');
-    renderDevPanel();
+  function toggleDevEdit(cat, it) {
+    if (it.status === 'removed') { it.status = recomputeStatus(it); refreshDevHead(cat, it); refreshDevSecBadge(cat); devApplyAll(); return; }
+    if (it._editEl) { collapseDevEdit(it); return; }
+    it._open = true; it._draft = cloneVal(it.val);
+    it._editEl = buildDevEditForm(cat, it); it._wrap.appendChild(it._editEl);
   }
-  function devCancelEdit() {
-    if (devEditing.isNew) { var its = devEditing.cat.items, i = its.indexOf(devEditing.item); if (i >= 0) its.splice(i, 1); }
-    renderDevPanel();
+  function devApply(cat, it) { it.val = cloneVal(it._draft); it._isNew = false; it.status = recomputeStatus(it); collapseDevEdit(it); refreshDevHead(cat, it); refreshDevSecBadge(cat); devApplyAll(); }
+  function devCancel(cat, it) { collapseDevEdit(it); if (it._isNew) { var i = cat.items.indexOf(it); if (i >= 0) cat.items.splice(i, 1); if (it._wrap) it._wrap.remove(); refreshDevSecBadge(cat); } }
+  function devRestore(cat, it) { it.val = cloneVal(it.orig); it.status = 'unchanged'; collapseDevEdit(it); refreshDevHead(cat, it); refreshDevSecBadge(cat); devApplyAll(); }
+  function devRemove(cat, it) { it.status = 'removed'; collapseDevEdit(it); refreshDevHead(cat, it); refreshDevSecBadge(cat); devApplyAll(); }
+  // swipe a row left to mark removed (right to restore) — reversible, part of the diff
+  function attachDevSwipe(cat, it, head, wrap) {
+    var sx = 0, w = 0, dx = 0, tracking = false;
+    head.addEventListener('pointerdown', function (e) { if (e.target.closest('.di-edit')) return; sx = e.clientX; w = wrap.offsetWidth || 300; dx = 0; tracking = true; it._swiping = false; });
+    head.addEventListener('pointermove', function (e) { if (!tracking) return; dx = e.clientX - sx; if (Math.abs(dx) > 8) it._swiping = true; wrap.style.transform = dx < 0 ? 'translateX(' + Math.max(dx, -0.5 * w) + 'px)' : 'none'; head.classList.toggle('del-arm', -dx >= 0.4 * w); });
+    function end() {
+      if (!tracking) return; tracking = false; wrap.style.transform = 'none'; head.classList.remove('del-arm');
+      if (-dx >= 0.4 * w) { it.status = it.status === 'removed' ? recomputeStatus(it) : 'removed'; devApplyAll(); refreshDevHead(cat, it); refreshDevSecBadge(cat); }
+      else if (dx >= 0.4 * w && it.status === 'removed') { it.status = recomputeStatus(it); devApplyAll(); refreshDevHead(cat, it); refreshDevSecBadge(cat); }
+      setTimeout(function () { it._swiping = false; }, 0);
+    }
+    head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
   }
-  function devRestoreEdit() { devEditing.item.val = cloneVal(devEditing.item.orig); devEditing.item.status = 'unchanged'; renderDevPanel(); }
-  function devRemoveEdit() { devEditing.item.status = 'removed'; renderDevPanel(); }
+  function buildDevItem(cat, it) {
+    var wrap = document.createElement('div'); wrap.className = 'devitem-wrap'; it._wrap = wrap;
+    var head = document.createElement('div'); head.className = 'devitem st-' + it.status; it._head = head;
+    head.innerHTML = devItemHeadHTML(cat, it);
+    head.onclick = function () { if (it._swiping) return; toggleDevEdit(cat, it); };
+    wrap.appendChild(head); attachDevSwipe(cat, it, head, wrap);
+    return wrap;
+  }
+  function buildDevSection(cat) {
+    var sec = document.createElement('details'); sec.className = 'devsec';
+    var sum = document.createElement('summary'); cat._sum = sum; sum.innerHTML = devSecLabelHTML(cat); sec.appendChild(sum);
+    var list = document.createElement('div'); list.className = 'devlist'; cat._list = list; sec.appendChild(list);
+    itemsSorted(cat).forEach(function (it) { list.appendChild(buildDevItem(cat, it)); });
+    var add = el('button', 'devadd', '+ добави');
+    add.onclick = function () { var it = addDevItem(cat); list.insertBefore(buildDevItem(cat, it), add); refreshDevSecBadge(cat); toggleDevEdit(cat, it); };
+    list.appendChild(add);
+    return sec;
+  }
+  function renderDevModal() {
+    if (!devCats) buildDevCats();
+    var body = $('devBody'); body.innerHTML = '';
+    DEV_GROUPS.forEach(function (grp) {
+      body.appendChild(el('div', 'devgrp', grp.label));
+      grp.keys.forEach(function (k) { var cat = devCats.filter(function (c) { return c.key === k; })[0]; if (cat) body.appendChild(buildDevSection(cat)); });
+    });
+  }
+  function devApplyAllBtn() {
+    if (!devCats) return;
+    devCats.forEach(function (cat) {
+      cat.items.forEach(function (it) { if (it._open && it._draft != null) { it.val = cloneVal(it._draft); it._isNew = false; it.status = recomputeStatus(it); collapseDevEdit(it); refreshDevHead(cat, it); } });
+      refreshDevSecBadge(cat);
+    });
+    devApplyAll();
+  }
+  function openDevModal() { renderDevModal(); $('devModal').classList.remove('hidden'); }
+  function closeDevModal(force) {
+    var open = [];
+    if (devCats) devCats.forEach(function (cat) { cat.items.forEach(function (it) { if (it._open) open.push({ cat: cat, it: it }); }); });
+    if (!force && open.length) { showDevClosePrompt(open); return; }
+    $('devModal').classList.add('hidden');
+  }
+  function showDevClosePrompt(open) {
+    if ($('devClosePrompt')) return;
+    var ov = document.createElement('div'); ov.id = 'devClosePrompt'; ov.className = 'devcloseprompt';
+    ov.innerHTML = '<div class="dcp-box"><div class="dcp-txt">Има <b>' + open.length + '</b> отворени за редакция. Какво да правя с тях?</div>'
+      + '<div class="dcp-btns"><button class="btn primary" id="dcpApply">↻ Приложи всичко</button>'
+      + '<button class="btn" id="dcpDiscard">Изхвърли</button><button class="btn" id="dcpBack">Назад</button></div></div>';
+    $('devModal').querySelector('.modal').appendChild(ov);
+    $('dcpApply').onclick = function () { devApplyAllBtn(); ov.remove(); $('devModal').classList.add('hidden'); };
+    $('dcpDiscard').onclick = function () { open.forEach(function (o) { devCancel(o.cat, o.it); }); ov.remove(); $('devModal').classList.add('hidden'); };
+    $('dcpBack').onclick = function () { ov.remove(); };
+  }
   // ----- copy: only the changes, with an executable identifier -----
   function wordJSON(v) { var r = {}; ['m', 'n', 'f'].forEach(function (k) { if (v[k]) r[k] = v[k]; }); if (v.inv) r.inv = true; if (v.nsfw) r.nsfw = true; if (v.b && v.b !== '10+') r.b = v.b; return JSON.stringify(r); }
   function diffVal(cat, v) { return cat.kind === 'word' ? wordJSON(v) : JSON.stringify(v); }
@@ -4337,8 +4419,6 @@ body.modal-open{ overflow:hidden; }
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
     syncOwnerGender(); syncOwnerColor(); syncRuleset(); syncOwnerKeep();
     $('clearPanel').classList.add('hidden'); $('ownerBubble').classList.add('hidden'); $('ruleBubble').classList.add('hidden'); updateStorageInfo();
-    if (settings.dev) { renderDevPanel(); $('devPanel').classList.remove('hidden'); }
-    else $('devPanel').classList.add('hidden');
     $('settingsModal').classList.remove('hidden');
   }
   $('setupMenuBtn').onclick = openSettings;
