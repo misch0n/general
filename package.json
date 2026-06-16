@@ -6,5 +6,10 @@
   "scripts": {
     "test": "node --test"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@roamhq/wrtc": "^0.10.0",
+    "jsdom": "^29.1.1",
+    "puppeteer": "^25.1.0"
+  }
 }
