@@ -87,10 +87,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* player pills */
 .pstrip{ display:flex; gap:12px; padding:5px 16px 8px; flex-wrap:wrap; align-items:center; }   /* roomy gap so the enlarged current pill never shifts its neighbours */
-.ppill{ display:inline-flex; align-items:center; justify-content:center; min-width:46px; padding:4px 9px; border-radius:var(--gen-r-pill); font-size:11px; font-weight:700;
+.ppill{ position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:46px; padding:4px 9px; border-radius:var(--gen-r-pill); font-size:11px; font-weight:700;
   background:var(--gen-pill); color:#cfcca8; border:1px solid rgba(0,0,0,.35); letter-spacing:.5px;
   font-variant-numeric:tabular-nums; transition:transform .12s ease; }   /* background is the player's own colour; sized to hold 3 digits without resizing */
 .ppill .pdot{ width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
+/* manual net: „МАМНИК!" shame bubble under the peek marker of someone racing ahead */
+.ppill .mamnik{ position:absolute; top:calc(100% + 5px); left:50%; transform:translateX(-50%); background:#c0392b; color:#fff;
+  font-family:var(--gen-font-display); font-weight:800; font-size:9px; letter-spacing:.4px; padding:2px 7px; border-radius:8px; white-space:nowrap;
+  box-shadow:0 2px 6px rgba(0,0,0,.45); pointer-events:none; z-index:4; animation:mamnikpop .28s cubic-bezier(.2,1.5,.4,1); }
+.ppill .mamnik::before{ content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-bottom-color:#c0392b; }
+@keyframes mamnikpop{ from{ opacity:0; transform:translateX(-50%) translateY(-4px) scale(.7); } to{ opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
 .ppill.on{ transform:scale(1.22); font-weight:800; box-shadow:0 0 0 2px var(--gen-brass), 0 3px 9px rgba(0,0,0,.45); z-index:2; }   /* current player: bigger, not recoloured */
 /* a disconnected player (turns skipped): desaturated, with a fashionable pulsing amber ring */
 .ppill.mine{ text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:2px; }   /* your own board */
@@ -2012,7 +2018,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.12.0';
+  var APP_VERSION = '1.12.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -3891,10 +3897,20 @@ body.modal-open{ overflow:hidden; }
     return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1c1a0f' : '#fff';
   }
   function isMyNetPlayer(p) { return netMode && p && p.owner; }   // each device owns exactly its own seat
+  function filledCount(p) { return G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length; }
+  // manual net free-for-all: shame a player who races 2+ categories ahead of the next-fastest one
+  function isMamnik(i) {
+    if (!(netMode && manualMode) || !game) return false;
+    var others = game.players.filter(function (p, j) { return j !== i && !p.dropped; });
+    if (!others.length) return false;
+    var maxOther = Math.max.apply(null, others.map(filledCount));
+    return filledCount(game.players[i]) >= maxOther + 2;
+  }
   function pillHTML(p, i) {
     var col = p.color || 'var(--gen-pill)';
+    var mamnik = isMamnik(i) ? '<span class="mamnik">МАМНИК!</span>' : '';
     return '<button class="ppill' + (i === game.current ? ' on' : '') + (p.dropped ? ' dropped' : '') + (isMyNetPlayer(p) ? ' mine' : '')
-      + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)" title="' + (p.dropped ? 'разпадна се' : '') + '">' + (p.dropped ? '📵' : total(p)) + '</button>';
+      + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)" title="' + (p.dropped ? 'разпадна се' : '') + '">' + (p.dropped ? '📵' : total(p)) + mamnik + '</button>';
   }
   function renderPills() {
     $('pillWrap').innerHTML = game.players.map(pillHTML).join('');
