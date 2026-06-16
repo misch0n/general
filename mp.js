@@ -94,8 +94,8 @@
   function hexRGB(hex) { var h = String(hex || '#888888').replace('#', ''); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; var n = parseInt(h, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
   function rgbHex(rgb) { function p(x) { return (x < 16 ? '0' : '') + (x & 255).toString(16); } return '#' + p(rgb[0]) + p(rgb[1]) + p(rgb[2]); }
   function genIx(g) { var i = GENDERS.indexOf(g); return i < 0 ? 0 : i; }
-  function writeMeta(w, p) { w.u8(p.id || 0); w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.u8((p.ready ? 1 : 0) | (p.isAI ? 2 : 0)); w.str(p.name, 28); }
-  function readMeta(r) { var id = r.u8(), rgb = r.bytes(3), g = r.u8(), fl = r.u8(), name = r.str(); return { id: id, color: rgbHex(rgb), gender: GENDERS[g] || 'm', ready: !!(fl & 1), isAI: !!(fl & 2), name: name }; }
+  function writeMeta(w, p) { w.u8(p.id || 0); w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.u8((p.ready ? 1 : 0) | (p.isAI ? 2 : 0) | (p.dropped ? 4 : 0)); w.str(p.name, 28); }
+  function readMeta(r) { var id = r.u8(), rgb = r.bytes(3), g = r.u8(), fl = r.u8(), name = r.str(); return { id: id, color: rgbHex(rgb), gender: GENDERS[g] || 'm', ready: !!(fl & 1), isAI: !!(fl & 2), dropped: !!(fl & 4), name: name }; }
   // a player's self-edit in the lobby (sender identifies the player; can't edit others)
   function packMetaUpd(meta) { var w = new Writer(); w.bytes(hexRGB(meta.color)); w.u8(genIx(meta.gender)); w.str(meta.name, 28); return w.out(); }
   function unpackMetaUpd(p) { var r = new Reader(p); return { color: rgbHex(r.bytes(3)), gender: GENDERS[r.u8()] || 'm', name: r.str() }; }
@@ -181,7 +181,9 @@
     this.activeId = null;
     this.myId = this.isHost ? HOST_ID : null;
     this.sessionId = this.isHost ? (1 + Math.floor(this.rand() * 250)) : null;
-    this.eph = this.isHost ? 0 : (1 + Math.floor(this.rand() * 60000));
+    // eph identifies a client across reconnects: a returning player reuses its eph so the
+    // host recognises it (clears its dropped flag + catches it up) rather than seating a new boец.
+    this.eph = this.isHost ? 0 : (opts.eph || (1 + Math.floor(this.rand() * 60000)));
     this._lastBytes = null;            // immediate-dup filter
     this._timers = {};
     this._wantJoin = false;
@@ -381,7 +383,15 @@
     })();
   };
   Session.prototype._filled = function (id) { return Object.keys(this.scores[id] || {}).length; };
-  Session.prototype._allDone = function () { var self = this; return this.order.every(function (id) { return self._filled(id) >= self.rounds; }); };
+  // a seat still owes turns unless its board is full, or it has dropped and isn't AI-driven
+  // (a dropped player is skipped so the rest can finish; an AI takeover keeps playing the seat)
+  Session.prototype._needsTurn = function (id) {
+    if (this._filled(id) >= this.rounds) return false;
+    var e = this._byId(id);
+    if (e && e.dropped && !this.isAIControlled(id)) return false;
+    return true;
+  };
+  Session.prototype._allDone = function () { var self = this; return this.order.every(function (id) { return !self._needsTurn(id); }); };
 
   // ---------- applying a move (host authoritative) ----------
   Session.prototype._applyMove = function (mv) {
@@ -426,6 +436,19 @@
     // resuming on a stalled seat: re-grant so the AI gets prompted immediately
     if (on && this.state === 'IN_GAME' && this.activeId === id) { if (this.cb.onTurn) this.cb.onTurn(id, false); }
   };
+  // host: flag/unflag a player as dropped (connection lost). A dropped seat is skipped in the
+  // rotation; if it drops while holding the turn, advance immediately so nobody waits on it.
+  Session.prototype.markDropped = function (id, on) {
+    if (!this.isHost || id === HOST_ID) return;
+    var e = this._byId(id); if (!e || !!e.dropped === !!on) return;
+    e.dropped = !!on;
+    this._send(T.ROSTER, packRoster(this.roster));
+    if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+    if (this.cb.onDrop) this.cb.onDrop(id, !!on);
+    if (on && this.state === 'IN_GAME' && this.activeId === id && !this.isAIControlled(id)) {
+      this._ct(this._timers.move); this._advance();   // skip the seat that just vanished mid-turn
+    }
+  };
   Session.prototype.submitMoveFor = function (playerId, mv) {
     if (!this.isHost || this.state !== 'IN_GAME' || playerId !== this.activeId) return false;
     mv.playerId = playerId; mv.ackVersion = this.version;
@@ -434,7 +457,8 @@
   };
   Session.prototype._advance = function () {
     if (this._allDone()) { this.state = 'GAME_OVER'; this._send(T.END, new Uint8Array(0)); if (this.cb.onEnd) this.cb.onEnd(); return; }
-    do { this.turnIx++; } while (this._filled(this.order[this.turnIx % this.order.length]) >= this.rounds);
+    var n = this.order.length, guard = 0;
+    do { this.turnIx++; } while (++guard <= n && !this._needsTurn(this.order[this.turnIx % n]));   // skip full + dropped seats
     this._grant();
   };
 
@@ -451,6 +475,12 @@
     this._status('🔊 Искам да вляза…');
     var self = this, backoff = this.p.joinRetry + Math.floor(this.rand() * this.p.joinRetry); // ALOHA backoff
     this._timers.join = this._st(function () { self._sendJoin(); }, backoff);
+  };
+  // client: re-announce after a transport reconnect so the host clears our dropped flag and
+  // catches us up. Works mid-game (same eph identifies us); the host answers ACK+ROSTER+STATE.
+  Session.prototype.rejoin = function () {
+    if (this.isHost) return;
+    this._send(T.JOIN_REQ, packJoinReq(this.eph, this.me));
   };
 
   // ---------- receive / dispatch ----------
@@ -480,6 +510,23 @@
       }
       this._send(T.JOIN_ACK, packJoinAck(jr.eph, existing.id));
       this._send(T.ROSTER, packRoster(this.roster));
+    } else if (pkt.type === T.JOIN_REQ && (this.state === 'IN_GAME' || this.state === 'PREP')) {
+      // a known player returning after a drop: re-admit by eph, clear dropped, catch them up.
+      var rj = unpackJoinReq(pkt.payload), back = null;
+      this.roster.forEach(function (p) { if (p.eph === rj.eph) back = p; });
+      if (back) {
+        var was = back.dropped; back.dropped = false;
+        this._send(T.JOIN_ACK, packJoinAck(rj.eph, back.id));
+        this._send(T.ROSTER, packRoster(this.roster));
+        if (this.state === 'IN_GAME') {
+          this._send(T.START, packStart(this.version, this.activeId, this.roster));   // rebuild their board (idempotent for others)
+          this._send(T.STATE, packStateSnapshot(this.version, this.scores));          // fill in everything they missed
+        } else {
+          this._send(T.PREP, packPrep(this.settingsBits));
+        }
+        if (was && this.cb.onDrop) this.cb.onDrop(back.id, false);
+        if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+      }
     } else if (pkt.type === T.MOVE && this.state === 'IN_GAME') {
       var mv = unpackMove(pkt.payload);
       if (mv.playerId === this.activeId && (this.scores[mv.playerId] || {})[mv.category] == null) {
@@ -534,9 +581,12 @@
       if (this.cb.onTakeover) this.cb.onTakeover(ac.id, ac.on);
     } else if (pkt.type === T.START) {
       var st = unpackStart(pkt.payload);
-      this.roster = st.players; this.version = st.version; this.order = st.players.map(function (p) { return p.id; });
-      this.scores = {}; this.state = 'IN_GAME';
-      if (this.cb.onStart) this.cb.onStart(this.roster.slice(), this.order.slice());
+      var fresh = (this.state !== 'IN_GAME');         // re-broadcast START (a peer reconnecting) must NOT wipe a live board
+      this.roster = st.players; this.order = st.players.map(function (p) { return p.id; });
+      if (fresh) {
+        this.version = st.version; this.scores = {}; this.state = 'IN_GAME';
+        if (this.cb.onStart) this.cb.onStart(this.roster.slice(), this.order.slice());
+      } else if (this.cb.onRoster) { this.cb.onRoster(this.roster.slice()); }   // already playing: just refresh the roster
       this._applyActive(st.firstId);
     } else if (pkt.type === T.GRANT) {
       var g = unpackGrant(pkt.payload);

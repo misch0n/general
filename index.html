@@ -92,6 +92,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   font-variant-numeric:tabular-nums; transition:transform .12s ease; }   /* background is the player's own colour; sized to hold 3 digits without resizing */
 .ppill .pdot{ width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
 .ppill.on{ transform:scale(1.22); font-weight:800; box-shadow:0 0 0 2px var(--gen-brass), 0 3px 9px rgba(0,0,0,.45); z-index:2; }   /* current player: bigger, not recoloured */
+.ppill.dropped{ opacity:.4; filter:grayscale(.8); }   /* a disconnected player (turns skipped) */
 
 /* ===== scoreboard ===== */
 .sheet{ padding:10px 16px 2px; display:flex; flex-direction:column; gap:4px; }
@@ -449,10 +450,15 @@ body.modal-open{ overflow:hidden; }
 .wrcap-hd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:6px; }
 .devrow-disabled{ opacity:.4; }
 .devrow-disabled .toggle{ pointer-events:none; }
+.menunetcode{ margin:0 0 12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:center; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; }
+.menunetcode .netcode-show{ display:block; margin-top:4px; font-size:26px; letter-spacing:6px; color:var(--gen-brass-bright); }
+.menunetcode .mnc-hint{ margin-top:6px; font-size:10px; color:var(--gen-muted); text-transform:none; letter-spacing:0; }
 .netp{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line);
   font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:13px; }
 .netp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
 .netp b{ color:var(--gen-brass-bright); }
+.netp.dropped{ opacity:.5; }
+.netp .netdrop{ font-size:11px; color:#c0392b; }
 /* lobby preparation */
 .netprep-hd{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; font-size:11px; color:var(--gen-brass); margin:4px 0 8px; }
 .netmecard{ padding:11px; border-radius:10px; border:1px solid var(--gen-brass-stroke); background:rgba(0,0,0,.22); margin-bottom:10px; }
@@ -659,6 +665,7 @@ body.modal-open{ overflow:hidden; }
 .rankrow{ cursor:pointer; }
 .rankrow.picked{ box-shadow:inset 0 0 0 2px var(--gen-brass); }
 .rankrow.nodata{ cursor:default; }
+.rankrow.excluded{ opacity:.45; filter:grayscale(.7); }   /* dropped/incomplete: out of the ranking */
 .rankrow .persub{ font-family:var(--gen-font-body); font-weight:500; text-transform:none; letter-spacing:0; font-size:10px; color:var(--gen-brass); }
 /* tap affordance: a chevron that points down when the player's report is open */
 .rankrow .rkcaret{ flex:none; width:10px; height:10px; margin-left:2px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted);
@@ -1489,6 +1496,7 @@ body.modal-open{ overflow:hidden; }
 <div id="menuModal" class="overlay hidden">
   <div class="modal" style="max-width:300px">
     <h2 style="text-align:center">Щаб</h2>
+    <div id="menuNetCode" class="menunetcode hidden"></div>
     <div id="menuAiTk" class="aitk hidden"></div>
     <div class="setup-actions" style="flex-direction:column">
       <button id="menuHowto" class="btn">📖 Правила</button>
@@ -1886,7 +1894,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.4.2';
+  var APP_VERSION = '1.5.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2398,8 +2406,8 @@ body.modal-open{ overflow:hidden; }
   function renderNetRoster() {
     if (!net) return;
     $('netRoster').innerHTML = net.roster.map(function (m) {
-      return '<div class="netp"><span class="netdot" style="background:' + m.color + '"></span>' + esc(m.name)
-        + (m.id === localPid ? ' <b>(ти)</b>' : '') + (m.id === MP.HOST_ID ? ' · старшина' : '') + '</div>';
+      return '<div class="netp' + (m.dropped ? ' dropped' : '') + '"><span class="netdot" style="background:' + m.color + '"></span>' + esc(m.name)
+        + (m.id === localPid ? ' <b>(ти)</b>' : '') + (m.id === MP.HOST_ID ? ' · старшина' : '') + (m.dropped ? ' <span class="netdrop">📵 разпадна се</span>' : '') + '</div>';
     }).join('');
   }
   function netCallbacks() {
@@ -2417,10 +2425,44 @@ body.modal-open{ overflow:hidden; }
       onStart: function (roster, order) { stopFlavour(); startNetGame(roster, order); },
       onTurn: function (activeId) { netSetTurn(activeId); },
       onMove: function (mv) { netApplyRemote(mv); },
+      onResync: function (scores) { netApplySnapshot(scores); },     // catching up after a reconnect
       onTakeover: function () { if (netMode) { renderAiTakeover(); renderAll && game && renderAll(); } },
+      onDrop: function (id, dropped) { netOnDrop(id, dropped); },
       onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
     };
+  }
+  // mirror the host's dropped flags onto the live players, refresh the board, and surface it
+  function netOnDrop(id, dropped) {
+    if (!netMode || !game) { if (netPhase) renderNetRoster(); return; }
+    syncNetDropped();
+    var seat = netOrder.indexOf(id), pl = seat >= 0 ? game.players[seat] : null;
+    if (pl) netNotice((dropped ? '📵 ' : '✅ ') + esc(pl.name) + (dropped ? ' се разпадна — прескачам го' : ' се върна в битката'));
+    renderAll();
+  }
+  // a transient in-game notice (reuses the roast bubble chrome) for drop/reconnect events
+  function netNotice(html) {
+    var box = $('roast'); if (!box) return;
+    box.className = 'roast show order';
+    box.innerHTML = '<span class="bubble">' + html + '</span>';
+    box.querySelector('.bubble').onclick = clearRoast;
+    clearTimeout(roastTimer); roastTimer = setTimeout(clearRoast, 3500);
+  }
+  // copy roster.dropped → game.players[].dropped (matched by netId)
+  function syncNetDropped() {
+    if (!game || !net) return;
+    var byId = {}; net.roster.forEach(function (m) { byId[m.id] = m; });
+    game.players.forEach(function (p) { if (p.netId != null && byId[p.netId]) p.dropped = !!byId[p.netId].dropped; });
+  }
+  // apply a host snapshot (id → {catIdx: score}) onto the local board after a reconnect
+  function netApplySnapshot(scores) {
+    if (!netMode || !game) return;
+    Object.keys(scores).forEach(function (idStr) {
+      var seat = netOrder.indexOf(+idStr); if (seat < 0) return;
+      var pl = game.players[seat], cells = scores[idStr];
+      Object.keys(cells).forEach(function (cIx) { var key = G.CATEGORIES[+cIx] && G.CATEGORIES[+cIx].key; if (key && !G.isCategoryFilled(pl, key)) pl.scores[key] = cells[cIx]; });
+    });
+    syncNetDropped(); renderAll();
   }
   // ---------- lobby preparation UI ----------
   function netShow(phase) {
@@ -2572,9 +2614,14 @@ body.modal-open{ overflow:hidden; }
   function newSession(isHost) {
     return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
   }
-  function newSessionWith(transport, isHost) {
-    return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
+  function newSessionWith(transport, isHost, eph) {
+    return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), eph: eph, minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
   }
+  // a client persists its eph (player identity) per game code, so a reconnect/reload rejoins
+  // the same seat the host already knows — rather than seating a brand-new boец.
+  function wrEphKey(code) { return 'genrl:wrtc:eph:' + code; }
+  function wrLoadEph(code) { var v = lsGet(wrEphKey(code)); v = v && parseInt(v, 10); return (v && v > 0 && v < 65535) ? v : null; }
+  function wrSaveEph(code, eph) { try { lsSet(wrEphKey(code), String(eph)); } catch (e) {} }
   // ===================================================== WebRTC transport (PeerJS) ==============
   // A pluggable MP.Session transport over WebRTC data channels. PeerJS provides the public
   // signalling cloud (no account/server needed) just for the handshake; gameplay is P2P.
@@ -2622,6 +2669,7 @@ body.modal-open{ overflow:hidden; }
     this.isHost = !!opts.isHost; this.code = opts.code;
     this.peer = null; this.conns = []; this._rx = null;
     this.onPeers = opts.onPeers || function () {}; this.onLost = opts.onLost || function () {};
+    this.onReup = opts.onReup || function () {};   // client: a dropped data channel was re-established
     this.maxPayload = 60000;
   }
   PeerBus.prototype.onReceive = function (cb) { this._rx = cb; };   // MP.Session transport interface
@@ -2636,10 +2684,17 @@ body.modal-open{ overflow:hidden; }
     wrlog('conn-add', { peer: conn.peer, n: this.conns.length });
     conn.on('data', function (data) {
       var b = data instanceof Uint8Array ? data : new Uint8Array(data);
+      // host: tag this connection with the player id it carries, so a close maps to a dropped seat
+      if (self.isHost) { try { var u = MP.unframe(b); if (u && u.sender > 0 && u.sender < 15) conn._pid = u.sender; } catch (e) {} }
       if (settings.webrtcDebug) wrlog('rx', wrFrame(b));
       if (self._rx) self._rx(b);
     });
-    conn.on('close', function () { wrlog('conn-close', { peer: conn.peer }); self.conns = self.conns.filter(function (c) { return c !== conn; }); self.onPeers(self.conns.length); self.onLost(conn); });
+    conn.on('close', function () {
+      wrlog('conn-close', { peer: conn.peer, pid: conn._pid });
+      self.conns = self.conns.filter(function (c) { return c !== conn; });
+      self.onPeers(self.conns.length); self.onLost(conn);
+      if (!self.isHost) self._scheduleRedial();   // client: lost the host — try to get back in
+    });
     conn.on('error', function (e) { wrlog('conn-error', wrPeerErr(e)); });
     self.onPeers(self.conns.length);
   };
@@ -2655,6 +2710,32 @@ body.modal-open{ overflow:hidden; }
       wrlog('peer-reconnect', { attempt: self._recon });
       try { self.peer.reconnect(); } catch (e) { wrlog('reconnect-error', { message: e.message }); }
     }, Math.min(800 * self._recon, 4000));
+  };
+  // client: (re)establish the data channel to the host. `first` carries the initial start()
+  // resolve/reject; a redial (first=null) instead fires onReup so the session can re-announce.
+  PeerBus.prototype._dialHost = function (first) {
+    var self = this;
+    if (self._stopped || self._dialing || self.conns.length || !self.peer || self.peer.destroyed) return;
+    self._dialing = true;
+    wrlog('conn-attempt', { target: PEER_PREFIX + self.code, redial: !first });
+    var conn, settled = false;
+    var settle = function (okFn) { if (settled) return; settled = true; self._dialing = false; okFn(); };
+    try { conn = self.peer.connect(PEER_PREFIX + self.code, { reliable: true }); }
+    catch (e) { self._dialing = false; if (first) first.fail(e); else self._scheduleRedial(); return; }
+    var t = setTimeout(function () { settle(function () { wrlog('conn-timeout', { redial: !first }); if (first) first.fail(new Error('timeout')); else self._scheduleRedial(); }); }, 20000);
+    conn.on('open', function () { clearTimeout(t); settle(function () {
+      wrlog('client-conn-open', { peer: conn.peer, redial: !first }); self._redialN = 0; self._addConn(conn);
+      if (first) first.ok(); else self.onReup();
+    }); });
+    conn.on('error', function (e) { clearTimeout(t); settle(function () { wrlog('client-conn-error', wrPeerErr(e)); if (first) first.fail(e); else self._scheduleRedial(); }); });
+  };
+  PeerBus.prototype._scheduleRedial = function () {
+    var self = this;
+    if (self._stopped || self.conns.length) return;
+    self._redialN = (self._redialN || 0) + 1;
+    if (self._redialN > 20) { wrlog('redial-giveup', { attempts: self._redialN }); return; }
+    wrlog('redial-schedule', { attempt: self._redialN });
+    setTimeout(function () { if (!self._stopped && !self.conns.length) self._dialHost(null); }, Math.min(1000 * self._redialN, 5000));
   };
   PeerBus.prototype.start = function () {
     var self = this;
@@ -2678,15 +2759,11 @@ body.modal-open{ overflow:hidden; }
         self.peer = new window.Peer();
         self.peer.on('open', function (id) {
           wrlog('peer-open', { id: id }); self._recon = 0;
-          wrlog('conn-attempt', { target: PEER_PREFIX + self.code });
-          var conn = self.peer.connect(PEER_PREFIX + self.code, { reliable: true });
-          var t = setTimeout(function () { wrlog('conn-timeout', {}); fail(new Error('timeout')); }, 20000);
-          conn.on('open', function () { wrlog('client-conn-open', { peer: conn.peer }); clearTimeout(t); self._addConn(conn); if (!done) { done = true; resolve(); } });
-          conn.on('error', function (e) { wrlog('client-conn-error', wrPeerErr(e)); clearTimeout(t); fail(e); });
-          conn.on('close', function () { wrlog('client-conn-close', {}); });
+          if (!self._opened) { self._opened = true; self._dialHost({ ok: function () { if (!done) { done = true; resolve(); } }, fail: function (e) { fail(e); } }); }
+          else if (!self.conns.length) self._dialHost(null);   // broker came back mid-session: re-grab the host
         });
         self.peer.on('disconnected', function () { wrlog('peer-disconnected', {}); self._reconnect(); });
-        self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); fail(e); });
+        self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); if (!done) fail(e); });
       }
     });
   };
@@ -2765,18 +2842,32 @@ body.modal-open{ overflow:hidden; }
     $('netCodeJoin').disabled = true; netChooseMsg('Свързвам се с код ' + code + '…');
     loadPeerJS(function (ok) {
       if (!ok) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
-      netBus = new PeerBus({ isHost: false, code: code, onLost: function () { netClientLost(); } });
+      netBus = new PeerBus({ isHost: false, code: code,
+        onLost: function () { netClientLost(); },
+        onReup: function () { wrlog('reup', {}); if (net) net.rejoin(); netSay('Връзката се възстанови — наваксвам…'); } });
       netBus.start().then(function () {
-        net = newSessionWith(netBus, false);
+        var savedEph = wrLoadEph(code);                 // reuse our identity if we've played this game before
+        net = newSessionWith(netBus, false, savedEph || undefined);
+        wrSaveEph(code, net.eph);
         $('netJoinCode').classList.add('hidden'); $('netCodeJoin').disabled = false; netChooseMsg('');
         netShow('scan'); $('netToPrep').classList.add('hidden');
         net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
       }).catch(function (e) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Връзката се провали: ' + ((e && (e.type || e.message)) || 'кодът не е намерен') + '. Провери кода и опитай пак.'); netBus = null; });
     });
   };
-  // connection loss handlers (full drop/reconnect handling lands in a later slice)
-  function netHostLost(conn) { if (netMode) setFlavour($('netStatus'), 'lobbyWait'); }
-  function netClientLost() { if (netMode) netSay('Връзката с хоста прекъсна.'); else netSay('Връзката прекъсна. Опитай пак.'); }
+  // ---- connection-loss handling ----
+  // host: a closed data channel maps (via the tagged connection) to a player seat → mark it dropped
+  function netHostLost(conn) {
+    if (!net || !net.isHost) return;
+    var pid = conn && conn._pid; if (pid == null) return;
+    // ignore if another live connection already carries this player (an overlapping reconnect)
+    if (netBus && netBus.conns.some(function (c) { return c !== conn && c.open && c._pid === pid; })) return;
+    net.markDropped(pid, true);
+  }
+  function netClientLost() {
+    if (netMode) netSay('Връзката с хоста прекъсна — опитвам да се върна…');
+    else netChooseMsg('⚠ Връзката прекъсна. Опитай пак.');
+  }
   // host closes the scan and moves everyone into preparation
   $('netToPrep').onclick = function () { if (net && net.isHost) net.startPrep(settingsBits()); };
   // host adds an AI seat (generated boец); clients can't
@@ -2829,7 +2920,7 @@ body.modal-open{ overflow:hidden; }
     netOrder = order.slice();
     var players = roster.map(function (m) {
       var pl = G.createPlayer(m.name, m.color, !!m.isAI);       // humans play on their own device; AI seats are host-driven
-      pl.gender = m.gender; pl.bet = ''; pl.bonus = 0; pl.netId = m.id;
+      pl.gender = m.gender; pl.bet = ''; pl.bonus = 0; pl.netId = m.id; pl.dropped = !!m.dropped;
       if (!m.isAI) pl.selectKeep = !!settings.selectKeep;       // each device's human plays in its own flavour
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       pl.owner = (m.id === localPid);                           // ★ each device owns ITS OWN player (history attribution)
@@ -2895,6 +2986,13 @@ body.modal-open{ overflow:hidden; }
     box.querySelectorAll('.toggle[data-id]').forEach(function (t) {
       t.onclick = function () { var id = +t.getAttribute('data-id'); net.setTakeover(id, !net.takeover[id]); renderAiTakeover(); };
     });
+  }
+  // host (WebRTC): show the game code in-game so a dropped player can read it and rejoin
+  function renderMenuNetCode() {
+    var box = $('menuNetCode'); if (!box) return;
+    if (!netMode || !net || !net.isHost || netKind !== 'webrtc' || !wrCode) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+    box.innerHTML = 'Код за връщане в играта<br><b class="netcode-show">' + wrCode + '</b><div class="mnc-hint">Разпаднал се боец може да влезе пак с този код.</div>';
   }
 
   loadSettings();   // restore censor + owner name/toggle before the first muster
@@ -3143,7 +3241,7 @@ body.modal-open{ overflow:hidden; }
   }
   function pillHTML(p, i) {
     var col = p.color || 'var(--gen-pill)';
-    return '<button class="ppill' + (i === game.current ? ' on' : '') + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)">' + total(p) + '</button>';
+    return '<button class="ppill' + (i === game.current ? ' on' : '') + (p.dropped ? ' dropped' : '') + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)" title="' + (p.dropped ? 'разпадна се' : '') + '">' + (p.dropped ? '📵' : total(p)) + '</button>';
   }
   function renderPills() {
     $('pillWrap').innerHTML = game.players.map(pillHTML).join('');
@@ -4333,6 +4431,7 @@ body.modal-open{ overflow:hidden; }
     ['comboTip', 'fxBubble', 'guideTip'].forEach(function (id) { $(id).classList.add('hidden'); });
     clearRoast();
     renderAiTakeover();   // host: per-player AI-takeover controls (network game only)
+    renderMenuNetCode();  // host: the game code so a dropped boец can rejoin
     $('menuModal').classList.remove('hidden');
   };
   $('menuClose').onclick = function () { $('menuModal').classList.add('hidden'); };
@@ -4758,8 +4857,11 @@ body.modal-open{ overflow:hidden; }
   }
   function endGame() {
     if (!viewingHistory) { saveCurrentGame(); clearResume(); }   // archive (each device flags ITS player as owner) + drop resume
-    var top = Math.max.apply(null, game.players.map(total)); // ranking includes the bonus
-    var tied = game.players.filter(function (p) { return total(p) === top; });
+    // dropped/incomplete players can't win or place — rank only those who finished
+    var pool = game.players.filter(function (p) { return !isExcluded(p); });
+    if (!pool.length) pool = game.players.slice();
+    var top = Math.max.apply(null, pool.map(total)); // ranking includes the bonus
+    var tied = pool.filter(function (p) { return total(p) === top; });
     // network games skip the local dice tie-break (no shared RNG); pick a top scorer
     if (tied.length > 1 && !netMode) startTieBreak(tied, showGameOver); else showGameOver(tied[0]);
   }
@@ -4805,13 +4907,20 @@ body.modal-open{ overflow:hidden; }
   function sumExp() { return !!(game && game.ruleset === 'experimental'); }
   function sumCats() { return sumExp() ? G.CATEGORIES_EXP : G.CATEGORIES; }
   function sumLabel(k) { return catLabelOf(k, sumExp() ? 'experimental' : 'standard'); }
+  // a network player who dropped and never finished their board: excluded from rankings/stats,
+  // shown greyed at the very bottom of the standings with no per-player summary.
+  function netComplete(p) { var cs = sumCats(); for (var i = 0; i < cs.length; i++) if (!G.isCategoryFilled(p, cs[i].key)) return false; return true; }
+  function isExcluded(p) { return netMode && !netComplete(p); }
 
   function showGameOver(winner) {
-    var others = game.players.filter(function (p) { return p !== winner; })
+    // completed contenders ranked by points; dropped/incomplete players appended, greyed, at the bottom
+    var others = game.players.filter(function (p) { return p !== winner && !isExcluded(p); })
       .sort(function (a, b) { return total(b) - total(a); });
-    var ordered = [winner].concat(others);                // standings: by points only
+    var excluded = game.players.filter(function (p) { return p !== winner && isExcluded(p); });   // never duplicate the winner
+    var ordered = [winner].concat(others).concat(excluded);
     var analysisByPlayer = {};
     game.players.forEach(function (p, idx) {
+      if (isExcluded(p)) { analysisByPlayer[idx] = null; return; }    // no summary for a dropped/incomplete boец
       // manual games are analysed too — category decisions only (dice rolls unseen)
       var ready = sumExp() ? exactReady : evReady;
       analysisByPlayer[idx] = (ready && moveLog[idx] && moveLog[idx].length)
@@ -4924,7 +5033,9 @@ body.modal-open{ overflow:hidden; }
   // ---- §1 shared award metadata: points winner, skill leader, luck champ, category board ----
   function computeSummaryMeta() {
     var players = game.players, ana = summary.ana, pts = players.map(function (p) { return total(p); });
-    var winIdx = 0; for (var i = 1; i < players.length; i++) if (pts[i] > pts[winIdx]) winIdx = i;
+    var live = players.map(function (p) { return !isExcluded(p); }), liveN = live.filter(Boolean).length || players.length;
+    var winIdx = -1; for (var i = 0; i < players.length; i++) if (live[i] && (winIdx < 0 || pts[i] > pts[winIdx])) winIdx = i;
+    if (winIdx < 0) winIdx = 0;
     // skill leader = fewest POINTS lost to suboptimal decisions (EV-skill, higher = better),
     // ties broken by optimal-decision %. This is the SAME quantity the margin split (умение)
     // uses, so the 🎯 badge, the verdict and the headline can never disagree (mistakes are
@@ -4948,6 +5059,7 @@ body.modal-open{ overflow:hidden; }
     var board = sumCats().map(function (c) {
       var hit = 0, recVal = -1, recPi = -1, recTies = 0;
       players.forEach(function (p, i) {
+        if (!live[i]) return;                        // dropped/incomplete players don't count toward records
         var v = p.scores[c.key];
         if (typeof v !== 'number') return;
         if (v > 0) hit++;
@@ -4955,7 +5067,7 @@ body.modal-open{ overflow:hidden; }
         else if (v === recVal && v > 0) recTies++;
       });
       var holder = (recVal > 0 && recTies === 1 && !FIXED_VALUE_CATS[c.key]) ? recPi : -1;
-      return { key: c.key, label: c.label, hit: hit, n: players.length, recVal: recVal, recPi: holder };
+      return { key: c.key, label: c.label, hit: hit, n: liveN, recVal: recVal, recPi: holder };
     });
     var recCount = players.map(function () { return 0; });
     board.forEach(function (b) { if (b.recPi >= 0) recCount[b.recPi]++; });
@@ -5090,12 +5202,17 @@ body.modal-open{ overflow:hidden; }
 
     // rows are collapsed by default; the tapped player's full report is injected
     // right after their own row (so details sit *between* players)
+    var contenderN = rows.filter(function (p) { return !isExcluded(p); }).length || n, rankPos = 0;
     $('ranks').innerHTML = rows.map(function (p, i) {
-      var pi = idx(p), a = ana[pi], expanded = pi === summary.sel, sub = '', val;
+      var pi = idx(p), a = ana[pi], excl = isExcluded(p), expanded = pi === summary.sel, sub = '', val;
       // each tab ranks independently: the rank TITLE is assigned by the player's POSITION
-      // in THIS tab's sequence — top row → Генерал, then the next lower title, and so on
-      var badge = G.rankForPlacement(i, n);
-      if (tab === 'skill') {
+      // in THIS tab's sequence — top row → Генерал, then the next lower title, and so on.
+      // dropped/incomplete players get no title and sit at the bottom, outside the ranking.
+      var badge = excl ? '✕' : G.rankForPlacement(rankPos++, contenderN);
+      if (excl) {
+        val = '📵';
+        sub = '<div class="persub">разпадна се — извън класирането</div>';
+      } else if (tab === 'skill') {
         val = a ? Math.round(a.accuracy * 100) + '%' : '–';
       } else if (tab === 'luck') {
         var lk = a && typeof a.luck === 'number' && !a.manual ? Math.round(a.luck) : null;
@@ -5110,12 +5227,12 @@ body.modal-open{ overflow:hidden; }
       }
       // the colour-coded rank title leads the row; the player's name follows (names are
       // crucial to read a ranking), then the metric value for this tab
-      var row = '<div class="rankrow' + (i === 0 ? ' first' : '') + (expanded ? ' picked' : '') + (a ? '' : ' nodata') + '" data-pi="' + pi + '">'
+      var row = '<div class="rankrow' + (i === 0 && !excl ? ' first' : '') + (expanded ? ' picked' : '') + (a && !excl ? '' : ' nodata') + (excl ? ' excluded' : '') + '" data-pi="' + pi + '">'
         + '<span class="rkbadge" style="color:' + p.color + ';border-color:' + p.color + '">' + esc(badge) + '</span>'
         + '<span class="nm">' + esc(p.name) + sub + '</span>'
         + '<span class="tt">' + val + '</span>'
-        + (a ? '<span class="rkcaret' + (expanded ? ' open' : '') + '"></span>' : '') + '</div>';
-      if (expanded && a) row += '<div class="evinline">' + renderReport(pi) + '</div>';
+        + (a && !excl ? '<span class="rkcaret' + (expanded ? ' open' : '') + '"></span>' : '') + '</div>';
+      if (expanded && a && !excl) row += '<div class="evinline">' + renderReport(pi) + '</div>';
       return row;
     }).join('');
     $('ranks').querySelectorAll('.rankrow').forEach(function (r) {

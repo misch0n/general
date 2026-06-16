@@ -18,21 +18,24 @@ var noTimers = { setTimeout: function () { return 0; }, clearTimeout: function (
 // (a client's conn list = [host]; the host's conn list = [every client]). ----
 function StarBus() { this.host = null; this.clients = []; this.q = []; }
 StarBus.prototype.transport = function (isHost) {
-  var bus = this, node = { cb: null, isHost: isHost };
+  var bus = this, node = { cb: null, isHost: isHost, down: false };
   node.tp = {
     maxPayload: 60000,
-    send: function (bytes) { bus.q.push({ from: node, bytes: bytes }); return Promise.resolve(); },
+    send: function (bytes) { if (!node.down) bus.q.push({ from: node, bytes: bytes }); return Promise.resolve(); },
     onReceive: function (cb) { node.cb = cb; },
+    __node: node,
   };
   if (isHost) bus.host = node; else bus.clients.push(node);
   return node.tp;
 };
+StarBus.prototype.drop = function (tp) { tp.__node.down = true; };          // simulate a vanished client
 StarBus.prototype.drain = function () {
   var bus = this, guard = 0;
   while (this.q.length && guard++ < 100000) {
     var m = this.q.shift();
-    if (m.from.isHost) {                                   // host → every client
-      this.clients.forEach(function (n) { if (n.cb) n.cb(m.bytes); });
+    if (m.from.down) continue;
+    if (m.from.isHost) {                                   // host → every (live) client
+      this.clients.forEach(function (n) { if (n.cb && !n.down) n.cb(m.bytes); });
     } else if (bus.host && bus.host.cb) {                  // client → host only
       bus.host.cb(m.bytes);
     }
@@ -122,4 +125,97 @@ test('star topology: a client move propagates to the other client only via the h
     }
   }
   assert.ok(moved, 'a client took at least one turn');
+});
+
+test('drop: a vanished client is skipped, the rest finish, its board stays incomplete', function () {
+  var bus = new StarBus();
+  var ended = {};
+  function mk(isHost, me) {
+    return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onEnd: function () { ended[me.name] = true; } } });
+  }
+  var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' });
+  var c1tp = bus.transport(false);
+  var c1 = new MP.Session({ transport: c1tp, isHost: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  var c2 = mk(false, { name: 'B', color: '#5566ff', gender: 'f' });
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  host.startGame(); bus.drain();
+  var c1id = c1.myId;
+
+  // play 3 full rounds normally
+  var nodes = [host, c1, c2];
+  function step() { var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0]; a.submitMove({ category: nextCat(a, a.myId), score: 5, rolls: [[1, 2, 3, 4, 5]], keeps: [] }); bus.drain(); }
+  for (var i = 0; i < 9 && host.state === 'IN_GAME'; i++) step();
+
+  // c1 vanishes; host marks it dropped
+  bus.drop(c1tp); host.markDropped(c1id, true); bus.drain();
+  assert.strictEqual(host._byId(c1id).dropped, true, 'host flagged the dropped seat');
+  assert.strictEqual(c2.roster.find(function (p) { return p.id === c1id; }).dropped, true, 'c2 sees it greyed');
+
+  // host + c2 keep playing to the end — c1 must never be granted again
+  var guard = 0;
+  while (host.state === 'IN_GAME' && guard++ < 5000) {
+    assert.notStrictEqual(host.activeId, c1id, 'dropped seat is never granted a turn');
+    var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0];
+    a.submitMove({ category: nextCat(a, a.myId), score: 5, rolls: [[1, 2, 3, 4, 5]], keeps: [] });
+    bus.drain();
+  }
+  assert.ok(ended['H'] && ended['B'], 'the connected players finished the game');
+  assert.strictEqual(host._filled(host.myId), General.CATEGORIES.length, 'host board complete');
+  assert.ok(host._filled(c1id) < General.CATEGORIES.length, 'dropped board left incomplete');
+});
+
+test('reconnect: a dropped player rejoins by eph, catches up, and finishes', function () {
+  var bus = new StarBus();
+  function mk(isHost, me, extra) {
+    var o = { transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} };
+    for (var k in (extra || {})) o[k] = extra[k];
+    return new MP.Session(o);
+  }
+  var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' });
+  var c1tp = bus.transport(false);
+  var c1 = new MP.Session({ transport: c1tp, isHost: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  var c2 = mk(false, { name: 'B', color: '#5566ff', gender: 'f' });
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  var c1eph = c1.eph, c1id = c1.myId;
+  host.startGame(); bus.drain();
+
+  var nodes = [host, c1, c2];
+  function step() { var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0]; if (!a) return; a.submitMove({ category: nextCat(a, a.myId), score: 7, rolls: [[1, 2, 3, 4, 5]], keeps: [] }); bus.drain(); }
+  for (var i = 0; i < 6; i++) step();
+
+  // c1 drops; host skips it for a few rounds
+  bus.drop(c1tp); host.markDropped(c1id, true); bus.drain();
+  var missed = 0;
+  for (var j = 0; j < 6 && host.state === 'IN_GAME'; j++) { if (host.activeId === host.myId || host.activeId === c2.myId) { step(); missed++; } }
+  assert.ok(host._filled(c1id) < host._filled(host.myId), 'dropped player fell behind while away');
+
+  // c1 returns: a NEW session reusing the SAME eph (as the app does from stored state)
+  var r1tp = bus.transport(false);
+  var rejoined = { start: false };
+  var r1 = new MP.Session({ transport: r1tp, isHost: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, eph: c1eph,
+    setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+    callbacks: { onStart: function () { rejoined.start = true; } } });
+  r1.requestJoin(); bus.drain();
+  assert.strictEqual(r1.myId, c1id, 'host re-admitted the returning player under its old id');
+  assert.strictEqual(host._byId(c1id).dropped, false, 'host cleared the dropped flag');
+  assert.ok(rejoined.start, 'returning client rebuilt its game board');
+  // the snapshot caught it up to the host scoreboard
+  assert.deepStrictEqual(r1.scores, host.scores, 'returning client is fully caught up');
+
+  // now everyone (including the returned player) plays to the finish
+  nodes = [host, r1, c2];
+  var guard = 0;
+  while (host.state === 'IN_GAME' && guard++ < 5000) {
+    var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0];
+    a.submitMove({ category: nextCat(a, a.myId), score: 7, rolls: [[1, 2, 3, 4, 5]], keeps: [] });
+    bus.drain();
+  }
+  assert.strictEqual(host._filled(c1id), General.CATEGORIES.length, 'returned player completed its board');
+  assert.strictEqual(host.state, 'GAME_OVER', 'game ended cleanly with everyone done');
 });
