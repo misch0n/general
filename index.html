@@ -957,7 +957,7 @@ body.modal-open{ overflow:hidden; }
 .histgame .hg-count.ex{ border-color:var(--gen-muted); color:var(--gen-muted); }
 .histgame .hg-main{ flex:1; min-width:0; }
 .histgame .hg-top{ font-family:var(--gen-font-display); font-weight:600; letter-spacing:.3px; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:5px; }
-.histgame .hg-crown{ font-size:12px; }
+.histgame .hg-crown{ flex:none; font-size:10px; line-height:1; }   /* smaller than the title, vertically centred on the row */
 .histgame .hg-skip{ font-size:12px; color:var(--gen-muted); }
 .histgame .hg-sub{ font-size:10px; color:var(--gen-muted); margin-top:2px; }
 .histgame .hg-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
@@ -5907,9 +5907,9 @@ body.modal-open{ overflow:hidden; }
       html += '<div class="histgame' + (excluded ? ' ex' : '') + '" data-id="' + esc(rec.id) + '">'
         + '<button type="button" class="hg-count ' + rankCls + '" title="' + esc(rankTitle) + '">' + rankNum + '</button>'
         + '<span class="hg-main"><span class="hg-top">' + primary
-        + (winR ? ' <span class="hg-crown" title="Победа">👑</span>' : '')
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
         + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode">' + (rec.manualMode ? 'отчет' : 'игра') + '</span>' + pctTag + '</span></span>'
+        + (winR ? '<span class="hg-crown" title="Победа">👑</span>' : '')
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '<button class="hg-play ic-play" title="Реплей"><span class="gl"></span></button>'
         + '<button class="hg-exp" title="Експорт"><span class="ic ic-up solo"></span></button>'
