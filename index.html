@@ -150,6 +150,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   background:#d8cfa8; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-die);
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 3px 0 rgba(0,0,0,.4); transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
 .die:disabled{ cursor:default; opacity:.92; }
+/* „Нов набор зарове": a divider between kept dice and the freshly-rolled batch */
+.die-sep{ flex:none; align-self:center; width:2px; height:34px; border-radius:2px; background:rgba(20,18,12,.32);
+  box-shadow:1px 0 0 rgba(255,255,255,.14); margin:0 1px; }
 /* freshly re-rolled dice — a subtle gold hint so you can spot what changed */
 .die.fresh{ outline:1.5px solid rgba(255,216,107,.45); outline-offset:1px; }
 .die.fresh::after{ content:''; position:absolute; top:-3px; left:-3px; width:6px; height:6px; border-radius:50%; background:rgba(255,216,107,.8); }
@@ -1248,6 +1251,8 @@ body.modal-open{ overflow:hidden; }
 .rpdie .face{ width:30px; height:30px; }
 .rpdie.rr{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
 .rpdie.kept{ border-color:#5a8f3a; box-shadow:0 0 0 2px #7bb85a,inset 0 0 0 2px rgba(255,255,255,.22); transform:translateY(-3px); }
+/* „Нов набор зарове" in the summary: a divider between kept dice and the freshly-rolled batch */
+.rpdie-sep{ flex:none; align-self:center; width:2px; height:28px; border-radius:2px; background:rgba(20,18,12,.32); box-shadow:1px 0 0 rgba(255,255,255,.14); margin:0 1px; }
 .rplabel{ display:flex; align-items:center; justify-content:center; gap:6px; text-align:center; font-size:12px; color:var(--gen-label); min-height:16px; margin-bottom:8px; }
 .rplabel b{ color:var(--gen-brass-bright); }
 .rpdiceq{ flex:none; width:17px; height:17px; display:grid; place-items:center; border-radius:50%; cursor:pointer;
@@ -2052,7 +2057,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.17.0';
+  var APP_VERSION = '1.18.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2061,7 +2066,7 @@ body.modal-open{ overflow:hidden; }
   // true = tap the ones to KEEP (ДРЪЖ!). Default „keep". This is the owner's/default
   // preference (set in owner customisation); each HUMAN player carries their own copy
   // (p.selectKeep) so several humans in one game can play in different flavours.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: true, webrtcDebug: false, opticalHandshake: false, iceServers: '', selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: true, webrtcDebug: false, opticalHandshake: false, newDiceBatch: false, iceServers: '', selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -2096,14 +2101,14 @@ body.modal-open{ overflow:hidden; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, opticalHandshake: settings.opticalHandshake, iceServers: settings.iceServers, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
+              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, opticalHandshake: settings.opticalHandshake, newDiceBatch: settings.newDiceBatch, iceServers: settings.iceServers, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'opticalHandshake', 'iceServers', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'opticalHandshake', 'newDiceBatch', 'iceServers', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
       settings.webrtc = true;   // internet play is now a release feature — always on, even for older saves
@@ -3682,7 +3687,7 @@ body.modal-open{ overflow:hidden; }
   function renderSpecAction(a) {
     var seat = netOrder.indexOf(a.playerId); if (seat < 0) return;
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
-    dice = (a.dice || []).slice(); throwsLeft = a.throwsLeft || 0;
+    dice = (a.dice || []).slice(); throwsLeft = a.throwsLeft || 0; diceGen = [];   // spectated dice: no local generations
     diceNew = [0, 1, 2, 3, 4].map(function (i) { return !!(a.mask & (1 << i)); });
     // mirror the active player's keep/throw selection so watchers see their decision form
     selected = [0, 1, 2, 3, 4].map(function (i) { return !!(a.sel & (1 << i)); });
@@ -3697,7 +3702,7 @@ body.modal-open{ overflow:hidden; }
     var seat = netOrder.indexOf(localPid); if (seat < 0) return;
     specSelf = true; specKeepMode = null;   // my own board uses my own keep/throw flavour
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
-    dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
+    dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false]; diceGen = [];
     renderAll(); syncSpecReturn();
   }
   function returnToCurrent() {
@@ -3754,6 +3759,7 @@ body.modal-open{ overflow:hidden; }
     netMyTurn = false; awaitingRoll = false; locked = false;
     throwsLeft = ROLLS - 1; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
     dice = G.rollAll(); sortDice();
+    rollNo = 1; diceGen = dice.map(function () { return 1; });
     curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     renderAll(); shakeDice(); showOrder(p);
     netSendAct();   // clients watch the host-driven AI seat roll
@@ -3816,6 +3822,9 @@ body.modal-open{ overflow:hidden; }
 
   // ===================================================== GAME STATE
   var game = null, dice = [], selected = [false,false,false,false,false], diceNew = [false,false,false,false,false], throwsLeft = 0;
+  // „Нов набор зарове" (experimental): per-die generation = the roll it was last thrown in. Parallel to `dice`;
+  // used to group the tray (kept-longest left → newest right) instead of accenting. Empty = feature inactive this turn.
+  var diceGen = [], rollNo = 0;
   var aiBusy = false, locked = false, rerolledAll = false, roastIx = 0, roastTimer = null;
   var moveLog = [];   // per player index: array of completed turn logs
   var curLog = null;  // the in-progress turn log
@@ -3891,6 +3900,7 @@ body.modal-open{ overflow:hidden; }
     locked = false;
     rerolledAll = false;
     diceNew = [false, false, false, false, false];   // no "fresh" accent on a turn's first roll
+    diceGen = []; rollNo = 0;                          // generations are seeded by the turn's first roll
     hintsOn = false; $('hintBtn').classList.remove('on');   // advice is per-turn: re-click each turn
     clearRoast();
     var p = G.currentPlayer(game);
@@ -3917,6 +3927,7 @@ body.modal-open{ overflow:hidden; }
       awaitingRoll = false;
       throwsLeft = ROLLS - 1;
       dice = G.rollAll(); sortDice();
+      rollNo = 1; diceGen = dice.map(function () { return 1; });
       curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
       renderAll(); shakeDice(); showOrder(p);
       runAiTurn();
@@ -3939,6 +3950,7 @@ body.modal-open{ overflow:hidden; }
     var p = G.currentPlayer(game);
     awaitingRoll = false;
     dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
+    rollNo = 1; diceGen = dice.map(function () { return 1; });   // first throw: every die is generation 1
     curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     clearRoast();
     renderAll();
@@ -4238,10 +4250,16 @@ body.modal-open{ overflow:hidden; }
     // penalty overrides: swap the dice, or hide some (centred remainder)
     var shown = fx.dice ? fx.dice : dice;
     if (fx.diceKeep != null) shown = shown.slice(0, fx.diceKeep);
+    // „Нов набор зарове": group the tray by generation (separators) instead of accenting the new dice
+    var batchMode = settings.newDiceBatch && !fx.dice && fx.diceKeep == null && diceGen.length === shown.length;
     shown.forEach(function (v, i) {
+      if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {   // a generation boundary → divider between groups
+        var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true');
+        $('dice').appendChild(sep);
+      }
       var b = document.createElement('button');
       var sel = !fx.dice && fx.diceKeep == null && selected[i];
-      var fresh = !fx.dice && fx.diceKeep == null && diceNew[i];   // just rerolled — accent for easy scanning
+      var fresh = !batchMode && !fx.dice && fx.diceKeep == null && diceNew[i];   // just rerolled — accent (off in batch mode)
       var keepMode = specKeepMode != null ? specKeepMode : activeKeep();   // watching → mirror the active player's flavour
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive;
@@ -4346,13 +4364,17 @@ body.modal-open{ overflow:hidden; }
 
   // which dice get RE-THROWN this fire — interprets the tap marks per the player's keep/throw flavour
   function rerollMask() { return activeKeep() ? selected.map(function (s) { return !s; }) : selected.slice(); }
-  // re-roll the masked dice, KEEP the tray sorted ascending, and remember which dice are
-  // new (rerolled) so they can be accented — otherwise the new ones vanish into the sort
+  // re-roll the masked dice. Default: keep the tray sorted ascending, mark the new ones (accent).
+  // „Нов набор зарове": stamp each die with its generation (the roll it was last thrown in) and
+  // sort by (generation, value) so kept dice group on the left and the fresh batch lands ordered on the right.
   function applyReroll(rr) {
-    var paired = dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i] }; });
-    paired.sort(function (a, b) { return a.v - b.v; });
+    rollNo++;
+    var paired = dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i], g: rr[i] ? rollNo : (diceGen[i] || 1) }; });
+    if (settings.newDiceBatch && !expMode) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
+    else paired.sort(function (a, b) { return a.v - b.v; });
     dice = paired.map(function (x) { return x.v; });
     diceNew = paired.map(function (x) { return x.nw; });
+    diceGen = paired.map(function (x) { return x.g; });
   }
   function humanFire() {
     if (expMode) { expHumanFire(); return; }
@@ -4489,7 +4511,7 @@ body.modal-open{ overflow:hidden; }
     expBeginTurn();
   }
   function expBeginTurn() {
-    locked = false; rerolledAll = false; diceNew = [false, false, false, false, false];
+    locked = false; rerolledAll = false; diceNew = [false, false, false, false, false]; diceGen = []; rollNo = 0;
     hintsOn = false; $('hintBtn').classList.remove('on'); $('hintBtn').classList.toggle('hidden', !exactReady);  // hints need the exact table
     clearRoast();
     var p = G.currentPlayer(game);
@@ -5731,6 +5753,8 @@ body.modal-open{ overflow:hidden; }
     // internet play (WebRTC) is now a release feature — no enable toggle here. Optical (QR) pairing stays experimental.
     var optr = devToggleRow('Оптично сдвояване (QR)', 'opticalHandshake', function () {}); optr.id = 'devOpticalRow';
     exp.list.appendChild(optr);
+    // group the dice tray by roll instead of accenting — kept dice left, fresh batch right, ordered
+    exp.list.appendChild(devToggleRow('Нов набор зарове', 'newDiceBatch', function () { if (game && !manualMode) renderAll(); }));
     body.appendChild(exp.sec);
     syncAcousticDebugVis();
   }
@@ -6855,6 +6879,24 @@ body.modal-open{ overflow:hidden; }
 
   // ---------- §8 replay viewer (turn-by-turn + roll-by-roll, scrubbable) ----------
   var replay = null;
+  // reconstruct each throw's per-die generation (the throw it was last rolled in) from the saved
+  // keep masks, so the summary can group dice the same way „Нов набор зарове" does live. Generations
+  // are carried across throws by value-matching the kept dice; remaining dice are this throw's batch.
+  function replayGens(rolls, keeps) {
+    var gens = [];
+    for (var i = 0; i < rolls.length; i++) {
+      var cur = rolls[i] || [];
+      if (i === 0) { gens.push(cur.map(function () { return 1; })); continue; }
+      var prev = rolls[i - 1] || [], prevGen = gens[i - 1] || [], km = keeps[i - 1] || [];
+      var pool = [];
+      for (var j = 0; j < prev.length; j++) if (km[j]) pool.push({ v: prev[j], g: prevGen[j] || 1, used: false });
+      gens.push(cur.map(function (v) {
+        for (var k = 0; k < pool.length; k++) if (!pool[k].used && pool[k].v === v) { pool[k].used = true; return pool[k].g; }
+        return i + 1;   // not carried over → newly rolled this throw
+      }));
+    }
+    return gens;
+  }
   // flatten a saved game into atomic actions in true play order (round-robin)
   function buildReplayActions(rec) {
     var actions = [], nP = rec.players.length, R = G.CATEGORIES.length;
@@ -6867,16 +6909,16 @@ body.modal-open{ overflow:hidden; }
           actions.push({ type: 'roll', p: p, r: r, dice: log.dice || [], kept: null, rollNo: 1, rolls: 1 });
           actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: log.dice || [] });
         } else {
-          var rolls = log.rolls || [];
+          var rolls = log.rolls || [], gens = replayGens(rolls, log.keeps || []);
           for (var i = 0; i < rolls.length; i++) {
             // remember BOTH the kept set and the re-thrown set for this throw; renderReplay
             // highlights whichever matches the game's dice-selection flavour (keep vs throw)
             var last = i === rolls.length - 1;
             var keep = (!last && log.keeps[i]) ? log.keeps[i].slice() : null;
             var reroll = keep ? keep.map(function (k) { return !k; }) : null;
-            actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], reroll: reroll, keep: keep, rollNo: i + 1, rolls: rolls.length });
+            actions.push({ type: 'roll', p: p, r: r, dice: rolls[i], reroll: reroll, keep: keep, gens: gens[i], rollNo: i + 1, rolls: rolls.length });
           }
-          actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: rolls.length ? rolls[rolls.length - 1] : [] });
+          actions.push({ type: 'commit', p: p, r: r, category: log.category, score: score, dice: rolls.length ? rolls[rolls.length - 1] : [], gens: rolls.length ? gens[rolls.length - 1] : null });
         }
       }
     }
@@ -6908,9 +6950,19 @@ body.modal-open{ overflow:hidden; }
     $('replayBoard').innerHTML = replayBoardHTML(sc[a.p], a.type === 'commit' ? a.category : null);
     // highlight the dice this game's flavour marks: keep-mode → held; throw-mode → re-thrown
     var keepMode = !!rec.selectKeep, hlMask = keepMode ? a.keep : a.reroll;
-    $('replayDice').innerHTML = (a.dice || []).map(function (v, i) {
-      return '<div class="rpdie' + (hlMask && hlMask[i] ? (keepMode ? ' kept' : ' rr') : '') + '">' + pipFace(v) + '</div>';
-    }).join('');
+    var batchMode = !!settings.newDiceBatch;
+    if (batchMode) {
+      // group by generation: kept dice (older) left → freshly-rolled batch right, ordered, with dividers
+      var dArr = a.dice || [], gArr = (a.gens && a.gens.length === dArr.length) ? a.gens : dArr.map(function () { return 1; });
+      var pairs = dArr.map(function (v, i) { return { v: v, g: gArr[i] }; }).sort(function (x, y) { return (x.g - y.g) || (x.v - y.v); });
+      $('replayDice').innerHTML = pairs.map(function (pr, i) {
+        return (i > 0 && pr.g !== pairs[i - 1].g ? '<span class="rpdie-sep" aria-hidden="true"></span>' : '') + '<div class="rpdie">' + pipFace(pr.v) + '</div>';
+      }).join('');
+    } else {
+      $('replayDice').innerHTML = (a.dice || []).map(function (v, i) {
+        return '<div class="rpdie' + (hlMask && hlMask[i] ? (keepMode ? ' kept' : ' rr') : '') + '">' + pipFace(v) + '</div>';
+      }).join('');
+    }
     // Х{ход}/14 · {етап} · точки — with a ? that explains the highlight
     var stage = a.type === 'commit' ? 'записване'
       : a.rollNo === 1 ? 'начално хвърляне' : a.rollNo === 2 ? 'второ хвърляне' : a.rollNo === 3 ? 'трето хвърляне' : 'хвърляне ' + a.rollNo;
@@ -6919,7 +6971,9 @@ body.modal-open{ overflow:hidden; }
     $('rpDiceQ').onclick = function (e) {
       e.stopPropagation();
       var help = $('rpDiceHelp');
-      help.innerHTML = keepMode
+      help.innerHTML = batchMode
+        ? '🎲 Заровете са подредени по <b>хвърляне</b>: задържаните отляво, новохвърлените отдясно (разделени с черта), всяка група подредена. Така веднага виждаш кои са новите.'
+        : keepMode
         ? '🎲 <b>Маркираните</b> зарове са тези, които играчът <b>задържа</b> (избор „кои да държиш“). Останалите се хвърлят наново.'
         : '🎲 <b>Маркираните</b> зарове са тези, които играчът <b>хвърля наново</b> (избор „кои да хвърлиш“). Останалите се пазят.';
       help.classList.toggle('hidden');
@@ -7721,7 +7775,7 @@ body.modal-open{ overflow:hidden; }
     var all = rr.every(Boolean);
     if (st.gate === 'rerollAll' && !all) { tutNudge(); return; }
     dice = (tut.dice || dice).slice(); sortDice();
-    diceNew = [false, false, false, false, false];
+    diceNew = [false, false, false, false, false]; diceGen = [];
     if (curLog) { curLog.keeps.push(rr.map(function (x) { return !x; })); curLog.rolls.push(dice.slice()); }
     selected = [false, false, false, false, false];
     throwsLeft--;
