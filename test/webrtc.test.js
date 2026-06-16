@@ -220,18 +220,20 @@ test('reconnect: a dropped player rejoins by eph, catches up, and finishes', fun
   assert.strictEqual(host.state, 'GAME_OVER', 'game ended cleanly with everyone done');
 });
 
-test('manual game: a manual client is rejected from a regular (turn) host', function () {
+test('join: a client adopts the host game mode regardless of what it picked', function () {
   var bus = new StarBus();
-  var rejected = { reason: null };
-  var host = new MP.Session({ transport: bus.transport(true), isHost: true, manual: false, me: { name: 'H', color: '#ee0055', gender: 'm' },
+  var joined = { id: null, manual: null };
+  var host = new MP.Session({ transport: bus.transport(true), isHost: true, manual: true, me: { name: 'H', color: '#ee0055', gender: 'm' },
     minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
-  var cli = new MP.Session({ transport: bus.transport(false), isHost: false, manual: true, me: { name: 'A', color: '#00aa55', gender: 'm' },
+  // client requests a REGULAR game, but the host is MANUAL — the client must be seated and switch to manual
+  var cli = new MP.Session({ transport: bus.transport(false), isHost: false, manual: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
     minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
-    callbacks: { onReject: function (r) { rejected.reason = r; }, onJoined: function () { rejected.joined = true; } } });
+    callbacks: { onJoined: function (id, manual) { joined.id = id; joined.manual = manual; } } });
   host.openLobby(); cli.requestJoin(); bus.drain();
-  assert.strictEqual(rejected.reason, 1, 'client got a mode-mismatch rejection');
-  assert.ok(!rejected.joined, 'client was NOT seated');
-  assert.strictEqual(host.roster.length, 1, 'host roster still only itself');
+  assert.ok(joined.id != null, 'client was seated');
+  assert.strictEqual(joined.manual, true, 'onJoined reported the host mode (manual)');
+  assert.strictEqual(cli.manual, true, 'client session adopted the host mode');
+  assert.strictEqual(host.roster.length, 2, 'host seated the client');
 });
 
 test('manual game: free-for-all — players fill their own boards in any order, ends when all done', function () {
