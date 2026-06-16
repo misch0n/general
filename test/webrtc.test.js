@@ -219,3 +219,43 @@ test('reconnect: a dropped player rejoins by eph, catches up, and finishes', fun
   assert.strictEqual(host._filled(c1id), General.CATEGORIES.length, 'returned player completed its board');
   assert.strictEqual(host.state, 'GAME_OVER', 'game ended cleanly with everyone done');
 });
+
+test('live spectating: the active player\'s action reaches the host AND the other client (relay)', function () {
+  var bus = new StarBus();
+  var got = { host: [], c1: [], c2: [] };
+  function mk(isHost, me, key) {
+    return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onAction: function (a) { got[key].push(a); } } });
+  }
+  var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' }, 'host');
+  var c1 = mk(false, { name: 'A', color: '#00aa55', gender: 'm' }, 'c1');
+  var c2 = mk(false, { name: 'B', color: '#5566ff', gender: 'f' }, 'c2');
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  host.startGame(); bus.drain();
+
+  // c1 (a client) broadcasts a roll action; it should reach the host and be relayed to c2 — but NOT echo to c1
+  c1.activeId = c1.myId; host.activeId = c1.myId;   // make c1 the active player on both
+  c1.sendAction({ throwsLeft: 2, dice: [1, 2, 3, 4, 5], mask: 0 });
+  bus.drain();
+  assert.strictEqual(got.host.length, 1, 'host received the action');
+  assert.strictEqual(got.c2.length, 1, 'other client received the relayed action');
+  assert.strictEqual(got.c1.length, 0, 'the actor does not receive its own action back');
+  assert.deepStrictEqual(got.host[0].dice, [1, 2, 3, 4, 5], 'dice carried intact');
+  assert.strictEqual(got.host[0].playerId, c1.myId, 'attributed to the active player');
+
+  // a commit action carries the category + value
+  c1.sendAction({ commit: true, category: 7, value: 24, dice: [3, 3, 3, 4, 5] });
+  bus.drain();
+  var last = got.c2[got.c2.length - 1];
+  assert.strictEqual(last.commit, true);
+  assert.strictEqual(last.category, 7);
+  assert.strictEqual(last.value, 24);
+
+  // the HOST as active player broadcasts straight to clients (no relay needed)
+  host.activeId = host.myId;
+  host.sendAction({ throwsLeft: 1, dice: [6, 6, 6, 2, 1], mask: 0b00011 });
+  bus.drain();
+  assert.strictEqual(got.c1[got.c1.length - 1].playerId, host.myId, 'host action reaches clients');
+  assert.deepStrictEqual(got.c2[got.c2.length - 1].dice, [6, 6, 6, 2, 1]);
+});

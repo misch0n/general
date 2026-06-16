@@ -93,6 +93,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ppill .pdot{ width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
 .ppill.on{ transform:scale(1.22); font-weight:800; box-shadow:0 0 0 2px var(--gen-brass), 0 3px 9px rgba(0,0,0,.45); z-index:2; }   /* current player: bigger, not recoloured */
 /* a disconnected player (turns skipped): desaturated, with a fashionable pulsing amber ring */
+.ppill.mine{ text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:2px; }   /* your own board */
 .ppill.dropped{ filter:grayscale(.7); opacity:.7; animation:droppulse 1.6s ease-in-out infinite; }
 @keyframes droppulse{ 0%,100%{ box-shadow:0 0 0 1px rgba(224,122,46,.5), 0 0 7px rgba(224,122,46,.35); opacity:.55; }
   50%{ box-shadow:0 0 0 2px rgba(224,122,46,.95), 0 0 13px rgba(224,122,46,.6); opacity:.9; } }
@@ -162,6 +163,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   box-shadow:0 4px 0 var(--gen-brass-dark); transition:transform .08s ease; }
 .fire:active:not(:disabled){ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-brass-dark); }
 .fire:disabled{ background:var(--gen-disabled); color:#cfcca8; box-shadow:none; border-color:var(--gen-disabled-line); cursor:default; }
+/* spectating an opponent's turn: the action button is muted + clearly unclickable */
+.fire.muted{ background:transparent; color:var(--gen-muted); border-color:var(--gen-pill-line); box-shadow:none; letter-spacing:1px; font-size:15px; opacity:.8; }
+.specreturn{ width:100%; }
 .fire-wrap{ position:relative; }
 .fire-wrap .fire{ width:100%; }   /* keep the button full-width like before (it used to be the flex child) */
 /* small ? square on the left of the fire button — opens the throw/keep chooser (works even when the button is disabled) */
@@ -1425,6 +1429,7 @@ body.modal-open{ overflow:hidden; }
       </div>
       <div id="rollHint" class="rollhint hidden">докосни, за да хвърлиш</div>
       <div id="aiThinking" class="aithinking hidden">ЩАБЪТ ОБМИСЛЯ…</div>
+      <button type="button" id="specReturn" class="btn specreturn hidden">↩ Към текущия играч</button>
       <button type="button" id="expReserve" class="btn small hidden" title="Изхарчи резервно хвърляне">🎁 Резерва</button>
     </div>
     <!-- manual-entry footer (ОТЧЕТ mode): tap the five table dice, then pick a combo above -->
@@ -1956,7 +1961,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.7.6';
+  var APP_VERSION = '1.8.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2487,6 +2492,7 @@ body.modal-open{ overflow:hidden; }
       onStart: function (roster, order) { stopFlavour(); startNetGame(roster, order); },
       onTurn: function (activeId) { netSetTurn(activeId); },
       onMove: function (mv) { netApplyRemote(mv); },
+      onAction: function (a) { netSpectate(a); },                    // watch the active player roll/reroll/commit live
       onResync: function (scores) { netApplySnapshot(scores); },     // catching up after a reconnect
       onTakeover: function () { if (netMode) { renderAiTakeover(); renderAll && game && renderAll(); } },
       onDrop: function (id, dropped) { netOnDrop(id, dropped); },
@@ -3131,10 +3137,75 @@ body.modal-open{ overflow:hidden; }
   function netSetTurn(activeId) {
     if (!netMode || !game) return;
     var seat = netOrder.indexOf(activeId); if (seat < 0) return;
+    netActiveId = activeId; specSelf = false; specAct = null; syncSpecReturn();   // new turn → back to spectating
     game.current = seat; netMyTurn = (activeId === localPid);
     // the host plays any seat it controls (lobby AI or a live takeover) locally
     if (net.isHost && net.isAIControlled(activeId)) { runNetAiTurn(seat, activeId); return; }
     beginTurn();
+  }
+  // ---------- live spectating: broadcast my actions; watch the active player's actions ----------
+  // the active player broadcasts each completed action so everyone else can watch (WebRTC only —
+  // an acoustic link is too slow for per-action traffic). Works for my own turn AND a host-driven AI seat.
+  function netSendAct(extra) {
+    if (!(netMode && netKind === 'webrtc' && net)) return;
+    var pid = (netAiActiveId != null && net.isHost) ? netAiActiveId : (netMyTurn ? localPid : null);
+    if (pid == null) return;
+    var mask = 0; for (var i = 0; i < 5; i++) if (diceNew[i]) mask |= (1 << i);
+    var a = { playerId: pid, throwsLeft: throwsLeft, dice: dice.slice(), mask: mask };
+    if (extra) for (var k in extra) a[k] = extra[k];
+    try { net.sendAction(a); } catch (e) {}
+  }
+  function netSpectate(a) {
+    if (!netMode || !game) return;
+    if (a.playerId === localPid) return;                 // my own action — already on my board
+    var seat = netOrder.indexOf(a.playerId); if (seat < 0) return;
+    netActiveId = a.playerId; specAct = a;               // remember so RETURN can jump back here
+    if (specSelf) return;                                // user is previewing their own board — don't yank them away
+    renderSpecAction(a);
+  }
+  // render one spectated action on the main board (the active player's view, read-only)
+  function renderSpecAction(a) {
+    var seat = netOrder.indexOf(a.playerId); if (seat < 0) return;
+    game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
+    dice = (a.dice || []).slice(); throwsLeft = a.throwsLeft || 0;
+    diceNew = [0, 1, 2, 3, 4].map(function (i) { return !!(a.mask & (1 << i)); });
+    selected = [false, false, false, false, false];
+    renderAll();
+    if (a.commit) { if (a.category != null) flashTile(G.CATEGORIES[a.category].key); }
+    else { shakeDice(); }
+  }
+  // tap your own board while spectating → see your usual during-turn screen (read-only preview)
+  function previewSelf() {
+    if (!netMode || localPid == null) return;
+    var seat = netOrder.indexOf(localPid); if (seat < 0) return;
+    specSelf = true;
+    game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
+    dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
+    renderAll(); syncSpecReturn();
+  }
+  function returnToCurrent() {
+    specSelf = false;
+    if (specAct) renderSpecAction(specAct);
+    else if (netActiveId != null) {
+      var seat = netOrder.indexOf(netActiveId);
+      if (seat >= 0) { game.current = seat; netMyTurn = (netActiveId === localPid); dice = []; throwsLeft = 0; locked = !netMyTurn; awaitingRoll = false; renderAll(); }
+    }
+    syncSpecReturn();
+  }
+  function syncSpecReturn() { var b = $('specReturn'); if (b) b.classList.toggle('hidden', !(netMode && specSelf)); }
+  // dev-only: open the lobby PREP screen with a mock roster, to preview that flow without a 2nd device
+  function devMockLobby() {
+    try { leaveNet(); } catch (e) {}
+    var nullTp = { maxPayload: 60000, onReceive: function () {}, send: function () { return Promise.resolve(); } };
+    netKind = 'webrtc'; wrCode = 'MOCK01';
+    openNetModal('webrtc');
+    net = newSessionWith(nullTp, true); localPid = MP.HOST_ID;
+    net.openLobby();
+    net.roster.push({ id: net._nextId(), eph: 9001, name: 'Редник Тъпан', color: '#2e9e5b', gender: 'm', ready: true });
+    net.roster.push({ id: net._nextId(), eph: 9002, name: 'Ефрейтор Мечка', color: '#6a52c0', gender: 'f', ready: false });
+    net.addAI({ name: 'Сержант Болт', color: '#e07a2e', gender: 'n' });
+    netShow('scan'); renderNetRoster();
+    net.startPrep(settingsBits());   // → onPrep → enterNetPrep (the preparation screen)
   }
   // pick a bot strength matching the (dropped) player's optimal-decision rate so far
   function netAiPolicy(seat) {
@@ -3152,6 +3223,7 @@ body.modal-open{ overflow:hidden; }
     dice = G.rollAll(); sortDice();
     curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     renderAll(); shakeDice(); showOrder(p);
+    netSendAct();   // clients watch the host-driven AI seat roll
     runAiTurn();
   }
   function netApplyRemote(mv) {
@@ -3206,6 +3278,7 @@ body.modal-open{ overflow:hidden; }
   var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
   var netKind = 'acoustic', netBus = null;   // 'acoustic' (sound FSK) | 'webrtc' (PeerJS) — selects the transport
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
+  var netActiveId = null, specSelf = false, specAct = null;   // spectating: who's playing, am I previewing my own board, last action
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
@@ -3322,6 +3395,7 @@ body.modal-open{ overflow:hidden; }
     clearRoast();
     renderAll();
     shakeDice();
+    netSendAct();   // let spectators watch my initial roll
     if (tut) tutEvent('roll');
   }
 
@@ -3432,14 +3506,21 @@ body.modal-open{ overflow:hidden; }
     var r = parseInt(c.substr(0, 2), 16) || 0, g = parseInt(c.substr(2, 2), 16) || 0, b = parseInt(c.substr(4, 2), 16) || 0;
     return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1c1a0f' : '#fff';
   }
+  function isMyNetPlayer(p) { return netMode && p && p.owner; }   // each device owns exactly its own seat
   function pillHTML(p, i) {
     var col = p.color || 'var(--gen-pill)';
-    return '<button class="ppill' + (i === game.current ? ' on' : '') + (p.dropped ? ' dropped' : '') + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)" title="' + (p.dropped ? 'разпадна се' : '') + '">' + (p.dropped ? '📵' : total(p)) + '</button>';
+    return '<button class="ppill' + (i === game.current ? ' on' : '') + (p.dropped ? ' dropped' : '') + (isMyNetPlayer(p) ? ' mine' : '')
+      + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)" title="' + (p.dropped ? 'разпадна се' : '') + '">' + (p.dropped ? '📵' : total(p)) + '</button>';
   }
   function renderPills() {
     $('pillWrap').innerHTML = game.players.map(pillHTML).join('');
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) {
-      b.onclick = function () { openPeek(+b.getAttribute('data-i')); };
+      b.onclick = function () {
+        var i = +b.getAttribute('data-i');
+        // network spectating: tapping MY OWN board shows my full during-turn screen (with a RETURN button)
+        if (netMode && !netMyTurn && isMyNetPlayer(game.players[i])) { previewSelf(); return; }
+        openPeek(i);
+      };
     });
   }
 
@@ -3616,7 +3697,21 @@ body.modal-open{ overflow:hidden; }
   }
 
   function renderFire() {
+    $('fire').classList.remove('muted');   // clear any leftover spectator styling
+    syncSpecReturn();
     if (manualMode) { $('bottombar').classList.remove('preroll'); return; }
+    // ---- network spectating: previewing my own board, or watching an opponent's turn ----
+    if (netMode && specSelf) {
+      $('bottombar').classList.remove('preroll');
+      $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('rollHint').classList.add('hidden');
+      return;   // the RETURN-to-current button is shown separately
+    }
+    if (netMode && !netMyTurn && netAiActiveId == null && !aiBusy) {
+      $('bottombar').classList.remove('preroll');
+      $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
+      var fo = $('fire'); fo.classList.remove('hidden'); fo.disabled = true; fo.classList.add('muted'); $('fireTxt').textContent = 'ХОД НА ОПОНЕНТА';
+      return;
+    }
     if (awaitingRoll) {
       // before the first throw: only the centred ХВЪРЛИ! button (no dice, no ? chooser yet)
       $('bottombar').classList.add('preroll');
@@ -3648,6 +3743,7 @@ body.modal-open{ overflow:hidden; }
     renderDice(); renderFire();
   }
   $('fire').onclick = function () { humanFire(); };
+  $('specReturn').onclick = function () { returnToCurrent(); };
   $('expAgain').onclick = function () { var ps = game.players; $('expOver').classList.add('hidden'); expStartGame(ps); };
   $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); expMode = false; openHistory(); };
   $('expOver').onclick = function (e) { if (e.target === $('expOver')) $('expOver').classList.add('hidden'); };
@@ -3713,6 +3809,7 @@ body.modal-open{ overflow:hidden; }
     selected = [false,false,false,false,false];
     throwsLeft--;
     renderAll(); shakeDice();
+    netSendAct();   // spectators see my reroll (newly-thrown dice accented)
   }
 
   function sortDice() { dice.sort(function (a, b) { return a - b; }); }
@@ -3746,9 +3843,11 @@ body.modal-open{ overflow:hidden; }
     if (netMode) {
       // broadcast my completed turn; the host's STATE + next GRANT drive the rest
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
+      netSendAct({ commit: true, category: CAT_INDEX[key], value: value });   // spectators see the category go in
       var mv = { category: CAT_INDEX[key], score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
-      if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, AI_VIEW_DELAY); }  // host injects the AI seat's move (after a beat to read the board)
-      else { net.submitMove(mv); netSay('🔊 Изпращам хода…'); }
+      // hold the committed board a beat (comprehension) before the move propagates and the turn passes
+      if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, AI_VIEW_DELAY); }  // host injects the AI seat's move
+      else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, AI_VIEW_DELAY); }
       return;
     }
     if (manualMode) {
@@ -4303,6 +4402,7 @@ body.modal-open{ overflow:hidden; }
           if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
           selected = [false,false,false,false,false]; throwsLeft--;
           renderAll(); shakeDice();
+          netSendAct();   // clients watch the AI seat's reroll
           setTimeout(throwsLeft > 0 ? aiStep : aiFinish, AI_DELAY);
         }, AI_DELAY * 0.65);
         return;
@@ -5049,6 +5149,10 @@ body.modal-open{ overflow:hidden; }
     tutRow.appendChild(el('span', null, 'Обучение'));
     var tutBtn = el('button', 'btn small', '📚 Започни'); tutBtn.onclick = function () { closeDevModal(true); tutStart(); };
     tutRow.appendChild(tutBtn); exp.list.appendChild(tutRow);
+    var mlRow = document.createElement('div'); mlRow.className = 'devctrl-row';
+    mlRow.appendChild(el('span', null, 'Мок лоби'));
+    var mlBtn = el('button', 'btn small', '🧪 Отвори'); mlBtn.onclick = function () { closeDevModal(true); devMockLobby(); };
+    mlRow.appendChild(mlBtn); exp.list.appendChild(mlRow);
     exp.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
     exp.list.appendChild(devToggleRow('Игра по интернет (WebRTC)', 'webrtc', function () { syncWebrtcUI(); syncWebrtcDebugRow(); }));
     body.appendChild(exp.sec);
@@ -7537,6 +7641,7 @@ body.modal-open{ overflow:hidden; }
     if (net) { try { net.dispose(); } catch (e) {} }
     if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} }
     net = null; netFSK = null; netMode = false; localPid = null; netMyTurn = false;
+    netActiveId = null; specSelf = false; specAct = null; if ($('specReturn')) $('specReturn').classList.add('hidden');
     $('netLink').classList.add('hidden'); $('netLink').innerHTML = '';
   }
 

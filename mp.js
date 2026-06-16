@@ -16,6 +16,7 @@
     BEACON: 1, JOIN_REQ: 2, JOIN_ACK: 3, ROSTER: 4, START: 5,
     GRANT: 6, MOVE: 7, STATE: 8, RESYNC_REQ: 9, PING: 10, PONG: 11, END: 12,
     META: 13, READY: 14, PREP: 15, AICTRL: 16,              // lobby preparation + AI takeover
+    TACT: 17,                                               // live turn action (spectating: roll/reroll/commit)
     XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
     // adaptive link & resilience (reserved 30-39)
     CAL_PROBE: 30, CAL_REPORT: 31, CAL_SELECT: 32, CAL_CONFIRM: 33, PROFILE_SWITCH: 34, QUALITY: 35, RELAY: 36, GOSSIP: 37,
@@ -105,6 +106,20 @@
   function unpackPrep(p) { return new Reader(p).u8(); }
   function packAICtrl(id, on) { return new Writer().u8(id).u8(on ? 1 : 0).out(); }              // host → all: a seat is now AI-driven (display)
   function unpackAICtrl(p) { var r = new Reader(p); return { id: r.u8(), on: !!r.u8() }; }
+  // TACT — the active player's live turn action so everyone else can WATCH (display-only):
+  // a roll/reroll (dice + remaining throws + which dice are freshly rolled) or a commit (category+value).
+  function packAct(a) {
+    var w = new Writer().u8(a.playerId).u8(a.commit ? 1 : 0).u8(a.throwsLeft || 0)
+      .u8(a.category == null ? 255 : a.category).u16(a.value || 0).u8(a.mask || 0);
+    for (var i = 0; i < 5; i++) w.u8((a.dice && a.dice[i]) || 0);
+    return w.out();
+  }
+  function unpackAct(p) {
+    var r = new Reader(p), a = { playerId: r.u8(), commit: !!r.u8(), throwsLeft: r.u8(), category: r.u8(), value: r.u16(), mask: r.u8(), dice: [] };
+    if (a.category === 255) a.category = null;
+    for (var i = 0; i < 5; i++) a.dice.push(r.u8());
+    return a;
+  }
 
   // ---- [GAME-SPECIFIC] payload schemas ----
   function packBeacon(sessionId, slotsFree) { return new Writer().u8(sessionId).u8(slotsFree).out(); }
@@ -403,6 +418,13 @@
     return true;
   };
 
+  // the local active player broadcasts a live turn action (display-only; spectators render it).
+  // host → all clients; a client → host, which relays to the rest.
+  Session.prototype.sendAction = function (a) {
+    if (this.state !== 'IN_GAME') return;
+    a.playerId = this.myId;
+    this._send(T.TACT, packAct(a));
+  };
   // the local active player submits their completed turn
   Session.prototype.submitMove = function (mv) {
     mv.playerId = this.myId; mv.ackVersion = this.version;
@@ -527,6 +549,9 @@
         if (was && this.cb.onDrop) this.cb.onDrop(back.id, false);
         if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
       }
+    } else if (pkt.type === T.TACT && this.state === 'IN_GAME') {
+      var ta = unpackAct(pkt.payload);
+      if (ta.playerId === this.activeId) { this._send(T.TACT, packAct(ta)); if (this.cb.onAction) this.cb.onAction(ta); }   // relay to all + render locally
     } else if (pkt.type === T.MOVE && this.state === 'IN_GAME') {
       var mv = unpackMove(pkt.payload);
       if (mv.playerId === this.activeId && (this.scores[mv.playerId] || {})[mv.category] == null) {
@@ -579,6 +604,9 @@
       var ac = unpackAICtrl(pkt.payload);
       if (ac.on) this.takeover[ac.id] = true; else delete this.takeover[ac.id];
       if (this.cb.onTakeover) this.cb.onTakeover(ac.id, ac.on);
+    } else if (pkt.type === T.TACT) {
+      var cta = unpackAct(pkt.payload);
+      if (cta.playerId !== this.myId && this.cb.onAction) this.cb.onAction(cta);   // watch the active player live
     } else if (pkt.type === T.START) {
       var st = unpackStart(pkt.payload);
       var fresh = (this.state !== 'IN_GAME');         // re-broadcast START (a peer reconnecting) must NOT wipe a live board
