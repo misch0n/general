@@ -1955,7 +1955,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.7.4';
+  var APP_VERSION = '1.7.5';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2667,10 +2667,10 @@ body.modal-open{ overflow:hidden; }
   $('ndCopy').onclick = function () {
     if (!netFSK || !netFSK.getCapture) return;
     var b64; try { b64 = 'GENCAP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(netFSK.getCapture())))); } catch (e) { b64 = 'грешка: ' + e.message; }
-    var ta = $('ndCapOut'); ta.value = b64; ta.classList.remove('hidden'); ta.select();
-    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(b64).then(function () {}, function () {});
-    $('ndCapStatus').textContent = (ok ? '✓ копирано · ' : '') + b64.length + ' знака (избери и копирай ръчно ако трябва)';
+    var ok = copyToClipboard(b64);
+    flashCopied($('ndCopy'), '📋 Копирай записа');
+    var ta = $('ndCapOut'); ta.value = b64; ta.classList.toggle('hidden', ok);   // reveal only if copy failed
+    $('ndCapStatus').textContent = b64.length + ' знака' + (ok ? '' : ' — копирай ръчно ⬇');
   };
   function newSession(isHost) {
     return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
@@ -2738,6 +2738,29 @@ body.modal-open{ overflow:hidden; }
     return info;
   }
   function wrPeerErr(e) { return { type: (e && e.type) || null, message: (e && e.message) || String(e) }; }
+  // ICE-level diagnostics: shows whether STUN/TURN candidates are gathered, whether the TURN
+  // server authenticates (icecandidateerror code 401), and whether ICE actually connects/fails.
+  function candType(c) { var m = / typ (\w+)/.exec(c || ''); return m ? m[1] : '?'; }
+  function wrAttachIce(conn, who) {
+    if (!settings.webrtcDebug || !conn) return;
+    var tries = 0, seen = {};
+    (function grab() {
+      var pc = conn.peerConnection;
+      if (!pc) { if (tries++ < 25) setTimeout(grab, 150); return; }
+      if (pc._wrHooked) return; pc._wrHooked = true;
+      try {
+        wrlog('ice-attach', { who: who, ice: pc.iceConnectionState, gather: pc.iceGatheringState });
+        pc.addEventListener('iceconnectionstatechange', function () { wrlog('ice-state', { who: who, state: pc.iceConnectionState }); });
+        pc.addEventListener('icegatheringstatechange', function () { wrlog('ice-gather', { who: who, state: pc.iceGatheringState }); });
+        pc.addEventListener('icecandidate', function (e) {
+          if (!e.candidate) { wrlog('ice-cand-end', { who: who }); return; }
+          var typ = candType(e.candidate.candidate);
+          if (!seen[typ]) { seen[typ] = 1; wrlog('ice-cand', { who: who, typ: typ, proto: e.candidate.protocol }); }   // one per type to stay compact
+        });
+        pc.addEventListener('icecandidateerror', function (e) { wrlog('ice-cand-err', { who: who, code: e.errorCode, url: (e.url || '').slice(0, 40), text: (e.errorText || '').slice(0, 50) }); });
+      } catch (err) { wrlog('ice-attach-fail', { message: err && err.message }); }
+    })();
+  }
   function syncWrCapStatus() { var el = $('wrCapStatus'); if (el) el.textContent = settings.webrtcDebug ? (wrLog.length + ' събития записани') : 'дебъгът е изключен'; }
   function syncWrCapVis() {
     var box = $('wrCap'); if (!box) return;
@@ -2807,6 +2830,7 @@ body.modal-open{ overflow:hidden; }
     var settle = function (okFn) { if (settled) return; settled = true; self._dialing = false; okFn(); };
     try { conn = self.peer.connect(PEER_PREFIX + self.code, { reliable: true }); }
     catch (e) { self._dialing = false; if (first) first.fail(e); else self._scheduleRedial(); return; }
+    wrAttachIce(conn, 'client');
     var t = setTimeout(function () { settle(function () { wrlog('conn-timeout', { redial: !first }); if (first) first.fail(new Error('timeout')); else self._scheduleRedial(); }); }, 20000);
     conn.on('open', function () { clearTimeout(t); settle(function () {
       wrlog('client-conn-open', { peer: conn.peer, redial: !first }); self._redialN = 0; self._addConn(conn);
@@ -2833,7 +2857,7 @@ body.modal-open{ overflow:hidden; }
         self.peer = new window.Peer(PEER_PREFIX + self.code, peerOpts());
         self.peer.on('open', function (id) { wrlog('peer-open', { id: id }); self._recon = 0; if (!done) { done = true; resolve(); } });
         self.peer.on('connection', function (conn) {
-          wrlog('host-incoming', { peer: conn.peer });
+          wrlog('host-incoming', { peer: conn.peer }); wrAttachIce(conn, 'host');
           conn.on('open', function () { wrlog('host-conn-open', { peer: conn.peer }); self._addConn(conn); });
           conn.on('error', function (e) { wrlog('host-conn-error', wrPeerErr(e)); });
         });
@@ -2922,8 +2946,10 @@ body.modal-open{ overflow:hidden; }
   function wireCodeCopy(container, code) {
     var btn = container.querySelector('.codecopy');
     if (btn) btn.onclick = function () { copyGameCode(code, btn); };
-    var hold = container.querySelector('.netcode-show');   // touching the code copies too
-    if (hold) hold.addEventListener('pointerdown', function () { copyGameCode(code, btn); });
+    // tapping the code text copies too — use click (a trusted gesture iOS allows clipboard in),
+    // not pointerdown (which iOS Safari does NOT treat as activating for the clipboard)
+    var hold = container.querySelector('.netcode-show');
+    if (hold) hold.onclick = function () { copyGameCode(code, btn); };
   }
   function renderHostCode(code) {
     var box = $('netHostCode');
@@ -2953,6 +2979,12 @@ body.modal-open{ overflow:hidden; }
   function copyGameCode(code, btn) {
     copyToClipboard(code);   // best-effort; the green tint confirms the action either way
     if (btn) { btn.classList.add('copied'); clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); }, 1600); }
+  }
+  // a bundle/diff copy button: push to clipboard on tap, flash „копирано", never show a textbox
+  function flashCopied(btn, original) {
+    if (!btn) return;
+    btn.textContent = '✓ копирано'; clearTimeout(btn._t);
+    btn._t = setTimeout(function () { btn.textContent = original; }, 1500);
   }
   function webrtcHost() {
     wrCapReset('host', ''); wrlog('action', { tap: 'host' }); syncWrCapVis();
@@ -3060,10 +3092,10 @@ body.modal-open{ overflow:hidden; }
   $('wrCapCopy').onclick = function () {
     var payload = { v: 1, app: APP_VERSION, role: wrRole, code: wrCode, ts: Date.now(), log: wrLog };
     var b64; try { b64 = 'GENWRCAP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload)))); } catch (e) { b64 = 'грешка: ' + e.message; }
-    var ta = $('wrCapOut'); ta.value = b64; ta.classList.remove('hidden'); ta.select();
-    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(b64).then(function () {}, function () {});
-    $('wrCapStatus').textContent = (ok ? '✓ копирано · ' : '') + b64.length + ' знака · ' + wrLog.length + ' събития (избери и копирай ръчно ако трябва)';
+    var ok = copyToClipboard(b64);
+    flashCopied($('wrCapCopy'), '📋 Копирай WebRTC лог');
+    var ta = $('wrCapOut'); ta.value = b64; ta.classList.toggle('hidden', ok);   // only reveal as a fallback if the copy failed
+    $('wrCapStatus').textContent = wrLog.length + ' събития · ' + b64.length + ' знака' + (ok ? '' : ' — копирай ръчно ⬇');
   };
   $('wrCapClear').onclick = function () { wrCapReset(wrRole, wrCode); $('wrCapOut').classList.add('hidden'); $('wrCapOut').value = ''; syncWrCapStatus(); };
   $('wrIceSave').onclick = function () {
@@ -4685,10 +4717,10 @@ body.modal-open{ overflow:hidden; }
   $('devModal').onclick = function (e) { if (e.target === $('devModal')) closeDevModal(); };
   $('devApplyAll').onclick = function () { devApplyAllBtn(); var b = $('devApplyAll'); b.textContent = '↻ Приложено!'; setTimeout(function () { b.textContent = '↻ Приложи всичко'; }, 1300); };
   $('devCopy').onclick = function () {
-    var txt = serializeDevDiff(), out = $('devOut'); out.value = txt; out.classList.remove('hidden'); try { out.focus(); out.select(); } catch (e) {}
-    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(txt); ok = true; } catch (e) {} }
-    var b = $('devCopy'); b.textContent = ok ? '📋 Копирано!' : '📋 Маркирай ⬇'; setTimeout(function () { b.textContent = '📋 Копирай diff'; }, 1500);
+    var txt = serializeDevDiff();
+    var ok = copyToClipboard(txt);
+    flashCopied($('devCopy'), '📋 Копирай diff');
+    var out = $('devOut'); out.value = txt; out.classList.toggle('hidden', ok);   // reveal only if copy failed
   };
 
   // ---- dev-mode editor: ALL game strings, edit-on-touch, diff-only copy ----
