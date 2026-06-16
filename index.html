@@ -566,16 +566,25 @@ body.modal-open{ overflow:hidden; }
   border:1.5px solid var(--gen-brass-stroke); color:var(--gen-text); font-size:11.5px; line-height:1.45; box-shadow:0 8px 22px rgba(0,0,0,.5); cursor:pointer; }
 .medaltip .mt-holder{ margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.12); }
 /* tutorial coach bubble + spotlight */
-.tutbubble{ position:fixed; z-index:85; max-width:290px; padding:14px 15px 12px; border-radius:13px; background:var(--gen-ink);
-  border:2px solid var(--gen-brass); color:var(--gen-text); font-size:13px; line-height:1.5; box-shadow:0 14px 38px rgba(0,0,0,.65); }
+/* tutorial coach bubble — its own fixed overlay layer, pinned in a static spot above the
+   footer; never displaces in-game items (the related item is ringed via .tut-spot) */
+.tutbubble{ position:fixed; z-index:88; padding:13px 15px 11px; border-radius:13px; background:var(--gen-ink);
+  border:2px solid var(--gen-brass); color:var(--gen-text); font-size:13px; line-height:1.5; box-shadow:0 14px 38px rgba(0,0,0,.7); }
 .tutbubble.hidden{ display:none; }
 .tutbubble.nudge{ animation:tutnudge .32s ease; }
 @keyframes tutnudge{ 0%,100%{ transform:translateX(0); } 20%,60%{ transform:translateX(-6px); } 40%,80%{ transform:translateX(6px); } }
+.tutbubble .tb-text{ outline:none; }
 .tutbubble .tb-text b{ color:var(--gen-brass-bright); }
-.tutbubble .tb-x{ position:absolute; top:6px; right:7px; width:20px; height:20px; border:none; background:transparent; color:var(--gen-muted); font-size:13px; cursor:pointer; border-radius:5px; }
-.tutbubble .tb-x:hover{ color:var(--gen-brass); }
-.tutbubble .tb-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px; }
+.tutbubble .tb-text[contenteditable]:focus{ outline:1px dashed var(--gen-brass-stroke); outline-offset:3px; border-radius:4px; }
+.tutbubble .tb-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:11px; gap:10px; }
 .tutbubble .tb-step{ font-size:10px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+.tutbubble .tb-actions{ display:flex; align-items:center; gap:8px; }
+.tutbubble .tb-copy{ width:26px; height:26px; border-radius:6px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-muted); cursor:pointer; font-size:12px; }
+.tutbubble .tb-copy:hover{ border-color:var(--gen-brass); color:var(--gen-brass); }
+.tutbubble .tb-skip{ background:transparent; border:none; color:var(--gen-muted); font-size:10px; text-decoration:underline; cursor:pointer; padding:2px 4px; }
+.tutbubble .tb-skip:hover{ color:var(--gen-brass); }
+.tutbubble .tb-copybox{ display:block; width:100%; height:118px; margin-top:8px; font-family:monospace; font-size:10px; line-height:1.4;
+  background:rgba(0,0,0,.3); color:var(--gen-text); border:1px solid var(--gen-pill-line); border-radius:6px; resize:none; }
 .tutbubble .tb-next{ padding:7px 16px; border-radius:8px; background:var(--gen-brass); color:var(--gen-ink); font-weight:700; border:none; cursor:pointer; font-family:var(--gen-font-display); letter-spacing:.5px; }
 .tutbubble .tb-next:hover{ background:var(--gen-brass-bright); }
 .tutbubble .tb-hint{ font-size:11px; color:var(--gen-brass-bright); font-weight:700; }
@@ -1807,7 +1816,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.1.0';
+  var APP_VERSION = '1.1.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -6155,13 +6164,13 @@ body.modal-open{ overflow:hidden; }
     return at === 'fire' ? $('fireWrap') : at === 'dice' ? $('dice') : at === 'pills' ? $('pillWrap')
          : at === 'fireQ' ? $('fireQ') : at === 'up' ? $('boardUpper') : at === 'low' ? $('boardLower') : null;
   }
-  function tutPlace(anchor) {
-    var b = $('tutBubble');
-    if (!anchor) { b.style.left = '50%'; b.style.top = '26%'; b.style.transform = 'translateX(-50%)'; return; }
-    b.style.transform = 'none';
-    var r = anchor.getBoundingClientRect(), bw = b.offsetWidth, bh = b.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
-    b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - bw / 2), vw - bw - 8) + 'px';
-    b.style.top = (r.bottom + 10 + bh < vh - 8 ? r.bottom + 10 : Math.max(8, r.top - bh - 10)) + 'px';
+  // the bubble lives in its OWN fixed overlay layer in a STATIC spot — just above the
+  // footer, in the gap below the combination cells (it may cover the points total; fine).
+  // It never displaces in-game items; the related item is highlighted with the spotlight ring.
+  function tutPlaceStatic() {
+    var b = $('tutBubble'), bb = $('bottombar');
+    b.style.transform = 'none'; b.style.top = 'auto'; b.style.left = '10px'; b.style.right = '10px'; b.style.maxWidth = 'none';
+    b.style.bottom = ((bb ? bb.offsetHeight : 0) + 12) + 'px';
   }
   function tutClearSpot() { var e = document.querySelector('.tut-spot'); while (e) { e.classList.remove('tut-spot'); e = document.querySelector('.tut-spot'); } }
   function tutShow() {
@@ -6173,15 +6182,33 @@ body.modal-open{ overflow:hidden; }
     var anchor = tutAnchor(st.at);
     if (anchor) anchor.classList.add('tut-spot');
     var last = tut.i === tut.steps.length - 1;
+    var text = (tut.edits[tut.i] != null) ? tut.edits[tut.i] : st.t;   // keep any in-place wording edits
     var foot = st.gate ? '<span class="tb-hint">' + (TUT_HINT[st.gate] || '') + '</span>'
                        : '<button class="tb-next" id="tutNextBtn">' + (last ? 'Завърши' : 'Напред →') + '</button>';
-    $('tutBubble').innerHTML = '<button class="tb-x" id="tutExitBtn" aria-label="Изход">✕</button>'
-      + '<div class="tb-text">' + st.t + '</div>'
-      + '<div class="tb-foot"><span class="tb-step">' + (tut.i + 1) + ' / ' + tut.steps.length + '</span>' + foot + '</div>';
+    $('tutBubble').innerHTML = '<div class="tb-text" contenteditable="true" spellcheck="false">' + text + '</div>'
+      + '<div class="tb-foot"><span class="tb-step">' + (tut.i + 1) + ' / ' + tut.steps.length + '</span>'
+      + '<span class="tb-actions"><button type="button" class="tb-copy" id="tutCopyBtn" title="Копирай редактираните текстове">📋</button>'
+      + '<button type="button" class="tb-skip" id="tutSkipBtn">пропусни</button>' + foot + '</span></div>';
     $('tutBubble').classList.remove('hidden');
-    tutPlace(anchor);
+    tutPlaceStatic();
+    var txt = $('tutBubble').querySelector('.tb-text');
+    txt.oninput = function () { tut.edits[tut.i] = txt.innerHTML; };   // capture wording tweaks live
     var nb = $('tutNextBtn'); if (nb) nb.onclick = tutAdvance;
-    $('tutExitBtn').onclick = tutEnd;
+    $('tutCopyBtn').onclick = tutCopyTexts;
+    $('tutSkipBtn').onclick = tutEnd;
+  }
+  // dev convenience: copy ALL step texts (with edits applied) as a JSON array to paste back
+  function tutCopyTexts() {
+    if (!tut) return;
+    var arr = tut.steps.map(function (st, i) { return (tut.edits[i] != null) ? tut.edits[i] : st.t; });
+    var out = '// TUT_' + (tut.ruleset === 'experimental' ? 'EXP' : 'STD') + ' — текстове\n' + JSON.stringify(arr, null, 2);
+    try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(out); } catch (e) {}
+    var b = $('tutBubble');
+    b.innerHTML = '<div class="tb-text">Копирано в клипборда. Или избери и копирай оттук:</div>'
+      + '<textarea class="tb-copybox" readonly></textarea>'
+      + '<div class="tb-foot"><span class="tb-step"></span><button type="button" class="tb-next" id="tutCopyBack">Назад</button></div>';
+    var ta = b.querySelector('.tb-copybox'); ta.value = out; try { ta.focus(); ta.select(); } catch (e) {}
+    $('tutCopyBack').onclick = tutShow;
   }
   function tutAdvance() { if (!tut) return; tut.i++; tutShow(); }
   function tutGate(name) { var st = tut && tut.steps[tut.i]; return !!(st && st.gate === name); }
@@ -6219,10 +6246,11 @@ body.modal-open{ overflow:hidden; }
     opp.gender = 'm'; opp.ribbons = RIBBON_COLORS.slice(0, 6); opp.persona = G.PERSONAS ? G.PERSONAS[0] : null;
     var CATS = exp ? G.CATEGORIES_EXP : G.CATEGORIES, OPP = exp ? TUT_OPP_EXP : TUT_OPP_STD;
     CATS.forEach(function (c) { opp.scores[c.key] = (OPP[c.key] != null ? OPP[c.key] : 0); });
-    tut = { ruleset: settings.ruleset, steps: exp ? TUT_EXP : TUT_STD, i: 0, dice: null };
+    tut = { ruleset: settings.ruleset, steps: exp ? TUT_EXP : TUT_STD, i: 0, dice: null, edits: {} };
     startGame([me, opp], false);   // routes to expStartGame when the ruleset is experimental
     tutShow();
   }
+  window.addEventListener('resize', function () { if (tut) tutPlaceStatic(); });
   function tutEnd() {
     tut = null;
     $('tutBubble').classList.add('hidden'); tutClearSpot();
