@@ -884,8 +884,8 @@ body.modal-open{ overflow:hidden; }
 .ho-sum::before{ content:''; flex:none; width:9px; }   /* mirrors the caret so the head sits truly centred */
 .ho-head{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .ho-avgwrap{ display:inline-flex; flex-direction:column; align-items:center; gap:9px; }   /* shrinks to the averages width */
-.ho-winbar{ display:flex; width:70%; height:6px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.06); }   /* win/lose ratio separator */
-.ho-winbar .wb-win{ background:#5fa85f; } .ho-winbar .wb-lose{ background:#c0453b; }
+.ho-winbar{ display:flex; width:70%; height:3px; border-radius:2px; overflow:hidden; background:rgba(255,255,255,.05); }   /* win/lose ratio: a thin muted accent */
+.ho-winbar .wb-win{ background:rgba(138,162,108,.7); } .ho-winbar .wb-lose{ background:rgba(176,104,90,.7); }
 .ho-sum .ho-mini{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 24px; font-family:var(--gen-font-display); }
 .ho-sum .ho-mini .hom-cell{ display:flex; flex-direction:column; align-items:center; gap:6px; line-height:1; }
 .ho-sum .ho-mini b{ font-size:17px; font-weight:800; color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
