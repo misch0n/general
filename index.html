@@ -522,6 +522,8 @@ body.modal-open{ overflow:hidden; }
 .nd-capstat{ font-size:11px; color:var(--gen-label); text-align:center; margin:6px 0; min-height:14px; }
 .nd-capout{ width:100%; height:70px; font-size:9px; font-family:monospace; color:var(--gen-muted); background:rgba(0,0,0,.3);
   border:1px solid var(--gen-pill-line); border-radius:7px; padding:6px; resize:vertical; word-break:break-all; }
+.wr-ice{ width:100%; height:54px; font-size:10px; font-family:monospace; color:var(--gen-ink-bright,#f0ead6); background:rgba(0,0,0,.3);
+  border:1px solid var(--gen-pill-line); border-radius:7px; padding:6px; resize:vertical; word-break:break-all; }
 /* link-quality signal bars + warnings */
 .netbars{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:var(--gen-muted); min-height:16px; margin:6px 0; }
 .netbars:empty{ display:none; }
@@ -1774,6 +1776,15 @@ body.modal-open{ overflow:hidden; }
       </div>
       <textarea id="wrCapOut" class="nd-capout hidden" readonly></textarea>
       <div class="nd-hint">Записва всичко: PeerJS събития, грешки, рамки. Направи опит за свързване, после <b>Копирай</b> и прати записа от <b>двете</b> устройства.</div>
+      <!-- ICE / TURN config: paste your own TURN servers (JSON array) for cross-network play -->
+      <div class="wrcap-hd" style="margin-top:10px">🧊 ICE / TURN сървъри</div>
+      <textarea id="wrIce" class="wr-ice" placeholder='[{"urls":"turn:HOST:3478","username":"USER","credential":"PASS"}]' spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="setup-actions">
+        <button id="wrIceSave" class="btn small">💾 Запази ICE</button>
+        <button id="wrIceClear" class="btn small">↺ По подразбиране</button>
+      </div>
+      <div id="wrIceStatus" class="nd-capstat"></div>
+      <div class="nd-hint">Празно = вградените STUN + безплатен TURN (ненадежден). За игра по различни мрежи сложи свой TURN — напр. безплатен ключ от metered.ca. JSON масив от <b>iceServers</b>. Важи и за двете устройства.</div>
     </div>
     <!-- acoustic diagnostics: live tone meters + test tones, to debug the link on real devices -->
     <div id="netDiag" class="netdiag hidden">
@@ -1936,7 +1947,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.7.0';
+  var APP_VERSION = '1.7.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -1945,7 +1956,7 @@ body.modal-open{ overflow:hidden; }
   // true = tap the ones to KEEP (ДРЪЖ!). Default „keep". This is the owner's/default
   // preference (set in owner customisation); each HUMAN player carries their own copy
   // (p.selectKeep) so several humans in one game can play in different flavours.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: false, webrtcDebug: false, selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: false, webrtcDebug: false, iceServers: '', selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -1980,14 +1991,14 @@ body.modal-open{ overflow:hidden; }
 
   function saveSettings() {
     var s = { titles: settings.titles, titlePoints: settings.titlePoints, advice: settings.advice, glupost: settings.glupost,
-              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
+              barracks: settings.barracks, bets: settings.bets, acoustic: settings.acoustic, acousticDebug: settings.acousticDebug, webrtc: settings.webrtc, webrtcDebug: settings.webrtcDebug, iceServers: settings.iceServers, selectKeep: settings.selectKeep, ruleset: settings.ruleset, ownerName: settings.ownerName, useOwnerName: settings.useOwnerName, ownerGender: settings.ownerGender, ownerColor: settings.ownerColor };
     lsSet(SETTINGS_KEY, JSON.stringify(s));
   }
   function loadSettings() {
     var raw = lsGet(SETTINGS_KEY); if (!raw) return;
     try {
       var s = JSON.parse(raw);
-      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
+      ['titles', 'titlePoints', 'advice', 'glupost', 'barracks', 'bets', 'acoustic', 'acousticDebug', 'webrtc', 'webrtcDebug', 'iceServers', 'selectKeep', 'ruleset', 'ownerName', 'useOwnerName', 'ownerGender', 'ownerColor'].forEach(function (k) { if (s[k] != null) settings[k] = s[k]; });
       if (s.glupost == null && s.censor != null) settings.glupost = !s.censor;   // migrate the old (inverted) Цензура toggle
       // advice intentionally NOT migrated — it must default OFF (legacy `bonus` is dropped)
     } catch (e) {}
@@ -2670,16 +2681,24 @@ body.modal-open{ overflow:hidden; }
   // It emulates the acoustic BROADCAST bus: the host sends to every client connection, a client
   // sends to the host, and the host re-broadcasts state — so the session needs no topology change.
   var PEER_PREFIX = 'genrl1-';                 // namespaces our peer ids on the shared PeerJS cloud
-  // ICE servers for NAT traversal. The PeerJS cloud only gives STUN; without a TURN relay the
-  // P2P negotiation fails on many real networks (cellular / symmetric NAT) — which is exactly the
-  // „negotiation-failed" we saw. Add public STUN + a free TURN relay so a relayed path exists.
-  var PEER_OPTS = { config: { iceServers: [
+  // ICE servers for NAT traversal. The PeerJS cloud only gives STUN; without a TURN RELAY the
+  // P2P path fails across different networks (cellular ↔ Wi-Fi / symmetric NAT). The free
+  // no-signup TURN relays are unreliable, so the relay is user-configurable: paste your own
+  // TURN (e.g. a free Metered/Twilio key) in the WebRTC-debug panel. STUN covers same-network play.
+  var DEFAULT_ICE = [
     { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-  ] } };
+  ];
+  // custom iceServers (JSON array) override the default when provided + valid
+  function customIce() {
+    var raw = (settings.iceServers || '').trim(); if (!raw) return null;
+    try { var a = JSON.parse(raw); return (Array.isArray(a) && a.length) ? a : null; } catch (e) { return null; }
+  }
+  function peerOpts() { return { config: { iceServers: customIce() || DEFAULT_ICE } }; }
   function genGameCode() { var a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', s = ''; for (var i = 0; i < 6; i++) s += a.charAt(Math.floor(Math.random() * a.length)); return s; }
   function loadPeerJS(cb) {
     if (window.Peer) { cb(true); return; }
@@ -2715,7 +2734,13 @@ body.modal-open{ overflow:hidden; }
   function syncWrCapVis() {
     var box = $('wrCap'); if (!box) return;
     var show = !$('netModal').classList.contains('hidden') && netKind === 'webrtc' && settings.webrtc && settings.webrtcDebug;
-    box.classList.toggle('hidden', !show); syncWrCapStatus();
+    box.classList.toggle('hidden', !show); syncWrCapStatus(); if (show) syncIceField();
+  }
+  function syncIceField() { var t = $('wrIce'); if (t) t.value = settings.iceServers || ''; iceStatus(); }
+  function iceStatus() {
+    var el = $('wrIceStatus'); if (!el) return;
+    var n = (customIce() || []).length;
+    el.textContent = n ? ('✓ ' + n + ' собствени ICE сървъра') : 'по подразбиране (STUN + безплатен TURN)';
   }
   function PeerBus(opts) {
     this.isHost = !!opts.isHost; this.code = opts.code;
@@ -2797,7 +2822,7 @@ body.modal-open{ overflow:hidden; }
       if (!window.Peer) { wrlog('start-fail', { reason: 'no-peerjs' }); reject(new Error('no-peerjs')); return; }
       var done = false, fail = function (e) { wrlog('start-fail', wrPeerErr(e)); if (!done) { done = true; reject(e); } };
       if (self.isHost) {
-        self.peer = new window.Peer(PEER_PREFIX + self.code, PEER_OPTS);
+        self.peer = new window.Peer(PEER_PREFIX + self.code, peerOpts());
         self.peer.on('open', function (id) { wrlog('peer-open', { id: id }); self._recon = 0; if (!done) { done = true; resolve(); } });
         self.peer.on('connection', function (conn) {
           wrlog('host-incoming', { peer: conn.peer });
@@ -2808,7 +2833,7 @@ body.modal-open{ overflow:hidden; }
         // a 'network'/socket error after we're open is a transient broker drop — keep the lobby alive
         self.peer.on('error', function (e) { wrlog('peer-error', wrPeerErr(e)); if (!done) fail(e); });
       } else {
-        self.peer = new window.Peer(undefined, PEER_OPTS);
+        self.peer = new window.Peer(undefined, peerOpts());
         self.peer.on('open', function (id) {
           wrlog('peer-open', { id: id }); self._recon = 0;
           if (!self._opened) { self._opened = true; self._dialHost({ ok: function () { if (!done) { done = true; resolve(); } }, fail: function (e) { fail(e); } }); }
@@ -2934,7 +2959,16 @@ body.modal-open{ overflow:hidden; }
         $('netJoinCode').classList.add('hidden'); $('netCodeJoin').disabled = false; netChooseMsg('');
         netShow('scan'); $('netToPrep').classList.add('hidden');
         net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
-      }).catch(function (e) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Връзката се провали: ' + ((e && (e.type || e.message)) || 'кодът не е намерен') + '. Провери кода и опитай пак.'); netBus = null; });
+      }).catch(function (e) {
+        $('netCodeJoin').disabled = false;
+        var et = e && (e.type || e.message);
+        // a timeout/negotiation failure = signalling worked but the P2P link couldn't form (NAT/TURN);
+        // 'peer-unavailable' = the code/host wasn't found at all
+        if (et === 'timeout' || et === 'negotiation-failed') netChooseMsg('⚠ Намерих играта, но не успях да изградя връзка с хоста. При различни мрежи трябва TURN сървър — пробвайте на една и съща Wi-Fi мрежа, или задайте TURN в дебъг панела.');
+        else if (et === 'peer-unavailable') netChooseMsg('⚠ Няма игра с този код. Провери кода и опитай пак.');
+        else netChooseMsg('⚠ Връзката се провали: ' + (et || 'грешка') + '. Опитай пак.');
+        netBus = null;
+      });
     });
   };
   // ---- connection-loss handling ----
@@ -3002,6 +3036,13 @@ body.modal-open{ overflow:hidden; }
     $('wrCapStatus').textContent = (ok ? '✓ копирано · ' : '') + b64.length + ' знака · ' + wrLog.length + ' събития (избери и копирай ръчно ако трябва)';
   };
   $('wrCapClear').onclick = function () { wrCapReset(wrRole, wrCode); $('wrCapOut').classList.add('hidden'); $('wrCapOut').value = ''; syncWrCapStatus(); };
+  $('wrIceSave').onclick = function () {
+    var raw = ($('wrIce').value || '').trim();
+    if (raw) { try { var a = JSON.parse(raw); if (!Array.isArray(a)) throw 0; } catch (e) { $('wrIceStatus').textContent = '⚠ Невалиден JSON масив.'; return; } }
+    settings.iceServers = raw; saveSettings(); iceStatus();
+    $('wrIceStatus').textContent = (customIce() ? '✓ Запазено — важи при следващо свързване.' : 'по подразбиране (STUN + безплатен TURN)');
+  };
+  $('wrIceClear').onclick = function () { settings.iceServers = ''; saveSettings(); $('wrIce').value = ''; iceStatus(); };
 
   function startNetGame(roster, order) {
     clearAllPenalties();
