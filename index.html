@@ -273,6 +273,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 
 /* ===== overlays ===== */
 .overlay{ position:fixed; inset:0; background:rgba(8,10,5,.78); backdrop-filter:blur(3px); display:grid; place-items:center; padding:18px; z-index:40; overscroll-behavior:contain; }
+#settingsModal{ z-index:50; }   /* opened from the lobby — must sit ABOVE the net modal (both .overlay) */
 #menuModal{ z-index:60; } /* always above floating bubbles/penalties */
 .modal{ width:340px; max-width:100%; max-height:88vh; overflow:auto; overscroll-behavior:contain; background:var(--gen-ink); border:2px solid var(--gen-brass); border-radius:14px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); }
 /* lock the page behind any open overlay so only the panel scrolls */
@@ -588,8 +589,14 @@ body.modal-open{ overflow:hidden; }
 .signal .bar:nth-child(1){ height:5px; } .signal .bar:nth-child(2){ height:8px; } .signal .bar:nth-child(3){ height:11px; } .signal .bar:nth-child(4){ height:14px; }
 .signal.s-good .bar.on{ background:#9bd17e; } .signal.s-degrading .bar.on{ background:var(--gen-brass-bright); } .signal.s-critical .bar.on{ background:#e8807a; }
 .netwarn{ color:#e8807a; font-weight:600; }
-.netlink{ position:absolute; top:8px; right:10px; z-index:6; display:flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px;
-  background:rgba(0,0,0,.45); border:1px solid var(--gen-pill-line); font-size:10px; }
+.netlink{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px;
+  background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); font-size:10px; }
+.netlink .condot{ width:8px; height:8px; border-radius:50%; flex:none; }
+.netlink .condot.up{ background:#2e9e5b; box-shadow:0 0 6px rgba(46,158,91,.7); }
+.netlink .condot.warn{ background:#e0a92e; box-shadow:0 0 6px rgba(224,169,46,.7); animation:condotpulse .9s ease-in-out infinite; }
+@keyframes condotpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+.netlink .condot.down{ background:#c0392b; }
+.netlink .conlbl{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.4px; color:var(--gen-muted); }
 .xferbar{ height:10px; border-radius:6px; background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); overflow:hidden; margin:12px 0 4px; }
 .xferfill{ height:100%; width:0; background:var(--gen-brass); transition:width .2s; }
 .xferstage{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; color:var(--gen-brass-bright); font-size:14px; margin-top:6px; }
@@ -1421,8 +1428,6 @@ body.modal-open{ overflow:hidden; }
 
 <!-- ============ GAME ============ -->
 <div id="game" class="board hidden">
-  <div id="netLink" class="netlink hidden"></div>
-
   <div id="gamebody" class="gamebody">
     <div class="hd">
       <button id="menuBtn" class="rank menubtn" title="Меню" aria-label="Меню"><span class="burger"></span></button>
@@ -1433,6 +1438,7 @@ body.modal-open{ overflow:hidden; }
           <span id="curPersona" class="ppersona hidden"></span>
         </span>
       </span>
+      <span id="netLink" class="netlink hidden"></span>
       <span class="totalbox">
         <span id="curRound" class="ptotal rnum">1/14</span>
         <span class="tcap">ХОД</span>
@@ -2027,7 +2033,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.13.2';
+  var APP_VERSION = '1.14.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2528,6 +2534,19 @@ body.modal-open{ overflow:hidden; }
     if ($('netBars')) $('netBars').innerHTML = html;
     var nl = $('netLink');
     if (nl) { nl.innerHTML = barsHTML(link.bars, st) + (st !== 'GOOD' ? ' <span class="netwarn">слаба връзка</span>' : ''); nl.classList.toggle('hidden', !netMode); }
+  }
+  // WebRTC connection indicator (acoustic uses the signal bars above): a dot by the turn marker
+  var netReconnecting = false;
+  function syncNetLink() {
+    var nl = $('netLink'); if (!nl) return;
+    if (!netMode || netKind !== 'webrtc') return;   // acoustic is driven by updateNetLink
+    var up = !!(netBus && netBus.conns && netBus.conns.length > 0);
+    var cls, lbl;
+    if (net && net.isHost) { cls = 'up'; lbl = 'хост'; }
+    else if (netReconnecting || !up) { cls = 'warn'; lbl = 'връзка…'; }
+    else { cls = 'up'; lbl = 'свързан'; }
+    nl.innerHTML = '<span class="condot ' + cls + '"></span><span class="conlbl">' + lbl + '</span>';
+    nl.classList.remove('hidden');
   }
 
   // host rejected our join (e.g. we picked the wrong game mode) → explain + back to the chooser
@@ -3217,7 +3236,7 @@ body.modal-open{ overflow:hidden; }
       if (!ok) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
       netBus = new PeerBus({ isHost: false, code: code,
         onLost: function () { netClientLost(); },
-        onReup: function () { wrlog('reup', {}); if (net) net.rejoin(); netSay('Връзката се възстанови — наваксвам…'); } });
+        onReup: function () { wrlog('reup', {}); netReconnecting = false; syncNetLink(); if (net) net.rejoin(); netSay('Връзката се възстанови — наваксвам…'); } });
       netBus.start().then(function () {
         var savedEph = wrLoadEph(code);                 // reuse our identity if we've played this game before
         net = newSessionWith(netBus, false, savedEph || undefined);
@@ -3247,7 +3266,7 @@ body.modal-open{ overflow:hidden; }
     net.markDropped(pid, true);
   }
   function netClientLost() {
-    if (netMode) netSay('Връзката с хоста прекъсна — опитвам да се върна…');
+    if (netMode) { netReconnecting = true; syncNetLink(); netSay('Връзката с хоста прекъсна — опитвам да се върна…'); }
     else netChooseMsg('⚠ Връзката прекъсна. Опитай пак.');
   }
   // ===================================================== OPTICAL (QR) handshake ==============
@@ -3515,6 +3534,7 @@ body.modal-open{ overflow:hidden; }
     paintCamo($('game'));
     syncHintBtn();
     setDockUI(manualMode);
+    netReconnecting = false; syncNetLink();   // show the connection indicator by the turn marker
     if (manualMode) {
       // FREE-FOR-ALL: I always fill MY OWN sheet at my own pace; others' boards update for peeking
       var mySeat = netOrder.indexOf(localPid); game.current = mySeat >= 0 ? mySeat : 0;
@@ -3767,7 +3787,7 @@ body.modal-open{ overflow:hidden; }
       // the active player drives input on their own device; everyone else watches
       selected = [false, false, false, false, false];
       dice = []; throwsLeft = 0; curLog = null;
-      if (netMyTurn) { awaitingRoll = true; locked = false; renderAll(); showOrder(p); }
+      if (netMyTurn) { awaitingRoll = true; locked = false; throwsLeft = ROLLS - 1; renderAll(); showOrder(p); }   // my turn: a first roll + (ROLLS-1) rerolls
       else { awaitingRoll = false; locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
       return;
     }
