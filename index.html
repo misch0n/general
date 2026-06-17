@@ -2133,7 +2133,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.25.0';
+  var APP_VERSION = '1.25.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
@@ -4334,7 +4334,11 @@ body.modal-open{ overflow:hidden; }
     var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
     $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
     $('curNumPart').classList.add('hidden');   // number-part chip is experimental-only
-    $('curRound').innerHTML = game.round + '<span class="rsub">/' + (sumExp() ? G.CATEGORIES_EXP.length : G.CATEGORIES.length) + '</span>';   // which turn of the game
+    // which turn of the game. net games don't run the local turn counter, so derive it from the
+    // shown player's progress (their filled categories + 1) — works for the active AND watched player.
+    var totalCats = sumExp() ? G.CATEGORIES_EXP.length : G.CATEGORIES.length;
+    var roundNum = netMode ? Math.min(totalCats, filledCount(p) + 1) : game.round;
+    $('curRound').innerHTML = roundNum + '<span class="rsub">/' + totalCats + '</span>';
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
