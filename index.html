@@ -2252,10 +2252,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.37.0';
+  var APP_VERSION = '1.37.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.37.1', items: [
+      ['chg', 'Плъзгането на бутона за старт също заключва вертикалния скрол, докато трае.'] ] },
     { v: '1.37.0', items: [
       ['rem', 'Настройки: „Нови зарове“ махнато (живее при стопанина/звездата и в „?“ бутона); „Облози“ вече не се показва по време на игра.'] ] },
     { v: '1.36.0', items: [
@@ -3034,6 +3036,7 @@ body.modal-open{ overflow:hidden; }
     var pb = $('playBtn'), gold = pb.querySelector('.pb-gold');
     var MAX_TX = 34;                                  // matches .playbtn.man .pb-gold (translateX 0 → 34%)
     var sx = null, sy = null, pid = null, decided = false, dragging = false, baseTx = 0, blobW = 1, curTx = 0;
+    function lockScroll(lock) { var sc = document.querySelector('.setup-scroll'); if (sc) sc.style.overflowY = lock ? 'hidden' : ''; }
     pb.addEventListener('pointerdown', function (e) {
       sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; dragging = false;
       blobW = gold.offsetWidth || 1; baseTx = playManual ? MAX_TX : 0; curTx = baseTx;
@@ -3045,7 +3048,7 @@ body.modal-open{ overflow:hidden; }
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
         decided = true;
         dragging = Math.abs(dx) > Math.abs(dy);       // horizontal → the gold tracks the finger
-        if (dragging) { try { pb.setPointerCapture(pid); } catch (x) {} gold.style.transition = 'none'; }
+        if (dragging) { try { pb.setPointerCapture(pid); } catch (x) {} gold.style.transition = 'none'; lockScroll(true); }   // freeze vertical scroll
         else { sx = null; return; }                   // vertical → ignore (leave for scrolling)
       }
       if (!dragging) return;
@@ -3063,7 +3066,7 @@ body.modal-open{ overflow:hidden; }
     pb.addEventListener('pointerup', function (e) {
       if (sx == null) return;
       var moved = decided; sx = null;
-      if (dragging) { settleDrag(); return; }
+      if (dragging) { lockScroll(false); settleDrag(); return; }
       if (moved) return;                                        // a vertical drag — no tap
       var r = pb.getBoundingClientRect();                       // a tap: resolve the zone by pointer X
       var rel = r.width ? (e.clientX - r.left) / r.width : 0.5;
@@ -3073,7 +3076,7 @@ body.modal-open{ overflow:hidden; }
       else startPlay();                                         // active end or middle → start
     });
     pb.addEventListener('pointercancel', function () {
-      if (dragging) { gold.style.transition = ''; gold.style.transform = ''; }   // revert to the current mode
+      if (dragging) { lockScroll(false); gold.style.transition = ''; gold.style.transform = ''; }   // revert to the current mode
       sx = null; decided = false; dragging = false;
     });
     pb.addEventListener('keydown', function (e) {
