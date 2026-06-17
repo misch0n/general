@@ -2259,10 +2259,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.40.1';
+  var APP_VERSION = '1.40.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.40.2', items: [
+      ['fix', 'Архив: по-старите мрежови игри (без явен маркер) се разпознават по записа на ходовете — вече не се водят грешно като игри на устройството.'] ] },
     { v: '1.40.1', items: [
       ['fix', 'Селектори с плъзване (правила, устройство/мрежа, архив, пол): посоката се заключва и превключването става чак при вдигане на пръста — без задействане при излизане от кутийката.'] ] },
     { v: '1.40.0', items: [
@@ -7667,6 +7669,14 @@ body.modal-open{ overflow:hidden; }
   var viewingHistory = false, histSnapshot = null, dossierCtx = null, currentHistRec = null;
 
   function recIsExp(rec) { return !!(rec && rec.ruleset === 'experimental'); }
+  // local vs network game. New records carry an explicit `net` flag; for older ones we infer it from
+  // the move log — a networked game recorded remote players' fill order with a `remote` marker.
+  function recIsNet(rec) {
+    if (!rec) return false;
+    if (typeof rec.net === 'boolean') return rec.net;
+    var ml = rec.moveLog;
+    return !!(ml && ml.some && ml.some(function (log) { return log && log.some && log.some(function (m) { return m && m.remote; }); }));
+  }
   // per-player total, ALWAYS computed per the record's ruleset (so scoring-rule fixes — e.g. the
   // minus −50 — apply to old saves too, and the entry matches the details view). The stored `pts`
   // is only a fallback for legacy standard records.
@@ -8377,8 +8387,8 @@ body.modal-open{ overflow:hidden; }
         + '<span class="hg-sub">'
         + '<span class="hg-mode" title="' + (rec.manualMode ? 'отчет (ръчно)' : 'със зарове') + '">'
         +   (rec.manualMode ? '<i class="minipencil"></i>' : '<i class="minidie"></i>') + '</span>'
-        + '<span class="hg-net" title="' + (rec.net ? 'по мрежа' : 'на устройството') + '">'
-        +   (rec.net ? '<i class="mininet"></i>' : '<i class="minidev"></i>') + '</span>'
+        + (function () { var isNet = recIsNet(rec); return '<span class="hg-net" title="' + (isNet ? 'по мрежа' : 'на устройството') + '">'
+        +   (isNet ? '<i class="mininet"></i>' : '<i class="minidev"></i>') + '</span>'; })()
         + ' · ' + subDate + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '</div>'
