@@ -2252,10 +2252,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.35.2';
+  var APP_VERSION = '1.35.3';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.35.3', items: [
+      ['chg', 'Смяната на режим (зарове/отчет) също показва кратко обяснение долу.'] ] },
     { v: '1.35.2', items: [
       ['chg', 'Повече разстояние между селектора устройство/мрежа и долния край на екрана.'] ] },
     { v: '1.35.1', items: [
@@ -2972,6 +2974,8 @@ body.modal-open{ overflow:hidden; }
                     standard: 'Без минуси: класическата игра — само положителни точки.' };
   var WHERE_NOTE = { net: 'По мрежа: хостът дава код, останалите се присъединяват и играят по неговите правила.',
                      local: 'На устройството: всички играят на този телефон, един след друг.' };
+  var MODE_NOTE = { dice: 'Със зарове: хвърляш заровете и трупаш точки по комбинации.',
+                    manual: 'Отчет: ръчно вписване на точки без зарове — за игра на маса.' };
   function setStartRuleset(rs) {
     if (settings.ruleset === rs) return;
     settings.ruleset = rs; saveSettings(); syncStartRuleSel(); syncRuleset();
@@ -3015,7 +3019,7 @@ body.modal-open{ overflow:hidden; }
   //      switch to it; swipe ←/→ picks a mode (the gradient slides/floods to the new mode) ----
   var playManual = false;   // false = игра (със зарове), true = отчет (ръчно)
   function syncPlayBtn() { $('playBtn').classList.toggle('man', playManual); }
-  function setPlayMode(manual) { if (playManual !== manual) { playManual = manual; syncPlayBtn(); } }
+  function setPlayMode(manual) { if (playManual !== manual) { playManual = manual; syncPlayBtn(); showInfoToast(manual ? MODE_NOTE.manual : MODE_NOTE.dice); } }
   function startPlay() { if (netPlay) startNetFlow(playManual); else startFromSetup(playManual); }
   (function () {
     var pb = $('playBtn'), sx = null;
