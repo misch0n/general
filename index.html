@@ -230,25 +230,26 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* hold-to-unlock area: never select/callout */
 .setup-hambwrap{ position:absolute; right:0; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
 .setuphamb{ flex:none; width:calc(var(--ttl) * .7); height:calc(var(--ttl) * .7); border-color:var(--gen-brass-stroke); }   /* 70% of the title height, vertically centred */
-/* underline-style segmented selectors on the start screen (ruleset + local/network) */
-.ssel{ display:flex; gap:20px; justify-content:center; margin:0 0 8px; -webkit-user-select:none; user-select:none; }
-.ssel-where{ margin:10px 0 8px; }
-.ssel-opt{ background:none; border:none; border-bottom:2px solid transparent; padding:2px 1px 3px; cursor:pointer;
-  font-family:var(--gen-font-display); font-weight:700; font-size:13.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
-.ssel-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
+/* underline-style segmented selectors on the start screen (ruleset + local/network).
+   active = regular size + bold; inactive = ~70% size + thinner, vertically centred against the active */
+.ssel{ display:flex; gap:14px; justify-content:center; align-items:center; margin:0 0 7px; -webkit-user-select:none; user-select:none; }
+.ssel-where{ margin:8px 0 7px; }
+.ssel-opt{ background:none; border:none; border-bottom:2px solid transparent; padding:1px 1px 2px; cursor:pointer; line-height:1;
+  font-family:var(--gen-font-display); font-weight:300; font-size:8px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
+.ssel-opt.on{ font-weight:700; font-size:11.5px; color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
 .ssel-opt.rs-off{ opacity:.32; cursor:not-allowed; }
 /* the play button: [игра | В БОЙ! | отчет] — sides pick the mode, the middle starts the game */
 .playbtn{ display:flex; align-items:stretch; height:46px; max-width:300px; margin:6px auto; border-radius:var(--gen-r-tag); overflow:hidden;
   border:2px solid var(--gen-ink-line); -webkit-user-select:none; user-select:none; touch-action:pan-y; }
-.playbtn .pb-side{ flex:none; width:34px; display:grid; place-items:center; cursor:pointer; background:var(--gen-pill); color:var(--gen-text);
-  font-family:var(--gen-font-display); font-weight:400; font-size:10.5px; letter-spacing:1px; text-transform:uppercase; transition:background .15s ease, color .15s ease; }
-.playbtn .pb-side.on{ background:#cb8a33; color:var(--gen-ink); font-weight:800; }        /* active mode = orange, a shade darker than the play area */
+.playbtn .pb-side{ flex:none; width:32px; display:grid; place-items:center; cursor:pointer; background:var(--gen-pill); color:var(--gen-text);
+  font-family:var(--gen-font-display); font-weight:300; font-size:9px; letter-spacing:1px; text-transform:uppercase; transition:background .15s ease, color .15s ease; }
+.playbtn .pb-side.on{ background:#b09551; color:var(--gen-ink); font-weight:500; font-size:11px; }   /* active mode = a muted shade of the gold play area, regular print */
 .playbtn .pb-left{ border-right:1px solid rgba(0,0,0,.45); box-shadow:inset -1px 0 0 rgba(255,255,255,.06); }   /* fine separator */
 .playbtn .pb-right{ border-left:1px solid rgba(0,0,0,.45); box-shadow:inset 1px 0 0 rgba(255,255,255,.06); }
 .playbtn .pb-left span{ display:block; transform:rotate(-90deg); }                       /* bottoms face the middle */
 .playbtn .pb-right span{ display:block; transform:rotate(90deg); }
-.playbtn .pb-go{ flex:1; display:grid; place-items:center; cursor:pointer; background:var(--gen-brass); color:var(--gen-ink);
-  font-family:var(--gen-font-display); font-weight:700; font-size:17px; letter-spacing:1.5px; text-transform:uppercase; }
+.playbtn .pb-go{ flex:1; display:grid; place-items:center; cursor:pointer; background:var(--gen-brass); color:var(--gen-ink); padding:0 15%;   /* ~30% of the middle is label padding */
+  font-family:var(--gen-font-display); font-weight:700; font-size:16px; letter-spacing:1px; text-transform:uppercase; white-space:nowrap; }
 .playbtn .pb-go:active{ box-shadow:inset 0 3px 10px rgba(0,0,0,.3); }
 .pcard{ position:relative; overflow:hidden; border:1px solid var(--gen-pill-line); border-radius:10px; }
 .pcard.swipeable{ touch-action:pan-y; }
@@ -2141,10 +2142,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.26.0';
+  var APP_VERSION = '1.26.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.26.1', items: [
+      ['chg', 'Начален екран: по-изчистени превключватели и бутон за старт (по-фин неактивен текст, по-меки цветове).'] ] },
     { v: '1.26.0', items: [
       ['new', 'Начален екран: плъзни боец наляво, за да го махнеш (червено „МАХНИ" се разкрива; готово при 50%).'] ] },
     { v: '1.25.0', items: [
