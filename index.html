@@ -2252,10 +2252,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.35.4';
+  var APP_VERSION = '1.36.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.36.0', items: [
+      ['chg', 'Бутон за старт: златното петно следва пръста при плъзгане (в границите на бутона) и щрака към най-близкия край при пускане.'] ] },
     { v: '1.35.4', items: [
       ['fix', 'Свайп за махане на боец заключва вертикалния скрол, докато трае плъзгането.'] ] },
     { v: '1.35.3', items: [
@@ -3027,12 +3029,40 @@ body.modal-open{ overflow:hidden; }
   function setPlayMode(manual) { if (playManual !== manual) { playManual = manual; syncPlayBtn(); showInfoToast(manual ? MODE_NOTE.manual : MODE_NOTE.dice); } }
   function startPlay() { if (netPlay) startNetFlow(playManual); else startFromSetup(playManual); }
   (function () {
-    var pb = $('playBtn'), sx = null;
-    pb.addEventListener('pointerdown', function (e) { sx = e.clientX; });
+    var pb = $('playBtn'), gold = pb.querySelector('.pb-gold');
+    var MAX_TX = 34;                                  // matches .playbtn.man .pb-gold (translateX 0 → 34%)
+    var sx = null, sy = null, pid = null, decided = false, dragging = false, baseTx = 0, blobW = 1, curTx = 0;
+    pb.addEventListener('pointerdown', function (e) {
+      sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; dragging = false;
+      blobW = gold.offsetWidth || 1; baseTx = playManual ? MAX_TX : 0; curTx = baseTx;
+    });
+    pb.addEventListener('pointermove', function (e) {
+      if (sx == null || e.pointerId !== pid) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true;
+        dragging = Math.abs(dx) > Math.abs(dy);       // horizontal → the gold tracks the finger
+        if (dragging) { try { pb.setPointerCapture(pid); } catch (x) {} gold.style.transition = 'none'; }
+        else { sx = null; return; }                   // vertical → ignore (leave for scrolling)
+      }
+      if (!dragging) return;
+      e.preventDefault();
+      curTx = Math.max(0, Math.min(MAX_TX, baseTx + (dx / blobW) * 100));   // 1:1 with the swipe, clamped to the ends
+      gold.style.transform = 'translateX(' + curTx + '%)';
+    });
+    function settleDrag() {
+      // snap to the nearer end (past the midpoint commits the switch) with the normal transition
+      var manual = curTx > MAX_TX / 2, changed = manual !== playManual;
+      playManual = manual; pb.classList.toggle('man', playManual);
+      gold.style.transition = ''; void gold.offsetWidth; gold.style.transform = '';   // animate from curTx to the end
+      if (changed) showInfoToast(playManual ? MODE_NOTE.manual : MODE_NOTE.dice);
+    }
     pb.addEventListener('pointerup', function (e) {
       if (sx == null) return;
-      var dx = e.clientX - sx; sx = null;
-      if (Math.abs(dx) > 24) { setPlayMode(dx > 0); return; }   // a horizontal swipe: right→отчет, left→игра
+      var moved = decided; sx = null;
+      if (dragging) { settleDrag(); return; }
+      if (moved) return;                                        // a vertical drag — no tap
       var r = pb.getBoundingClientRect();                       // a tap: resolve the zone by pointer X
       var rel = r.width ? (e.clientX - r.left) / r.width : 0.5;
       // tapping the INACTIVE end switches to that mode; the active end (or the middle) starts the game
@@ -3040,7 +3070,10 @@ body.modal-open{ overflow:hidden; }
       else if (rel > 0.76 && !playManual) setPlayMode(true);    // inactive right → отчет
       else startPlay();                                         // active end or middle → start
     });
-    pb.addEventListener('pointercancel', function () { sx = null; });
+    pb.addEventListener('pointercancel', function () {
+      if (dragging) { gold.style.transition = ''; gold.style.transform = ''; }   // revert to the current mode
+      sx = null; decided = false; dragging = false;
+    });
     pb.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowLeft') { e.preventDefault(); setPlayMode(false); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); setPlayMode(true); }
