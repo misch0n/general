@@ -2268,10 +2268,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.42.1';
+  var APP_VERSION = '1.43.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.43.0', items: [
+      ['chg', 'Плъзгания (без бутона за старт): не заключват вертикалния скрол; четат движението по X до вдигане на пръста и действат при вдигане според крайното разместване.'] ] },
     { v: '1.42.1', items: [
       ['chg', 'Картон на боеца: при заключено име на старшината селекторът за пол е изключен и с приглушени цветове.'] ] },
     { v: '1.42.0', items: [
@@ -2734,29 +2736,30 @@ body.modal-open{ overflow:hidden; }
     renderSetup();
   }
   // gender selector swipe: a horizontal drag shifts the choice ONE step in the swipe direction
-  // (left → мъжко, right → женско). The direction LOCKS on the first clear horizontal move (and
-  // captures the pointer so leaving the box doesn't matter), but the shift fires only on LIFT.
+  // (left → мъжко, right → женско). X is read until the finger LIFTS; the shift fires on lift based
+  // on the NET displacement, and vertical scroll is never locked.
   var suppressGenderClick = false;
   function attachGenderSwipe(gsw, p) {
-    var GENS = ['m', 'n', 'f'], sx = null, sy = null, pid = null, decided = false, dir = 0;
+    var GENS = ['m', 'n', 'f'], sx = null, sy = null, pid = null, lastX = 0, lastY = 0, capturing = false;
     gsw.style.touchAction = 'pan-y';                            // vertical scroll passes through
-    gsw.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; dir = 0; });
+    gsw.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; lastX = e.clientX; lastY = e.clientY; pid = e.pointerId; capturing = false; });
     gsw.addEventListener('pointermove', function (e) {
-      if (sx == null || e.pointerId !== pid || decided) return;
-      var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
-      if (Math.abs(dx) <= Math.abs(dy)) { sx = null; return; }  // vertical → leave it for scrolling
-      decided = true; dir = dx > 0 ? 1 : -1;                    // lock the direction
-      try { gsw.setPointerCapture(pid); } catch (x) {}          // keep the gesture even if it leaves the box
+      if (sx == null || e.pointerId !== pid) return;
+      lastX = e.clientX; lastY = e.clientY;
+      if (!capturing && Math.abs(e.clientX - sx) > 8 && Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy)) {
+        capturing = true; try { gsw.setPointerCapture(pid); } catch (x) {}
+      }
     });
     gsw.addEventListener('pointerup', function (e) {
-      if (sx != null && e.pointerId === pid && decided) {       // apply the shift only on lift
-        var idx = GENS.indexOf(p.gender), ni = dir > 0 ? Math.min(2, idx + 1) : Math.max(0, idx - 1);
+      if (sx == null) return;
+      var ex = (e.pointerId === pid && e.clientX != null) ? e.clientX : lastX, ey = (e.pointerId === pid && e.clientY != null) ? e.clientY : lastY;
+      var dx = ex - sx, dy = ey - sy; sx = null;
+      if (Math.abs(dx) >= 18 && Math.abs(dx) > Math.abs(dy)) {
+        var idx = GENS.indexOf(p.gender), ni = dx > 0 ? Math.min(2, idx + 1) : Math.max(0, idx - 1);
         if (ni !== idx) { suppressGenderClick = true; setGender(p, GENS[ni]); renderSetup(); setTimeout(function () { suppressGenderClick = false; }, 400); }
       }
-      sx = null; decided = false; dir = 0;
     });
-    gsw.addEventListener('pointercancel', function () { sx = null; decided = false; dir = 0; });
+    gsw.addEventListener('pointercancel', function () { sx = null; });
   }
   function renderSetup() {
     applyOwnerName(); // seat #1 carries the owner's name when the toggle is on
@@ -2909,8 +2912,6 @@ body.modal-open{ overflow:hidden; }
   // the red underlay is only as wide as the swipe (no bleed-through behind the transparent card).
   function attachSwipeRemove(card, fg, bg, p) {
     var sx = 0, sy = 0, w = 1, active = false, decided = false, swiping = false, pid = null;
-    // lock the roster's vertical scroll for the duration of a horizontal delete-swipe
-    function lockScroll(lock) { var sc = document.querySelector('.setup-scroll'); if (sc) sc.style.overflowY = lock ? 'hidden' : ''; }
     function settle() { setTimeout(function () { fg.classList.remove('snap'); bg.classList.remove('snap'); fg.style.transform = ''; bg.style.width = ''; }, 240); }
     card.addEventListener('pointerdown', function (e) {
       if (drag) return;                                            // a reorder drag is running
@@ -2926,7 +2927,7 @@ body.modal-open{ overflow:hidden; }
       if (!decided) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
         decided = true; swiping = (Math.abs(dx) > Math.abs(dy)) && dx < 0;   // a clear horizontal-left gesture
-        if (swiping) { try { card.setPointerCapture(pid); } catch (x) {} lockScroll(true); }   // freeze vertical scroll
+        if (swiping) { try { card.setPointerCapture(pid); } catch (x) {} }   // own the horizontal drag (vertical scroll stays free)
         else { active = false; return; }                           // vertical → leave it for scroll
       }
       if (!swiping) return;
@@ -2937,7 +2938,6 @@ body.modal-open{ overflow:hidden; }
     });
     function end(e) {
       if (!active || (e.pointerId != null && e.pointerId !== pid)) return;
-      if (swiping) lockScroll(false);
       if (!swiping) { active = false; return; }
       var dx = e.clientX - sx; active = false; fg.classList.add('snap'); bg.classList.add('snap');
       if (-dx >= w * 0.5) {   // past halfway → remove
@@ -2946,7 +2946,7 @@ body.modal-open{ overflow:hidden; }
       } else { fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); }   // not far enough → snap back
     }
     card.addEventListener('pointerup', end);
-    card.addEventListener('pointercancel', function () { lockScroll(false); if (active && swiping) { fg.classList.add('snap'); bg.classList.add('snap'); fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); } active = false; });
+    card.addEventListener('pointercancel', function () { if (active && swiping) { fg.classList.add('snap'); bg.classList.add('snap'); fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); } active = false; });
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
 
@@ -3074,26 +3074,27 @@ body.modal-open{ overflow:hidden; }
   }
   // swipe across a selector: any horizontal drag toward an option picks it (left option / right
   // option by direction). A tap still picks the tapped option; the post-swipe click is suppressed.
-  // a horizontal swipe picks the option in the swipe direction. The direction LOCKS on the first
-  // clear horizontal move (and captures the pointer so leaving the box doesn't matter), but the
-  // switch only fires when the finger LIFTS — never mid-gesture.
+  // a horizontal swipe picks the option in the swipe direction. The X movement is read continuously
+  // until the finger LIFTS; the switch fires on lift based on the NET displacement — never mid-gesture,
+  // and vertical scroll is never locked.
   function attachSelSwipe(sel, pickLeft, pickRight) {
-    var sx = null, sy = null, pid = null, decided = false, dir = 0;
+    var sx = null, sy = null, pid = null, lastX = 0, lastY = 0, capturing = false;
     sel.style.touchAction = 'pan-y';                            // vertical scroll passes through; we own horizontal
-    sel.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; dir = 0; sel._swiped = false; });
+    sel.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; lastX = e.clientX; lastY = e.clientY; pid = e.pointerId; capturing = false; sel._swiped = false; });
     sel.addEventListener('pointermove', function (e) {
-      if (sx == null || e.pointerId !== pid || decided) return;
-      var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
-      if (Math.abs(dx) <= Math.abs(dy)) { sx = null; return; }  // vertical → leave it for scrolling
-      decided = true; sel._swiped = true; dir = dx > 0 ? 1 : -1; // lock the direction
-      try { sel.setPointerCapture(pid); } catch (x) {}          // keep the gesture even if it leaves the box
+      if (sx == null || e.pointerId !== pid) return;
+      lastX = e.clientX; lastY = e.clientY;
+      if (!capturing && Math.abs(e.clientX - sx) > 8 && Math.abs(e.clientX - sx) > Math.abs(e.clientY - sy)) {
+        capturing = true; try { sel.setPointerCapture(pid); } catch (x) {}   // a horizontal drag → keep tracking until lift
+      }
     });
     sel.addEventListener('pointerup', function (e) {
-      if (sx != null && e.pointerId === pid && decided) { (dir > 0 ? pickRight : pickLeft)(); }   // fire on lift only
-      sx = null; decided = false; dir = 0;
+      if (sx == null) return;
+      var ex = (e.pointerId === pid && e.clientX != null) ? e.clientX : lastX, ey = (e.pointerId === pid && e.clientY != null) ? e.clientY : lastY;
+      var dx = ex - sx, dy = ey - sy; sx = null;
+      if (Math.abs(dx) >= 18 && Math.abs(dx) > Math.abs(dy)) { sel._swiped = true; (dx > 0 ? pickRight : pickLeft)(); }
     });
-    sel.addEventListener('pointercancel', function () { sx = null; decided = false; dir = 0; });
+    sel.addEventListener('pointercancel', function () { sx = null; });
   }
   $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
     b.onclick = function () { if ($('startRuleSel')._swiped) { $('startRuleSel')._swiped = false; return; } setStartRuleset(b.getAttribute('data-rs')); };
