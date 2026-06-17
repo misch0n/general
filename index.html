@@ -937,7 +937,20 @@ body.modal-open{ overflow:hidden; }
 .cssec{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:12px 0 6px; }
 .settings-titlerow{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; }
 .settings-titlerow h2{ margin:0; }
-.app-ver{ font-size:11px; font-weight:700; color:var(--gen-muted); font-variant-numeric:tabular-nums; letter-spacing:.3px; }
+.app-ver{ font-size:11px; font-weight:700; color:var(--gen-muted); font-variant-numeric:tabular-nums; letter-spacing:.3px; cursor:pointer; text-decoration:underline dotted rgba(255,255,255,.25); text-underline-offset:3px; }
+.app-ver:hover{ color:var(--gen-brass-bright); }
+/* changelog popover (tap the version marker on the start-screen settings) */
+.clogpop{ position:fixed; z-index:80; width:300px; max-width:calc(100vw - 24px); max-height:62vh; overflow-y:auto;
+  padding:12px 14px; border-radius:12px; background:var(--gen-ink); border:2px solid var(--gen-brass-stroke); box-shadow:0 12px 34px rgba(0,0,0,.6); }
+.clogpop .clog-hd{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:8px; }
+.clogpop .clog-v{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-text); margin:10px 0 4px; font-size:12.5px; }
+.clogpop .clog-v:first-of-type{ margin-top:0; }
+.clogpop .clog-i{ display:flex; gap:6px; margin:3px 0; font-size:11.5px; line-height:1.45; color:var(--gen-label); }
+.clogpop .clog-tag{ flex:none; font-size:8.5px; font-weight:700; padding:1px 5px; border-radius:4px; text-transform:uppercase; letter-spacing:.3px; align-self:flex-start; margin-top:1px; }
+.clogpop .clog-tag.new{ background:rgba(46,107,58,.5); color:#9bd17e; }
+.clogpop .clog-tag.fix{ background:rgba(107,58,46,.5); color:#e8a07a; }
+.clogpop .clog-tag.chg{ background:rgba(58,74,107,.5); color:#9bb8e8; }
+.clogpop .clog-tag.rem{ background:rgba(90,46,46,.5); color:#e88; }
 .csitem{ padding:6px 0; border-bottom:1px solid var(--gen-pill-line); }
 .csrow{ display:flex; align-items:baseline; gap:8px; }
 .csex{ display:flex; gap:4px; margin:6px 0 1px 0; }
@@ -2015,6 +2028,7 @@ body.modal-open{ overflow:hidden; }
 
 <!-- floating owner-token explainer (tap the ★) -->
 <div id="ownerInfo" class="ownerinfo hidden"></div>
+<div id="changelogPop" class="clogpop hidden"></div>
 
 <!-- resume an unfinished game (offered on load) --><div id="resumeModal" class="overlay hidden">
   <div class="modal" style="max-width:320px;text-align:center">
@@ -2096,8 +2110,63 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.20.1';
-  (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
+  var APP_VERSION = '1.21.0';
+  // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
+  // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
+  var CHANGELOG = [
+    { v: '1.21.0', items: [
+      ['new', 'Маркерът за версия (на началния екран) се натиска и показва този списък с промени.'] ] },
+    { v: '1.20.x', items: [
+      ['fix', 'История: точките за игри „с минуси“ се смятат правилно (включват −50).'],
+      ['new', 'Начален екран: избор на правила (без/с минуси) и „на устройството / по мрежа“.'],
+      ['new', 'При влизане в игра по мрежа с различни правила/тип — предупреждение (но не блокира).'],
+      ['rem', 'Отделният бутон „Игра по интернет“ — вече е през избора „по мрежа“.'] ] },
+    { v: '1.19.x', items: [
+      ['new', '„Нови зарове“ (подреди/раздели) — в настройките, при стопанина и на бутона „?“.'],
+      ['chg', '„КАЗАРМА“ се преименува на „Сол и хранилки“.'],
+      ['fix', 'Съветите „с минуси“ вече следват настройката (не са включени по подразбиране).'],
+      ['fix', 'Менютата „с минуси“ вече не махат „два чифта“ от дъската.'],
+      ['new', 'Личният рекорд показва и най-нисък резултат, не само най-висок.'] ] },
+    { v: '1.18.x', items: [
+      ['new', '„Нови зарове“: новохвърлените зарове се групират отделно (и в обобщението).'],
+      ['fix', '„С минуси“: −50 се добавя ВЪРХУ минуса в числовата част (а не вместо него).'] ] },
+    { v: '1.17.x', items: [
+      ['chg', 'Режимът на играта (зарове/отчет) е избор на старшината; гостите го наследяват.'],
+      ['new', 'Играта по интернет е официална функция (вече не е скрита).'] ] },
+    { v: '1.15–1.16', items: [
+      ['new', 'QR код за играта: хостът го показва, гостът го сканира.'],
+      ['new', 'Поставяне на кода от клипборда + живо показване на избора на зарове.'] ] },
+  ];
+  function renderChangelog() {
+    var h = '<div class="clog-hd">Какво ново</div>';
+    CHANGELOG.forEach(function (rel) {
+      h += '<div class="clog-v">v' + rel.v + '</div>';
+      rel.items.forEach(function (it) { h += '<div class="clog-i"><span class="clog-tag ' + it[0] + '">' + it[0] + '</span><span>' + it[1] + '</span></div>'; });
+    });
+    return h;
+  }
+  function toggleChangelog(anchor) {
+    var b = $('changelogPop');
+    if (!b.classList.contains('hidden')) { b.classList.add('hidden'); return; }
+    b.innerHTML = renderChangelog(); b.classList.remove('hidden');
+    var r = anchor.getBoundingClientRect();
+    b.style.left = Math.min(Math.max(8, r.right - b.offsetWidth), window.innerWidth - b.offsetWidth - 8) + 'px';
+    var below = r.bottom + 8;
+    b.style.top = (below + b.offsetHeight < window.innerHeight - 8 ? below : Math.max(8, r.top - b.offsetHeight - 8)) + 'px';
+  }
+  (function () {
+    var av = $('appVer');
+    if (av) {
+      av.textContent = 'v' + APP_VERSION;
+      av.title = 'Какво ново';
+      av.onclick = function (e) { e.stopPropagation(); toggleChangelog(av); };
+    }
+    // tap anywhere else closes the changelog popover
+    document.addEventListener('click', function (e) {
+      var b = $('changelogPop');
+      if (b && !b.classList.contains('hidden') && e.target !== av && !b.contains(e.target)) b.classList.add('hidden');
+    });
+  })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
   // глупости (profanity) ON by default = NSFW words allowed; OFF = censored to the SFW set
@@ -5963,6 +6032,8 @@ body.modal-open{ overflow:hidden; }
     $('ruleBox').classList.toggle('hidden', inGame || lobbyOnly);
     $('clearArchiveRow').classList.toggle('hidden', inGame || lobbyOnly);
     $('settingsTitle').textContent = lobbyOnly ? '⚙ Настройки на играта' : '⚙ Настройки';
+    // the version marker (tap = changelog) belongs to the pre-game start screen only
+    $('appVer').classList.toggle('hidden', inGame || lobbyOnly);
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
