@@ -243,12 +243,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-hambwrap{ position:absolute; right:0; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
 .setuphamb{ flex:none; width:calc(var(--ttl) * .7); height:calc(var(--ttl) * .7); border-color:var(--gen-brass-stroke); }   /* 70% of the title height, vertically centred */
 /* underline-style segmented selectors on the start screen (ruleset + local/network).
-   active = regular size + bold; inactive = ~70% size + thinner, vertically centred against the active */
+   both options are the same size; the inactive one is simply MUTED (no scale-down), the active
+   one is brass with an underline */
 .ssel{ display:flex; gap:14px; justify-content:center; align-items:center; margin:0 0 7px; -webkit-user-select:none; user-select:none; }
 .ssel-where{ margin:8px 0 7px; }
 .ssel-opt{ background:none; border:none; border-bottom:2px solid transparent; padding:1px 1px 2px; cursor:pointer; line-height:1;
-  font-family:var(--gen-font-display); font-weight:700; font-size:8px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
-.ssel-opt.on{ font-size:11.5px; color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
+  font-family:var(--gen-font-display); font-weight:700; font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
+.ssel-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
 .ssel-opt.rs-off{ opacity:.32; cursor:not-allowed; }
 /* the play button: one seamless surface. A horizontal gradient paints three solid colour zones
    — [ left mode | gold play | right mode ] — joined by soft fades, with NO clickable sub-sections.
@@ -2201,10 +2202,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.30.2';
+  var APP_VERSION = '1.30.3';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.30.3', items: [
+      ['chg', 'Селекторите (правила и устройство/мрежа): неактивната опция вече е със същия размер, само приглушена — без смаляване.'] ] },
     { v: '1.30.2', items: [
       ['chg', 'Режим за разработчици: вече не се появява допълнителна иконка — след отключване самото заглавие „ГЕНЕРАЛ“ става докосваемо и го отваря.'] ] },
     { v: '1.30.1', items: [
