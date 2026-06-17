@@ -257,14 +257,22 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
    right solid zone. Taps are resolved by pointer X (left/middle/right); swipes by direction. */
 .playbtn{ position:relative; width:100%; height:46px; max-width:238px; margin:6px auto; border-radius:var(--gen-r-tag); overflow:hidden;
   border:2px solid var(--gen-ink-line); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:pan-y;
-  --pb-lc:#b09551; --pb-rc:var(--gen-pill);    /* left active (muted gold), right inactive (pill) — default = regular mode */
-  /* each side: its mode colour solid to a hard stop at the edge, then a smooth fade that FINISHES
-     EARLY into a wide central gold band where the „БОЙ!" label sits, between the two gradients */
-  background:linear-gradient(90deg,
-    var(--pb-lc) 0, var(--pb-lc) 16%, var(--gen-brass) 36%,
-    var(--gen-brass) 64%, var(--pb-rc) 84%, var(--pb-rc) 100%); }
-.playbtn.man{ --pb-lc:var(--gen-pill); --pb-rc:#b09551; }   /* manual mode: right zone becomes the active muted gold */
+  --pb-act:#b09551; --pb-inact:var(--gen-pill);    /* active = muted gold, inactive = pill */
+  /* a 200%-wide gradient holding BOTH modes side by side; sliding background-position morphs between
+     them — that slide IS the swap/„flood" animation (and the once-per-session entrance hint).
+     Left half = regular [act | gold | inact]; right half = manual [inact | gold | act]; the seam
+     (pill→pill at 50%) is continuous. At position 0% the visible window reproduces the regular
+     design exactly (act 0-16%, gold 36-64%, inact 84-100%), at 100% the manual mirror image. */
+  background-image:linear-gradient(90deg,
+    var(--pb-act) 0%, var(--pb-act) 8%, var(--gen-brass) 18%, var(--gen-brass) 32%, var(--pb-inact) 42%, var(--pb-inact) 50%,
+    var(--pb-inact) 50%, var(--pb-inact) 58%, var(--gen-brass) 68%, var(--gen-brass) 82%, var(--pb-act) 92%, var(--pb-act) 100%);
+  background-size:200% 100%; background-position:0% 0%;
+  transition:background-position .42s cubic-bezier(.4,.1,.3,1); }
+.playbtn.man{ background-position:100% 0%; }                  /* manual — the slide right→ is the flood */
 .playbtn:active{ box-shadow:inset 0 3px 12px rgba(0,0,0,.32); }
+/* once-per-session entrance hint: a gentle sway of the gradient to advertise the swipe affordance */
+.playbtn.pb-hint{ animation:pbHint 1s ease-in-out .35s 1; }
+@keyframes pbHint { 0%{ background-position:0% 0%; } 32%{ background-position:18% 0%; } 66%{ background-position:5% 0%; } 100%{ background-position:0% 0%; } }
 .playbtn .pb-go{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; color:var(--gen-ink);
   font-family:var(--gen-font-display); font-weight:700; font-size:17px; letter-spacing:1.5px; text-transform:uppercase; white-space:nowrap; }
 /* CSS-drawn mode icons — absolutely placed, fully inside their solid colour zone, never clickable */
@@ -576,6 +584,10 @@ body.modal-open{ overflow:hidden; }
 .netcodeqr{ width:100%; max-width:172px; margin:10px auto 8px; background:#fff; padding:8px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
 .netcodeqr svg{ display:block; width:100%; height:auto; }
 .netcodeqr .qr-load{ display:block; padding:18px 6px; color:#16160e; font-size:12px; text-transform:none; letter-spacing:0; }
+/* QR loading spinner — shown in the host code box until the QR is generated */
+.netcodeqr .qr-spin{ display:block; width:34px; height:34px; margin:0 auto 10px; border-radius:50%;
+  border:3px solid rgba(22,22,14,.18); border-top-color:#16160e; animation:qrspin .8s linear infinite; }
+@keyframes qrspin { to { transform:rotate(360deg); } }
 .netcode-lbl{ margin-bottom:2px; }
 .netjoinview{ margin:6px 0; }
 /* regular vs manual network-game switcher */
@@ -2202,10 +2214,15 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.30.3';
+  var APP_VERSION = '1.31.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.31.0', items: [
+      ['new', 'Бутон за старт: при свеж старт (веднъж на сесия) леко се поклаща, а при превключване на режим градиентът се „разлива“ в посоката на плъзгане.'],
+      ['chg', 'Бутон за старт: докосване на активния край също стартира играта; докосване на неактивния край сменя режима.'],
+      ['fix', 'Мрежа: класирането в края показва кривата на точките за всички играчи, не само за локалния.'],
+      ['chg', 'Хост по мрежа: докато QR кодът се зарежда, се върти индикатор за зареждане.'] ] },
     { v: '1.30.3', items: [
       ['chg', 'Селекторите (правила и устройство/мрежа): неактивната опция вече е със същия размер, само приглушена — без смаляване.'] ] },
     { v: '1.30.2', items: [
@@ -2899,7 +2916,8 @@ body.modal-open{ overflow:hidden; }
     $('setupErr').textContent = '';
     netManual = manual; openNetModal('webrtc', manual);
   }
-  // ---- play button: one surface. Tap left=игра, right=отчет, middle=старт; swipe ←/→ picks a mode ----
+  // ---- play button: one surface. Tap the ACTIVE end or the middle = старт; tap the INACTIVE end =
+  //      switch to it; swipe ←/→ picks a mode (the gradient slides/floods to the new mode) ----
   var playManual = false;   // false = игра (със зарове), true = отчет (ръчно)
   function syncPlayBtn() { $('playBtn').classList.toggle('man', playManual); }
   function setPlayMode(manual) { if (playManual !== manual) { playManual = manual; syncPlayBtn(); } }
@@ -2913,9 +2931,10 @@ body.modal-open{ overflow:hidden; }
       if (Math.abs(dx) > 24) { setPlayMode(dx > 0); return; }   // a horizontal swipe: right→отчет, left→игра
       var r = pb.getBoundingClientRect();                       // a tap: resolve the zone by pointer X
       var rel = r.width ? (e.clientX - r.left) / r.width : 0.5;
-      if (rel < 0.24) setPlayMode(false);                       // left zone → игра
-      else if (rel > 0.76) setPlayMode(true);                   // right zone → отчет
-      else startPlay();                                         // middle → start in the active mode
+      // tapping the INACTIVE end switches to that mode; the active end (or the middle) starts the game
+      if (rel < 0.24 && playManual) setPlayMode(false);         // inactive left → игра
+      else if (rel > 0.76 && !playManual) setPlayMode(true);    // inactive right → отчет
+      else startPlay();                                         // active end or middle → start
     });
     pb.addEventListener('pointercancel', function () { sx = null; });
     pb.addEventListener('keydown', function (e) {
@@ -2924,6 +2943,13 @@ body.modal-open{ overflow:hidden; }
       else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startPlay(); }
     });
     syncPlayBtn();
+    // once-per-session entrance hint: sway the gradient so players notice the swipe affordance
+    var hinted; try { hinted = sessionStorage.getItem('pbHinted'); } catch (e) {}
+    if (!hinted) {
+      try { sessionStorage.setItem('pbHinted', '1'); } catch (e) {}
+      pb.classList.add('pb-hint');
+      pb.addEventListener('animationend', function h() { pb.classList.remove('pb-hint'); pb.removeEventListener('animationend', h); });
+    }
   })();
 
   // ===================================================== acoustic multiplayer (mp.js)
@@ -3691,7 +3717,7 @@ body.modal-open{ overflow:hidden; }
   function renderCodeQRInto(qbox, code) {
     if (!qbox) return;
     if (window.qrcode) { renderCodeQR(qbox, code); return; }
-    qbox.innerHTML = '<span class="qr-load">Зареждам QR…</span>';
+    qbox.innerHTML = '<span class="qr-load"><span class="qr-spin"></span>Зареждам QR…</span>';
     loadOpticalLibs(function (ok) {
       if (ok && window.qrcode) renderCodeQR(qbox, code);
       else qbox.innerHTML = '<span class="qr-load">⚠ Няма QR (нужен е интернет първия път).</span>';
@@ -4251,7 +4277,12 @@ body.modal-open{ overflow:hidden; }
     if (mv.playerId === localPid) return;                        // my own move is already on my board
     var seat = netOrder.indexOf(mv.playerId); if (seat < 0) return;
     var pl = game.players[seat], key = catKeyAt(mv.category);
-    if (key && !G.isCategoryFilled(pl, key)) pl.scores[key] = mv.score; // mirror the remote score (no local dice for them)
+    if (key && !G.isCategoryFilled(pl, key)) {
+      pl.scores[key] = mv.score;                                 // mirror the remote score (no local dice for them)
+      // record the FILL ORDER so the points-progression chart can plot this player too. No dice are
+      // relayed, so the entry is marked `remote` and skipped by the skill/luck (EV) analysis.
+      if (moveLog[seat]) moveLog[seat].push({ category: key, remote: true });
+    }
     renderAll();
   }
   // host-only in-game control: flip a (dropped) player to AI play, or hand it back
@@ -6544,9 +6575,13 @@ body.modal-open{ overflow:hidden; }
       if (isExcluded(p)) { analysisByPlayer[idx] = null; return; }    // no summary for a dropped/incomplete boец
       // manual games are analysed too — category decisions only (dice rolls unseen)
       var ready = sumExp() ? exactReady : evReady;
-      analysisByPlayer[idx] = (ready && moveLog[idx] && moveLog[idx].length)
-        ? (sumExp() ? (manualMode ? analyzeManualGameExp(moveLog[idx]) : analyzeGameExp(moveLog[idx]))
-                    : (manualMode ? EV.analyzeManualGame(moveLog[idx]) : EV.analyzeGame(moveLog[idx])))
+      var log = moveLog[idx];
+      // remote (networked) players carry only fill order, no dice — good enough for the points chart
+      // but not for EV skill/luck analysis, so leave their analysis null
+      var analysable = log && log.length && !log[0].remote;
+      analysisByPlayer[idx] = (ready && analysable)
+        ? (sumExp() ? (manualMode ? analyzeManualGameExp(log) : analyzeGameExp(log))
+                    : (manualMode ? EV.analyzeManualGame(log) : EV.analyzeGame(log)))
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
