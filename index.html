@@ -462,6 +462,11 @@ body.modal-open{ overflow:hidden; }
 /* in-game bar: stack the coloured total over a small точки label (like ТОЧКИ, thinner/smaller) */
 #expNumBar.expnumbar{ flex-direction:column; align-items:center; gap:0; }
 #expNumBar .np-cap{ font-size:7px; font-weight:400; letter-spacing:1.5px; text-transform:uppercase; color:var(--gen-muted); margin-top:1px; }
+.np-x.np-tap{ cursor:pointer; text-decoration:underline dotted currentColor; text-underline-offset:3px; }
+#numPartTip{ max-width:240px; }
+#numPartTip .np-tip-txt{ font-size:11.5px; line-height:1.5; color:var(--gen-label); }
+#numPartTip .np-tip-pen{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-ink-line); font-size:11.5px; line-height:1.5; color:var(--gen-label); }
+#numPartTip .np-tip-pen b, #numPartTip .np-tip-txt b{ color:var(--gen-brass-bright); }
 
 /* setup: add-button, reorder arrows, manual mode */
 .addbtn{ width:100%; margin-top:4px; }
@@ -1593,6 +1598,7 @@ body.modal-open{ overflow:hidden; }
   </div>
   <div class="kt-fine">* докосни предпочитаното действие</div>
 </div>
+<div id="numPartTip" class="ktbubble hidden"></div>
 
 <!-- peek -->
 <div id="peekModal" class="overlay hidden">
@@ -2110,10 +2116,13 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.21.0';
+  var APP_VERSION = '1.21.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.21.1', items: [
+      ['chg', 'В обобщението: „+Xт умение / +Yт късмет“ — за да е ясно, че са точки.'],
+      ['new', '„С минуси“: точките на числовата част се натискат — обяснение за −50 при минус.'] ] },
     { v: '1.21.0', items: [
       ['new', 'Маркерът за версия (на началния екран) се натиска и показва този списък с промени.'] ] },
     { v: '1.20.x', items: [
@@ -5098,8 +5107,27 @@ body.modal-open{ overflow:hidden; }
     // number-part points-so-far BETWEEN the two sections: ±X (red/gold/green)
     var st = G.upperStateExp(sc), Xv = st.contribution, xcls = Xv > 0 ? 'pos' : Xv < 0 ? 'neg' : 'zero';
     $('expNumBar').className = 'expnumbar';
-    $('expNumBar').innerHTML = '<span class="np-x ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-cap">точки</span>';
+    $('expNumBar').innerHTML = '<span class="np-x np-tap ' + xcls + '">' + (Xv > 0 ? '+' : '') + Xv + '</span><span class="np-cap">точки</span>';
+    var npx = $('expNumBar').querySelector('.np-x');
+    if (npx) npx.onclick = function (e) { e.stopPropagation(); showNumPartTip(npx, st); };
   }
+  // explainer for the minus number-part total: must finish 0+ or it takes a flat −50 (on top of the minus)
+  function showNumPartTip(anchor, st) {
+    var b = $('numPartTip');
+    if (!b.classList.contains('hidden')) { b.classList.add('hidden'); return; }
+    var sv = function (n) { return (n < 0 ? '−' : (n > 0 ? '+' : '')) + Math.abs(n); };
+    var html = '<div class="kt-hd">Числова част (горна редица)</div>'
+      + '<div class="np-tip-txt">Сборът трябва да е <b>0 или повече</b>. Ако завърши на минус — <b>−50 точки</b> отгоре.</div>';
+    if (st.penalised) html += '<div class="np-tip-pen">Сборът е <b>' + sv(st.subtotal) + '</b>, значи общо <b>' + sv(st.subtotal) + ' − 50 = ' + sv(st.contribution) + ' т.</b></div>';
+    b.innerHTML = html; b.classList.remove('hidden');
+    var r = anchor.getBoundingClientRect();
+    b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
+    b.style.top = (r.bottom + 8 + b.offsetHeight < window.innerHeight - 8 ? r.bottom + 8 : Math.max(8, r.top - b.offsetHeight - 8)) + 'px';
+  }
+  document.addEventListener('click', function (e) {
+    var b = $('numPartTip');
+    if (b && !b.classList.contains('hidden') && !b.contains(e.target) && !(e.target.classList && e.target.classList.contains('np-tap'))) b.classList.add('hidden');
+  });
   function expRenderDice() {
     var p = G.currentPlayer(game);
     var box = $('dice'); box.innerHTML = '';
@@ -6321,8 +6349,8 @@ body.modal-open{ overflow:hidden; }
     // WD-03: split the margin against the runner-up so the parts sum to it
     var split = (runnerUp >= 0 && ana[m.winIdx] && ana[runnerUp]) ? EV.marginSplit(ana[m.winIdx], ana[runnerUp], margin) : null;
     if (split && margin > 0) {
-      var parts = '<b class="' + (split.skill >= 0 ? 'np' : 'nn') + '">' + signed(split.skill) + ' умение</b>';
-      if (split.luck != null) parts += ' / <b class="' + (split.luck >= 0 ? 'np' : 'nn') + '">' + signed(split.luck) + ' късмет</b>';
+      var parts = '<b class="' + (split.skill >= 0 ? 'np' : 'nn') + '">' + signed(split.skill) + 'т умение</b>';
+      if (split.luck != null) parts += ' / <b class="' + (split.luck >= 0 ? 'np' : 'nn') + '">' + signed(split.luck) + 'т късмет</b>';
       html += '<div class="wh-split">' + parts + '</div>';
     }
 
