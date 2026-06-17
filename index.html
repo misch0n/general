@@ -2252,10 +2252,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.35.3';
+  var APP_VERSION = '1.35.4';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.35.4', items: [
+      ['fix', 'Свайп за махане на боец заключва вертикалния скрол, докато трае плъзгането.'] ] },
     { v: '1.35.3', items: [
       ['chg', 'Смяната на режим (зарове/отчет) също показва кратко обяснение долу.'] ] },
     { v: '1.35.2', items: [
@@ -2827,6 +2829,8 @@ body.modal-open{ overflow:hidden; }
   // the red underlay is only as wide as the swipe (no bleed-through behind the transparent card).
   function attachSwipeRemove(card, fg, bg, p) {
     var sx = 0, sy = 0, w = 1, active = false, decided = false, swiping = false, pid = null;
+    // lock the roster's vertical scroll for the duration of a horizontal delete-swipe
+    function lockScroll(lock) { var sc = document.querySelector('.setup-scroll'); if (sc) sc.style.overflowY = lock ? 'hidden' : ''; }
     function settle() { setTimeout(function () { fg.classList.remove('snap'); bg.classList.remove('snap'); fg.style.transform = ''; bg.style.width = ''; }, 240); }
     card.addEventListener('pointerdown', function (e) {
       if (drag) return;                                            // a reorder drag is running
@@ -2841,7 +2845,7 @@ body.modal-open{ overflow:hidden; }
       if (!decided) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
         decided = true; swiping = (Math.abs(dx) > Math.abs(dy)) && dx < 0;   // a clear horizontal-left gesture
-        if (swiping) { try { card.setPointerCapture(pid); } catch (x) {} }
+        if (swiping) { try { card.setPointerCapture(pid); } catch (x) {} lockScroll(true); }   // freeze vertical scroll
         else { active = false; return; }                           // vertical → leave it for scroll
       }
       if (!swiping) return;
@@ -2852,6 +2856,7 @@ body.modal-open{ overflow:hidden; }
     });
     function end(e) {
       if (!active || (e.pointerId != null && e.pointerId !== pid)) return;
+      if (swiping) lockScroll(false);
       if (!swiping) { active = false; return; }
       var dx = e.clientX - sx; active = false; fg.classList.add('snap'); bg.classList.add('snap');
       if (-dx >= w * 0.5) {   // past halfway → remove
@@ -2860,7 +2865,7 @@ body.modal-open{ overflow:hidden; }
       } else { fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); }   // not far enough → snap back
     }
     card.addEventListener('pointerup', end);
-    card.addEventListener('pointercancel', function () { if (active && swiping) { fg.classList.add('snap'); bg.classList.add('snap'); fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); } active = false; });
+    card.addEventListener('pointercancel', function () { lockScroll(false); if (active && swiping) { fg.classList.add('snap'); bg.classList.add('snap'); fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); } active = false; });
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
 
