@@ -156,6 +156,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* freshly re-rolled dice — a subtle gold hint so you can spot what changed */
 .die.fresh{ outline:1.5px solid rgba(255,216,107,.45); outline-offset:1px; }
 .die.fresh::after{ content:''; position:absolute; top:-3px; left:-3px; width:6px; height:6px; border-radius:50%; background:rgba(255,216,107,.8); }
+/* spectating: dice the active player is about to re-throw — a brief "leaving" accent (distinct from fresh) */
+.die.throwing{ transform:scale(.9); opacity:.62; border-color:#c46; box-shadow:0 0 0 2px rgba(204,68,102,.7), 0 0 12px rgba(204,68,102,.4); }
 /* throw-mode (select-to-throw): marked = the dice you're re-rolling — RED outline + small ✕ */
 .die.sel{ transform:translateY(-7px); border-color:#e0584a; box-shadow:0 0 0 2px #e0584a, 0 0 16px rgba(224,88,74,.55), 0 3px 0 rgba(0,0,0,.4); }
 .die.sel .reticle{ color:#f0a097; border-color:#e0584a; }
@@ -2116,10 +2118,14 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.23.1';
+  var APP_VERSION = '1.24.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.24.0', items: [
+      ['chg', 'Наблюдение по мрежа: ходовете на опонента се показват по-спокойно (2 сек между действията).'],
+      ['new', 'Наблюдение: новите зарове на опонента се групират по ТВОИте настройки; виждаш и възможните комбинации.'],
+      ['chg', 'Наблюдение: вместо избора на зарове на живо — кратко маркиране кои зарове се хвърлят, после новите.'] ] },
     { v: '1.23.1', items: [
       ['fix', 'Мрежа: ходът на по-бавен играч вече не се рестартира (заровете не се хвърлят пак сами).'] ] },
     { v: '1.23.0', items: [
@@ -3837,7 +3843,7 @@ body.modal-open{ overflow:hidden; }
   function netSetTurn(activeId) {
     if (!netMode || !game) return;
     var seat = netOrder.indexOf(activeId); if (seat < 0) return;
-    netActiveId = activeId; specSelf = false; specAct = null; syncSpecReturn();   // new turn → back to spectating
+    netActiveId = activeId; specSelf = false; specAct = null; resetSpecPlay(); syncSpecReturn();   // new turn → fresh spectating
     game.current = seat; netMyTurn = (activeId === localPid);
     // the host plays any seat it controls (lobby AI or a live takeover) locally
     if (net.isHost && net.isAIControlled(activeId)) { runNetAiTurn(seat, activeId); return; }
@@ -3850,51 +3856,89 @@ body.modal-open{ overflow:hidden; }
     if (!(netMode && netKind === 'webrtc' && net)) return;
     var pid = (netAiActiveId != null && net.isHost) ? netAiActiveId : (netMyTurn ? localPid : null);
     if (pid == null) return;
-    var mask = 0, selMask = 0;
-    for (var i = 0; i < 5; i++) { if (diceNew[i]) mask |= (1 << i); if (selected[i]) selMask |= (1 << i); }
-    // sel/keep let spectators see which dice the active player is holding vs throwing, live
-    var a = { playerId: pid, throwsLeft: throwsLeft, dice: dice.slice(), mask: mask, sel: selMask, keep: activeKeep() ? 1 : 0 };
+    var mask = 0;
+    for (var i = 0; i < 5; i++) if (diceNew[i]) mask |= (1 << i);   // which dice are freshly thrown (drives the watcher's reroll view)
+    var a = { playerId: pid, throwsLeft: throwsLeft, dice: dice.slice(), mask: mask };
     if (extra) for (var k in extra) a[k] = extra[k];
     try { net.sendAction(a); } catch (e) {}
   }
+  // ---- spectating: a calm, QUEUED replay of the watched player's actions (~2s apart) so a fast
+  // player doesn't blur past watchers. New dice are grouped/accented by THE WATCHER's own settings;
+  // a reroll first highlights the dice being thrown (distinct accent) for a beat, then reveals them.
+  var SPEC_GAP = 2000, SPEC_HILITE = 500;
+  var specQueue = [], specBusy = false, specTimer = null, specEpoch = 0;
+  var specPid = null, specRollNo = 0, specPairs = [], specThrow = null;
+  function resetSpecPlay() { specEpoch++; specQueue = []; specBusy = false; clearTimeout(specTimer); specTimer = null; specPid = null; specRollNo = 0; specPairs = []; specThrow = null; }
   function netSpectate(a) {
     if (!netMode || !game) return;
     if (a.playerId === localPid) return;                 // my own action — already on my board
-    var seat = netOrder.indexOf(a.playerId); if (seat < 0) return;
+    if (netOrder.indexOf(a.playerId) < 0) return;
     netActiveId = a.playerId; specAct = a;               // remember so RETURN can jump back here
-    if (specSelf) return;                                // user is previewing their own board — don't yank them away
-    renderSpecAction(a);
+    if (a.playerId !== specPid) { specQueue = []; specPid = a.playerId; specRollNo = 0; specPairs = []; }   // new player → fresh
+    specQueue.push(a);
+    if (specQueue.length > 6) specQueue.splice(0, specQueue.length - 6);   // never lag more than a few actions behind
+    specPump();
   }
-  // render one spectated action on the main board (the active player's view, read-only)
-  function renderSpecAction(a) {
-    var seat = netOrder.indexOf(a.playerId); if (seat < 0) return;
+  function specPump() {
+    if (specBusy || specSelf || !specQueue.length) return;   // specSelf: watcher is on their own board → hold the queue
+    specBusy = true;
+    var ep = specEpoch, a = specQueue.shift();
+    playSpecAction(a, function () { if (ep !== specEpoch) return; specTimer = setTimeout(function () { if (ep !== specEpoch) return; specBusy = false; specPump(); }, SPEC_GAP); });
+  }
+  function playSpecAction(a, done) {
+    var seat = netOrder.indexOf(a.playerId); if (seat < 0) { done(); return; }
+    var ep = specEpoch;
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
-    dice = (a.dice || []).slice(); throwsLeft = a.throwsLeft || 0; diceGen = [];   // spectated dice: no local generations
-    diceNew = [0, 1, 2, 3, 4].map(function (i) { return !!(a.mask & (1 << i)); });
-    // mirror the active player's keep/throw selection so watchers see their decision form
-    selected = [0, 1, 2, 3, 4].map(function (i) { return !!(a.sel & (1 << i)); });
-    specKeepMode = (a.keep != null) ? !!a.keep : null;
-    renderAll();
-    if (a.commit) { if (a.category != null) { var ck = catKeyAt(a.category); if (ck) flashTile(ck); } }
-    else if (!a.selOnly) { shakeDice(); }   // a pure selection change shouldn't re-shake the tray
+    if (a.commit) { specSetDice(a); specThrow = null; renderAll(); if (a.category != null) { var ck = catKeyAt(a.category); if (ck) flashTile(ck); } done(); return; }
+    if (!specPairs.length || a.mask === 0) { specThrow = null; specSetDice(a); renderAll(); shakeDice(); done(); return; }   // turn's first roll
+    // a reroll: HIGHLIGHT the dice being thrown on the current frame, then reveal the new batch
+    specThrow = specThrownPositions(a); renderAll();
+    setTimeout(function () { if (ep !== specEpoch) return; specThrow = null; specSetDice(a); renderAll(); shakeDice(); done(); }, SPEC_HILITE);
   }
-  // tap your own board while spectating → see your usual during-turn screen (read-only preview)
+  // which CURRENTLY-shown dice are being re-thrown — derived from the values that survive the reroll
+  function specThrownPositions(a) {
+    var nd = a.dice || [], kept = [];
+    nd.forEach(function (v, i) { if (!(a.mask & (1 << i))) kept.push(v); });
+    return specPairs.map(function (p) { var k = kept.indexOf(p.v); if (k >= 0) { kept.splice(k, 1); return false; } return true; });
+  }
+  // set the watched dice + reconstruct their generations, then ORDER them by the watcher's own setting
+  function specSetDice(a) {
+    var bd = (a.dice || []).slice(), bm = [0, 1, 2, 3, 4].map(function (i) { return !!(a.mask & (1 << i)); }), pairs;
+    if (specPairs.length && bm.some(Boolean)) {
+      specRollNo++;
+      var pool = specPairs.map(function (p) { return { v: p.v, g: p.g, used: false }; });
+      pairs = bd.map(function (v, i) {
+        if (bm[i]) return { v: v, g: specRollNo };
+        for (var k = 0; k < pool.length; k++) if (!pool[k].used && pool[k].v === v) { pool[k].used = true; return { v: v, g: pool[k].g }; }
+        return { v: v, g: specRollNo };
+      });
+    } else { specRollNo = 1; pairs = bd.map(function (v) { return { v: v, g: 1 }; }); }
+    if (settings.newDiceBatch) pairs.sort(function (x, y) { return (x.g - y.g) || (x.v - y.v); });
+    else pairs.sort(function (x, y) { return x.v - y.v; });
+    specPairs = pairs;
+    dice = pairs.map(function (p) { return p.v; });
+    diceGen = pairs.map(function (p) { return p.g; });
+    diceNew = pairs.map(function (p) { return specRollNo > 1 && p.g === specRollNo; });   // accent the freshest batch (not the opening roll)
+    throwsLeft = a.throwsLeft || 0; selected = [false, false, false, false, false];
+  }
+  // tap your own board while spectating → see your usual during-turn screen (read-only preview).
+  // the spectator queue is HELD while you're here, then resumes on RETURN.
   function previewSelf() {
     if (!netMode || localPid == null) return;
     var seat = netOrder.indexOf(localPid); if (seat < 0) return;
-    specSelf = true; specKeepMode = null;   // my own board uses my own keep/throw flavour
+    specSelf = true; specThrow = null;
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
     dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false]; diceGen = [];
     renderAll(); syncSpecReturn();
   }
   function returnToCurrent() {
     specSelf = false;
-    if (specAct) renderSpecAction(specAct);
-    else if (netActiveId != null) {
+    if (netActiveId != null && specPairs.length) {
       var seat = netOrder.indexOf(netActiveId);
-      if (seat >= 0) { game.current = seat; netMyTurn = (netActiveId === localPid); dice = []; throwsLeft = 0; locked = !netMyTurn; awaitingRoll = false; renderAll(); }
+      if (seat >= 0) { game.current = seat; netMyTurn = (netActiveId === localPid); locked = !netMyTurn; awaitingRoll = false; renderAll(); }
     }
     syncSpecReturn();
+    specPump();   // resume the paced replay
   }
   function syncSpecReturn() { var b = $('specReturn'); if (b) b.classList.toggle('hidden', !(netMode && specSelf)); }
   // dev-only: open the lobby PREP screen with a mock roster, to preview that flow without a 2nd device
@@ -4019,7 +4063,8 @@ body.modal-open{ overflow:hidden; }
   var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var netActiveId = null, specSelf = false, specAct = null;   // spectating: who's playing, am I previewing my own board, last action
-  var specKeepMode = null;   // while watching: the active player's keep/throw flavour (null = use my own)
+  // true while we're rendering a watched opponent's read-only frame (not my turn, not my own-board preview)
+  function netWatching() { return netMode && locked && !netMyTurn && !specSelf && netActiveId != null && netActiveId !== localPid; }
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
   // experimental category space (for net minus games — the move protocol indexes into THIS list)
   var CAT_INDEX_EXP = {}, CAT_KEYS_EXP = G.CATEGORIES_EXP.map(function (c) { return c.key; }); G.CATEGORIES_EXP.forEach(function (c, i) { CAT_INDEX_EXP[c.key] = i; });
@@ -4097,7 +4142,7 @@ body.modal-open{ overflow:hidden; }
     document.documentElement.style.setProperty('--pc', p.color);
     if (netMode) {
       // the active player drives input on their own device; everyone else watches
-      selected = [false, false, false, false, false]; specKeepMode = null;
+      selected = [false, false, false, false, false];
       dice = []; throwsLeft = 0; curLog = null;
       if (netMyTurn) { awaitingRoll = true; locked = false; throwsLeft = ROLLS - 1; renderAll(); showOrder(p); }   // my turn: a first roll + (ROLLS-1) rerolls
       else { awaitingRoll = false; locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
@@ -4302,6 +4347,9 @@ body.modal-open{ overflow:hidden; }
     var pv = dice.length === G.DICE_COUNT ? computePreviews(p) : { prev: {}, cand: {}, best: null };
     var canScore = !locked && dice.length === G.DICE_COUNT && !fx.lock
       && (manualMode || (!p.isAI && !awaitingRoll));
+    // spectators see the same combo previews for the watched dice (read-only — no commit handlers)
+    var watchPrev = netWatching() && dice.length === G.DICE_COUNT;
+    var showPrev = canScore || watchPrev;
     var hidden = fx.hide || [], blanked = fx.blank || [];
 
     $('boardUpper').innerHTML = '';
@@ -4316,10 +4364,10 @@ body.modal-open{ overflow:hidden; }
       var el = document.createElement('button');
       el.className = cls;
       // 0-point 1-6 combos show ✕ (forfeit) to match the lower combos, not a dot
-      var zeroForfeit = canScore && !done && !(val > 0);
-      var pts = forf ? '·' : (done ? (blanked.indexOf(key) >= 0 ? '·' : p.scores[key]) : (val > 0 ? val : (canScore ? '✕' : '·')));
+      var zeroForfeit = showPrev && !done && !(val > 0);
+      var pts = forf ? '·' : (done ? (blanked.indexOf(key) >= 0 ? '·' : p.scores[key]) : (val > 0 ? val : (showPrev ? '✕' : '·')));
       el.innerHTML = '<span class="face-n">' + c.label + '</span>'
-        + '<span class="pts' + (canScore && !done ? (zeroForfeit ? ' xchip' : ' upchip') : '') + '">' + pts + '</span>';
+        + '<span class="pts' + (showPrev && !done ? (zeroForfeit ? ' xchip' : ' upchip') : '') + '">' + pts + '</span>';
       if (canScore && !done) el.onclick = function () { val > 0 ? commitScore(key, val) : commitForfeit(key); };
       attachTip(el.querySelector('.face-n'), key, p.isAI && !manualMode);
       $('boardUpper').appendChild(el);
@@ -4342,23 +4390,26 @@ body.modal-open{ overflow:hidden; }
       } else {
         row.innerHTML = html + '<span class="acts"></span>';
         var acts = row.querySelector('.acts');
-        if (canScore) {
-          var positives = pv.cand[key].filter(function (v) { return v > 0; });
+        if (showPrev) {
+          var positives = (pv.cand[key] || []).filter(function (v) { return v > 0; });
           positives.forEach(function (v) {
             var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v;
-            chip.onclick = function (e) { e.stopPropagation(); commitScore(key, v); };
+            if (canScore) chip.onclick = function (e) { e.stopPropagation(); commitScore(key, v); };
+            else chip.disabled = true;
             acts.appendChild(chip);
           });
           var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се');
-          x.onclick = function (e) { e.stopPropagation(); commitForfeit(key); };
+          if (canScore) x.onclick = function (e) { e.stopPropagation(); commitForfeit(key); }; else x.disabled = true;
           acts.appendChild(x);
-          // tap the box to submit — but a multi-way combo still needs the exact number
-          row.style.cursor = 'pointer';
-          row.onclick = function () {
-            if (positives.length === 1) commitScore(key, positives[0]);
-            else if (positives.length > 1) showGuide(row, 'Няколко начина — удари точното число.');
-            else showGuide(row, 'Нищо не става тук — откажи с ×.');
-          };
+          if (canScore) {
+            // tap the box to submit — but a multi-way combo still needs the exact number
+            row.style.cursor = 'pointer';
+            row.onclick = function () {
+              if (positives.length === 1) commitScore(key, positives[0]);
+              else if (positives.length > 1) showGuide(row, 'Няколко начина — удари точното число.');
+              else showGuide(row, 'Нищо не става тук — откажи с ×.');
+            };
+          }
         }
       }
       attachTip(row.querySelector('.cname'), key, p.isAI && !manualMode);
@@ -4440,21 +4491,24 @@ body.modal-open{ overflow:hidden; }
       return;
     }
     var interactive = !p.isAI && !locked && throwsLeft > 0 && !fx.lock;
+    var watching = netWatching();   // rendering a watched opponent's frame (read-only)
     // penalty overrides: swap the dice, or hide some (centred remainder)
     var shown = fx.dice ? fx.dice : dice;
     if (fx.diceKeep != null) shown = shown.slice(0, fx.diceKeep);
-    // „Нов набор зарове": group the tray by generation (separators) instead of accenting the new dice
-    var batchMode = activeBatch() && !fx.dice && fx.diceKeep == null && diceGen.length === shown.length;
+    // „Нови зарове": group the tray by generation (separators) instead of accenting. While watching,
+    // it follows THE WATCHER's own setting (not the active player's), for easy scanning of new dice.
+    var batchMode = (watching ? settings.newDiceBatch : activeBatch()) && !fx.dice && fx.diceKeep == null && diceGen.length === shown.length;
     shown.forEach(function (v, i) {
       if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {   // a generation boundary → divider between groups
         var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true');
         $('dice').appendChild(sep);
       }
       var b = document.createElement('button');
-      var sel = !fx.dice && fx.diceKeep == null && selected[i];
-      var fresh = !batchMode && !fx.dice && fx.diceKeep == null && diceNew[i];   // just rerolled — accent (off in batch mode)
-      var keepMode = specKeepMode != null ? specKeepMode : activeKeep();   // watching → mirror the active player's flavour
-      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
+      var sel = !watching && !fx.dice && fx.diceKeep == null && selected[i];
+      var fresh = !batchMode && !fx.dice && fx.diceKeep == null && diceNew[i];   // freshly thrown — gold accent (off in batch mode)
+      var throwing = watching && specThrow && specThrow[i];                       // watcher: dice about to be re-thrown
+      var keepMode = activeKeep();
+      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '') + (throwing ? ' throwing' : '');
       b.disabled = !interactive;
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
@@ -4510,7 +4564,7 @@ body.modal-open{ overflow:hidden; }
     selected[i] = !selected[i];
     if (expMode) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
-    if (netMode && netKind === 'webrtc' && netMyTurn) netSendAct({ selOnly: true });   // watchers see my keep/throw choice live
+    // (no live broadcast of selections — watchers see the throw highlighted at reroll time instead)
   }
   $('fire').onclick = function () { humanFire(); };
   $('specReturn').onclick = function () { returnToCurrent(); };
@@ -5106,17 +5160,18 @@ body.modal-open{ overflow:hidden; }
   function expRenderBoard() {
     var p = G.currentPlayer(game), sc = p.scores;
     var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    var watchPrev = netWatching() && dice.length === G.DICE_COUNT, showPrev = canScore || watchPrev;   // spectators see read-only previews
     // ---- number part (deviation tiles) ----
     $('boardUpper').innerHTML = '';
     G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
-      var key = c.key, done = typeof sc[key] === 'number', open = canScore && !done;
-      var dev = done ? sc[key] : (canScore ? G.scoreForExp(key, dice) : null);
-      var val = done ? sc[key] : (open ? dev : null);
+      var key = c.key, done = typeof sc[key] === 'number', open = canScore && !done, prev = showPrev && !done;
+      var dev = done ? sc[key] : (showPrev ? G.scoreForExp(key, dice) : null);
+      var val = done ? sc[key] : (prev ? dev : null);
       var sign = val == null ? '' : (val > 0 ? ' pos' : val < 0 ? ' neg' : ' zero');   // colour the number by value
       var el = document.createElement('button');
       el.className = 'tile up' + (done ? ' done' : '');
-      var pts = done ? sc[key] : (open ? (dev > 0 ? '+' + dev : dev) : '·');
-      el.innerHTML = '<span class="face-n">' + c.label + '</span><span class="pts' + (open ? ' upchip' : '') + sign + '">' + pts + '</span>';
+      var pts = done ? sc[key] : (prev ? (dev > 0 ? '+' + dev : dev) : '·');
+      el.innerHTML = '<span class="face-n">' + c.label + '</span><span class="pts' + (prev ? ' upchip' : '') + sign + '">' + pts + '</span>';
       if (open) el.onclick = function () { expCommit(key); };   // number rows take their (signed) deviation
       $('boardUpper').appendChild(el);
     });
@@ -5131,12 +5186,11 @@ body.modal-open{ overflow:hidden; }
       else {
         row.innerHTML = head + '<span class="acts"></span>';
         var acts = row.querySelector('.acts');
-        if (canScore) {
+        if (showPrev) {
           var v = G.scoreForExp(key, dice);
-          if (v > 0) { var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v; chip.onclick = function (e) { e.stopPropagation(); expCommit(key, v); }; acts.appendChild(chip); }
-          var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се'); x.onclick = function (e) { e.stopPropagation(); expCommit(key, 0); }; acts.appendChild(x);
-          row.style.cursor = 'pointer';
-          row.onclick = function () { v > 0 ? expCommit(key, v) : expCommit(key, 0); };
+          if (v > 0) { var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v; if (canScore) chip.onclick = function (e) { e.stopPropagation(); expCommit(key, v); }; else chip.disabled = true; acts.appendChild(chip); }
+          var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се'); if (canScore) x.onclick = function (e) { e.stopPropagation(); expCommit(key, 0); }; else x.disabled = true; acts.appendChild(x);
+          if (canScore) { row.style.cursor = 'pointer'; row.onclick = function () { v > 0 ? expCommit(key, v) : expCommit(key, 0); }; }
         }
       }
       $('boardLower').appendChild(row);
@@ -8569,7 +8623,7 @@ body.modal-open{ overflow:hidden; }
     if (net) { try { net.dispose(); } catch (e) {} }
     if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} }
     net = null; netFSK = null; netMode = false; localPid = null; netMyTurn = false;
-    netActiveId = null; specSelf = false; specAct = null; if ($('specReturn')) $('specReturn').classList.add('hidden');
+    netActiveId = null; specSelf = false; specAct = null; resetSpecPlay(); if ($('specReturn')) $('specReturn').classList.add('hidden');
     $('netLink').classList.add('hidden'); $('netLink').innerHTML = '';
   }
 
