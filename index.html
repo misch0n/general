@@ -237,6 +237,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   font-family:var(--gen-font-display); font-weight:700; font-size:13.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
 .ssel-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
 .ssel-opt.rs-off{ opacity:.32; cursor:not-allowed; }
+/* the play button: [игра | В БОЙ! | отчет] — sides pick the mode, the middle starts the game */
+.playbtn{ display:flex; align-items:stretch; height:58px; margin:6px 0; border-radius:var(--gen-r-tag); overflow:hidden;
+  border:2px solid var(--gen-ink-line); -webkit-user-select:none; user-select:none; touch-action:pan-y; }
+.playbtn .pb-side{ flex:none; width:40px; display:grid; place-items:center; cursor:pointer; background:rgba(255,255,255,.06); color:var(--gen-brass-bright);
+  font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; transition:background .15s ease, color .15s ease; }
+.playbtn .pb-side.on{ background:var(--gen-brass); color:var(--gen-ink); }              /* active mode = golden, like В БОЙ! */
+.playbtn .pb-left{ border-right:1px solid rgba(0,0,0,.4); box-shadow:inset -1px 0 0 rgba(255,255,255,.08); }   /* fine separator */
+.playbtn .pb-right{ border-left:1px solid rgba(0,0,0,.4); box-shadow:inset 1px 0 0 rgba(255,255,255,.08); }
+.playbtn .pb-left span{ display:block; transform:rotate(-90deg); }                       /* bottoms face the middle */
+.playbtn .pb-right span{ display:block; transform:rotate(90deg); }
+.playbtn .pb-go{ flex:1; display:grid; place-items:center; cursor:pointer; background:var(--gen-brass); color:var(--gen-ink);
+  font-family:var(--gen-font-display); font-weight:700; font-size:19px; letter-spacing:1.5px; text-transform:uppercase; }
+.playbtn .pb-go:active{ box-shadow:inset 0 3px 10px rgba(0,0,0,.3); }
 .pcard{ background:rgba(20,22,12,.72); border:1px solid var(--gen-pill-line); border-radius:10px; padding:12px; }
 .pcard .name{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:15px; text-transform:uppercase; letter-spacing:.5px;
   color:var(--gen-text); background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:9px 11px; }
@@ -1467,8 +1480,8 @@ body.modal-open{ overflow:hidden; }
     </div>
     <!-- ruleset picker (underline-style, like the in-game keep/throw chooser) -->
     <div class="ssel" id="startRuleSel">
-      <button type="button" class="ssel-opt" data-rs="standard">без минуси</button>
       <button type="button" class="ssel-opt" data-rs="experimental">с минуси</button>
+      <button type="button" class="ssel-opt" data-rs="standard">без минуси</button>
     </div>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
@@ -1478,9 +1491,11 @@ body.modal-open{ overflow:hidden; }
       <button type="button" class="ssel-opt" data-net="0">на устройството</button>
       <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
     </div>
-    <div class="setup-actions">
-      <button id="startGame" class="btn primary">⚔ В Бой!</button>
-      <button id="startManual" class="btn">✍ Полеви отчет</button>
+    <!-- play button: tap a side to pick a mode (or swipe ←/→), tap the middle to start -->
+    <div class="playbtn" id="playBtn" role="group" aria-label="Старт на играта">
+      <div class="pb-side pb-left" data-manual="0" role="button" tabindex="0" aria-label="Режим: игра със зарове"><span>игра</span></div>
+      <div class="pb-go" id="pbGo" role="button" tabindex="0">В БОЙ!</div>
+      <div class="pb-side pb-right" data-manual="1" role="button" tabindex="0" aria-label="Режим: отчет (ръчно)"><span>отчет</span></div>
     </div>
     <p class="modehint" id="modeHint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
     <div class="setup-actions">
@@ -1724,8 +1739,8 @@ body.modal-open{ overflow:hidden; }
     <div class="rulebox setrow" id="ruleBox" style="cursor:default">
       <span>Правила <button id="ruleHelp" class="qmark" aria-label="Кои са правилата?">?</button></span>
       <div class="ruleseg" id="ruleSeg">
-        <button class="rlabel" data-rs="standard">без минуси</button>
         <button class="rlabel" data-rs="experimental">с минуси</button>
+        <button class="rlabel" data-rs="standard">без минуси</button>
       </div>
     </div>
     <div id="ruleBubble" class="ownerbubble hidden"></div>
@@ -2118,10 +2133,13 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.24.0';
+  var APP_VERSION = '1.25.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.25.0', items: [
+      ['new', 'Нов бутон за старт: „игра / В БОЙ! / отчет“ — избери режим (докосни страна или плъзни), стартирай от средата.'],
+      ['chg', '„С минуси“ е по подразбиране за нови игри; редът на избора е „с минуси · без минуси“.'] ] },
     { v: '1.24.0', items: [
       ['chg', 'Наблюдение по мрежа: ходовете на опонента се показват по-спокойно (2 сек между действията).'],
       ['new', 'Наблюдение: новите зарове на опонента се групират по ТВОИте настройки; виждаш и възможните комбинации.'],
@@ -2197,7 +2215,7 @@ body.modal-open{ overflow:hidden; }
   // true = tap the ones to KEEP (ДРЪЖ!). Default „keep". This is the owner's/default
   // preference (set in owner customisation); each HUMAN player carries their own copy
   // (p.selectKeep) so several humans in one game can play in different flavours.
-  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: true, webrtcDebug: false, opticalHandshake: false, newDiceBatch: false, iceServers: '', selectKeep: true, ruleset: 'standard', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
+  var settings = { titles: false, titlePoints: false, advice: false, glupost: true, barracks: false, bets: false, acoustic: false, acousticDebug: false, webrtc: true, webrtcDebug: false, opticalHandshake: false, newDiceBatch: false, iceServers: '', selectKeep: true, ruleset: 'experimental', ownerName: '', useOwnerName: false, ownerGender: 'm', ownerColor: '#d4a02e' };
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
@@ -2672,8 +2690,30 @@ body.modal-open{ overflow:hidden; }
     $('setupErr').textContent = '';
     netManual = manual; openNetModal('webrtc', manual);
   }
-  $('startGame').onclick = function () { if (netPlay) startNetFlow(false); else startFromSetup(false); };
-  $('startManual').onclick = function () { if (netPlay) startNetFlow(true); else startFromSetup(true); };
+  // ---- composite play button: tap a side (or swipe ←/→) to pick the mode, tap the middle to start ----
+  var playManual = false;   // false = игра (със зарове), true = отчет (ръчно)
+  function syncPlayBtn() {
+    $('playBtn').querySelector('.pb-left').classList.toggle('on', !playManual);
+    $('playBtn').querySelector('.pb-right').classList.toggle('on', playManual);
+  }
+  function setPlayMode(manual) { if (playManual !== manual) { playManual = manual; syncPlayBtn(); } }
+  function startPlay() { if (netPlay) startNetFlow(playManual); else startFromSetup(playManual); }
+  (function () {
+    var pb = $('playBtn'), sx = null;
+    pb.addEventListener('pointerdown', function (e) { sx = e.clientX; });
+    pb.addEventListener('pointerup', function (e) {
+      if (sx == null) return;
+      var dx = e.clientX - sx; sx = null;
+      if (Math.abs(dx) > 24) { setPlayMode(dx > 0); return; }   // a horizontal swipe: right→отчет, left→игра
+      var seg = e.target.closest && e.target.closest('.pb-side, .pb-go'); if (!seg) return;
+      if (seg.id === 'pbGo') startPlay(); else setPlayMode(seg.getAttribute('data-manual') === '1');
+    });
+    pb.addEventListener('pointercancel', function () { sx = null; });
+    pb.querySelector('.pb-left').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPlayMode(false); } });
+    pb.querySelector('.pb-right').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPlayMode(true); } });
+    $('pbGo').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startPlay(); } });
+    syncPlayBtn();
+  })();
 
   // ===================================================== acoustic multiplayer (mp.js)
   // rotating flavour accents per protocol stage — funny filler while sound negotiates
