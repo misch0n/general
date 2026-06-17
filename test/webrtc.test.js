@@ -127,6 +127,37 @@ test('star topology: a client move propagates to the other client only via the h
   assert.ok(moved, 'a client took at least one turn');
 });
 
+test('the full turn log rides the move to the host and on to the other client (complete history)', function () {
+  var bus = new StarBus();
+  var seen = { H: {}, A: {}, B: {} };
+  function mk(isHost, me) {
+    return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onMove: function (mv) { seen[me.name][mv.playerId] = mv.log; } } });
+  }
+  var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' });
+  var c1 = mk(false, { name: 'A', color: '#00aa55', gender: 'm' });
+  var c2 = mk(false, { name: 'B', color: '#5566ff', gender: 'f' });
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  host.startGame(); bus.drain();
+  var nodes = [host, c1, c2], theLog = JSON.stringify({ mask: 7, rolls: [[1, 2, 3, 4, 5]], keeps: [[true, false, true, false, true]], category: 0 });
+  var moved = false;
+  for (var g = 0; g < 5000 && host.state === 'IN_GAME' && !moved; g++) {
+    var actId = host.activeId, active = nodes.filter(function (n) { return n.myId === actId; })[0], cat = nextCat(active, actId);
+    if (active !== host) {
+      active.submitMove({ category: cat, score: 42, rolls: [[1, 2, 3, 4, 5]], keeps: [], log: theLog });
+      bus.drain();
+      assert.strictEqual(seen.H[actId], theLog, 'host received the full turn log');
+      var otherName = active === c1 ? 'B' : 'A';
+      assert.strictEqual(seen[otherName][actId], theLog, 'the other client received the full turn log too');
+      moved = true;
+    } else {
+      active.submitMove({ category: cat, score: 1, rolls: [[1, 2, 3, 4, 5]], keeps: [] }); bus.drain();
+    }
+  }
+  assert.ok(moved, 'a client move carried its log end to end');
+});
+
 test('drop: a vanished client is skipped, the rest finish, its board stays incomplete', function () {
   var bus = new StarBus();
   var ended = {};

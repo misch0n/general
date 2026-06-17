@@ -70,12 +70,14 @@
   Writer.prototype.u16 = function (v) { this.b.push((v >>> 8) & 0xff, v & 0xff); return this; };
   Writer.prototype.bytes = function (arr) { for (var i = 0; i < arr.length; i++) this.b.push(arr[i] & 0xff); return this; };
   Writer.prototype.str = function (s, maxLen) { var e = utf8(String(s == null ? '' : s)); if (maxLen && e.length > maxLen) e = e.slice(0, maxLen); this.u8(e.length); this.bytes(e); return this; };
+  Writer.prototype.str16 = function (s) { var e = utf8(String(s == null ? '' : s)); this.u16(e.length & 0xffff); this.bytes(e); return this; };   // longer payloads (e.g. a turn log)
   Writer.prototype.out = function () { return new Uint8Array(this.b); };
   function Reader(bytes) { this.b = bytes; this.i = 0; }
   Reader.prototype.u8 = function () { return this.b[this.i++]; };
   Reader.prototype.u16 = function () { var v = (this.b[this.i] << 8) | this.b[this.i + 1]; this.i += 2; return v; };
   Reader.prototype.bytes = function (n) { var s = this.b.slice(this.i, this.i + n); this.i += n; return s; };
   Reader.prototype.str = function () { return utf8d(this.bytes(this.u8())); };
+  Reader.prototype.str16 = function () { return utf8d(this.bytes(this.u16())); };
   Reader.prototype.left = function () { return this.b.length - this.i; };
 
   // ---- L1 framing: [TYPE][SENDER][SEQ][PAYLOAD…][CRC8] ----
@@ -149,6 +151,7 @@
     var rolls = m.rolls || [], nr = rolls.length; w.u8(nr);
     for (var i = 0; i < nr; i++) for (var j = 0; j < 5; j++) w.u8((rolls[i][j] || 0));
     for (i = 0; i < nr - 1; i++) { var mask = 0, kp = (m.keeps && m.keeps[i]) || []; for (j = 0; j < 5; j++) if (kp[j]) mask |= (1 << j); w.u8(mask); }
+    w.str16(m.log || '');   // full turn-log entry (JSON) so every device gets complete per-player history
     return w.out();
   }
   function unpackMove(p) {
@@ -156,10 +159,11 @@
     var nr = r.u8(); m.rolls = []; m.keeps = [];
     for (var i = 0; i < nr; i++) { var d = []; for (var j = 0; j < 5; j++) d.push(r.u8()); m.rolls.push(d); }
     for (i = 0; i < nr - 1; i++) { var mask = r.u8(), k = []; for (j = 0; j < 5; j++) k.push(!!(mask & (1 << j))); m.keeps.push(k); }
+    m.log = r.left() > 0 ? r.str16() : '';   // tolerate older peers that don't send a log
     return m;
   }
   // STATE — sub 0: delta (one applied move); sub 1: full snapshot (re-baseline on resync)
-  function packStateDelta(version, mv) { return new Writer().u8(0).u16(version).u8(mv.playerId).u8(mv.category).u16(mv.score).out(); }
+  function packStateDelta(version, mv) { return new Writer().u8(0).u16(version).u8(mv.playerId).u8(mv.category).u16(mv.score).str16(mv.log || '').out(); }
   function packStateSnapshot(version, scores) {
     var w = new Writer().u8(1).u16(version), ids = Object.keys(scores); w.u8(ids.length);
     ids.forEach(function (id) { var cells = scores[id], cs = Object.keys(cells); w.u8(+id).u8(cs.length); cs.forEach(function (c) { w.u8(+c).u16(cells[c]); }); });
@@ -167,7 +171,7 @@
   }
   function unpackState(p) {
     var r = new Reader(p), sub = r.u8(), version = r.u16();
-    if (sub === 0) return { kind: 'delta', version: version, playerId: r.u8(), category: r.u8(), score: r.u16() };
+    if (sub === 0) { var d = { kind: 'delta', version: version, playerId: r.u8(), category: r.u8(), score: r.u16() }; d.log = r.left() > 0 ? r.str16() : ''; return d; }
     var n = r.u8(), scores = {};
     for (var i = 0; i < n; i++) { var id = r.u8(), m = r.u8(), cells = {}; for (var j = 0; j < m; j++) { var c = r.u8(); cells[c] = r.u16(); } scores[id] = cells; }
     return { kind: 'snapshot', version: version, scores: scores };
@@ -585,7 +589,7 @@
       if (ok && (this.scores[mv.playerId] || {})[mv.category] == null) {
         if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); if (this.manual) this._maybeEnd(); else this._advance(); }
       } else {
-        this._send(T.STATE, packStateDelta(this.version, { playerId: mv.playerId, category: mv.category, score: (this.scores[mv.playerId] || {})[mv.category] || 0 }));
+        this._send(T.STATE, packStateDelta(this.version, { playerId: mv.playerId, category: mv.category, score: (this.scores[mv.playerId] || {})[mv.category] || 0, log: mv.log }));
       }
     } else if (pkt.type === T.META && this.state === 'PREP') {
       var entry = this._byId(pkt.sender);                  // a client edits ONLY its own seat
@@ -690,7 +694,7 @@
     this.scores[s.playerId][s.category] = s.score;
     this.version = s.version;
     if (this._pendingMove && s.playerId === this.myId && s.category === this._pendingMove.category) { this._ct(this._timers.mymove); this._pendingMove = null; }
-    if (this.cb.onMove) this.cb.onMove({ playerId: s.playerId, category: s.category, score: s.score });
+    if (this.cb.onMove) this.cb.onMove({ playerId: s.playerId, category: s.category, score: s.score, log: s.log });
   };
 
   function crc16(bytes) { var c = 0xffff; for (var i = 0; i < bytes.length; i++) { c ^= bytes[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }

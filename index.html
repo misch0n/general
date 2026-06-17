@@ -2259,10 +2259,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.40.3';
+  var APP_VERSION = '1.41.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.41.0', items: [
+      ['fix', 'Мрежа: всеки ход се пренася с пълните данни (зарове/решения) до всички устройства — историята вече е пълна за всички играчи, режими и правила (вкл. „с минуси“).'] ] },
     { v: '1.40.3', items: [
       ['fix', 'Архив: кривата на точките се показва и за играчи без записани ходове (взима се от резултатите) — вече се вижда линия за всички.'],
       ['fix', 'Архив: разпознаване на по-стари мрежови игри (без минуси) и по липсващите облози.'] ] },
@@ -4508,10 +4510,14 @@ body.modal-open{ overflow:hidden; }
     var seat = netOrder.indexOf(mv.playerId); if (seat < 0) return;
     var pl = game.players[seat], key = catKeyAt(mv.category);
     if (key && !G.isCategoryFilled(pl, key)) {
-      pl.scores[key] = mv.score;                                 // mirror the remote score (no local dice for them)
-      // record the FILL ORDER so the points-progression chart can plot this player too. No dice are
-      // relayed, so the entry is marked `remote` and skipped by the skill/luck (EV) analysis.
-      if (moveLog[seat]) moveLog[seat].push({ category: key, remote: true });
+      pl.scores[key] = mv.score;                                 // mirror the remote score
+      // store this player's FULL turn log (relayed as JSON) so history is complete on every device.
+      // If no log came through (older peer / acoustic), fall back to a fill-order-only marker.
+      if (moveLog[seat]) {
+        var entry = null;
+        if (mv.log) { try { entry = JSON.parse(mv.log); } catch (e) {} }
+        moveLog[seat].push(entry || { category: key, remote: true });
+      }
     }
     renderAll();
   }
@@ -5213,9 +5219,10 @@ body.modal-open{ overflow:hidden; }
     if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     if (netMode && manualMode) {
       // FREE-FOR-ALL: record + broadcast my entry, then reset for my next category (no turn handover)
-      if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: dice.slice(), category: key });
+      var ment = { mask: evReady ? (EV.maskOfScores(p.scores) & ~EV.catBit(key)) : 0, dice: dice.slice(), category: key };
+      if (evReady) moveLog[game.current].push(ment);
       flashTile(key);
-      if (net) net.submitMove({ category: catIndexOf(key), score: value, rolls: [dice.slice()], keeps: [] });
+      if (net) net.submitMove({ category: catIndexOf(key), score: value, rolls: [dice.slice()], keeps: [], log: JSON.stringify(ment) });
       locked = true; renderAll();
       if (G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming, same as local
       setTimeout(beginManualEntry, END_DELAY);
@@ -5226,7 +5233,7 @@ body.modal-open{ overflow:hidden; }
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
       netSendAct({ commit: true, category: catIndexOf(key), value: value });   // spectators see the category go in
       if (netAiActiveId == null && G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming on my own commit
-      var mv = { category: catIndexOf(key), score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
+      var mv = { category: catIndexOf(key), score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
       // hold the committed board a beat (comprehension) before the move propagates and the turn passes
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }  // host injects the AI seat's move
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
@@ -5354,16 +5361,21 @@ body.modal-open{ overflow:hidden; }
     if (!X.canPlay(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     if (manualMode && !netMode) {
-      // local ОПА can rewind this; the turn is logged for category-only analytics (mask BEFORE the pick)
+      // local ОПА can rewind this
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
-      if (exactReady) moveLog[game.current].push({ mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true });
-    } else if (curLog && !netMode) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
+    }
+    // build the turn-log entry BEFORE assigning the score (mask = filled categories before this pick),
+    // and record it locally for net games too (it used to be skipped) so history is complete here as well
+    var expEnt = null;
+    if (manualMode) { if (exactReady) expEnt = { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true }; }
+    else if (curLog) { curLog.category = key; expEnt = curLog; curLog = null; }
+    if (expEnt) moveLog[game.current].push(expEnt);
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
     var committed = p.scores[key];
     // ---- net minus (manual / отчет): free-for-all — broadcast my entry, then reset for my next category ----
     if (netMode && manualMode) {
       flashTile(key);
-      if (net) net.submitMove({ category: catIndexOf(key), score: committed, rolls: [dice.slice()], keeps: [] });
+      if (net) net.submitMove({ category: catIndexOf(key), score: committed, rolls: [dice.slice()], keeps: [], log: expEnt ? JSON.stringify(expEnt) : '' });
       locked = true; renderAll();
       setTimeout(beginManualEntry, END_DELAY);
       return;
@@ -5371,10 +5383,10 @@ body.modal-open{ overflow:hidden; }
     // ---- net minus (regular): broadcast my completed turn; the host's STATE + next GRANT drive the rest ----
     if (netMode && !manualMode) {
       if (tut) tutEvent('commit');
-      var log = curLog; curLog = null;
+      var log = expEnt;
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
       netSendAct({ commit: true, category: catIndexOf(key), value: committed });   // spectators see the category go in
-      var mv = { category: catIndexOf(key), score: committed, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
+      var mv = { category: catIndexOf(key), score: committed, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
       return;
