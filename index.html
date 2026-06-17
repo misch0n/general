@@ -999,8 +999,11 @@ body.modal-open{ overflow:hidden; }
   background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; -webkit-user-select:none; }
 .grip .gripdots{ display:grid; grid-template-columns:repeat(2,4px); grid-template-rows:repeat(3,4px); gap:4px; }
 .grip .gripdots i{ width:4px; height:4px; border-radius:50%; background:currentColor; }
-.grip:active{ cursor:grabbing; background:var(--gen-brass); color:var(--gen-ink); }
-.pcard.dragging{ opacity:.85; box-shadow:0 10px 26px rgba(0,0,0,.5); outline:2px solid var(--gen-brass); }
+.grip:active{ cursor:grabbing; }   /* no colour highlight when grabbed */
+/* the lifted card's highlight renders INWARD (inset on the foreground) so it never overlaps the
+   neighbouring entry as the card slides past it */
+.pcard.dragging{ opacity:.92; box-shadow:0 10px 26px rgba(0,0,0,.5); }
+.pcard.dragging .pc-fg{ box-shadow:inset 0 0 0 2px var(--gen-brass); }
 
 /* hamburger menu, how-to button */
 /* hamburger sits in the header where the rank box was (replaces the initials) */
@@ -2247,10 +2250,14 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.32.0';
+  var APP_VERSION = '1.33.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.33.0', items: [
+      ['chg', 'Добавянето на боец скролва надолу, така че новата карта и бутонът „+“ остават видими.'],
+      ['chg', 'Подреждане: дръжката вече не светва; маркерът на влачената карта се рисува навътре, за да не застъпва съседа.'],
+      ['new', 'Селекторите (правила и устройство/мрежа) се превключват и с плъзване настрани.'] ] },
     { v: '1.32.0', items: [
       ['new', 'Смяната на правила или устройство/мрежа показва кратко обяснение долу (5 сек) — старите бележки в долния панел паднаха.'],
       ['chg', 'Хост: докосване на кода го оцветява зелено (като копчето за копиране).'],
@@ -2641,6 +2648,9 @@ body.modal-open{ overflow:hidden; }
     regenName(p);
     setupPlayers.push(p);
     renderSetup();
+    // reveal the new card + keep the add button in view
+    var sc = document.querySelector('.setup-scroll');
+    if (sc) requestAnimationFrame(function () { sc.scrollTop = sc.scrollHeight; });
   }
   // removing a card. The owner can be removed ONLY while skipped; doing so DETACHES the owner —
   // seat #1 then shows a muted token but keeps its own identity until the token is re-activated.
@@ -2959,12 +2969,30 @@ body.modal-open{ overflow:hidden; }
     netPlay = net; syncStartWhereSel();
     showInfoToast(net ? WHERE_NOTE.net : WHERE_NOTE.local);
   }
+  // swipe across a selector: any horizontal drag toward an option picks it (left option / right
+  // option by direction). A tap still picks the tapped option; the post-swipe click is suppressed.
+  function attachSelSwipe(sel, pickLeft, pickRight) {
+    var sx = null, sy = null, pid = null, decided = false;
+    sel.style.touchAction = 'pan-y';                            // vertical scroll passes through; we own horizontal
+    sel.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; sel._swiped = false; });
+    sel.addEventListener('pointermove', function (e) {
+      if (sx == null || e.pointerId !== pid || decided) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) < 12 || Math.abs(dx) <= Math.abs(dy)) return;   // need a clear horizontal move
+      decided = true; sel._swiped = true;
+      if (dx > 0) pickRight(); else pickLeft();                 // toward the option in that direction
+    });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { sel.addEventListener(ev, function () { sx = null; }); });
+  }
   $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
-    b.onclick = function () { setStartRuleset(b.getAttribute('data-rs')); };
+    b.onclick = function () { if ($('startRuleSel')._swiped) { $('startRuleSel')._swiped = false; return; } setStartRuleset(b.getAttribute('data-rs')); };
   });
   $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) {
-    b.onclick = function () { setStartWhere(b.getAttribute('data-net') === '1'); };
+    b.onclick = function () { if ($('startWhereSel')._swiped) { $('startWhereSel')._swiped = false; return; } setStartWhere(b.getAttribute('data-net') === '1'); };
   });
+  // ruleset row: [с минуси | без минуси]; where row: [на устройството | по мрежа]
+  attachSelSwipe($('startRuleSel'), function () { setStartRuleset('experimental'); }, function () { setStartRuleset('standard'); });
+  attachSelSwipe($('startWhereSel'), function () { setStartWhere(false); }, function () { setStartWhere(true); });
   // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
   function startNetFlow(manual) {
     $('setupErr').textContent = '';
