@@ -186,6 +186,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .ktbubble{ position:fixed; z-index:70; max-width:250px; padding:11px 14px; border-radius:12px; background:var(--gen-ink);
   border:1.5px solid var(--gen-brass-stroke); box-shadow:0 8px 22px rgba(0,0,0,.5); text-align:center; }
 .ktbubble .kt-hd{ font-size:11.5px; color:var(--gen-label); margin-bottom:9px; }
+.ktbubble .kt-hd2{ margin-top:11px; padding-top:10px; border-top:1px solid var(--gen-ink-line); }
 .ktbubble .kt-opts{ display:flex; gap:16px; justify-content:center; margin-bottom:9px; }
 .ktbubble .kt-opt{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.5px; text-transform:uppercase;
   background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; padding:1px 3px 3px; color:var(--gen-muted); }
@@ -218,12 +219,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* ===== setup ===== */
 .setup-body{ padding:18px 16px 22px; display:flex; flex-direction:column; gap:12px; }
 .setup-intro{ font-size:12px; color:var(--gen-label); line-height:1.5; }
-.setup-title{ margin:0; text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:42px;
+.setup-title{ margin:0; text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:var(--ttl); line-height:1;
   letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35);
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* press-and-hold = secret dev unlock */
-.setup-titlerow{ display:flex; align-items:center; justify-content:center; gap:16px; margin:2px 0 4px;
+/* the title is centred on the screen; the hamburger is overlaid on the right (absolute) so it
+   never pushes the title off-centre — it's positioned AFTER the title has centred itself */
+.setup-titlerow{ --ttl:42px; position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 4px;
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* hold-to-unlock area: never select/callout */
-.setuphamb{ flex:none; border-color:var(--gen-brass-stroke); }   /* settings hamburger beside the title */
+.setup-hambwrap{ position:absolute; right:0; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
+.setuphamb{ flex:none; width:calc(var(--ttl) * .7); height:calc(var(--ttl) * .7); border-color:var(--gen-brass-stroke); }   /* 70% of the title height, vertically centred */
 .pcard{ background:rgba(20,22,12,.72); border:1px solid var(--gen-pill-line); border-radius:10px; padding:12px; }
 .pcard .name{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:15px; text-transform:uppercase; letter-spacing:.5px;
   color:var(--gen-text); background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:9px 11px; }
@@ -959,6 +963,9 @@ body.modal-open{ overflow:hidden; }
 .ownerinfo{ position:fixed; z-index:55; max-width:250px; padding:10px 12px; border-radius:10px; background:var(--gen-brass-bright);
   color:var(--gen-ink); font-size:11.5px; line-height:1.45; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.5); border:2px solid var(--gen-brass-stroke); }
 .ownerinfo b{ font-weight:700; }
+.ownerinfo .oi-cust{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-ink-line); display:flex; flex-direction:column; gap:7px; }
+.ownerinfo .oi-crow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.ownerinfo .oi-crow > span{ font-weight:700; font-size:11px; }
 .ownerinfo .oi-skip-note{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-ink-line); font-size:11px; opacity:.9; }
 .ownerinfo .oi-skip{ display:block; width:100%; margin-top:8px; padding:8px 10px; border-radius:7px; cursor:pointer; font-family:var(--gen-font-display);
   font-weight:700; font-size:11px; letter-spacing:.3px; color:var(--gen-ink); background:rgba(0,0,0,.18); border:1.5px solid var(--gen-brass-stroke); }
@@ -1423,8 +1430,10 @@ body.modal-open{ overflow:hidden; }
   <div class="setup-body">
     <div class="setup-titlerow">
       <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
-      <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
-      <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
+      <div class="setup-hambwrap">
+        <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
+        <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
+      </div>
     </div>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
@@ -1547,6 +1556,11 @@ body.modal-open{ overflow:hidden; }
     <button type="button" class="kt-opt" data-keep="0">ХВЪРЛИШ</button>
     <button type="button" class="kt-opt" data-keep="1">ЗАДЪРЖИШ</button>
   </div>
+  <div class="kt-hd kt-hd2">Нови зарове:</div>
+  <div class="kt-opts">
+    <button type="button" class="kt-opt kt-batch" data-batch="0">ПОДРЕДИ</button>
+    <button type="button" class="kt-opt kt-batch" data-batch="1">РАЗДЕЛИ</button>
+  </div>
   <div class="kt-fine">* докосни предпочитаното действие</div>
 </div>
 
@@ -1657,6 +1671,13 @@ body.modal-open{ overflow:hidden; }
         <div class="keepseg" id="ownerKeep">
           <button class="klabel" data-keep="1">дръж</button>
           <button class="klabel" data-keep="0">хвърли</button>
+        </div>
+      </div>
+      <div class="ownertog setrow" style="cursor:default">
+        <span>Нови зарове по подразбиране</span>
+        <div class="keepseg" id="ownerBatch">
+          <button class="klabel" data-batch="0">подреди</button>
+          <button class="klabel" data-batch="1">раздели</button>
         </div>
       </div>
       <div id="ownerBubble" class="ownerbubble hidden"></div>
@@ -2057,7 +2078,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.18.2';
+  var APP_VERSION = '1.19.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2130,7 +2151,7 @@ body.modal-open{ overflow:hidden; }
     return game.players.map(function (p) {
       return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, personaId: p.persona ? p.persona.id : null,
                gender: p.gender, bet: p.bet, scores: p.scores, bonus: p.bonus || 0, ribbons: p.ribbons || [],
-               selectKeep: p.selectKeep };
+               selectKeep: p.selectKeep, diceBatch: p.diceBatch };
     });
   }
   // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
@@ -2506,7 +2527,7 @@ body.modal-open{ overflow:hidden; }
     return setupPlayers.map(function (p) {
       var pl = G.createPlayer(p.name.trim(), p.color, p.isAI); pl.bet = p.bet; pl.gender = p.gender || 'm';
       pl.owner = skipOwnerNext ? false : !!p.owner; // owner skipped → nobody carries the flag this game
-      if (!p.isAI) pl.selectKeep = !!settings.selectKeep;   // each human starts on the default, then keeps their own
+      if (!p.isAI) { pl.selectKeep = !!settings.selectKeep; pl.diceBatch = !!settings.newDiceBatch; }   // each human starts on the defaults, then keeps their own
       pl.bonus = namePointsOn() ? (p.bonus || 0) : 0; // rare-name starting bonus (Титли + точки)
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       if (p.isAI) pl.persona = G.personaById(p.personaId);
@@ -3620,7 +3641,7 @@ body.modal-open{ overflow:hidden; }
     var players = roster.map(function (m) {
       var pl = G.createPlayer(m.name, m.color, !!m.isAI);       // humans play on their own device; AI seats are host-driven
       pl.gender = m.gender; pl.bet = ''; pl.bonus = 0; pl.netId = m.id; pl.dropped = !!m.dropped;
-      if (!m.isAI) pl.selectKeep = !!settings.selectKeep;       // each device's human plays in its own flavour
+      if (!m.isAI) { pl.selectKeep = !!settings.selectKeep; pl.diceBatch = !!settings.newDiceBatch; }       // each device's human plays in its own flavour
       pl.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);
       pl.owner = (m.id === localPid);                           // ★ each device owns ITS OWN player (history attribution)
       return pl;
@@ -4251,7 +4272,7 @@ body.modal-open{ overflow:hidden; }
     var shown = fx.dice ? fx.dice : dice;
     if (fx.diceKeep != null) shown = shown.slice(0, fx.diceKeep);
     // „Нов набор зарове": group the tray by generation (separators) instead of accenting the new dice
-    var batchMode = settings.newDiceBatch && !fx.dice && fx.diceKeep == null && diceGen.length === shown.length;
+    var batchMode = activeBatch() && !fx.dice && fx.diceKeep == null && diceGen.length === shown.length;
     shown.forEach(function (v, i) {
       if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {   // a generation boundary → divider between groups
         var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true');
@@ -4331,9 +4352,18 @@ body.modal-open{ overflow:hidden; }
     if (p && !p.isAI && typeof p.selectKeep === 'boolean') return p.selectKeep;
     return !!settings.selectKeep;
   }
+  // „Нови зарове": the current player's tray-display flavour (separate vs sort) — same per-player pattern as keep
+  function activeBatch() {
+    var p = game && game.players && game.players[game.current];
+    if (p && !p.isAI && typeof p.diceBatch === 'boolean') return p.diceBatch;
+    return !!settings.newDiceBatch;
+  }
   function renderKeepThrowTip() {
-    $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
+    $('keepThrowTip').querySelectorAll('.kt-opt[data-keep]').forEach(function (b) {
       b.classList.toggle('on', (b.getAttribute('data-keep') === '1') === activeKeep());
+    });
+    $('keepThrowTip').querySelectorAll('.kt-batch').forEach(function (b) {
+      b.classList.toggle('on', (b.getAttribute('data-batch') === '1') === activeBatch());
     });
   }
   function showKeepThrowTip() {
@@ -4346,7 +4376,7 @@ body.modal-open{ overflow:hidden; }
     if (tut) tutEvent('chooser');
   }
   $('fireQ').onclick = function (e) { e.stopPropagation(); showKeepThrowTip(); };
-  $('keepThrowTip').querySelectorAll('.kt-opt').forEach(function (b) {
+  $('keepThrowTip').querySelectorAll('.kt-opt[data-keep]').forEach(function (b) {
     b.onclick = function (e) {
       e.stopPropagation();
       var newKeep = b.getAttribute('data-keep') === '1';
@@ -4361,6 +4391,20 @@ body.modal-open{ overflow:hidden; }
       renderKeepThrowTip();
     };
   });
+  // „Нови зарове" flavour — same per-player pattern; the owner's pick is also the saved default
+  $('keepThrowTip').querySelectorAll('.kt-batch').forEach(function (b) {
+    b.onclick = function (e) {
+      e.stopPropagation();
+      var nb = b.getAttribute('data-batch') === '1';
+      if (nb !== activeBatch()) {
+        var p = game && game.players[game.current];
+        if (p && !p.isAI) p.diceBatch = nb;
+        if (!p || p.owner || p.isAI) { settings.newDiceBatch = nb; saveSettings(); }
+        if (game) renderAll();
+      }
+      renderKeepThrowTip();
+    };
+  });
 
   // which dice get RE-THROWN this fire — interprets the tap marks per the player's keep/throw flavour
   function rerollMask() { return activeKeep() ? selected.map(function (s) { return !s; }) : selected.slice(); }
@@ -4370,7 +4414,7 @@ body.modal-open{ overflow:hidden; }
   function applyReroll(rr) {
     rollNo++;
     var paired = dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i], g: rr[i] ? rollNo : (diceGen[i] || 1) }; });
-    if (settings.newDiceBatch) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
+    if (activeBatch()) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
     else paired.sort(function (a, b) { return a.v - b.v; });
     dice = paired.map(function (x) { return x.v; });
     diceNew = paired.map(function (x) { return x.nw; });
@@ -4484,7 +4528,7 @@ body.modal-open{ overflow:hidden; }
     undoStack = []; moveLog = players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
-    $('hintBtn').classList.toggle('hidden', !exactReady || manualMode);
+    $('hintBtn').classList.toggle('hidden', !exactReady || manualMode || !settings.advice);
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
     $('expBoard').classList.add('hidden');
     $('expReserve').classList.add('hidden');
@@ -4496,7 +4540,7 @@ body.modal-open{ overflow:hidden; }
     var players = snap.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
       pl.gender = sp.gender || 'm'; pl.owner = !!sp.owner; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.scores = sp.scores || {};
-      if (!sp.isAI) pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep;
+      if (!sp.isAI) { pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep; pl.diceBatch = (typeof sp.diceBatch === 'boolean') ? sp.diceBatch : !!settings.newDiceBatch; }
       if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
       return pl;
     });
@@ -4505,14 +4549,14 @@ body.modal-open{ overflow:hidden; }
     undoStack = []; viewingHistory = false; moveLog = snap.moveLog || players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
-    $('hintBtn').classList.toggle('hidden', !exactReady);
+    $('hintBtn').classList.toggle('hidden', !exactReady || !settings.advice);
     document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
     setDockUI(false);
     expBeginTurn();
   }
   function expBeginTurn() {
     locked = false; rerolledAll = false; diceNew = [false, false, false, false, false]; diceGen = []; rollNo = 0;
-    hintsOn = false; $('hintBtn').classList.remove('on'); $('hintBtn').classList.toggle('hidden', !exactReady);  // hints need the exact table
+    hintsOn = false; $('hintBtn').classList.remove('on'); $('hintBtn').classList.toggle('hidden', !exactReady || !settings.advice);  // hints need the exact table AND the advice toggle
     clearRoast();
     var p = G.currentPlayer(game);
     if (!netMode) saveResume();
@@ -4920,7 +4964,7 @@ body.modal-open{ overflow:hidden; }
       var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>'; $('throws').innerHTML = td; return;
     }
     var interactive = !p.isAI && !locked && throwsLeft > 0;
-    var batchMode = settings.newDiceBatch && diceGen.length === dice.length;   // group by roll instead of accenting
+    var batchMode = activeBatch() && diceGen.length === dice.length;   // group by roll instead of accenting
     dice.forEach(function (v, i) {
       if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {
         var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true'); box.appendChild(sep);
@@ -5345,9 +5389,9 @@ body.modal-open{ overflow:hidden; }
   // ---------- settings (with a secret developer mode) ----------
   function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || !settings.advice); }
   var SETTINGS_ROWS = [
-    // КАЗАРМА — master switch for the goofy layer (off = core only; on enables
+    // master switch for the goofy layer (off = core only; on enables
     // callouts, penalties, combo tooltips and bets). Rare-name titles are separate.
-    { key: 'barracks', label: 'КАЗАРМА', onChange: function () {
+    { key: 'barracks', label: 'Сол и хранилки', onChange: function () {
         if (game) renderAll();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
@@ -5370,6 +5414,10 @@ body.modal-open{ overflow:hidden; }
         setupPlayers.forEach(swapCensorName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
+    // Нови зарове — tray display: ON = раздели (group the fresh batch), OFF = подреди (sort+accent).
+    // This is the saved DEFAULT; per-player it's toggled live from the „?“ on the fire button.
+    { key: 'newDiceBatch', label: 'Нови зарове', labelFn: function (v) { return 'Нови зарове: ' + (v ? 'раздели' : 'подреди'); },
+      onChange: function () { if (game && !manualMode) (expMode ? expRenderAll : renderAll)(); } },
     // (Акустична мрежа + Дебъг режим moved to the developer menu — Debug / Experimental)
   ];
   function buildSettingsRows(inGame, lobbyOnly) {
@@ -5759,8 +5807,7 @@ body.modal-open{ overflow:hidden; }
     // internet play (WebRTC) is now a release feature — no enable toggle here. Optical (QR) pairing stays experimental.
     var optr = devToggleRow('Оптично сдвояване (QR)', 'opticalHandshake', function () {}); optr.id = 'devOpticalRow';
     exp.list.appendChild(optr);
-    // group the dice tray by roll instead of accenting — kept dice left, fresh batch right, ordered
-    exp.list.appendChild(devToggleRow('Нов набор зарове', 'newDiceBatch', function () { if (game && !manualMode) renderAll(); }));
+    // (Нови зарове moved out of dev → the keep/throw „?“ bubble, regular settings, and owner defaults)
     body.appendChild(exp.sec);
     syncAcousticDebugVis();
   }
@@ -5842,7 +5889,7 @@ body.modal-open{ overflow:hidden; }
     // reflect persisted owner controls
     $('ownerName').value = settings.ownerName || '';
     $('ownerToggle').classList.toggle('on', !!settings.useOwnerName);
-    syncOwnerGender(); syncOwnerColor(); syncRuleset(); syncOwnerKeep();
+    syncOwnerGender(); syncOwnerColor(); syncRuleset(); syncOwnerKeep(); syncOwnerBatch();
     $('clearPanel').classList.add('hidden'); $('ownerBubble').classList.add('hidden'); $('ruleBubble').classList.add('hidden'); updateStorageInfo();
     $('settingsModal').classList.remove('hidden');
   }
@@ -6531,7 +6578,7 @@ body.modal-open{ overflow:hidden; }
     zero: '<b>Нули</b> — нулираните полета: общо, <b>принудени</b> (нищо не върви) и <b class="nn">по твоя вина</b>.',
     stages: '<b>По етапи</b> — средно изпуснати точки на ход в началото, средата и края на играта. Показва кога играеш най-слабо.',
     chin: '<b>Чин</b> — средният ти чин по умение през игрите, процентът победи и средното ти място.',
-    pr: '<b>Личен рекорд</b> — най-добрият ти резултат, средният резултат и средният късмет през архива.',
+    pr: '<b>Личен рекорд</b> — най-добрият и най-лошият ти резултат, средният резултат и средният късмет през архива.',
     generali: '<b>Генерали</b> — в колко от битките си хвърлял Генерал (пет еднакви).',
     consist: '<b>Постоянство</b> — колко стабилни са резултатите и точността ти (± разсейване около средното).',
     razvitie: '<b>Развитие</b> — накъде върви точността ти през игрите: качваш ли се, спадаш или си стабилен.',
@@ -6848,7 +6895,7 @@ body.modal-open{ overflow:hidden; }
     return rec.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
       pl.gender = sp.gender || 'm'; pl.bet = sp.bet; pl.scores = sp.scores || {}; pl.bonus = sp.bonus || 0; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.owner = !!sp.owner;
-      if (!sp.isAI) pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep;
+      if (!sp.isAI) { pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep; pl.diceBatch = (typeof sp.diceBatch === 'boolean') ? sp.diceBatch : !!settings.newDiceBatch; }
       if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
       return pl;
     });
@@ -7177,7 +7224,7 @@ body.modal-open{ overflow:hidden; }
       avgAcc: avgAcc, accSd: stdev(data.map(function (d) { return d.ana.accuracy * 100; }), avgAcc * 100),
       accSlope: trendSlope(data.map(function (d) { return d.ana.accuracy * 100; })),
       wins: rankedPlaces.filter(function (p) { return p === 1; }).length, rankedN: rankedN,
-      best: Math.max.apply(null, scores), avgPlace: rankedN ? rankedPlaces.reduce(function (s, p) { return s + p; }, 0) / rankedN : null,
+      best: Math.max.apply(null, scores), worst: Math.min.apply(null, scores), avgPlace: rankedN ? rankedPlaces.reduce(function (s, p) { return s + p; }, 0) / rankedN : null,
       generals: data.filter(function (d) { return d.general; }).length,
       avgLuck: diceData.length ? diceData.reduce(function (s, d) { return s + d.ana.luck; }, 0) / diceData.length : null,
       catList: catList, report: report, ruleset: rs,
@@ -7351,7 +7398,7 @@ body.modal-open{ overflow:hidden; }
     if (c.rankedN) chinRows.push('процент победи <b>' + Math.round(100 * c.wins / c.rankedN) + '%</b> <span class="hmuted">(' + c.rankedN + ' с класиране)</span>', 'средно място <b>' + c.avgPlace.toFixed(1) + '</b>');
     else chinRows.push('<span class="hmuted">няма игри с класиране за победи</span>');
     h += statRows('Чин', RC.skill, chinRows);
-    h += statRows('Личен рекорд', RC.upper, ['<b>' + c.best + '</b> т.', 'среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'].concat(c.avgLuck != null ? ['среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>'] : []));
+    h += statRows('Личен рекорд', RC.upper, ['най-висок <b>' + c.best + '</b> т.', 'най-нисък <b>' + c.worst + '</b> т.', 'среден резултат <b>' + Math.round(c.avgScore) + '</b> т.'].concat(c.avgLuck != null ? ['среден късмет <b>' + (c.avgLuck >= 0 ? '+' : '') + c.avgLuck.toFixed(0) + '</b>'] : []));
     h += stat('Генерали', RC.gen, '<b>' + c.generals + '</b> от ' + n + ' битки');   // single line, no blunder here
     var consTag = c.scoreSd < 18 ? 'стабилен' : c.scoreSd > 32 ? 'нестабилен' : 'умерен';
     h += statRows('Постоянство', RC.stage, ['резултат <b>±' + Math.round(c.scoreSd) + ' т.</b>', 'точност <b>±' + Math.round(c.accSd) + '%</b>', '<span class="hmuted">' + consTag + '</span>']);
@@ -8111,9 +8158,21 @@ body.modal-open{ overflow:hidden; }
     var b = $('ownerInfo');
     if (!b.classList.contains('hidden')) { b.classList.add('hidden'); return; }
     b.innerHTML = OWNER_INFO
+      + '<div class="oi-cust">'
+      +   '<div class="oi-crow"><span>Зарове</span><div class="keepseg" id="oiKeep"><button class="klabel" data-keep="1">дръж</button><button class="klabel" data-keep="0">хвърли</button></div></div>'
+      +   '<div class="oi-crow"><span>Нови зарове</span><div class="keepseg" id="oiBatch"><button class="klabel" data-batch="0">подреди</button><button class="klabel" data-batch="1">раздели</button></div></div>'
+      + '</div>'
       + '<div class="oi-skip-note">Друг играе на телефона? Пропусни старшината — тази игра няма да влезе в личната статистика.</div>'
       + '<button class="oi-skip' + (skipOwnerNext ? ' on' : '') + '" id="ownerSkipBtn">' + skipBtnLabel() + '</button>';
     b.classList.remove('hidden');
+    // owner default dice mechanics, editable straight from the token (mirrors the settings owner box)
+    function oiSyncSegs() {
+      $('oiKeep').querySelectorAll('.klabel').forEach(function (x) { x.classList.toggle('on', (x.getAttribute('data-keep') === '1') === !!settings.selectKeep); });
+      $('oiBatch').querySelectorAll('.klabel').forEach(function (x) { x.classList.toggle('on', (x.getAttribute('data-batch') === '1') === !!settings.newDiceBatch); });
+    }
+    $('oiKeep').querySelectorAll('.klabel').forEach(function (x) { x.onclick = function (e) { e.stopPropagation(); settings.selectKeep = x.getAttribute('data-keep') === '1'; saveSettings(); oiSyncSegs(); }; });
+    $('oiBatch').querySelectorAll('.klabel').forEach(function (x) { x.onclick = function (e) { e.stopPropagation(); settings.newDiceBatch = x.getAttribute('data-batch') === '1'; saveSettings(); oiSyncSegs(); }; });
+    oiSyncSegs();
     $('ownerSkipBtn').onclick = function (e) {
       e.stopPropagation();
       skipOwnerNext = !skipOwnerNext;
@@ -8216,6 +8275,10 @@ body.modal-open{ overflow:hidden; }
   function syncOwnerKeep() { $('ownerKeep').querySelectorAll('.klabel').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-keep') === '1') === !!settings.selectKeep); }); }
   $('ownerKeep').querySelectorAll('.klabel').forEach(function (b) {
     b.onclick = function () { settings.selectKeep = b.getAttribute('data-keep') === '1'; syncOwnerKeep(); saveSettings(); };
+  });
+  function syncOwnerBatch() { $('ownerBatch').querySelectorAll('.klabel').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-batch') === '1') === !!settings.newDiceBatch); }); }
+  $('ownerBatch').querySelectorAll('.klabel').forEach(function (b) {
+    b.onclick = function () { settings.newDiceBatch = b.getAttribute('data-batch') === '1'; syncOwnerBatch(); saveSettings(); };
   });
   // ---- localStorage fullness gauge (next to the clear-archive control) ----
   var LS_QUOTA = 5 * 1024 * 1024;   // typical per-origin localStorage cap (~5 MB)
