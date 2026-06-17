@@ -228,6 +228,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* hold-to-unlock area: never select/callout */
 .setup-hambwrap{ position:absolute; right:0; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
 .setuphamb{ flex:none; width:calc(var(--ttl) * .7); height:calc(var(--ttl) * .7); border-color:var(--gen-brass-stroke); }   /* 70% of the title height, vertically centred */
+/* underline-style segmented selectors on the start screen (ruleset + local/network) */
+.ssel{ display:flex; gap:20px; justify-content:center; margin:0 0 8px; -webkit-user-select:none; user-select:none; }
+.ssel-where{ margin:10px 0 8px; }
+.ssel-opt{ background:none; border:none; border-bottom:2px solid transparent; padding:2px 1px 3px; cursor:pointer;
+  font-family:var(--gen-font-display); font-weight:700; font-size:13.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
+.ssel-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
+.ssel-opt.rs-off{ opacity:.32; cursor:not-allowed; }
 .pcard{ background:rgba(20,22,12,.72); border:1px solid var(--gen-pill-line); border-radius:10px; padding:12px; }
 .pcard .name{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:15px; text-transform:uppercase; letter-spacing:.5px;
   color:var(--gen-text); background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:9px 11px; }
@@ -567,6 +574,9 @@ body.modal-open{ overflow:hidden; }
 .netsett .sc{ font-size:10px; letter-spacing:.3px; padding:3px 8px; border-radius:999px; background:rgba(201,166,75,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
 .netsett .sc.none{ background:transparent; border-color:var(--gen-pill-line); color:var(--gen-muted); }
 .netsett .sc.mode{ background:var(--gen-brass); border-color:var(--gen-brass); color:var(--gen-ink); font-weight:700; }
+.netpickinfo{ display:flex; gap:6px; justify-content:center; margin:0 0 12px; }
+.netpickinfo .npi-chip{ font-size:11px; padding:3px 10px; border-radius:999px; background:var(--gen-brass); color:var(--gen-ink);
+  font-weight:700; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.3px; }
 .netprep-tools{ margin-bottom:6px; }
 .btn.small{ padding:8px 10px; font-size:11px; }
 /* in-game AI-takeover roster (host menu) */
@@ -1435,19 +1445,26 @@ body.modal-open{ overflow:hidden; }
         <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
       </div>
     </div>
+    <!-- ruleset picker (underline-style, like the in-game keep/throw chooser) -->
+    <div class="ssel" id="startRuleSel">
+      <button type="button" class="ssel-opt" data-rs="standard">без минуси</button>
+      <button type="button" class="ssel-opt" data-rs="experimental">с минуси</button>
+    </div>
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
     <div id="setupErr" class="err"></div>
+    <!-- local vs network: decides what the play buttons below do -->
+    <div class="ssel ssel-where" id="startWhereSel">
+      <button type="button" class="ssel-opt" data-net="0">на устройството</button>
+      <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
+    </div>
     <div class="setup-actions">
       <button id="startGame" class="btn primary">⚔ В Бой!</button>
       <button id="startManual" class="btn">✍ Полеви отчет</button>
     </div>
-    <p class="modehint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
+    <p class="modehint" id="modeHint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
     <div class="setup-actions">
       <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
-    </div>
-    <div class="setup-actions">
-      <button id="webrtcBtn" class="btn wrfeature">🌐 Игра по интернет</button>
     </div>
     <div class="setup-actions">
       <button id="howtoBtn" class="btn">📖 Правила</button>
@@ -1854,6 +1871,7 @@ body.modal-open{ overflow:hidden; }
       </div>
       <!-- pick a role: host or join -->
       <div id="netPickRole">
+        <div id="netPickInfo" class="netpickinfo wr-only hidden"></div>
         <div class="setup-actions">
           <button id="netHost" class="btn primary">📡 Бъди старшина (хост)</button>
         </div>
@@ -2078,7 +2096,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.19.1';
+  var APP_VERSION = '1.20.0';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -2539,8 +2557,34 @@ body.modal-open{ overflow:hidden; }
     $('setupErr').textContent = '';
     startGame(buildPlayers(), manual);
   }
-  $('startGame').onclick = function () { startFromSetup(false); };
-  $('startManual').onclick = function () { startFromSetup(true); };
+  // ---- start-screen selectors: ruleset (без/с минуси) + where (device/network) ----
+  var netPlay = false;   // false = play on this device; true = launch the network host/join workflow
+  function syncStartRuleSel() { $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === (settings.ruleset || 'standard')); }); }
+  function syncStartWhereSel() {
+    $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-net') === '1') === netPlay); });
+    $('startGame').textContent = netPlay ? '🌐 Игра със зарове' : '⚔ В Бой!';
+    $('startManual').textContent = netPlay ? '🌐 Игра на отчет' : '✍ Полеви отчет';
+    // minus-over-network gameplay isn't wired yet → over the net, only „без минуси“ for now
+    if (netPlay && settings.ruleset === 'experimental') { settings.ruleset = 'standard'; saveSettings(); syncRuleset(); }
+    var expOpt = $('startRuleSel').querySelector('.ssel-opt[data-rs="experimental"]');
+    if (expOpt) { expOpt.classList.toggle('rs-off', netPlay); expOpt.title = netPlay ? 'С минуси по мрежа — очаквай скоро (засега само локално)' : ''; }
+    syncStartRuleSel();
+    $('modeHint').textContent = netPlay ? 'По мрежа: хостът дава код, останалите се присъединяват. „С минуси“ по мрежа предстои.'
+      : 'Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.';
+  }
+  $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
+    b.onclick = function () {
+      if (netPlay && b.getAttribute('data-rs') === 'experimental') return;   // disabled over the net for now
+      settings.ruleset = b.getAttribute('data-rs'); saveSettings(); syncStartRuleSel(); syncRuleset();
+    };
+  });
+  $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) {
+    b.onclick = function () { netPlay = b.getAttribute('data-net') === '1'; syncStartWhereSel(); };
+  });
+  // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
+  function startNetFlow(manual) { netManual = manual; openNetModal('webrtc', manual); }
+  $('startGame').onclick = function () { if (netPlay) startNetFlow(false); else startFromSetup(false); };
+  $('startManual').onclick = function () { if (netPlay) startNetFlow(true); else startFromSetup(true); };
 
   // ===================================================== acoustic multiplayer (mp.js)
   // rotating flavour accents per protocol stage — funny filler while sound negotiates
@@ -2632,7 +2676,16 @@ body.modal-open{ overflow:hidden; }
         if (net.isHost && net.roster.length >= net.minPlayers) { $('netToPrep').classList.remove('hidden'); setFlavour($('netStatus'), 'lobbyWait'); }
         else if (net.isHost) setFlavour($('netStatus'), 'hostSearch');
       },
-      onJoined: function (id, manual) { localPid = id; if (typeof manual === 'boolean') { netManual = manual; syncNetMode(); } renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait'); },
+      onJoined: function (id, manual, exp) {
+        localPid = id;
+        // what I SELECTED on the start screen, before adopting the host's actual game
+        var selM = netManual, selE = selExp();
+        var hostM = (typeof manual === 'boolean') ? manual : selM, hostE = !!exp;
+        if (typeof manual === 'boolean') { netManual = hostM; syncNetMode(); }   // adopt the host's mode (host rules win)
+        if (net) net.rounds = hostE ? (X ? X.KEYS.length : 15) : G.CATEGORIES.length;
+        netJoinMismatch(selM, selE, hostM, hostE);   // warn (don't block) if it differs from my selection
+        renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait');
+      },
       onReject: function (reason) { netOnReject(reason); },
       onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
       onPrep: function () { enterNetPrep(); },
@@ -2932,11 +2985,16 @@ body.modal-open{ overflow:hidden; }
     var ta = $('ndCapOut'); ta.value = b64; ta.classList.toggle('hidden', ok);   // reveal only if copy failed
     $('ndCapStatus').textContent = b64.length + ' знака' + (ok ? '' : ' — копирай ръчно ⬇');
   };
+  // the ruleset I'm SELECTING for a net game I host/join (the host's wins after JOIN_ACK adoption)
+  function selExp() { return settings.ruleset === 'experimental'; }
+  function netRounds() { return selExp() ? (X ? X.KEYS.length : 15) : G.CATEGORIES.length; }
+  // the ruleset the net game actually runs by (host-authoritative: net.exp once adopted)
+  function netRuleset() { return (net && net.exp) ? 'experimental' : 'standard'; }
   function newSession(isHost) {
-    return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), manual: netManual, minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
+    return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), manual: netManual, exp: selExp(), minPlayers: 2, maxPlayers: 6, rounds: netRounds(), callbacks: netCallbacks() });
   }
   function newSessionWith(transport, isHost, eph) {
-    return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), eph: eph, manual: netManual, minPlayers: 2, maxPlayers: 6, rounds: G.CATEGORIES.length, callbacks: netCallbacks() });
+    return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), eph: eph, manual: netManual, exp: selExp(), minPlayers: 2, maxPlayers: 6, rounds: netRounds(), callbacks: netCallbacks() });
   }
   // a client persists its eph (player identity) per game code, so a reconnect/reload rejoins
   // the same seat the host already knows — rather than seating a brand-new boец.
@@ -3142,16 +3200,19 @@ body.modal-open{ overflow:hidden; }
     if (this.peer) { try { this.peer.destroy(); } catch (e) {} } this.peer = null;
   };
   // open the multiplayer modal in the chosen transport mode ('acoustic' | 'webrtc')
-  function openNetModal(kind) {
+  function openNetModal(kind, presetManual) {
     netKind = kind;
     var wr = (kind === 'webrtc');
+    if (typeof presetManual === 'boolean') netManual = presetManual;   // webrtc: mode comes from the start-screen play button
     $('netTitle').textContent = wr ? '🌐 Игра по интернет' : '🔊 Акустична игра';
     document.querySelectorAll('#netModal .ac-only').forEach(function (e) { e.classList.toggle('hidden', wr); });
     document.querySelectorAll('#netModal .wr-only').forEach(function (e) { e.classList.toggle('hidden', !wr); });
     $('netMeName').textContent = localMeta().name;
     netShow('choose');
     $('netPickRole').classList.remove('hidden');                       // back to the role picker
-    $('netModeSwitch').classList.remove('hidden');                     // mode is the host's choice — shown at role-pick
+    // the regular/manual switch only matters for acoustic; webrtc mode is preset on the start screen
+    $('netModeSwitch').classList.toggle('hidden', wr);
+    renderNetPickInfo();
     $('netJoinCode').classList.add('hidden'); $('netCodeInput').value = '';
     $('netHostCode').classList.add('hidden'); $('netHostCode').innerHTML = '';
     $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay(''); netChooseMsg('');
@@ -3172,12 +3233,27 @@ body.modal-open{ overflow:hidden; }
     $('netModeSwitch').querySelectorAll('.nms-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-manual') === '1') === netManual); });
   }
   $('netModeSwitch').querySelectorAll('.nms-opt').forEach(function (b) {
-    b.onclick = function () { netManual = (b.getAttribute('data-manual') === '1'); syncNetMode(); };
+    b.onclick = function () { netManual = (b.getAttribute('data-manual') === '1'); syncNetMode(); renderNetPickInfo(); };
   });
+  // human-readable labels for the chosen ruleset / game type (reused in the mismatch warning)
+  function rsLabel(rs) { return rs === 'experimental' ? 'с минуси' : 'без минуси'; }
+  function modeLabel(manual) { return manual ? 'на отчет (ръчно)' : 'със зарове'; }
+  // joined a game that differs from what I picked → tell me (but never block); I play by the host's rules
+  function netJoinMismatch(selManual, selE, hostManual, hostE) {
+    if (selManual === hostManual && selE === hostE) return;
+    var diffs = [];
+    if (selE !== hostE) diffs.push('правила <b>' + rsLabel(hostE ? 'experimental' : 'standard') + '</b> (ти избра „' + rsLabel(selE ? 'experimental' : 'standard') + '“)');
+    if (selManual !== hostManual) diffs.push('игра <b>' + modeLabel(hostManual) + '</b> (ти избра „' + modeLabel(selManual) + '“)');
+    netSay('⚠ Тази игра е ' + diffs.join(' и ') + '. Влизаш по правилата на старшината — ако не искаш, върни се назад.');
+  }
+  // role-pick info chips: what you're about to host or join (webrtc only — mode/ruleset are preset)
+  function renderNetPickInfo() {
+    var el = $('netPickInfo'); if (!el) return;
+    el.innerHTML = '<span class="npi-chip">' + rsLabel(settings.ruleset) + '</span><span class="npi-chip">' + modeLabel(netManual) + '</span>';
+  }
   // a status line that is visible during the CHOOSE phase (netStatus lives inside the hidden lobby)
   function netChooseMsg(s) { var el = $('netChooseMsg'); if (el) el.innerHTML = s; }
   $('netBtn').onclick = function () { openNetModal('acoustic'); };
-  $('webrtcBtn').onclick = function () { openNetModal('webrtc'); };
   function opticalOn() { return netKind === 'webrtc' && settings.opticalHandshake; }
   $('netHost').onclick = function () {
     if (opticalOn()) { opticalHost(); return; }              // QR pairing instead of the broker
@@ -3840,6 +3916,7 @@ body.modal-open{ overflow:hidden; }
   maybeOfferResume();   // offer to continue an unfinished battle from a prior session
   syncAcousticUI();     // hide every data-over-sound feature unless Акустика is on
   syncWebrtcUI();       // hide the WebRTC entry unless the experimental toggle is on
+  syncStartRuleSel(); syncStartWhereSel();   // start-screen ruleset + local/network selectors
 
   // ===================================================== GAME STATE
   var game = null, dice = [], selected = [false,false,false,false,false], diceNew = [false,false,false,false,false], throwsLeft = 0;
@@ -8245,7 +8322,7 @@ body.modal-open{ overflow:hidden; }
   function syncRuleset() { $('ruleSeg').querySelectorAll('.rlabel').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === (settings.ruleset || 'standard')); }); }
   $('ruleSeg').querySelectorAll('.rlabel').forEach(function (b) {
     b.onclick = function () {
-      settings.ruleset = b.getAttribute('data-rs'); syncRuleset(); saveSettings();
+      settings.ruleset = b.getAttribute('data-rs'); syncRuleset(); syncStartRuleSel(); saveSettings();
       // experimental gameplay (the three-column card) is still being built — be honest
       if (settings.ruleset === 'experimental') showRuleBubble();
       else $('ruleBubble').classList.add('hidden');

@@ -131,10 +131,11 @@
   function packJoinReq(eph, meta, manual) { var w = new Writer().u16(eph).u8(manual ? 1 : 0); writeMeta(w, { id: 0, name: meta.name, color: meta.color, gender: meta.gender }); return w.out(); }
   function unpackJoinReq(p) { var r = new Reader(p), eph = r.u16(), manual = !!(r.u8() & 1); return { eph: eph, manual: manual, meta: readMeta(r) }; }
   // JOIN_ACK also carries the host's game mode — the client adopts it (the host's rules are authoritative)
-  function packJoinAck(eph, assignedId, manual) { return new Writer().u16(eph).u8(assignedId).u8(manual ? 1 : 0).out(); }
+  // the flags byte carries the host's game mode (bit0 = manual) AND ruleset (bit1 = experimental)
+  function packJoinAck(eph, assignedId, manual, exp) { return new Writer().u16(eph).u8(assignedId).u8((manual ? 1 : 0) | (exp ? 2 : 0)).out(); }
   function packJoinNak(eph, reason) { return new Writer().u16(eph).u8(reason || 0).out(); }
   function unpackJoinNak(p) { var r = new Reader(p); return { eph: r.u16(), reason: r.u8() }; }
-  function unpackJoinAck(p) { var r = new Reader(p), eph = r.u16(), id = r.u8(); return { eph: eph, id: id, manual: r.left() ? !!(r.u8() & 1) : false }; }
+  function unpackJoinAck(p) { var r = new Reader(p), eph = r.u16(), id = r.u8(), f = r.left() ? r.u8() : 0; return { eph: eph, id: id, manual: !!(f & 1), exp: !!(f & 2) }; }
   function packRoster(players) { var w = new Writer().u8(players.length); players.forEach(function (p) { writeMeta(w, p); }); return w.out(); }
   function unpackRoster(p) { var r = new Reader(p), n = r.u8(), a = []; for (var i = 0; i < n; i++) a.push(readMeta(r)); return a; }
   function packStart(version, firstId, players) { var w = new Writer().u16(version).u8(firstId).u8(players.length); players.forEach(function (p) { writeMeta(w, p); }); return w.out(); }
@@ -183,6 +184,7 @@
     this.minPlayers = opts.minPlayers || 2;
     this.rounds = opts.rounds || 14;             // categories per player (General = 14)
     this.manual = !!opts.manual;                 // manual (ОТЧЕТ) game: free-for-all, no turn order/spectating
+    this.exp = !!opts.exp;                        // ruleset flag (experimental „с минуси") — opaque metadata; host's wins
     this.cb = opts.callbacks || {};
     this._st = opts.setTimeout || function (f, ms) { return setTimeout(f, ms); };
     this._ct = opts.clearTimeout || function (id) { clearTimeout(id); };
@@ -547,7 +549,7 @@
         if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
         existing = p;
       }
-      this._send(T.JOIN_ACK, packJoinAck(jr.eph, existing.id, this.manual));
+      this._send(T.JOIN_ACK, packJoinAck(jr.eph, existing.id, this.manual, this.exp));
       this._send(T.ROSTER, packRoster(this.roster));
     } else if (pkt.type === T.JOIN_REQ && (this.state === 'IN_GAME' || this.state === 'PREP')) {
       // a known player returning after a drop: re-admit by eph, clear dropped, catch them up.
@@ -555,7 +557,7 @@
       this.roster.forEach(function (p) { if (p.eph === rj.eph) back = p; });
       if (back) {
         var was = back.dropped; back.dropped = false;
-        this._send(T.JOIN_ACK, packJoinAck(rj.eph, back.id, this.manual));
+        this._send(T.JOIN_ACK, packJoinAck(rj.eph, back.id, this.manual, this.exp));
         this._send(T.ROSTER, packRoster(this.roster));
         if (this.state === 'IN_GAME') {
           this._send(T.START, packStart(this.version, this.activeId, this.roster));   // rebuild their board (idempotent for others)
@@ -614,7 +616,7 @@
       if (this._wantJoin && !this._acked) this._sendJoin();
     } else if (pkt.type === T.JOIN_ACK) {
       var ja = unpackJoinAck(pkt.payload);
-      if (ja.eph === this.eph) { this.myId = ja.id; this.manual = ja.manual; this._acked = true; this.state = 'IN_LOBBY'; this._ct(this._timers.join); if (this.cb.onJoined) this.cb.onJoined(ja.id, ja.manual); }
+      if (ja.eph === this.eph) { this.myId = ja.id; this.manual = ja.manual; this.exp = ja.exp; this._acked = true; this.state = 'IN_LOBBY'; this._ct(this._timers.join); if (this.cb.onJoined) this.cb.onJoined(ja.id, ja.manual, ja.exp); }
     } else if (pkt.type === T.JOIN_NAK) {
       var jn = unpackJoinNak(pkt.payload);
       if (jn.eph === this.eph && !this._acked) { this._wantJoin = false; this._ct(this._timers.join); this.state = 'SEARCHING'; if (this.cb.onReject) this.cb.onReject(jn.reason); }
