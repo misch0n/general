@@ -2250,10 +2250,13 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.33.0';
+  var APP_VERSION = '1.34.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.34.0', items: [
+      ['new', 'Мрежа: ако старшината откаже лобито, гостите получават съобщение и се връщат към избора хост/гост.'],
+      ['fix', 'Мрежа: смяна на фокуса (напр. клавиатурата) вече не разваля изгледа на хост/гост работния поток.'] ] },
     { v: '1.33.0', items: [
       ['chg', 'Добавянето на боец скролва надолу, така че новата карта и бутонът „+“ остават видими.'],
       ['chg', 'Подреждане: дръжката вече не светва; маркерът на влачената карта се рисува навътре, за да не застъпва съседа.'],
@@ -3135,6 +3138,7 @@ body.modal-open{ overflow:hidden; }
         renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait');
       },
       onReject: function (reason) { netOnReject(reason); },
+      onHostGone: function () { netHostGone(); },             // host cancelled the lobby → back to picker
       onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
       onPrep: function () { enterNetPrep(); },
       onSpur: function (id, heat) { onNetSpur(id, heat); },
@@ -4136,12 +4140,24 @@ body.modal-open{ overflow:hidden; }
   function netDisposeSession() {
     stopFlavour(); resetSpur(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
     stopScan(); if (optBus) { try { optBus.stop(); } catch (e) {} } optBus = null; optPending = null; optClient = null;
-    if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop(); if (netBus) netBus.stop();
+    var disbanding = net && net.isHost;
+    if (disbanding) { try { net.disband(); } catch (e) {} }   // tell clients the lobby is cancelled
+    if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop();
+    // stop the transport — deferred briefly when disbanding so the BYE flushes to the clients first
+    var bus = netBus;
+    if (bus) { if (disbanding) setTimeout(function () { try { bus.stop(); } catch (e) {} }, 250); else bus.stop(); }
     net = null; netFSK = null; netBus = null; netMode = false; localPid = null;
     netPhase = 'choose'; netMe = null; netMyReady = false; netAiActiveId = null; netSettCtx = false;
     $('netBars').innerHTML = ''; $('netLink').classList.add('hidden'); $('netDiag').classList.add('hidden');
     if ($('netCodeJoin')) $('netCodeJoin').disabled = false;
     if ($('netOptical')) $('netOptical').classList.add('hidden'); if ($('netOptAdd')) $('netOptAdd').classList.add('hidden');
+  }
+  // a client whose host disbanded the lobby: drop the session and return to the host/join picker
+  function netHostGone() {
+    if (!netMode && !net) return;
+    netDisposeSession();
+    openNetModal(netKind, netManual);
+    netChooseMsg('⚠ Старшината отказа играта. Можеш да създадеш своя или да влезеш в друга.');
   }
   function leaveNet() { netDisposeSession(); $('netModal').classList.add('hidden'); }   // ✕ — back to the start screen
   // „Откажи" from the host invite / lobby returns to the host/join role picker (modal stays open)
@@ -7808,8 +7824,10 @@ body.modal-open{ overflow:hidden; }
     if (b.contains(t) || (t && t.closest && t.closest('.ownerstar'))) return;
     b.classList.add('hidden');
   });
-  // changing focus away from the window dismisses transient popovers/explainers
+  // changing focus away from the window dismisses transient popovers/explainers — but NOT while the
+  // network host/join flow is open (a focus change there must not disturb its view)
   function dismissTransients() {
+    if (!$('netModal').classList.contains('hidden')) return;
     ['comboTip', 'fxBubble', 'guideTip', 'ownerInfo', 'colorPop', 'rpFilterMenu', 'medalTip', 'keepThrowTip'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.classList.add('hidden');
     });

@@ -167,6 +167,25 @@ test('drop: a vanished client is skipped, the rest finish, its board stays incom
   assert.ok(host._filled(c1id) < General.CATEGORIES.length, 'dropped board left incomplete');
 });
 
+test('disband: host cancels the lobby → every client is told (onHostGone)', function () {
+  var bus = new StarBus();
+  var gone = {};
+  function mk(isHost, me) {
+    return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onHostGone: function () { gone[me.name] = true; } } });
+  }
+  var host = mk(true, { name: 'Иван', color: '#ee0055', gender: 'm' });
+  var c1 = mk(false, { name: 'Боби', color: '#00aa55', gender: 'm' });
+  var c2 = mk(false, { name: 'Мими', color: '#5566ff', gender: 'f' });
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  assert.strictEqual(host.roster.length, 3, 'both clients joined');
+  host.disband(); bus.drain();
+  assert.ok(gone['Боби'] && gone['Мими'], 'both clients were notified the host disbanded');
+  assert.strictEqual(c1.state, 'DEAD', 'client session is torn down');
+  assert.strictEqual(c2.state, 'DEAD', 'client session is torn down');
+});
+
 test('reconnect: a dropped player rejoins by eph, catches up, and finishes', function () {
   var bus = new StarBus();
   function mk(isHost, me, extra) {

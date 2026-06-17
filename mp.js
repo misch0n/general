@@ -19,6 +19,7 @@
     TACT: 17,                                               // live turn action (spectating: roll/reroll/commit)
     SPUR: 18,                                               // lobby „ДАЙ ЗОР" cheer (player id + heat)
     JOIN_NAK: 19,                                           // host rejects a join (e.g. game-mode mismatch)
+    BYE: 25,                                                // host disbands the lobby — clients return to host/join
     XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
     // adaptive link & resilience (reserved 30-39)
     CAL_PROBE: 30, CAL_REPORT: 31, CAL_SELECT: 32, CAL_CONFIRM: 33, PROFILE_SWITCH: 34, QUALITY: 35, RELAY: 36, GOSSIP: 37,
@@ -296,6 +297,8 @@
     try { return this.tp.send(pkt); } catch (e) { return Promise.resolve(); }
   };
   Session.prototype.dispose = function () { var t = this._timers; for (var k in t) this._ct(t[k]); this._timers = {}; this.state = 'DEAD'; };
+  // host: tell every client the lobby is being cancelled (they return to the host/join picker)
+  Session.prototype.disband = function () { if (this.isHost) this._send(T.BYE, new Uint8Array(0)); };
 
   // ---------- host: lobby ----------
   Session.prototype.openLobby = function () {
@@ -621,6 +624,10 @@
     } else if (pkt.type === T.JOIN_NAK) {
       var jn = unpackJoinNak(pkt.payload);
       if (jn.eph === this.eph && !this._acked) { this._wantJoin = false; this._ct(this._timers.join); this.state = 'SEARCHING'; if (this.cb.onReject) this.cb.onReject(jn.reason); }
+    } else if (pkt.type === T.BYE) {
+      // host cancelled the lobby — stop trying to join and bubble it up so the UI returns to the picker
+      this._wantJoin = false; this._ct(this._timers.join); this.state = 'DEAD';
+      if (this.cb.onHostGone) this.cb.onHostGone();
     } else if (pkt.type === T.ROSTER) {
       this.roster = unpackRoster(pkt.payload);
       if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
