@@ -36,6 +36,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   border:3px solid #1c1d12; box-shadow:0 24px 60px rgba(0,0,0,.6); }
 /* the in-game screen pins a dice footer to the bottom; everything else scrolls beneath it */
 #game.board{ height:100vh; height:100dvh; min-height:0; }
+/* the start screen: fixed header + footer, scrollable roster between them */
+#setup.board{ height:100vh; height:100dvh; min-height:0; }
 .gamebody{ position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; z-index:1; }   /* fills the screen + scrolls beneath the bar */
 .bottombar{ position:absolute; left:0; right:0; bottom:0; z-index:30; background:var(--gen-panel); border-top:2px solid var(--gen-brass); }
 .gamefooter{ position:relative; z-index:1; padding:13px 16px 6px; }   /* dice on top */
@@ -219,7 +221,16 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .roast.order .bubble::before{ border-top-color:#f3ead0; }
 
 /* ===== setup ===== */
-.setup-body{ padding:18px 16px 22px; display:flex; flex-direction:column; gap:12px; }
+.setup-body{ flex:1; min-height:0; display:flex; flex-direction:column; }
+/* header: title + ruleset selector, always visible. Extra top padding above the title, and a
+   generous gap below the ruleset selector before the roster begins. */
+.setup-header{ flex:none; padding:34px 16px 18px; }
+/* roster: the only scrolling region; grows scrollable once the players overflow */
+.setup-scroll{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  display:flex; flex-direction:column; gap:12px; padding:2px 16px 14px; }
+/* footer: a translucent overlay pinned to the bottom, building upward from it */
+.setup-footer{ flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(180deg, rgba(16,18,9,0), rgba(16,18,9,.5) 32%, rgba(16,18,9,.72)); }
 .setup-intro{ font-size:12px; color:var(--gen-label); line-height:1.5; }
 .setup-title{ margin:0; text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:var(--ttl); line-height:1;
   letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35);
@@ -245,11 +256,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .playbtn{ position:relative; width:100%; height:46px; max-width:238px; margin:6px auto; border-radius:var(--gen-r-tag); overflow:hidden;
   border:2px solid var(--gen-ink-line); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:pan-y;
   --pb-lc:#b09551; --pb-rc:var(--gen-pill);    /* left active (muted gold), right inactive (pill) — default = regular mode */
-  /* each side: its mode colour solid to a hard stop at the edge, then a long smooth fade into the
-     central gold band where the „БОЙ!" label sits, between the two gradients */
+  /* each side: its mode colour solid to a hard stop at the edge, then a smooth fade that FINISHES
+     EARLY into a wide central gold band where the „БОЙ!" label sits, between the two gradients */
   background:linear-gradient(90deg,
-    var(--pb-lc) 0, var(--pb-lc) 20%, var(--gen-brass) 44%,
-    var(--gen-brass) 56%, var(--pb-rc) 80%, var(--pb-rc) 100%); }
+    var(--pb-lc) 0, var(--pb-lc) 16%, var(--gen-brass) 36%,
+    var(--gen-brass) 64%, var(--pb-rc) 84%, var(--pb-rc) 100%); }
 .playbtn.man{ --pb-lc:var(--gen-pill); --pb-rc:#b09551; }   /* manual mode: right zone becomes the active muted gold */
 .playbtn:active{ box-shadow:inset 0 3px 12px rgba(0,0,0,.32); }
 .playbtn .pb-go{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; color:var(--gen-ink);
@@ -310,8 +321,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .betline{ margin-top:10px; font-size:12px; color:var(--gen-muted); display:flex; align-items:center; gap:7px; }
 .betline .betval{ color:var(--gen-text); font-weight:700; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); border-radius:7px; padding:3px 9px; }
 .setup-actions{ display:flex; gap:10px; margin-top:4px; }
-/* rules + archive buttons scaled down 30% from the base .btn */
-.setup-actions .btn{ font-size:9.8px; letter-spacing:1px; border-radius:6px; padding:8.4px; }
+/* footer rules + archive: small icon-only buttons (CSS-drawn glyphs, no text) */
+.setup-actions-icons{ justify-content:center; gap:14px; margin-top:0; }
+.btn.iconbtn{ flex:none; width:40px; height:40px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:0; }
+.iconbtn .ic-book, .iconbtn .ic-archive{ color:var(--gen-brass-bright); }
+/* CSS-drawn open book (rules) */
+.ic-book{ position:relative; display:block; width:22px; height:17px; }
+.ic-book::before{ content:''; position:absolute; inset:0; border:2px solid currentColor; border-radius:2px; }
+.ic-book::after{ content:''; position:absolute; top:0; bottom:0; left:50%; width:2px; margin-left:-1px; background:currentColor; }   /* the spine */
+/* CSS-drawn records sheet (archive) — a document with lines */
+.ic-archive{ position:relative; display:block; width:16px; height:19px; }
+.ic-archive::before{ content:''; position:absolute; inset:0; border:2px solid currentColor; border-radius:2px; }
+.ic-archive::after{ content:''; position:absolute; left:3px; right:3px; top:5px; height:2px; background:currentColor;
+  box-shadow:0 4px 0 currentColor, 0 8px 0 currentColor; }   /* three record lines */
 .btn{ flex:1; font-family:var(--gen-font-display); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; font-size:14px;
   border:2px solid var(--gen-ink-line); border-radius:8px; padding:12px; background:var(--gen-pill); color:var(--gen-text); }
 /* CSS-drawn theme icons (currentColor) — import/export arrows, text/sound methods */
@@ -1127,6 +1149,12 @@ body.modal-open{ overflow:hidden; }
 .histform .rk.rx{ background:rgba(255,255,255,.06); color:var(--gen-disabled); }   /* unranked (single-player) game */
 .ho-noranked{ font-size:9px; color:var(--gen-muted); font-style:italic; }
 .hg-mode{ text-transform:uppercase; font-size:8.5px; letter-spacing:.4px; color:var(--gen-label); opacity:.9; }
+/* game-type marker as a tiny CSS glyph (dice = със зарове, pencil = отчет) — mirrors the play button */
+.minidie{ display:inline-block; vertical-align:-2px; width:11px; height:11px; border:1.5px solid currentColor; border-radius:2px; position:relative; }
+.minidie::before{ content:''; position:absolute; top:1.6px; left:1.6px; width:1.5px; height:1.5px; border-radius:50%; background:currentColor;
+  box-shadow:3.6px 0 0 currentColor, 0 3.6px 0 currentColor, 3.6px 3.6px 0 currentColor; }
+.minipencil{ display:inline-block; vertical-align:-2px; width:5px; height:13px; position:relative; transform:rotate(43deg); }
+.minipencil::before{ content:''; position:absolute; inset:0; background:currentColor; clip-path:polygon(0 0,100% 0,100% 78%,50% 100%,0 78%); }
 /* manual-game multiplayer / placement annotation (summary) */
 .mpresult{ margin:0 0 11px; padding:9px 11px; border-radius:9px; background:rgba(200,166,75,.1); border:1px solid var(--gen-brass-stroke); }
 .mpresult.hidden{ display:none; }
@@ -1501,41 +1529,49 @@ body.modal-open{ overflow:hidden; }
 <!-- ============ SETUP ============ -->
 <div id="setup" class="board">
   <div class="setup-body">
-    <div class="setup-titlerow">
-      <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
-      <div class="setup-hambwrap">
-        <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
-        <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
+    <!-- header: always visible — title, ruleset selector, settings -->
+    <header class="setup-header">
+      <div class="setup-titlerow">
+        <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
+        <div class="setup-hambwrap">
+          <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
+          <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
+        </div>
       </div>
+      <!-- ruleset picker (underline-style, like the in-game keep/throw chooser) -->
+      <div class="ssel" id="startRuleSel">
+        <button type="button" class="ssel-opt" data-rs="experimental">с минуси</button>
+        <button type="button" class="ssel-opt" data-rs="standard">без минуси</button>
+      </div>
+    </header>
+    <!-- scrollable roster: grows scrollable when more players than the screen fits -->
+    <div class="setup-scroll">
+      <div id="playerList"></div>
+      <button id="addPlayer" class="btn addbtn" aria-label="Добави боец">+</button>
+      <div id="setupErr" class="err"></div>
     </div>
-    <!-- ruleset picker (underline-style, like the in-game keep/throw chooser) -->
-    <div class="ssel" id="startRuleSel">
-      <button type="button" class="ssel-opt" data-rs="experimental">с минуси</button>
-      <button type="button" class="ssel-opt" data-rs="standard">без минуси</button>
-    </div>
-    <div id="playerList"></div>
-    <button id="addPlayer" class="btn addbtn" aria-label="Добави боец">+</button>
-    <div id="setupErr" class="err"></div>
-    <!-- rules + archive sit above the play button -->
-    <div class="setup-actions">
-      <button id="howtoBtn" class="btn">📖 Правила</button>
-      <button id="archiveBtn" class="btn">📜 Военен архив</button>
-    </div>
-    <!-- play button: one surface — tap left=зарове, right=отчет, middle=старт; or swipe ←/→ to pick -->
-    <div class="playbtn" id="playBtn" role="button" tabindex="0" aria-label="Старт на играта">
-      <i class="pb-ic pb-dice" aria-hidden="true"></i>
-      <span class="pb-go" id="pbGo">БОЙ!</span>
-      <i class="pb-ic pb-pencil" aria-hidden="true"></i>
-    </div>
-    <!-- local vs network: decides what the play button above does -->
-    <div class="ssel ssel-where" id="startWhereSel">
-      <button type="button" class="ssel-opt" data-net="0">на устройството</button>
-      <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
-    </div>
-    <p class="modehint" id="modeHint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
-    <div class="setup-actions">
-      <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
-    </div>
+    <!-- footer: transparent overlay pinned to the bottom — rules/history, play, mode -->
+    <footer class="setup-footer">
+      <div class="setup-actions setup-actions-icons">
+        <button id="howtoBtn" class="btn iconbtn" title="Правила" aria-label="Правила"><i class="ic-book" aria-hidden="true"></i></button>
+        <button id="archiveBtn" class="btn iconbtn" title="Военен архив" aria-label="Военен архив"><i class="ic-archive" aria-hidden="true"></i></button>
+      </div>
+      <!-- play button: one surface — tap left=зарове, right=отчет, middle=старт; or swipe ←/→ to pick -->
+      <div class="playbtn" id="playBtn" role="button" tabindex="0" aria-label="Старт на играта">
+        <i class="pb-ic pb-dice" aria-hidden="true"></i>
+        <span class="pb-go" id="pbGo">БОЙ!</span>
+        <i class="pb-ic pb-pencil" aria-hidden="true"></i>
+      </div>
+      <!-- local vs network: decides what the play button above does -->
+      <div class="ssel ssel-where" id="startWhereSel">
+        <button type="button" class="ssel-opt" data-net="0">на устройството</button>
+        <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
+      </div>
+      <p class="modehint" id="modeHint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
+      <div class="setup-actions">
+        <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
+      </div>
+    </footer>
   </div>
 </div>
 
@@ -2164,10 +2200,17 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.29.0';
+  var APP_VERSION = '1.30.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.30.0', items: [
+      ['chg', 'Начален екран: фиксиран горен ред (заглавие, правила, настройки) и долен панел (правила/архив, БОЙ!, тип игра); списъкът с бойци се скролва, ако не побира.'],
+      ['chg', 'Правила и архив са вече малки иконки; типът игра в архива се показва със зар/молив вместо текст.'],
+      ['chg', 'Подреждане на бойците: задръж върху дръжката ~0.5 сек, после влачи — местенето е с анимация.'],
+      ['chg', 'Старшината не може да се маха, освен ако не е пропуснат; ако се махне, новият пръв боец пази своето, но показва приглушен знак — докосни го, за да върнеш старшината.'],
+      ['chg', 'По мрежа: „Откажи“ от поканата връща към избора хост/гост, а не към началото.'],
+      ['rem', 'Правилата (с/без минуси) ги няма вече в настройките — избираш ги на началния екран.'] ] },
     { v: '1.29.0', items: [
       ['chg', 'Бутон за добавяне: малък „+" с цвета на картончето на боеца (15% ширина, без рамка).'],
       ['chg', 'Бутоните „Правила" и „Архив" са смалени с 30%.'],
@@ -2356,11 +2399,11 @@ body.modal-open{ overflow:hidden; }
   function isOwnerP(p) { return !!(p && p.owner); }
   function ownerTokenHTML(small) { return '<span class="ownertok' + (small ? ' sm' : '') + '" title="Стопанин на устройството"><i>★</i></span>'; }
   function ownerOf(players) { for (var i = 0; i < players.length; i++) if (players[i].owner) return players[i]; return players[0]; }
-  function ensureOwner() { if (setupPlayers.length && !setupPlayers.some(isOwnerP)) setupPlayers[0].owner = true; }
+  function ensureOwner() { if (ownerDetached) return; if (setupPlayers.length && !setupPlayers.some(isOwnerP)) setupPlayers[0].owner = true; }
   // force the owner's name to the configured owner name when the toggle is on
   function applyOwnerName() {
     ensureOwner();
-    if (!setupPlayers.length) return;
+    if (!setupPlayers.length || ownerDetached) return;   // detached: seat #1 keeps its own name, no owner defaults
     if (settings.useOwnerName && settings.ownerName.trim()) {
       var p = ownerOf(setupPlayers);
       p.name = settings.ownerName.trim(); p.gender = settings.ownerGender || p.gender;   // custom name carries the chosen gender
@@ -2395,7 +2438,7 @@ body.modal-open{ overflow:hidden; }
   }
   // no two seats share a colour; the owner's colour is protected (others bump)
   function dedupeColors() {
-    var owner = setupPlayers.length ? ownerOf(setupPlayers) : null, used = {};
+    var owner = setupPlayers.filter(isOwnerP)[0] || null, used = {};   // protect only a REAL owner's colour (none while detached)
     if (owner) used[(owner.color || '').toLowerCase()] = 1;
     setupPlayers.forEach(function (p) {
       if (p === owner) return;
@@ -2536,6 +2579,24 @@ body.modal-open{ overflow:hidden; }
     setupPlayers.push(p);
     renderSetup();
   }
+  // removing a card. The owner can be removed ONLY while skipped; doing so DETACHES the owner —
+  // seat #1 then shows a muted token but keeps its own identity until the token is re-activated.
+  function removeSetupPlayer(p) {
+    var ix = setupPlayers.indexOf(p); if (ix < 0) return;
+    if (isOwnerP(p)) ownerDetached = true;
+    setupPlayers.splice(ix, 1);
+    renderSetup();
+  }
+  // re-activate the muted token on seat #1: bring the owner (and its defaults) back
+  function reclaimOwner() {
+    if (!setupPlayers.length) return;
+    ownerDetached = false; skipOwnerNext = false;
+    var p = setupPlayers[0]; p.owner = true;
+    p.gender = settings.ownerGender || p.gender;
+    p.color = settings.ownerColor || p.color;
+    regenName(p);                 // a fresh owner-style name (applyOwnerName overrides if the toggle is on)
+    renderSetup();
+  }
   function renderSetup() {
     applyOwnerName(); // seat #1 carries the owner's name when the toggle is on
     dedupeColors(); dedupeNames();   // keep colours + names unique across the roster
@@ -2544,12 +2605,14 @@ body.modal-open{ overflow:hidden; }
       var card = document.createElement('div'); card.className = 'pcard';
       card.__player = p;
       var owner = isOwnerP(p);
+      var detachedSeat = ownerDetached && i === 0;                   // muted token on the new first seat (no owner data)
+      var removable = setupPlayers.length > 1 && (!owner || skipOwnerNext);   // owner removable only while skipped
 
       var top = document.createElement('div'); top.className = 'pcardtop';
       if (setupPlayers.length > 1) {
         var grip = document.createElement('div'); grip.className = 'grip'; grip.title = 'Влачи, за да подредиш';
         grip.innerHTML = '<span class="gripdots"><i></i><i></i><i></i><i></i><i></i><i></i></span>';
-        grip.onpointerdown = function (e) { startCardDrag(card, e); };
+        grip.onpointerdown = function (e) { armCardDrag(card, e); };
         top.appendChild(grip);
       }
       var name = document.createElement('input');
@@ -2581,9 +2644,13 @@ body.modal-open{ overflow:hidden; }
       top.appendChild(name);
       // owner token sits to the RIGHT of the name box (CSS star, vertically centred);
       // tap it for a dismissible explainer
-      if (owner) {
-        var tk = document.createElement('button'); tk.className = 'ownerstar' + (skipOwnerNext ? ' skipped' : ''); tk.title = 'Старшината — ти'; tk.setAttribute('aria-label', 'Старшината');
-        tk.onclick = function (e) { e.stopPropagation(); showOwnerInfo(tk); };
+      if (owner || detachedSeat) {
+        var tk = document.createElement('button'); tk.className = 'ownerstar' + ((skipOwnerNext || detachedSeat) ? ' skipped' : '');
+        tk.title = detachedSeat ? 'Старшината е пропуснат — докосни, за да го върнеш' : 'Старшината — ти';
+        tk.setAttribute('aria-label', 'Старшината');
+        tk.onclick = detachedSeat
+          ? function (e) { e.stopPropagation(); reclaimOwner(); }      // re-activate → owner defaults come back
+          : function (e) { e.stopPropagation(); showOwnerInfo(tk); };
         top.appendChild(tk);
       }
       card.appendChild(top);
@@ -2619,9 +2686,9 @@ body.modal-open{ overflow:hidden; }
         renderSetup();
       };
       row.appendChild(color); row.appendChild(gsw); row.appendChild(toggle);
-      if (setupPlayers.length > 1) {
+      if (removable) {
         var del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
-        del.onclick = function () { setupPlayers.splice(i, 1); renderSetup(); };
+        del.onclick = function () { removeSetupPlayer(p); };
         row.appendChild(del);
       }
       card.appendChild(row);
@@ -2659,7 +2726,7 @@ body.modal-open{ overflow:hidden; }
       // wrap the content in a sliding foreground so the card can be swiped left to remove it
       var fg = document.createElement('div'); fg.className = 'pc-fg';
       while (card.firstChild) fg.appendChild(card.firstChild);
-      if (setupPlayers.length > 1) {
+      if (removable) {
         var rmbg = document.createElement('div'); rmbg.className = 'pc-bg'; rmbg.innerHTML = '<span class="pcrm">МАХНИ</span>';
         card.appendChild(rmbg); card.classList.add('swipeable');
         attachSwipeRemove(card, fg, rmbg, p);
@@ -2701,7 +2768,7 @@ body.modal-open{ overflow:hidden; }
       var dx = e.clientX - sx; active = false; fg.classList.add('snap'); bg.classList.add('snap');
       if (-dx >= w * 0.5) {   // past halfway → remove
         fg.style.transform = 'translateX(-100%)'; bg.style.width = '100%';
-        setTimeout(function () { var ix = setupPlayers.indexOf(p); if (ix >= 0) { setupPlayers.splice(ix, 1); renderSetup(); } }, 200);
+        setTimeout(function () { removeSetupPlayer(p); }, 200);
       } else { fg.style.transform = 'translateX(0)'; bg.style.width = '0'; settle(); }   // not far enough → snap back
     }
     card.addEventListener('pointerup', end);
@@ -2709,10 +2776,11 @@ body.modal-open{ overflow:hidden; }
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
 
-  // drag-to-reorder player cards: touch/drag the grip and swipe up/down; cards
-  // shuffle live as you cross their midpoints. Document-level pointer listeners
-  // (more robust than pointer-capture across touch browsers); no hold needed.
+  // drag-to-reorder player cards: press the grip and HOLD ~0.5s (selection disabled the whole time),
+  // then drag up/down. Crossing a neighbour's midpoint swaps the two cards with a slide (FLIP)
+  // animation. Moving before the hold elapses is treated as a scroll and cancels the arming.
   var drag = null;
+  var HOLD_MS = 500, HOLD_SLOP = 8;
   function dragAfter(list, y, card) {
     var result = null, closest = -Infinity;
     [].forEach.call(list.children, function (c) {
@@ -2723,25 +2791,57 @@ body.modal-open{ overflow:hidden; }
     });
     return result;
   }
-  function startCardDrag(card, e) {
+  // FLIP: snapshot every card's top, reorder the DOM, then animate each from its old spot to the new one
+  function flipReorder(list, card, before) {
+    var kids = [].slice.call(list.children), firsts = kids.map(function (c) { return c.getBoundingClientRect().top; });
+    if (before == null) list.appendChild(card); else list.insertBefore(card, before);
+    kids.forEach(function (c, i) {
+      var dy = firsts[i] - c.getBoundingClientRect().top;
+      if (!dy) return;
+      c.style.transition = 'none'; c.style.transform = 'translateY(' + dy + 'px)';
+      void c.offsetHeight;                                   // force reflow so the next frame animates
+      c.style.transition = 'transform .18s cubic-bezier(.3,.7,.4,1)'; c.style.transform = '';
+    });
+  }
+  // press-and-hold on the grip to arm reorder; a move before the timer fires aborts it (scroll)
+  function armCardDrag(card, e) {
     if (e.button != null && e.button > 0) return;
-    e.preventDefault();
-    drag = { card: card, list: $('playerList') };
+    var pid = e.pointerId, sx = e.clientX, sy = e.clientY, armed = false, holdTimer = null;
+    document.body.style.userSelect = 'none';                 // no text selection while the grip is touched
+    function cleanupPre() {
+      clearTimeout(holdTimer); holdTimer = null;
+      document.removeEventListener('pointermove', preMove);
+      document.removeEventListener('pointerup', preEnd);
+      document.removeEventListener('pointercancel', preEnd);
+    }
+    function preMove(ev) {
+      if (ev.pointerId !== pid || armed) return;
+      if (Math.abs(ev.clientX - sx) > HOLD_SLOP || Math.abs(ev.clientY - sy) > HOLD_SLOP) {
+        cleanupPre(); document.body.style.userSelect = '';   // moved too soon → treat as a scroll, not a hold
+      }
+    }
+    function preEnd(ev) { if (ev.pointerId !== pid) return; cleanupPre(); if (!armed) document.body.style.userSelect = ''; }
+    document.addEventListener('pointermove', preMove, { passive: true });
+    document.addEventListener('pointerup', preEnd);
+    document.addEventListener('pointercancel', preEnd);
+    holdTimer = setTimeout(function () { armed = true; cleanupPre(); beginCardDrag(card, pid); }, HOLD_MS);
+  }
+  function beginCardDrag(card, pid) {
+    drag = { card: card, list: $('playerList'), pid: pid };
     card.classList.add('dragging');
-    document.body.style.userSelect = 'none';
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }   // a tap cue that move is live
     document.addEventListener('pointermove', onDragMove, { passive: false });
     document.addEventListener('pointerup', endCardDrag);
     document.addEventListener('pointercancel', endCardDrag);
   }
   function onDragMove(e) {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pid) return;
     e.preventDefault();
     var after = dragAfter(drag.list, e.clientY, drag.card);
-    if (after == null) drag.list.appendChild(drag.card);
-    else if (after !== drag.card) drag.list.insertBefore(drag.card, after);
+    if (after !== drag.card && after !== drag.card.nextSibling) flipReorder(drag.list, drag.card, after);
   }
-  function endCardDrag() {
-    if (!drag) return;
+  function endCardDrag(e) {
+    if (!drag || (e && e.pointerId != null && e.pointerId !== drag.pid)) return;
     drag.card.classList.remove('dragging');
     document.body.style.userSelect = '';
     document.removeEventListener('pointermove', onDragMove);
@@ -3912,7 +4012,8 @@ body.modal-open{ overflow:hidden; }
     $('netBars').innerHTML = 'Калибрирам… 🔊';
     net.calibrate(function () { net.startGame(); });
   };
-  function leaveNet() {
+  // tear the live session/transport down without touching the modal's visibility
+  function netDisposeSession() {
     stopFlavour(); resetSpur(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
     stopScan(); if (optBus) { try { optBus.stop(); } catch (e) {} } optBus = null; optPending = null; optClient = null;
     if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop(); if (netBus) netBus.stop();
@@ -3921,9 +4022,11 @@ body.modal-open{ overflow:hidden; }
     $('netBars').innerHTML = ''; $('netLink').classList.add('hidden'); $('netDiag').classList.add('hidden');
     if ($('netCodeJoin')) $('netCodeJoin').disabled = false;
     if ($('netOptical')) $('netOptical').classList.add('hidden'); if ($('netOptAdd')) $('netOptAdd').classList.add('hidden');
-    $('netModal').classList.add('hidden');
   }
-  $('netLeave').onclick = leaveNet;
+  function leaveNet() { netDisposeSession(); $('netModal').classList.add('hidden'); }   // ✕ — back to the start screen
+  // „Откажи" from the host invite / lobby returns to the host/join role picker (modal stays open)
+  function netBackToChoose() { netDisposeSession(); openNetModal(netKind, netManual); }
+  $('netLeave').onclick = netBackToChoose;
   $('netClose').onclick = leaveNet;
   // ---- WebRTC capture export (mirrors the acoustic ndCopy: base64 JSON of every logged event) ----
   $('wrCapCopy').onclick = function () {
@@ -4201,6 +4304,7 @@ body.modal-open{ overflow:hidden; }
   var curLog = null;  // the in-progress turn log
   var hintsOn = false;
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
+  var ownerDetached = false; // owner deliberately removed from the roster (only while skipped): seat #1 shows a MUTED token but keeps its own identity until the token is re-activated
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
   var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
   var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
@@ -4230,8 +4334,8 @@ body.modal-open{ overflow:hidden; }
     $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden'); $('expNumBar').classList.add('hidden');
     clearAllPenalties();
     game = G.createGame(players);
-    game.ownerSkipped = skipOwnerNext; // record so this game is excluded from owner trends
-    skipOwnerNext = false;             // the skip is a one-game decision
+    game.ownerSkipped = skipOwnerNext || ownerDetached; // record so this game is excluded from owner trends
+    skipOwnerNext = false; ownerDetached = false;        // the skip/detach is a one-game decision
     manualMode = !!manual;
     undoStack = [];
     moveLog = players.map(function () { return []; });
@@ -6295,7 +6399,7 @@ body.modal-open{ overflow:hidden; }
     buildSettingsRows(inGame, lobbyOnly);
     // owner/ruleset/archive are general, per-device config — hidden mid-game AND in the lobby's game-settings view
     $('ownerBox').classList.toggle('hidden', inGame || lobbyOnly);
-    $('ruleBox').classList.toggle('hidden', inGame || lobbyOnly);
+    $('ruleBox').classList.add('hidden');   // ruleset lives on the start screen now — never shown in settings
     $('clearArchiveRow').classList.toggle('hidden', inGame || lobbyOnly);
     $('settingsTitle').textContent = lobbyOnly ? '⚙ Настройки на играта' : '⚙ Настройки';
     // the version marker (tap = changelog) belongs to the pre-game start screen only
@@ -7982,7 +8086,8 @@ body.modal-open{ overflow:hidden; }
         + '<button type="button" class="hg-count ' + rankCls + '" title="' + esc(rankTitle) + '">' + rankNum + '</button>'
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode">' + (rec.manualMode ? 'отчет' : 'игра') + '</span>' + pctTag + '</span></span>'
+        + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode" title="' + (rec.manualMode ? 'отчет (ръчно)' : 'със зарове') + '">'
+        + (rec.manualMode ? '<i class="minipencil"></i>' : '<i class="minidie"></i>') + '</span>' + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '</div>'
         + '<div class="hg-actions">'
@@ -8608,7 +8713,8 @@ body.modal-open{ overflow:hidden; }
       e.stopPropagation();
       skipOwnerNext = !skipOwnerNext;
       this.textContent = skipBtnLabel(); this.classList.toggle('on', skipOwnerNext);
-      var star = document.querySelector('.ownerstar'); if (star) star.classList.toggle('skipped', skipOwnerNext);
+      // re-render so the owner card picks up its new removability + muted-token state
+      if (!$('setup').classList.contains('hidden')) renderSetup();
     };
     var r = anchor.getBoundingClientRect();
     b.style.left = Math.min(Math.max(8, r.left + r.width / 2 - b.offsetWidth / 2), window.innerWidth - b.offsetWidth - 8) + 'px';
