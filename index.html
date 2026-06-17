@@ -2268,10 +2268,13 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.43.0';
+  var APP_VERSION = '1.44.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.44.0', items: [
+      ['chg', 'Досие на стопанина: графиките точки/умение/късмет се избират една по една (само избраната се показва); всяка с заглавие „… последните X игри“ и номера на игрите по оста с етикет „игра“.'],
+      ['chg', 'Средните по много игри броят и мрежовите игри за съответните правила (точките се водят дори без записани ходове).'] ] },
     { v: '1.43.0', items: [
       ['chg', 'Плъзгания (без бутона за старт): не заключват вертикалния скрол; четат движението по X до вдигане на пръста и действат при вдигане според крайното разместване.'] ] },
     { v: '1.42.1', items: [
@@ -8058,17 +8061,21 @@ body.modal-open{ overflow:hidden; }
                general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
       if (isExp) { item.secUpper = G.upperStateExp(o.scores).contribution; item.secLower = 0; CATS.forEach(function (c) { if (c.group === 'lower' && typeof o.scores[c.key] === 'number') item.secLower += o.scores[c.key]; }); }
       return item;
-    }).filter(function (d) { return d.ana; });
+    });
     if (!data.length) return null;
+    // points & score averages count EVERY owned game of this ruleset (incl. network games, even
+    // legacy ones without a recorded move log); skill/luck use only the games we could analyse.
+    var anaData = data.filter(function (d) { return d.ana; });
+    if (!anaData.length) return null;   // the dossier needs at least one analysable game for its stats
     var n = data.length;
     var scores = data.map(function (d) { return d.total; });
     var avgScore = scores.reduce(function (s, x) { return s + x; }, 0) / n;
-    var avgAcc = data.reduce(function (s, d) { return s + d.ana.accuracy; }, 0) / n;
-    var diceData = data.filter(function (d) { return !d.manual; });
+    var avgAcc = anaData.length ? anaData.reduce(function (s, d) { return s + d.ana.accuracy; }, 0) / anaData.length : 0;
+    var diceData = anaData.filter(function (d) { return !d.manual; });
     // §2.1 per-category mastery: reduce byCategory across games
     var cat = {};
     CATS.forEach(function (c) { cat[c.key] = { key: c.key, label: c.label, fills: 0, hits: 0, sum: 0, rec: 0, leak: 0 }; });
-    data.forEach(function (d) {
+    anaData.forEach(function (d) {
       var bc = d.ana.byCategory || {};
       Object.keys(bc).forEach(function (k) {
         var cell = bc[k], t = cat[k]; if (!t) return;
@@ -8081,7 +8088,7 @@ body.modal-open{ overflow:hidden; }
                avg: t.hits ? t.sum / t.hits : 0, rec: t.rec, avgLeak: t.fills ? t.leak / t.fills : 0 };
     }).filter(function (c) { return c.fills; });
     // averages of every per-player report stat — updated as more games are played
-    function mean(get, dice) { var a = (dice ? diceData : data).map(get).filter(function (v) { return typeof v === 'number'; }); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
+    function mean(get, dice) { var a = (dice ? diceData : anaData).map(get).filter(function (v) { return typeof v === 'number'; }); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
     function stageLoss(s) { return s.n ? -s.skill / s.n : 0; }
     var report = {
       secUpper: isExp ? mean(function (d) { return d.secUpper; }) : null, secLower: isExp ? mean(function (d) { return d.secLower; }) : null,
@@ -8097,9 +8104,9 @@ body.modal-open{ overflow:hidden; }
     var rankedPlaces = data.filter(function (d) { return d.ranked; }).map(function (d) { return d.place; });
     var rankedN = rankedPlaces.length;
     return {
-      data: data, n: n, dice: diceData.length, scores: scores, avgScore: avgScore, scoreSd: stdev(scores, avgScore),
-      avgAcc: avgAcc, accSd: stdev(data.map(function (d) { return d.ana.accuracy * 100; }), avgAcc * 100),
-      accSlope: trendSlope(data.map(function (d) { return d.ana.accuracy * 100; })),
+      data: data, anaData: anaData, n: n, dice: diceData.length, scores: scores, avgScore: avgScore, scoreSd: stdev(scores, avgScore),
+      avgAcc: avgAcc, accSd: stdev(anaData.map(function (d) { return d.ana.accuracy * 100; }), avgAcc * 100),
+      accSlope: trendSlope(anaData.map(function (d) { return d.ana.accuracy * 100; })),
       wins: rankedPlaces.filter(function (p) { return p === 1; }).length, rankedN: rankedN,
       best: Math.max.apply(null, scores), worst: Math.min.apply(null, scores), avgPlace: rankedN ? rankedPlaces.reduce(function (s, p) { return s + p; }, 0) / rankedN : null,
       generals: data.filter(function (d) { return d.general; }).length,
@@ -8117,8 +8124,8 @@ body.modal-open{ overflow:hidden; }
   function ownerChartSeries(data, kind) {
     return data.slice(-OC_N).map(function (d) {
       var v = kind === 'points' ? d.total
-            : kind === 'skill' ? d.ana.accuracy * 100
-            : (d.manual ? null : d.ana.luck);                  // luck is dice-only
+            : kind === 'skill' ? (d.ana ? d.ana.accuracy * 100 : null)
+            : (d.manual || !d.ana ? null : d.ana.luck);        // luck is dice-only; unanalysed games hold
       return { ts: d.rec.ts, name: d.rec.name, val: (typeof v === 'number' && isFinite(v)) ? v : null };
     });
   }
@@ -8135,7 +8142,7 @@ body.modal-open{ overflow:hidden; }
     if (luck) { yMin = Math.min(0, yMin); yMax = Math.max(0, yMax); }
     if (kind === 'skill') { yMax = 100; yMin = Math.max(0, Math.min(yMin, 99)); }
     if (yMin === yMax) yMax = yMin + 1;
-    var W = 300, H = 120, padL = 30, padR = 8, padT = 10, padB = 18, iw = W - padL - padR, ih = H - padT - padB, range = yMax - yMin || 1;
+    var W = 300, H = 128, padL = 30, padR = 8, padT = 10, padB = 26, iw = W - padL - padR, ih = H - padT - padB, range = yMax - yMin || 1;
     var xfn = function (i) { return padL + (n > 1 ? i / (n - 1) * iw : iw / 2); };
     var yfn = function (v) { return padT + ih - (v - yMin) / range * ih; };
     var gvals = luck ? [yMax, 0, yMin] : [yMax, (yMin + yMax) / 2, yMin];
@@ -8156,26 +8163,33 @@ body.modal-open{ overflow:hidden; }
       var r2 = games[m].val != null;
       dots += '<circle cx="' + xfn(m) + '" cy="' + yfn(yv[m]) + '" r="' + (r2 ? 2.4 : 1.6) + '" fill="' + (r2 ? color : 'var(--gen-muted)') + '"/>';
     }
+    // x-axis: game numbers (1..n) in sequence + an „игра" label at the start (like „ход" on per-turn charts)
+    var xticks = '', per = iw / (n - 1 || 1), step = per >= 13 ? 1 : Math.ceil(13 / per);
+    for (var t = 0; t < n; t += step) xticks += '<text x="' + xfn(t) + '" y="' + (H - 6) + '" class="oc-axis" text-anchor="middle">' + (t + 1) + '</text>';
+    xticks += '<text x="2" y="' + (H - 6) + '" class="oc-axis" text-anchor="start">игра</text>';
     return { kind: kind, games: games, yv: yv, color: color, suffix: suffix, luck: luck,
              W: W, H: H, padL: padL, padT: padT, iw: iw, ih: ih, n: n, xfn: xfn, yfn: yfn,
-             svg: grid + segs + dots + '<g class="oc-scrub"></g>' };
+             svg: grid + segs + dots + xticks + '<g class="oc-scrub"></g>' };
   }
   function buildOwnerCharts(c, grp) {
     grp = grp || 'std';
     if (!c || c.data.length < 2) return '';
     if (!ownerCharts) ownerCharts = {};                 // accumulate across groups (std + exp)
     var color = settings.ownerColor || '#d4a02e';
-    var defs = [['points', 'Точки'], ['skill', 'Точност'], ['luck', 'Късмет']];
-    var tabs = '', cards = '';
+    var defs = [['points', 'Точки', 'точки'], ['skill', 'Точност', 'умение'], ['luck', 'Късмет', 'късмет']];
+    var tabs = '', cards = '', first = true;
     defs.forEach(function (d) {
       var ch = makeOwnerChart(d[0], ownerChartSeries(c.data, d[0]), color);
       if (!ch) return;
       var id = grp + ':' + d[0];                         // namespaced so the two dossier cards don't collide
       ownerCharts[id] = ch;
-      tabs += '<button type="button" class="oc-tab" data-kind="' + id + '">' + d[1] + '</button>';
-      cards += '<div class="ocard hidden" data-card="' + id + '">'
+      var title = d[2] + ' последните ' + ch.n + ' игри';
+      tabs += '<button type="button" class="oc-tab' + (first ? ' on' : '') + '" data-kind="' + id + '">' + d[1] + '</button>';
+      cards += '<div class="ocard' + (first ? '' : ' hidden') + '" data-card="' + id + '">'
+        + '<div class="oc-title">' + title + '</div>'
         + '<div class="oc-wrap"><svg viewBox="0 0 ' + ch.W + ' ' + ch.H + '" class="oc-svg" data-kind="' + id + '" preserveAspectRatio="xMidYMid meet">'
         + ch.svg + '</svg><div class="oc-readout hidden"></div></div></div>';
+      first = false;   // only the first chart is shown by default
     });
     return tabs ? ('<div class="ocharts"><div class="oc-tabs">' + tabs + '</div>' + cards + '</div>') : '';
   }
@@ -8207,15 +8221,14 @@ body.modal-open{ overflow:hidden; }
       svg.addEventListener('pointerup', function () { on = false; hide(); });
       svg.addEventListener('pointercancel', function () { on = false; hide(); });
     });
-    // each category button toggles its (collapsed-by-default) chart
+    // selecting a tab shows ONLY that chart below the row (never two stacked)
     $('historyOverview').querySelectorAll('.oc-tab').forEach(function (tab) {
       tab.onclick = function (e) {
         e.preventDefault(); e.stopPropagation();
-        var kind = tab.getAttribute('data-kind');
-        var card = $('historyOverview').querySelector('.ocard[data-card="' + kind + '"]');
-        if (!card) return;
-        var open = card.classList.toggle('hidden') === false;
-        tab.classList.toggle('on', open);
+        var kind = tab.getAttribute('data-kind'), box = tab.closest('.ocharts');
+        if (!box) return;
+        box.querySelectorAll('.ocard').forEach(function (c) { c.classList.toggle('hidden', c.getAttribute('data-card') !== kind); });
+        box.querySelectorAll('.oc-tab').forEach(function (t) { t.classList.toggle('on', t === tab); });
       };
     });
   }
@@ -8229,13 +8242,13 @@ body.modal-open{ overflow:hidden; }
         + '<b title="В настройките включи „Използвай моето име“, или просто играй като боец №1 (★) — без да го пускаш AI.">влез в боя сам</b> '
         + '(★ боец №1, не AI). Тогава архивът ще почне да трупа графиката на величието ти.</div></div>';
     }
-    var n = c.n, data = c.data;
+    var n = c.n, data = c.data, anaData = c.anaData || [];
     var bl = {};
-    data.forEach(function (d) { var b = d.ana.blunder; if (b && b.cost < -0.5) { var k = b.chosenKey || b.turnCategory; if (k) bl[k] = (bl[k] || 0) + 1; } });
+    anaData.forEach(function (d) { var b = d.ana.blunder; if (b && b.cost < -0.5) { var k = b.chosenKey || b.turnCategory; if (k) bl[k] = (bl[k] || 0) + 1; } });
     var favBl = null, favN = 0; Object.keys(bl).forEach(function (k) { if (bl[k] > favN) { favN = bl[k]; favBl = k; } });
     // достижения: outstanding optimal calls (biggest-EV-margin moves) counted by category
     var gm = {};
-    data.forEach(function (d) { (d.ana.topMoves || []).forEach(function (mv) { var k = mv.chosenKey || mv.turnCategory; if (k) gm[k] = (gm[k] || 0) + 1; }); });
+    anaData.forEach(function (d) { (d.ana.topMoves || []).forEach(function (mv) { var k = mv.chosenKey || mv.turnCategory; if (k) gm[k] = (gm[k] || 0) + 1; }); });
     var topGood = Object.keys(gm).map(function (k) { return { key: k, n: gm[k] }; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 3);
     // name: the settings battle-name, else „Старшина“ (no random game name, no ★ token)
     var name = (settings.useOwnerName && settings.ownerName.trim()) || 'Старшина';
