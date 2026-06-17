@@ -573,8 +573,10 @@ body.modal-open{ overflow:hidden; }
 .netcode-in{ flex:1; min-width:0; text-align:center; text-transform:uppercase; letter-spacing:4px;
   font-family:var(--gen-font-display); font-weight:700; font-size:20px; padding:8px 10px; border-radius:8px;
   background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); }
+/* net modal title: icon vertically centred with the text */
+#netTitle{ display:inline-flex; align-items:center; justify-content:center; gap:8px; }
 /* CSS-drawn network icon — three connected nodes along a link (replaces the globe in the title) */
-.ic-net{ position:relative; display:inline-block; vertical-align:-2px; width:24px; height:9px;
+.ic-net{ position:relative; display:inline-block; width:24px; height:9px;
   background:linear-gradient(currentColor,currentColor) left center/100% 2px no-repeat; color:inherit; }
 .ic-net::before{ content:''; position:absolute; left:1px; top:50%; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:currentColor;
   box-shadow:8px 0 0 currentColor, 16px 0 0 currentColor; }   /* left + centre + right nodes */
@@ -593,14 +595,16 @@ body.modal-open{ overflow:hidden; }
 /* tapped: green tint (no text) */
 .codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
 .netcode-show.copied{ color:#8fe0ac; transition:color .12s; }   /* tapping the code copies → flash it green too */
-/* CSS-drawn camera glyph: body + lens */
-.cam-ic{ position:relative; width:17px; height:13px; display:block; color:inherit; }
-.cam-ic::before{ content:''; position:absolute; top:1px; left:0; right:0; bottom:0; border:1.5px solid currentColor; border-radius:2px; }
-.cam-ic::after{ content:''; position:absolute; top:4px; left:50%; transform:translateX(-50%); width:5px; height:5px; border:1.5px solid currentColor; border-radius:50%; }
-/* CSS-drawn clipboard-paste glyph: a board with a clip on top */
-.paste-ic{ position:relative; width:13px; height:15px; display:block; color:inherit; }
-.paste-ic::before{ content:''; position:absolute; top:2px; left:0; right:0; bottom:0; border:1.5px solid currentColor; border-radius:2px; }
-.paste-ic::after{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:6px; height:4px; border:1.5px solid currentColor; border-radius:1px; background:var(--gen-ink,#16160e); }
+/* CSS-drawn camera glyph: body + lens (bold strokes) */
+.cam-ic{ position:relative; width:18px; height:14px; display:block; color:inherit; }
+.cam-ic::before{ content:''; position:absolute; top:1px; left:0; right:0; bottom:0; border:2.5px solid currentColor; border-radius:3px; }
+.cam-ic::after{ content:''; position:absolute; top:4.5px; left:50%; transform:translateX(-50%); width:5.5px; height:5.5px; border:2.5px solid currentColor; border-radius:50%; }
+/* CSS-drawn clipboard-paste glyph: a board with a clip on top (bold strokes) */
+.paste-ic{ position:relative; width:14px; height:16px; display:block; color:inherit; }
+.paste-ic::before{ content:''; position:absolute; top:2px; left:0; right:0; bottom:0; border:2.5px solid currentColor; border-radius:3px; }
+.paste-ic::after{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:7px; height:4px; border:2.5px solid currentColor; border-radius:1px; background:var(--gen-ink,#16160e); }
+/* code box green flash (paste/scan feedback) */
+.netcode-in.flash-green{ border-color:#2e9e5b; color:#8fe0ac; background:rgba(46,158,91,.16); transition:border-color .12s, color .12s, background .12s; }
 /* the game-code QR (host side / in-game reconnect) — always shown above the code */
 .netcodeqr{ width:100%; max-width:172px; margin:10px auto 8px; background:#fff; padding:8px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
 .netcodeqr svg{ display:block; width:100%; height:auto; }
@@ -2259,10 +2263,14 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.41.0';
+  var APP_VERSION = '1.42.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.42.0', items: [
+      ['chg', 'Картон на боеца: при пропуснат старшина AI ключът на неговото място вече се включва.'],
+      ['chg', 'Мрежов изглед: иконата на заглавието е центрирана; по-плътни икони за камера/поставяне; при поставяне светват зелено бутонът и кодовото поле, при сканиране — само полето (без долната бележка).'],
+      ['fix', 'Мрежа: отказ от хост/гост вече не показва селектора за тип игра (той идва от началния екран).'] ] },
     { v: '1.41.0', items: [
       ['fix', 'Мрежа: всеки ход се пренася с пълните данни (зарове/решения) до всички устройства — историята вече е пълна за всички играчи, режими и правила (вкл. „с минуси“).'] ] },
     { v: '1.40.3', items: [
@@ -2814,8 +2822,9 @@ body.modal-open{ overflow:hidden; }
       var toggle = document.createElement('button');
       toggle.className = 'toggle' + (p.isAI ? ' on' : '');
       toggle.innerHTML = '<span class="switch"></span><span>AI</span>';
-      if (owner) {
-        // the device owner (старшина) is always human — the AI switch is disabled on that seat
+      if (owner && !skipOwnerNext) {
+        // the device owner (старшина) is always human — the AI switch is disabled on that seat,
+        // UNLESS the owner is skipped for the next game (then the seat is up for grabs, incl. AI)
         toggle.disabled = true; toggle.title = 'Старшината играе сам — не може да е AI';
       } else {
         toggle.onclick = function () {
@@ -3774,7 +3783,7 @@ body.modal-open{ overflow:hidden; }
     netKind = kind;
     var wr = (kind === 'webrtc');
     if (typeof presetManual === 'boolean') netManual = presetManual;   // webrtc: mode comes from the start-screen play button
-    $('netTitle').innerHTML = wr ? '<i class="ic-net" aria-hidden="true"></i> Игра по мрежа' : '🔊 Акустична игра';
+    $('netTitle').innerHTML = wr ? '<i class="ic-net" aria-hidden="true"></i><span>Игра по мрежа</span>' : '🔊 Акустична игра';
     document.querySelectorAll('#netModal .ac-only').forEach(function (e) { e.classList.toggle('hidden', wr); });
     document.querySelectorAll('#netModal .wr-only').forEach(function (e) { e.classList.toggle('hidden', !wr); });
     $('netMeName').textContent = localMeta().name;
@@ -3860,7 +3869,7 @@ body.modal-open{ overflow:hidden; }
       if (!code) { optStatus('⚠ Това не е код за игра. Опитай пак.'); optNextBtn('📷 Опитай пак', codeScanShow); return; }
       codeScanActive = false; stopScan(); optHideView();
       netShow('choose'); $('netPickRole').classList.add('hidden'); $('netJoinCode').classList.remove('hidden');
-      $('netCodeInput').value = code; netChooseMsg('Кодът е сканиран: ' + code + '. Натисни „Влез с кода“.');
+      $('netCodeInput').value = code; netChooseMsg(''); flashCodeGreen();   // scan feedback = code box only
     });
   }
   // pull a 4–6 char game code out of whatever the QR carried (plain code, or with stray chars)
@@ -3868,6 +3877,11 @@ body.modal-open{ overflow:hidden; }
     if (!data) return null;
     var s = String(data).toUpperCase().replace(/[^A-Z0-9]/g, '');
     return (s.length >= 4) ? s.slice(0, 6) : null;
+  }
+  // brief green flash on the code box (paste/scan feedback); optionally flash a button too
+  function flashCodeGreen(btn) {
+    var el = $('netCodeInput'); if (el) { el.classList.add('flash-green'); clearTimeout(el._fg); el._fg = setTimeout(function () { el.classList.remove('flash-green'); }, 1600); }
+    if (btn) { btn.classList.add('copied'); clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); }, 1600); }
   }
   $('netCodeScan').onclick = function () {
     if (netKind !== 'webrtc') return;
@@ -3877,20 +3891,21 @@ body.modal-open{ overflow:hidden; }
       netChooseMsg(''); codeScanShow();
     });
   };
-  // paste: pull the code straight from the clipboard into the field
+  // paste: pull the code straight from the clipboard into the field (paste button + code box flash green)
   $('netCodePaste').onclick = function () {
     if (netKind !== 'webrtc') return;
     if (!(navigator.clipboard && navigator.clipboard.readText)) { netChooseMsg('⚠ Браузърът не дава достъп до клипборда — постави ръчно.'); return; }
     navigator.clipboard.readText().then(function (t) {
       var code = extractGameCode(t);
-      if (code) { $('netCodeInput').value = code; netChooseMsg('Поставен код: ' + code + '.'); }
+      if (code) { $('netCodeInput').value = code; flashCodeGreen($('netCodePaste')); }
       else netChooseMsg('⚠ В клипборда няма код за игра.');
     }).catch(function () { netChooseMsg('⚠ Нямам достъп до клипборда — постави ръчно.'); });
   };
   // leave the join sub-view, back to the host/join picker
   $('netJoinCancel').onclick = function () {
     $('netJoinCode').classList.add('hidden'); $('netPickRole').classList.remove('hidden');
-    $('netModeSwitch').classList.remove('hidden');
+    // the game-type switch is only for acoustic; over the net the mode comes from the start screen
+    $('netModeSwitch').classList.toggle('hidden', netKind === 'webrtc');
     $('netCodeInput').value = ''; netChooseMsg('');
     if (netBus) { netBus.stop(); netBus = null; }
     if (net) { net.dispose(); net = null; }
