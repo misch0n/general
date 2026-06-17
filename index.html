@@ -2259,10 +2259,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.40.0';
+  var APP_VERSION = '1.40.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.40.1', items: [
+      ['fix', 'Селектори с плъзване (правила, устройство/мрежа, архив, пол): посоката се заключва и превключването става чак при вдигане на пръста — без задействане при излизане от кутийката.'] ] },
     { v: '1.40.0', items: [
       ['new', 'Архив: всеки запис показва и иконка дали играта е била на устройството или по мрежа.'],
       ['chg', 'Архив: маркерите (зар/молив и устройство/мрежа) са в началото на реда, преди датата/часа.'] ] },
@@ -2710,26 +2712,29 @@ body.modal-open{ overflow:hidden; }
     renderSetup();
   }
   // gender selector swipe: a horizontal drag shifts the choice ONE step in the swipe direction
-  // (left → мъжко, right → женско). Set while a swipe applies so the trailing tap is ignored.
+  // (left → мъжко, right → женско). The direction LOCKS on the first clear horizontal move (and
+  // captures the pointer so leaving the box doesn't matter), but the shift fires only on LIFT.
   var suppressGenderClick = false;
   function attachGenderSwipe(gsw, p) {
-    var GENS = ['m', 'n', 'f'], sx = null, sy = null, pid = null, decided = false;
+    var GENS = ['m', 'n', 'f'], sx = null, sy = null, pid = null, decided = false, dir = 0;
     gsw.style.touchAction = 'pan-y';                            // vertical scroll passes through
-    gsw.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; });
+    gsw.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; dir = 0; });
     gsw.addEventListener('pointermove', function (e) {
       if (sx == null || e.pointerId !== pid || decided) return;
       var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) < 14 || Math.abs(dx) <= Math.abs(dy)) return;   // need a clear horizontal move
-      decided = true; sx = null;
-      var idx = GENS.indexOf(p.gender);
-      var ni = dx > 0 ? Math.min(2, idx + 1) : Math.max(0, idx - 1);   // one step toward the swipe
-      if (ni !== idx) {
-        suppressGenderClick = true;
-        setGender(p, GENS[ni]); renderSetup();
-        setTimeout(function () { suppressGenderClick = false; }, 400);
-      }
+      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
+      if (Math.abs(dx) <= Math.abs(dy)) { sx = null; return; }  // vertical → leave it for scrolling
+      decided = true; dir = dx > 0 ? 1 : -1;                    // lock the direction
+      try { gsw.setPointerCapture(pid); } catch (x) {}          // keep the gesture even if it leaves the box
     });
-    ['pointerup', 'pointercancel'].forEach(function (ev) { gsw.addEventListener(ev, function () { sx = null; }); });
+    gsw.addEventListener('pointerup', function (e) {
+      if (sx != null && e.pointerId === pid && decided) {       // apply the shift only on lift
+        var idx = GENS.indexOf(p.gender), ni = dir > 0 ? Math.min(2, idx + 1) : Math.max(0, idx - 1);
+        if (ni !== idx) { suppressGenderClick = true; setGender(p, GENS[ni]); renderSetup(); setTimeout(function () { suppressGenderClick = false; }, 400); }
+      }
+      sx = null; decided = false; dir = 0;
+    });
+    gsw.addEventListener('pointercancel', function () { sx = null; decided = false; dir = 0; });
   }
   function renderSetup() {
     applyOwnerName(); // seat #1 carries the owner's name when the toggle is on
@@ -3044,18 +3049,26 @@ body.modal-open{ overflow:hidden; }
   }
   // swipe across a selector: any horizontal drag toward an option picks it (left option / right
   // option by direction). A tap still picks the tapped option; the post-swipe click is suppressed.
+  // a horizontal swipe picks the option in the swipe direction. The direction LOCKS on the first
+  // clear horizontal move (and captures the pointer so leaving the box doesn't matter), but the
+  // switch only fires when the finger LIFTS — never mid-gesture.
   function attachSelSwipe(sel, pickLeft, pickRight) {
-    var sx = null, sy = null, pid = null, decided = false;
+    var sx = null, sy = null, pid = null, decided = false, dir = 0;
     sel.style.touchAction = 'pan-y';                            // vertical scroll passes through; we own horizontal
-    sel.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; sel._swiped = false; });
+    sel.addEventListener('pointerdown', function (e) { sx = e.clientX; sy = e.clientY; pid = e.pointerId; decided = false; dir = 0; sel._swiped = false; });
     sel.addEventListener('pointermove', function (e) {
       if (sx == null || e.pointerId !== pid || decided) return;
       var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) < 12 || Math.abs(dx) <= Math.abs(dy)) return;   // need a clear horizontal move
-      decided = true; sel._swiped = true;
-      if (dx > 0) pickRight(); else pickLeft();                 // toward the option in that direction
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      if (Math.abs(dx) <= Math.abs(dy)) { sx = null; return; }  // vertical → leave it for scrolling
+      decided = true; sel._swiped = true; dir = dx > 0 ? 1 : -1; // lock the direction
+      try { sel.setPointerCapture(pid); } catch (x) {}          // keep the gesture even if it leaves the box
     });
-    ['pointerup', 'pointercancel'].forEach(function (ev) { sel.addEventListener(ev, function () { sx = null; }); });
+    sel.addEventListener('pointerup', function (e) {
+      if (sx != null && e.pointerId === pid && decided) { (dir > 0 ? pickRight : pickLeft)(); }   // fire on lift only
+      sx = null; decided = false; dir = 0;
+    });
+    sel.addEventListener('pointercancel', function () { sx = null; decided = false; dir = 0; });
   }
   $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
     b.onclick = function () { if ($('startRuleSel')._swiped) { $('startRuleSel')._swiped = false; return; } setStartRuleset(b.getAttribute('data-rs')); };
