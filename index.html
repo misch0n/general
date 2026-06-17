@@ -2116,14 +2116,16 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.22.0';
+  var APP_VERSION = '1.23.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.23.0', items: [
+      ['new', '„С минуси“ по мрежа и на отчет (ръчно вписване) — вече работи, не само със зарове.'] ] },
     { v: '1.22.0', items: [
       ['new', '„С минуси“ по мрежа (със зарове): хостът прави играта, всички играят по неговите правила.'],
       ['fix', 'История: мрежовите игри „с минуси“ се записват с правилния правилник.'],
-      ['chg', '„С минуси“ вече се избира и при „по мрежа“ (на отчет по мрежа предстои).'] ] },
+      ['chg', '„С минуси“ вече се избира и при „по мрежа“.'] ] },
     { v: '1.21.1', items: [
       ['chg', 'В обобщението: „+Xт умение / +Yт късмет“ — за да е ясно, че са точки.'],
       ['new', '„С минуси“: точките на числовата част се натискат — обяснение за −50 при минус.'] ] },
@@ -2646,7 +2648,7 @@ body.modal-open{ overflow:hidden; }
     $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-net') === '1') === netPlay); });
     // the play buttons keep their labels regardless of device/network — only the workflow they trigger changes
     syncStartRuleSel();
-    $('modeHint').textContent = netPlay ? 'По мрежа: хостът дава код, останалите се присъединяват. „С минуси“ работи по мрежа само със зарове (не на отчет засега).'
+    $('modeHint').textContent = netPlay ? 'По мрежа: хостът дава код, останалите се присъединяват — играят по неговите правила.'
       : 'Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.';
   }
   $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
@@ -2659,8 +2661,6 @@ body.modal-open{ overflow:hidden; }
   });
   // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
   function startNetFlow(manual) {
-    // minus over the net is wired for REGULAR (dice) games; manual minus net is still pending
-    if (manual && selExp()) { $('setupErr').textContent = '„С минуси“ на отчет по мрежа още не е готово — играй „без минуси“ на отчет, или „с минуси“ със зарове.'; return; }
     $('setupErr').textContent = '';
     netManual = manual; openNetModal('webrtc', manual);
   }
@@ -3824,14 +3824,14 @@ body.modal-open{ overflow:hidden; }
   }
   // manual net: reset the dock for my next category entry (stay on my own sheet)
   function beginManualEntry() {
-    var p = game.players[game.current];
-    var filled = G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length;
-    game.round = Math.min(G.CATEGORIES.length, filled + 1);
-    if (G.isGameOver(game) || myManualDone()) { locked = true; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; renderAll(); netSay('✔ Готов! Чакам останалите да попълнят…'); return; }
+    var p = game.players[game.current], cats = sumCats();   // ruleset-aware (minus has 15 rows incl. два чифта)
+    var filled = cats.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length;
+    game.round = Math.min(cats.length, filled + 1);
+    if (myManualDone()) { locked = true; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; renderAll(); netSay('✔ Готов! Чакам останалите да попълнят…'); return; }
     locked = false; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; throwsLeft = 0; curLog = null;
     renderAll();
   }
-  function myManualDone() { var p = game && game.players[game.current]; return p && G.CATEGORIES.every(function (c) { return G.isCategoryFilled(p, c.key); }); }
+  function myManualDone() { var p = game && game.players[game.current]; return p && sumCats().every(function (c) { return G.isCategoryFilled(p, c.key); }); }
   function netSetTurn(activeId) {
     if (!netMode || !game) return;
     var seat = netOrder.indexOf(activeId); if (seat < 0) return;
@@ -4258,7 +4258,7 @@ body.modal-open{ overflow:hidden; }
     return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1c1a0f' : '#fff';
   }
   function isMyNetPlayer(p) { return netMode && p && p.owner; }   // each device owns exactly its own seat
-  function filledCount(p) { return G.CATEGORIES.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length; }
+  function filledCount(p) { return sumCats().filter(function (c) { return G.isCategoryFilled(p, c.key); }).length; }
   // manual net free-for-all: shame a player who races 2+ categories ahead of the SLOWEST one
   function isMamnik(i) {
     if (!(netMode && manualMode) || !game) return false;
@@ -4777,13 +4777,21 @@ body.modal-open{ overflow:hidden; }
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
-    if (manualMode) {
-      // ОПА can rewind this; the turn is logged for category-only analytics (mask BEFORE the pick)
+    if (manualMode && !netMode) {
+      // local ОПА can rewind this; the turn is logged for category-only analytics (mask BEFORE the pick)
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
       if (exactReady) moveLog[game.current].push({ mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true });
     } else if (curLog && !netMode) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
     var committed = p.scores[key];
+    // ---- net minus (manual / отчет): free-for-all — broadcast my entry, then reset for my next category ----
+    if (netMode && manualMode) {
+      flashTile(key);
+      if (net) net.submitMove({ category: catIndexOf(key), score: committed, rolls: [dice.slice()], keeps: [] });
+      locked = true; renderAll();
+      setTimeout(beginManualEntry, END_DELAY);
+      return;
+    }
     // ---- net minus (regular): broadcast my completed turn; the host's STATE + next GRANT drive the rest ----
     if (netMode && !manualMode) {
       if (tut) tutEvent('commit');
