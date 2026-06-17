@@ -2057,7 +2057,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.18.1';
+  var APP_VERSION = '1.18.2';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -6327,6 +6327,7 @@ body.modal-open{ overflow:hidden; }
     var upLine = '';
     if (sumExp()) {
       var subs = players.map(function (p) { return G.upperStateExp(p.scores).subtotal; });
+      var tots = players.map(function (p) { return G.upperStateExp(p.scores).contribution; });   // upper total incl. the −50 if negative
       var cleared = subs.filter(function (s) { return s >= 0; }).length;
       var pctUp = Math.round(100 * cleared / players.length);
       var hiPi = 0, loPi = 0;
@@ -6334,8 +6335,8 @@ body.modal-open{ overflow:hidden; }
       var signv = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v); };
       var box = function (v, c) { return '<span class="cbu-box" style="background:' + rgba(c, 0.26) + ';border-color:' + c + '">' + signv(v) + '</span>'; };
       upLine = '<div class="cb-upline"><span class="cbu-txt"><b>' + pctUp + '%</b> с 0 или повече</span>'
-        + '<span class="cbu-ar">▲</span>' + box(subs[hiPi], players[hiPi].color)
-        + '<span class="cbu-ar">▼</span>' + box(subs[loPi], players[loPi].color) + '</div>';
+        + '<span class="cbu-ar">▲</span>' + box(tots[hiPi], players[hiPi].color)
+        + '<span class="cbu-ar">▼</span>' + box(tots[loPi], players[loPi].color) + '</div>';
     }
     var master = m.masterIdx >= 0 && m.recCount[m.masterIdx] >= 2
       ? '<div class="cb-master">📋 Майстор на категориите: <b style="color:' + players[m.masterIdx].color + '">' + esc(players[m.masterIdx].name) + '</b> · ' + m.recCount[m.masterIdx] + ' рекорда</div>' : '';

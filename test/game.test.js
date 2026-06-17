@@ -693,22 +693,31 @@ test('experimental lower combos still score like standard', function () {
   assert.strictEqual(G.scoreForExp('chance', [6, 5, 4, 3, 2]), 20);
 });
 
-test('experimental number part: −50 only once complete and negative', function () {
+test('experimental number part: −50 added on top once complete and negative', function () {
   // an incomplete negative number part is just its running sum (no penalty yet)
   var part = { ones: -2, twos: -4 };
   assert.strictEqual(G.upperStateExp(part).penalised, false);
   assert.strictEqual(G.playerTotalExp({ scores: part }), -6);
-  // all six upper filled and net negative → recorded as a flat −50
+  // all six upper filled and net negative → the −50 is applied ON TOP of the subtotal
   var neg = { ones: -2, twos: -4, threes: -3, fours: 0, fives: -5, sixes: -6, chance: 20 };
   var st = G.upperStateExp(neg);
   assert.strictEqual(st.complete, true);
   assert.strictEqual(st.penalised, true);
-  assert.strictEqual(st.contribution, -50);
-  assert.strictEqual(G.playerTotalExp({ scores: neg }), -30);   // 20 (chance) − 50
-  // a non-negative complete number part keeps its surplus
+  assert.strictEqual(st.subtotal, -20);
+  assert.strictEqual(st.contribution, -70);                     // −20 − 50
+  assert.strictEqual(G.playerTotalExp({ scores: neg }), -50);   // 20 (chance) − 70
+  // the user's worked example: upper −5, lower 100 → grand total 45
+  var ex = { ones: -5, twos: 0, threes: 0, fours: 0, fives: 0, sixes: 0, chance: 100 };
+  assert.strictEqual(G.upperStateExp(ex).contribution, -55);    // −5 − 50
+  assert.strictEqual(G.playerTotalExp({ scores: ex }), 45);
+  // a non-negative complete number part keeps its surplus (no penalty)
   var pos = { ones: 0, twos: 0, threes: 3, fours: 4, fives: 0, sixes: 0, general: 80 };
   assert.strictEqual(G.upperStateExp(pos).contribution, 7);
   assert.strictEqual(G.playerTotalExp({ scores: pos }), 87);
+  // upper exactly zero → no penalty
+  var zero = { ones: 0, twos: 0, threes: 0, fours: 0, fives: 0, sixes: 0, chance: 100 };
+  assert.strictEqual(G.upperStateExp(zero).penalised, false);
+  assert.strictEqual(G.playerTotalExp({ scores: zero }), 100);
 });
 
 test('ruleset registry exposes both rulesets with the right shapes', function () {

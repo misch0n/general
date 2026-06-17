@@ -228,15 +228,16 @@
   function scoreForExp(category, dice) { return Math.max.apply(null, candidatesExp(category, dice)); }
 
   // A single 15-row card, filled in any order. The number part (1-6) is a
-  // deviation-around-three section recorded as a flat −50 if it finishes negative
-  // (it's the one mandatory part); zero-or-positive, the surplus is kept.
+  // deviation-around-three section; if it finishes negative it takes an extra −50
+  // ON TOP of the negative subtotal (it's the one mandatory part). Zero-or-positive,
+  // the surplus is kept as-is. E.g. a −5 upper contributes −55; +5 contributes +5.
   function upperStateExp(scores) {
     var filled = 0, sub = 0;
     UPPER_KEYS.forEach(function (k) { if (typeof scores[k] === 'number') { filled++; sub += scores[k]; } });
     var complete = filled === UPPER_KEYS.length;
     var penalised = complete && sub < 0;
     return { filled: filled, complete: complete, subtotal: sub, penalised: penalised,
-             contribution: penalised ? UPPER_PENALTY : sub };
+             contribution: penalised ? (sub + UPPER_PENALTY) : sub };
   }
   function playerTotalExp(player) {
     var s = player.scores || {}, lower = 0;
