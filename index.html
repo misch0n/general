@@ -934,11 +934,8 @@ body.modal-open{ overflow:hidden; }
 .miniboard .mtile.low.fullspan{ grid-column:1 / -1; }
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
-/* archive ruleset tabs (Стандартен / Експериментален) */
-.histtabs{ display:flex; gap:6px; margin-bottom:10px; }
-.histtab{ flex:1; padding:8px 6px; border-radius:9px; cursor:pointer; background:var(--gen-pill); border:1px solid var(--gen-pill-line);
-  color:var(--gen-label); font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.5px; text-transform:uppercase; }
-.histtab.on{ color:var(--gen-brass-bright); border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.1); }
+/* archive ruleset selector — the underline-style picker from the start screen */
+.hist-rsel{ margin:0 0 12px; }
 /* compact recap table (end-of-game summary only) */
 .expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
 .expgrid th{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-muted); padding:3px 0; text-align:center; }
@@ -2254,10 +2251,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.38.0';
+  var APP_VERSION = '1.38.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.38.1', items: [
+      ['chg', 'Архив: правилата (с/без минуси) се избират със същия подчертан селектор като на началния екран (с докосване или плъзване).'] ] },
     { v: '1.38.0', items: [
       ['chg', 'Картон на боеца: знакът на старшината слезе на долния ред, вдясно до AI ключа (където беше ✕); AI ключът на старшината е изключен (винаги човек).'] ] },
     { v: '1.37.1', items: [
@@ -8240,6 +8239,7 @@ body.modal-open{ overflow:hidden; }
     return Math.round(100 * (below + 0.5 * equal) / scoresAll.length);
   }
   var histTab = 'standard';   // which ruleset the archive is showing
+  function setHistTab(rs) { if (histTab === rs) return; histTab = rs; renderHistory(); }
   var histShown = 5;          // how many battles are listed; grows by 5 via „покажи още“
   var histPlayFilter = 'all'; // 'all' | 'manual' (отчет) | 'engine' (игра) — manual-vs-engine filter
   var histPulsePending = false; // animate the first row's right edge once, only on a fresh open
@@ -8247,11 +8247,16 @@ body.modal-open{ overflow:hidden; }
     // paging is NOT reset here — loaded battles stay loaded across tab switches and
     // exclude toggles; histShown only resets on a fresh openHistory() (full close→open)
     ownerCharts = null;  // rebuilt fresh each render
-    var tabs = '<div class="histtabs">'
-      + '<button class="histtab' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">без минуси</button>'
-      + '<button class="histtab' + (histTab === 'experimental' ? ' on' : '') + '" data-rs="experimental">с минуси</button></div>';
+    // same underline-style ruleset selector as the start screen (с минуси / без минуси)
+    var tabs = '<div class="ssel hist-rsel">'
+      + '<button type="button" class="ssel-opt' + (histTab === 'experimental' ? ' on' : '') + '" data-rs="experimental">с минуси</button>'
+      + '<button type="button" class="ssel-opt' + (histTab === 'standard' ? ' on' : '') + '" data-rs="standard">без минуси</button></div>';
     $('historyOverview').innerHTML = tabs + ownerOverview(histTab);
-    $('historyOverview').querySelectorAll('.histtab').forEach(function (b) { b.onclick = function () { histTab = b.getAttribute('data-rs'); renderHistory(); }; });
+    var rsel = $('historyOverview').querySelector('.hist-rsel');
+    rsel.querySelectorAll('.ssel-opt').forEach(function (b) {
+      b.onclick = function () { if (rsel._swiped) { rsel._swiped = false; return; } setHistTab(b.getAttribute('data-rs')); };
+    });
+    attachSelSwipe(rsel, function () { setHistTab('experimental'); }, function () { setHistTab('standard'); });
     var wbar = $('historyOverview').querySelector('.ho-winbar');
     if (wbar) wbar.onclick = function (e) { e.preventDefault(); e.stopPropagation(); showWinTip(wbar); };   // tap → temporary rate bubble (don't toggle the <details>)
     wireOwnerCharts();   // attach the scrub readers to the per-battle career charts
