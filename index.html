@@ -1495,10 +1495,10 @@ body.modal-open{ overflow:hidden; }
     <div id="playerList"></div>
     <button id="addPlayer" class="btn addbtn">+ Боец</button>
     <div id="setupErr" class="err"></div>
-    <!-- local vs network: decides what the play buttons below do -->
-    <div class="ssel ssel-where" id="startWhereSel">
-      <button type="button" class="ssel-opt" data-net="0">на устройството</button>
-      <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
+    <!-- rules + archive sit above the play button -->
+    <div class="setup-actions">
+      <button id="howtoBtn" class="btn">📖 Правила</button>
+      <button id="archiveBtn" class="btn">📜 Военен архив</button>
     </div>
     <!-- play button: tap a side to pick a mode (or swipe ←/→), tap the middle to start -->
     <div class="playbtn" id="playBtn" role="group" aria-label="Старт на играта">
@@ -1506,13 +1506,14 @@ body.modal-open{ overflow:hidden; }
       <div class="pb-go" id="pbGo" role="button" tabindex="0">В БОЙ!</div>
       <div class="pb-side pb-right" data-manual="1" role="button" tabindex="0" aria-label="Режим: отчет (ръчно)"><span>отчет</span></div>
     </div>
+    <!-- local vs network: decides what the play button above does -->
+    <div class="ssel ssel-where" id="startWhereSel">
+      <button type="button" class="ssel-opt" data-net="0">на устройството</button>
+      <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
+    </div>
     <p class="modehint" id="modeHint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
     <div class="setup-actions">
       <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
-    </div>
-    <div class="setup-actions">
-      <button id="howtoBtn" class="btn">📖 Правила</button>
-      <button id="archiveBtn" class="btn">📜 Военен архив</button>
     </div>
   </div>
 </div>
@@ -2142,10 +2143,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.26.1';
+  var APP_VERSION = '1.26.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.26.2', items: [
+      ['chg', 'Начален екран: „Правила“ и „Архив“ са над бутона за старт, изборът „на устройството / по мрежа“ — под него.'] ] },
     { v: '1.26.1', items: [
       ['chg', 'Начален екран: по-изчистени превключватели и бутон за старт (по-фин неактивен текст, по-меки цветове).'] ] },
     { v: '1.26.0', items: [
