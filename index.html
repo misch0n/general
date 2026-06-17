@@ -245,9 +245,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .playbtn{ position:relative; width:100%; height:46px; max-width:238px; margin:6px auto; border-radius:var(--gen-r-tag); overflow:hidden;
   border:2px solid var(--gen-ink-line); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:pan-y;
   --pb-lc:#b09551; --pb-rc:var(--gen-pill);    /* left active (muted gold), right inactive (pill) — default = regular mode */
+  /* each side: its mode colour solid to a hard stop at the edge, then a long smooth fade into the
+     central gold band where the „БОЙ!" label sits, between the two gradients */
   background:linear-gradient(90deg,
-    var(--pb-lc) 0, var(--pb-lc) 17%, var(--gen-brass) 30%,
-    var(--gen-brass) 70%, var(--pb-rc) 83%, var(--pb-rc) 100%); }
+    var(--pb-lc) 0, var(--pb-lc) 20%, var(--gen-brass) 44%,
+    var(--gen-brass) 56%, var(--pb-rc) 80%, var(--pb-rc) 100%); }
 .playbtn.man{ --pb-lc:var(--gen-pill); --pb-rc:#b09551; }   /* manual mode: right zone becomes the active muted gold */
 .playbtn:active{ box-shadow:inset 0 3px 12px rgba(0,0,0,.32); }
 .playbtn .pb-go{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; color:var(--gen-ink);
@@ -308,6 +310,8 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .betline{ margin-top:10px; font-size:12px; color:var(--gen-muted); display:flex; align-items:center; gap:7px; }
 .betline .betval{ color:var(--gen-text); font-weight:700; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); border-radius:7px; padding:3px 9px; }
 .setup-actions{ display:flex; gap:10px; margin-top:4px; }
+/* rules + archive buttons scaled down 30% from the base .btn */
+.setup-actions .btn{ font-size:9.8px; letter-spacing:1px; border-radius:6px; padding:8.4px; }
 .btn{ flex:1; font-family:var(--gen-font-display); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; font-size:14px;
   border:2px solid var(--gen-ink-line); border-radius:8px; padding:12px; background:var(--gen-pill); color:var(--gen-text); }
 /* CSS-drawn theme icons (currentColor) — import/export arrows, text/sound methods */
@@ -508,9 +512,9 @@ body.modal-open{ overflow:hidden; }
 #numPartTip .np-tip-pen b, #numPartTip .np-tip-txt b{ color:var(--gen-brass-bright); }
 
 /* setup: add-button, reorder arrows, manual mode */
-.addbtn{ flex:none; width:auto; display:block; margin:6px auto 22px; padding:4px 10px; font-size:12px; letter-spacing:1px;
-  background:none; border:none; box-shadow:none; color:var(--gen-brass-bright); }
-.addbtn:active{ transform:none; }
+.addbtn{ flex:none; align-self:center; width:15%; display:block; margin:6px auto 22px; padding:9px 0; font-size:20px; line-height:1; font-weight:700;
+  background:rgba(20,22,12,.72); border:none; border-radius:9px; box-shadow:none; color:var(--gen-brass-bright); }
+.addbtn:active,.addbtn:focus{ transform:none; border:none; outline:none; box-shadow:none; }
 .modehint{ font-size:11px; color:var(--gen-muted); margin:8px 0 0; }
 /* acoustic multiplayer lobby */
 .netroster{ display:flex; flex-direction:column; gap:6px; margin:10px 0; }
@@ -1510,7 +1514,7 @@ body.modal-open{ overflow:hidden; }
       <button type="button" class="ssel-opt" data-rs="standard">без минуси</button>
     </div>
     <div id="playerList"></div>
-    <button id="addPlayer" class="btn addbtn">+ Боец</button>
+    <button id="addPlayer" class="btn addbtn" aria-label="Добави боец">+</button>
     <div id="setupErr" class="err"></div>
     <!-- rules + archive sit above the play button -->
     <div class="setup-actions">
@@ -1520,7 +1524,7 @@ body.modal-open{ overflow:hidden; }
     <!-- play button: one surface — tap left=зарове, right=отчет, middle=старт; or swipe ←/→ to pick -->
     <div class="playbtn" id="playBtn" role="button" tabindex="0" aria-label="Старт на играта">
       <i class="pb-ic pb-dice" aria-hidden="true"></i>
-      <span class="pb-go" id="pbGo">В БОЙ!</span>
+      <span class="pb-go" id="pbGo">БОЙ!</span>
       <i class="pb-ic pb-pencil" aria-hidden="true"></i>
     </div>
     <!-- local vs network: decides what the play button above does -->
@@ -2160,10 +2164,14 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.28.1';
+  var APP_VERSION = '1.29.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.29.0', items: [
+      ['chg', 'Бутон за добавяне: малък „+" с цвета на картончето на боеца (15% ширина, без рамка).'],
+      ['chg', 'Бутоните „Правила" и „Архив" са смалени с 30%.'],
+      ['chg', 'Бутон за старт: по-плавни преходи, надписът е само „БОЙ!" в средата между двата градиента.'] ] },
     { v: '1.28.1', items: [
       ['chg', 'Бутон за старт: смален до 70% от ширината.'] ] },
     { v: '1.28.0', items: [
