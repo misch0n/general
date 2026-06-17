@@ -229,8 +229,19 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-scroll{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
   display:flex; flex-direction:column; gap:12px; padding:2px 16px 14px; }
 /* footer: a translucent overlay pinned to the bottom, building upward from it */
-.setup-footer{ flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+.setup-footer{ position:relative; flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
   background:linear-gradient(180deg, rgba(16,18,9,0), rgba(16,18,9,.5) 32%, rgba(16,18,9,.72)); }
+/* transient info notification (ruleset / network change) — floats just above the footer controls.
+   CSS-drawn „i" in the active-selector colour, followed by a grey description; auto-hides after 5s. */
+.infotoast{ position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%) translateY(6px);
+  display:flex; align-items:center; gap:9px; width:max-content; max-width:90%; padding:9px 13px; border-radius:10px;
+  background:rgba(16,18,9,.94); border:1px solid var(--gen-pill-line); box-shadow:0 8px 22px rgba(0,0,0,.5);
+  opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:8; }
+.infotoast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.info-ic{ flex:none; position:relative; width:17px; height:17px; border-radius:50%; border:2px solid var(--gen-brass-bright); }
+.info-ic::before{ content:''; position:absolute; top:2.5px; left:50%; width:2px; height:2px; border-radius:50%; background:var(--gen-brass-bright); transform:translateX(-1px); }
+.info-ic::after{ content:''; position:absolute; top:6px; left:50%; width:2px; height:5.5px; border-radius:1px; background:var(--gen-brass-bright); transform:translateX(-1px); }
+.info-txt{ color:var(--gen-muted); font-size:12px; line-height:1.35; text-align:left; }
 .setup-intro{ font-size:12px; color:var(--gen-label); line-height:1.5; }
 .setup-title{ margin:0; text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:var(--ttl); line-height:1;
   letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35);
@@ -334,7 +345,13 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* footer rules + archive: small icon-only buttons (CSS-drawn glyphs, no text) */
 .setup-actions-icons{ justify-content:center; gap:14px; margin-top:0; }
 .btn.iconbtn{ flex:none; width:40px; height:40px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:0; }
-.iconbtn .ic-book, .iconbtn .ic-archive{ color:var(--gen-brass-bright); }
+.iconbtn .ic-book, .iconbtn .ic-archive, .iconbtn .ic-combos{ color:var(--gen-brass-bright); }
+/* CSS-drawn combinations list — two bullets + two lines (the scoring combos) */
+.ic-combos{ position:relative; display:block; width:19px; height:14px; }
+.ic-combos::before{ content:''; position:absolute; left:0; top:2px; width:4px; height:4px; border-radius:1px; background:currentColor; box-shadow:0 7px 0 currentColor; }
+.ic-combos::after{ content:''; position:absolute; left:8px; top:3px; width:11px; height:2px; background:currentColor; box-shadow:0 7px 0 currentColor; }
+/* centred icon row in the in-game menu (rules + combinations) */
+.menu-iconrow{ display:flex; justify-content:center; gap:14px; margin:2px 0; }
 /* settings glyph (hamburger) drawn gold inside the icon button, like the other footer icons */
 .btn.iconbtn .burger{ position:relative; width:18px; height:2px; background:var(--gen-brass-bright); border-radius:2px;
   box-shadow:0 -5px 0 var(--gen-brass-bright), 0 5px 0 var(--gen-brass-bright); }
@@ -572,6 +589,7 @@ body.modal-open{ overflow:hidden; }
 .copy-ic::after{ content:''; position:absolute; bottom:0; left:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; background:var(--gen-ink,#16160e); }
 /* tapped: green tint (no text) */
 .codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
+.netcode-show.copied{ color:#8fe0ac; transition:color .12s; }   /* tapping the code copies → flash it green too */
 /* CSS-drawn camera glyph: body + lens */
 .cam-ic{ position:relative; width:17px; height:13px; display:block; color:inherit; }
 .cam-ic::before{ content:''; position:absolute; top:1px; left:0; right:0; bottom:0; border:1.5px solid currentColor; border-radius:2px; }
@@ -1565,6 +1583,8 @@ body.modal-open{ overflow:hidden; }
     </div>
     <!-- footer: transparent overlay pinned to the bottom — rules/history, play, mode -->
     <footer class="setup-footer">
+      <!-- transient info note for ruleset / network changes -->
+      <div id="infoToast" class="infotoast" role="status" aria-live="polite"><i class="info-ic" aria-hidden="true"></i><span class="info-txt" id="infoToastTxt"></span></div>
       <div class="setup-actions setup-actions-icons">
         <button id="howtoBtn" class="btn iconbtn" title="Правила" aria-label="Правила"><i class="ic-book" aria-hidden="true"></i></button>
         <button id="setupMenuBtn" class="btn iconbtn" title="Настройки" aria-label="Настройки"><span class="burger" aria-hidden="true"></span></button>
@@ -1581,7 +1601,6 @@ body.modal-open{ overflow:hidden; }
         <button type="button" class="ssel-opt" data-net="0">на устройството</button>
         <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
       </div>
-      <p class="modehint" id="modeHint">Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.</p>
       <div class="setup-actions">
         <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
       </div>
@@ -1754,7 +1773,7 @@ body.modal-open{ overflow:hidden; }
     <div id="betMsgs" class="betmsgs"></div>
     <div class="setup-actions">
       <button id="overUndo" class="btn hidden">ОПА!</button>
-      <button id="playAgain" class="btn primary">↻ Нов набор</button>
+      <button id="playAgain" class="btn primary">НАЧАЛО</button>
     </div>
   </div>
 </div>
@@ -1766,12 +1785,26 @@ body.modal-open{ overflow:hidden; }
     <div id="menuNetCode" class="menunetcode hidden"></div>
     <div id="menuAiTk" class="aitk hidden"></div>
     <div class="setup-actions" style="flex-direction:column">
-      <button id="menuHowto" class="btn">📖 Правила</button>
-      <button id="menuCombos" class="btn">📋 Комбинации</button>
-      <button id="menuSettings" class="btn">⚙ Настройки</button>
-      <button id="menuWrLog" class="btn small hidden">📋 Копирай WebRTC лог</button>
       <button id="menuRestart" class="btn">Начало</button>
+      <button id="menuSettings" class="btn">Настройки</button>
+      <button id="menuWrLog" class="btn small hidden">📋 Копирай WebRTC лог</button>
+      <div class="menu-iconrow">
+        <button id="menuHowto" class="btn iconbtn" title="Правила" aria-label="Правила"><i class="ic-book" aria-hidden="true"></i></button>
+        <button id="menuCombos" class="btn iconbtn" title="Комбинации" aria-label="Комбинации"><i class="ic-combos" aria-hidden="true"></i></button>
+      </div>
       <button id="menuClose" class="btn primary">Назад</button>
+    </div>
+  </div>
+</div>
+
+<!-- abort-to-start confirmation -->
+<div id="abortModal" class="overlay hidden" style="z-index:70">
+  <div class="modal" style="max-width:300px;text-align:center">
+    <h2>Към началото?</h2>
+    <p class="ht">Текущата битка ще приключи и ще се върнеш към сбора.</p>
+    <div class="setup-actions">
+      <button id="abortYes" class="btn primary">Да, начало</button>
+      <button id="abortNo" class="btn">Назад</button>
     </div>
   </div>
 </div>
@@ -2214,10 +2247,15 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.31.0';
+  var APP_VERSION = '1.32.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.32.0', items: [
+      ['new', 'Смяната на правила или устройство/мрежа показва кратко обяснение долу (5 сек) — старите бележки в долния панел паднаха.'],
+      ['chg', 'Хост: докосване на кода го оцветява зелено (като копчето за копиране).'],
+      ['chg', 'Меню в игра: „Начало“ е най-горе и пита за потвърждение; „Правила“ и „Комбинации“ са иконки над „Назад“; без емоджи на „Настройки“.'],
+      ['chg', 'Край на играта: бутонът за нова игра е „НАЧАЛО“.'] ] },
     { v: '1.31.0', items: [
       ['new', 'Бутон за старт: при свеж старт (веднъж на сесия) леко се поклаща, а при превключване на режим градиентът се „разлива“ в посоката на плъзгане.'],
       ['chg', 'Бутон за старт: докосване на активния край също стартира играта; докосване на неактивния край сменя режима.'],
@@ -2898,18 +2936,34 @@ body.modal-open{ overflow:hidden; }
   function syncStartRuleSel() { $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === (settings.ruleset || 'standard')); }); }
   function syncStartWhereSel() {
     $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-net') === '1') === netPlay); });
-    // the play buttons keep their labels regardless of device/network — only the workflow they trigger changes
     syncStartRuleSel();
-    $('modeHint').textContent = netPlay ? 'По мрежа: хостът дава код, останалите се присъединяват — играят по неговите правила.'
-      : 'Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.';
+  }
+  // transient bottom-of-screen note explaining a ruleset / network change (auto-hides after 5s)
+  var infoToastTimer = null;
+  function showInfoToast(text) {
+    var t = $('infoToast'), tx = $('infoToastTxt'); if (!t || !tx) return;
+    tx.textContent = text; t.classList.add('show');
+    clearTimeout(infoToastTimer); infoToastTimer = setTimeout(function () { t.classList.remove('show'); }, 5000);
+  }
+  var RULE_NOTE = { experimental: 'С минуси: числата се точкуват със знак (−50 при провал) плюс „два чифта“.',
+                    standard: 'Без минуси: класическата игра — само положителни точки.' };
+  var WHERE_NOTE = { net: 'По мрежа: хостът дава код, останалите се присъединяват и играят по неговите правила.',
+                     local: 'На устройството: всички играят на този телефон, един след друг.' };
+  function setStartRuleset(rs) {
+    if (settings.ruleset === rs) return;
+    settings.ruleset = rs; saveSettings(); syncStartRuleSel(); syncRuleset();
+    showInfoToast(RULE_NOTE[rs] || '');
+  }
+  function setStartWhere(net) {
+    if (netPlay === net) return;
+    netPlay = net; syncStartWhereSel();
+    showInfoToast(net ? WHERE_NOTE.net : WHERE_NOTE.local);
   }
   $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
-    b.onclick = function () {
-      settings.ruleset = b.getAttribute('data-rs'); saveSettings(); syncStartRuleSel(); syncRuleset();
-    };
+    b.onclick = function () { setStartRuleset(b.getAttribute('data-rs')); };
   });
   $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) {
-    b.onclick = function () { netPlay = b.getAttribute('data-net') === '1'; syncStartWhereSel(); };
+    b.onclick = function () { setStartWhere(b.getAttribute('data-net') === '1'); };
   });
   // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
   function startNetFlow(manual) {
@@ -3760,6 +3814,10 @@ body.modal-open{ overflow:hidden; }
   function copyGameCode(code, btn) {
     copyToClipboard(code);   // best-effort; the green tint confirms the action either way
     if (btn) { btn.classList.add('copied'); clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); }, 1600); }
+    // also flash the code text itself green (same colour + duration as the copy button)
+    var line = btn && btn.closest ? btn.closest('.netcode-line') : null;
+    var show = line ? line.querySelector('.netcode-show') : null;
+    if (show) { show.classList.add('copied'); clearTimeout(show._t); show._t = setTimeout(function () { show.classList.remove('copied'); }, 1600); }
   }
   // a bundle/diff copy button: push to clipboard on tap, flash „копирано", never show a textbox
   function flashCopied(btn, original) {
@@ -5930,16 +5988,20 @@ body.modal-open{ overflow:hidden; }
   $('menuClose').onclick = function () { $('menuModal').classList.add('hidden'); };
   $('menuModal').onclick = function (e) { if (e.target === $('menuModal')) $('menuModal').classList.add('hidden'); };
   $('menuHowto').onclick = function () { $('menuModal').classList.add('hidden'); openHowto(); };
-  $('menuRestart').onclick = function () {
-    $('menuModal').classList.add('hidden');
+  // aborting a live battle to the muster screen — keeps the SAME roster so the lineup can be tweaked
+  function abortToStart() {
+    $('menuModal').classList.add('hidden'); $('abortModal').classList.add('hidden');
     $('overModal').classList.add('hidden');
     resetNet();
     clearAllPenalties();
-    // back to the muster screen with the SAME roster (player & AI counts intact),
-    // so the lineup can be tweaked before the next battle.
     $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
     renderSetup();
-  };
+  }
+  // начало mid-game asks for confirmation first (it ends the current battle)
+  $('menuRestart').onclick = function () { $('menuModal').classList.add('hidden'); $('abortModal').classList.remove('hidden'); };
+  $('abortYes').onclick = abortToStart;
+  $('abortNo').onclick = function () { $('abortModal').classList.add('hidden'); $('menuModal').classList.remove('hidden'); };
+  $('abortModal').onclick = function (e) { if (e.target === $('abortModal')) { $('abortModal').classList.add('hidden'); $('menuModal').classList.remove('hidden'); } };
 
   // ---------- settings (with a secret developer mode) ----------
   function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || !settings.advice); }
