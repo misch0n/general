@@ -229,7 +229,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-scroll{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
   display:flex; flex-direction:column; gap:12px; padding:2px 16px 14px; }
 /* footer: a translucent overlay pinned to the bottom, building upward from it */
-.setup-footer{ position:relative; flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+.setup-footer{ position:relative; flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 16px calc(32px + env(safe-area-inset-bottom, 0px));
   background:linear-gradient(180deg, rgba(16,18,9,0), rgba(16,18,9,.5) 32%, rgba(16,18,9,.72)); }
 /* transient info notification (ruleset / network change) — floats just above the footer controls.
    CSS-drawn „i" in the active-selector colour, followed by a grey description; auto-hides after 5s. */
@@ -2252,10 +2252,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.35.1';
+  var APP_VERSION = '1.35.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.35.2', items: [
+      ['chg', 'Повече разстояние между селектора устройство/мрежа и долния край на екрана.'] ] },
     { v: '1.35.1', items: [
       ['fix', 'Бутон за старт: вече само златното петно се плъзга (тъмното стои); анимацията при свеж старт се вижда на всяко зареждане.'] ] },
     { v: '1.35.0', items: [
