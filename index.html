@@ -2116,7 +2116,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.21.1';
+  var APP_VERSION = '1.21.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
@@ -2640,8 +2640,7 @@ body.modal-open{ overflow:hidden; }
   function syncStartRuleSel() { $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === (settings.ruleset || 'standard')); }); }
   function syncStartWhereSel() {
     $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-net') === '1') === netPlay); });
-    $('startGame').textContent = netPlay ? '🌐 Игра със зарове' : '⚔ В Бой!';
-    $('startManual').textContent = netPlay ? '🌐 Игра на отчет' : '✍ Полеви отчет';
+    // the play buttons keep their labels regardless of device/network — only the workflow they trigger changes
     // minus-over-network gameplay isn't wired yet → over the net, only „без минуси“ for now
     if (netPlay && settings.ruleset === 'experimental') { settings.ruleset = 'standard'; saveSettings(); syncRuleset(); }
     var expOpt = $('startRuleSel').querySelector('.ssel-opt[data-rs="experimental"]');
