@@ -319,6 +319,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .glabel.on.g-m{ color:#6fa8e8; }
 .glabel.on.g-f{ color:#e88bb0; }
 .glabel.on.g-n{ color:var(--gen-brass-bright); }
+/* locked (owner with a fixed name): no interaction + muted colours */
+.gender.locked{ opacity:.85; cursor:default; }
+.gender.locked .glabel{ cursor:default; }
+.gender.locked .glabel.on{ background:rgba(255,255,255,.04); }
+.gender.locked .glabel.on.g-m, .gender.locked .glabel.on.g-n, .gender.locked .glabel.on.g-f{ color:var(--gen-muted); }
 /* ruleset segmented picker — same chrome as the gender selector */
 .rulebox{ align-items:center; }
 .ruleseg{ display:inline-flex; gap:2px; padding:2px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; }
@@ -2263,10 +2268,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.42.0';
+  var APP_VERSION = '1.42.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.42.1', items: [
+      ['chg', 'Картон на боеца: при заключено име на старшината селекторът за пол е изключен и с приглушени цветове.'] ] },
     { v: '1.42.0', items: [
       ['chg', 'Картон на боеца: при пропуснат старшина AI ключът на неговото място вече се включва.'],
       ['chg', 'Мрежов изглед: иконата на заглавието е центрирана; по-плътни икони за камера/поставяне; при поставяне светват зелено бутонът и кодовото поле, при сканиране — само полето (без долната бележка).'],
@@ -2803,13 +2810,15 @@ body.modal-open{ overflow:hidden; }
       color.style.background = p.color; color.title = 'Избери цвят'; color.setAttribute('aria-label', 'Избери цвят');
       color.onclick = function (e) { e.stopPropagation(); showColorPop(color, p); };   // custom swatch popover — no system dialog
 
-      // gender switch (мъжко / то / женско) — changes the name + callouts
-      var gsw = document.createElement('div'); gsw.className = 'gender';
+      // gender switch (мъжко / то / женско) — changes the name + callouts. Locked when the owner's
+      // name is fixed from settings (the gender is forced to settings too), and then visually muted.
+      var gsw = document.createElement('div'); gsw.className = 'gender' + (nameLocked ? ' locked' : '');
       [['m', 'мъжко'], ['n', 'то'], ['f', 'женско']].forEach(function (g) {
         var gb = document.createElement('button');
         gb.className = 'glabel g-' + g[0] + (p.gender === g[0] ? ' on' : '');
         gb.textContent = g[1];
-        gb.onclick = function () {
+        if (nameLocked) { gb.disabled = true; }
+        else gb.onclick = function () {
           if (suppressGenderClick) return;             // a swipe just handled it
           if (p.gender === g[0]) return;
           setGender(p, g[0]); // re-cohere the SAME name, keep its rarity (§1)
@@ -2817,7 +2826,7 @@ body.modal-open{ overflow:hidden; }
         };
         gsw.appendChild(gb);
       });
-      attachGenderSwipe(gsw, p);   // horizontal swipe shifts the gender one step in that direction
+      if (!nameLocked) attachGenderSwipe(gsw, p);   // horizontal swipe shifts the gender one step in that direction
 
       var toggle = document.createElement('button');
       toggle.className = 'toggle' + (p.isAI ? ' on' : '');
