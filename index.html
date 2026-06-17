@@ -600,14 +600,21 @@ body.modal-open{ overflow:hidden; }
 /* tapped: green tint (no text) */
 .codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
 .netcode-show.copied{ color:#8fe0ac; transition:color .12s; }   /* tapping the code copies → flash it green too */
-/* CSS-drawn camera glyph: body + lens (bold strokes) */
-.cam-ic{ position:relative; width:18px; height:14px; display:block; color:inherit; }
-.cam-ic::before{ content:''; position:absolute; top:1px; left:0; right:0; bottom:0; border:2.5px solid currentColor; border-radius:3px; }
-.cam-ic::after{ content:''; position:absolute; top:4.5px; left:50%; transform:translateX(-50%); width:5.5px; height:5.5px; border:2.5px solid currentColor; border-radius:50%; }
-/* CSS-drawn clipboard-paste glyph: a board with a clip on top (bold strokes) */
-.paste-ic{ position:relative; width:14px; height:16px; display:block; color:inherit; }
-.paste-ic::before{ content:''; position:absolute; top:2px; left:0; right:0; bottom:0; border:2.5px solid currentColor; border-radius:3px; }
-.paste-ic::after{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:7px; height:4px; border:2.5px solid currentColor; border-radius:1px; background:var(--gen-ink,#16160e); }
+/* CSS-drawn camera glyph: rounded body + lens + flash dot (thin strokes) */
+.cam-ic{ position:relative; width:20px; height:15px; display:block; color:inherit; }
+.cam-ic::before{ content:''; position:absolute; bottom:0; left:0; right:0; height:13px; border:1.7px solid currentColor; border-radius:5px; }
+.cam-ic::after{ content:''; position:absolute; bottom:3.4px; left:50%; transform:translateX(-50%); width:6px; height:6px; border:1.7px solid currentColor; border-radius:50%; }
+.cam-ic b{ position:absolute; top:3px; right:3px; width:2px; height:2px; background:currentColor; border-radius:50%; }   /* flash */
+/* CSS-drawn paste glyph: a sheet with text lines (thin strokes) */
+.paste-ic{ position:relative; width:14px; height:17px; display:block; color:inherit; }
+.paste-ic::before{ content:''; position:absolute; inset:0; border:1.7px solid currentColor; border-radius:2.5px; }
+.paste-ic::after{ content:''; position:absolute; left:3px; right:3px; top:4.5px; height:1.5px; background:currentColor; box-shadow:0 4px 0 currentColor, 0 8px 0 currentColor; }
+/* CSS-drawn trash glyph: lid (with handle) + bin body */
+.trash-ic{ position:relative; display:inline-block; vertical-align:-2px; width:13px; height:15px; color:inherit; }
+.trash-ic::before{ content:''; position:absolute; top:3px; left:1px; right:1px; bottom:0; border:1.7px solid currentColor; border-top:none; border-radius:0 0 3px 3px; }
+.trash-ic::after{ content:''; position:absolute; top:1.5px; left:-1px; right:-1px; height:1.7px; background:currentColor; border-radius:1px; box-shadow:0 -2.4px 0 -3px currentColor; }
+/* drawn icons sitting inside a modal title render inline with the text */
+h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:middle; margin-right:6px; }
 /* CSS-drawn share glyph (iOS-style): a box with an up-arrow rising out of it */
 .share-ic{ position:relative; width:15px; height:16px; display:block; color:inherit; }
 .share-ic::before{ content:''; position:absolute; left:1px; right:1px; bottom:0; top:6px; border:2px solid currentColor; border-top:none; border-radius:0 0 3px 3px; }
@@ -1011,7 +1018,7 @@ body.modal-open{ overflow:hidden; }
 .ownerstar:hover{ background:var(--gen-brass-bright); }
 .grip{ flex:none; width:34px; height:40px; display:grid; place-items:center; cursor:grab; color:var(--gen-brass);
   background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; -webkit-user-select:none; }
-.grip .gripdots{ display:grid; grid-template-columns:repeat(2,4px); grid-template-rows:repeat(3,4px); gap:4px; }
+.grip .gripdots{ display:grid; grid-template-columns:repeat(2,4px); grid-template-rows:repeat(3,4px); gap:2px 7px; }
 .grip .gripdots i{ width:4px; height:4px; border-radius:50%; background:currentColor; }
 .grip:active{ cursor:grabbing; }   /* no colour highlight when grabbed */
 /* the lifted card's highlight renders INWARD (inset on the foreground) so it never overlaps the
@@ -1838,7 +1845,7 @@ body.modal-open{ overflow:hidden; }
 <!-- settings -->
 <div id="settingsModal" class="overlay hidden">
   <div class="modal" style="max-width:340px">
-    <div class="settings-titlerow"><h2 id="settingsTitle">⚙ Настройки</h2><span class="app-ver" id="appVer"></span></div>
+    <div class="settings-titlerow"><h2 id="settingsTitle"><i class="cog-ic"></i>Настройки</h2><span class="app-ver" id="appVer"></span></div>
     <!-- device owner (the старшина) — at the top; pre-game only -->
     <div class="ownerbox" id="ownerBox">
       <div class="ownersub">Име на старшината <button id="ownerHelp" class="qmark" aria-label="Какво е това?">?</button></div>
@@ -1887,7 +1894,7 @@ body.modal-open{ overflow:hidden; }
     <div id="settingsRows"></div>
     <div id="clearArchiveRow" style="margin-top:8px">
       <div id="storeInfo" class="storeinfo"></div>
-      <div class="setup-actions" style="margin-top:6px"><button id="clearHistory" class="btn">🗑 Изчисти архива…</button></div>
+      <div class="setup-actions" style="margin-top:6px"><button id="clearHistory" class="btn"><i class="trash-ic"></i> Изчисти архива…</button></div>
     </div>
     <div id="clearPanel" class="clearpanel hidden">
       <div class="cp-head"><span>Избери кои игри да изтриеш</span>
@@ -1934,7 +1941,7 @@ body.modal-open{ overflow:hidden; }
   <div class="modal">
     <button class="x-close" id="historyClose">✕</button>
     <div class="hist-titlerow">
-      <h2>📜 Военен архив</h2>
+      <h2><i class="ic-archive"></i>Военен архив</h2>
       <button type="button" id="calBtn" class="calicon" title="Календар на битките" aria-label="Календар на битките"><i class="cal-tab"></i></button>
     </div>
     <div id="historyOverview"></div>
@@ -2049,10 +2056,13 @@ body.modal-open{ overflow:hidden; }
       <div id="netPickRole">
         <div id="netPickInfo" class="netpickinfo wr-only hidden"></div>
         <div class="setup-actions">
-          <button id="netHost" class="btn primary">НАПРАВИ</button>
+          <button id="netHost" class="btn primary">ПОКАНИ</button>
         </div>
         <div class="setup-actions">
-          <button id="netJoin" class="btn">ВЛЕЗ</button>
+          <button id="netJoin" class="btn">ПРИСЪЕДИНИ СЕ</button>
+        </div>
+        <div class="setup-actions">
+          <button id="netChooseBack" class="btn small">‹ Назад</button>
         </div>
       </div>
       <!-- join sub-view: explainer + code entry + join/cancel -->
@@ -2061,8 +2071,8 @@ body.modal-open{ overflow:hidden; }
         <p class="ht ac-only">Слушам за игра наблизо…</p>
         <div class="netjoincode">
           <input id="netCodeInput" class="netcode-in" maxlength="6" placeholder="КОД" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" />
-          <button type="button" id="netCodeScan" class="codecopy wr-only hidden" title="Сканирай QR код" aria-label="Сканирай QR код"><i class="cam-ic"></i></button>
           <button type="button" id="netCodePaste" class="codecopy wr-only hidden" title="Постави от клипборда" aria-label="Постави код от клипборда"><i class="paste-ic"></i></button>
+          <button type="button" id="netCodeScan" class="codecopy wr-only hidden" title="Сканирай QR код" aria-label="Сканирай QR код"><i class="cam-ic"><b></b></i></button>
         </div>
         <div class="setup-actions">
           <button id="netCodeJoin" class="btn primary">Влез с кода</button>
@@ -2273,10 +2283,15 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.45.0';
+  var APP_VERSION = '1.46.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.46.0', items: [
+      ['chg', 'Мрежа: бутоните са „ПОКАНИ“ / „ПРИСЪЕДИНИ СЕ“; добавен бутон „Назад“; в изгледа за присъединяване — поставяне (ляво) и камера (дясно) с нови икони.'],
+      ['chg', 'Заглавия с нарисувани икони: „Правила“ (книга), „Военен архив“, „Настройки“ (зъбчато колело), „Изчисти архива“ (кошче) — без емоджита.'],
+      ['chg', 'Картон на боеца: при пропуснат старшина селекторът за пол отново става активен.'],
+      ['chg', 'Дръжката за подреждане: по-широки колони и по-стегнати редове на точките.'] ] },
     { v: '1.45.0', items: [
       ['new', 'Хост по мрежа: бутон „Сподели“ до копирането — отваря системния диалог за споделяне (напр. през Съобщения на iOS), за да пратиш кода направо.'] ] },
     { v: '1.44.0', items: [
@@ -2825,12 +2840,15 @@ body.modal-open{ overflow:hidden; }
 
       // gender switch (мъжко / то / женско) — changes the name + callouts. Locked when the owner's
       // name is fixed from settings (the gender is forced to settings too), and then visually muted.
-      var gsw = document.createElement('div'); gsw.className = 'gender' + (nameLocked ? ' locked' : '');
+      // the gender is locked (and muted) only when the owner's name is fixed AND the owner isn't
+      // skipped — once skipped, the seat is up for grabs so the gender becomes editable again
+      var genderLocked = nameLocked && !skipOwnerNext;
+      var gsw = document.createElement('div'); gsw.className = 'gender' + (genderLocked ? ' locked' : '');
       [['m', 'мъжко'], ['n', 'то'], ['f', 'женско']].forEach(function (g) {
         var gb = document.createElement('button');
         gb.className = 'glabel g-' + g[0] + (p.gender === g[0] ? ' on' : '');
         gb.textContent = g[1];
-        if (nameLocked) { gb.disabled = true; }
+        if (genderLocked) { gb.disabled = true; }
         else gb.onclick = function () {
           if (suppressGenderClick) return;             // a swipe just handled it
           if (p.gender === g[0]) return;
@@ -2839,7 +2857,7 @@ body.modal-open{ overflow:hidden; }
         };
         gsw.appendChild(gb);
       });
-      if (!nameLocked) attachGenderSwipe(gsw, p);   // horizontal swipe shifts the gender one step in that direction
+      if (!genderLocked) attachGenderSwipe(gsw, p);   // horizontal swipe shifts the gender one step in that direction
 
       var toggle = document.createElement('button');
       toggle.className = 'toggle' + (p.isAI ? ' on' : '');
@@ -3818,8 +3836,8 @@ body.modal-open{ overflow:hidden; }
     $('netOptical').classList.add('hidden'); $('netOptAdd').classList.add('hidden'); stopScan();
     // optical (QR) pairing replaces the code flow when its toggle is on
     var opt = wr && settings.opticalHandshake;
-    $('netJoin').textContent = 'ВЛЕЗ';
-    $('netHost').textContent = 'НАПРАВИ';
+    $('netJoin').textContent = 'ПРИСЪЕДИНИ СЕ';
+    $('netHost').textContent = 'ПОКАНИ';
     // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
     $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
     if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
@@ -4340,6 +4358,7 @@ body.modal-open{ overflow:hidden; }
     if (e.target === $('netModal') && netAtPicker()) leaveNet();
   });
   $('netClose').onclick = leaveNet;
+  if ($('netChooseBack')) $('netChooseBack').onclick = leaveNet;   // back from the host/join picker → start screen
   // ---- WebRTC capture export (mirrors the acoustic ndCopy: base64 JSON of every logged event) ----
   $('wrCapCopy').onclick = function () {
     var payload = { v: 1, app: APP_VERSION, role: wrRole, code: wrCode, ts: Date.now(), log: wrLog };
@@ -6123,7 +6142,7 @@ body.modal-open{ overflow:hidden; }
       ? '<h3 class="hth">Точкуване „с минуси“</h3>'
         + '<p class="ht">Числовата част (1-6) се точкува <b>около три</b>: три еднакви = 0, четири = +стойността, пет = +2×; <b>по-малко</b> от три вади минус. Събери шестте реда — ако сборът завърши на минус, отнемат ти <b>−50</b>. В комбинациите има и <b>2x2</b> (два различни чифта).</p>'
       : '';
-    return '<h2>📖 Бойна задача</h2>'
+    return '<h2><i class="ic-book"></i>Правила</h2>'
       + '<p class="ht">Печели бойният, който събере най-много точки — и грабва чин <b>Генерал</b>. Последният получава <b>Редник</b>.</p>'
       + '<h3 class="hth">Ходът</h3>'
       + '<p class="ht">Имаш 5 зара и до <b>3 хвърляния</b>. Натисни <b>ХВЪРЛИ!</b> за първото хвърляне. После маркирай зарове и стреляй — или спри по-рано. Кои зарове маркираш зависи от твоя избор (докосни <b>?</b> на бутона за огън): по подразбиране маркираш <b>тези за хвърляне</b> (✛) и натискаш <b>ХВЪРЛИ!</b>; в другия режим маркираш <b>тези за задържане</b> (✓) и натискаш <b>ДРЪЖ!</b>, а останалите се хвърлят. Всеки ход записваш точно <b>една</b> категория; всяка се пълни само веднъж. Ако нищо не става, отказваш се (0 точки).</p>'
@@ -6739,7 +6758,7 @@ body.modal-open{ overflow:hidden; }
     $('ownerBox').classList.toggle('hidden', inGame || lobbyOnly);
     $('ruleBox').classList.add('hidden');   // ruleset lives on the start screen now — never shown in settings
     $('clearArchiveRow').classList.toggle('hidden', inGame || lobbyOnly);
-    $('settingsTitle').textContent = lobbyOnly ? '⚙ Настройки на играта' : '⚙ Настройки';
+    $('settingsTitle').innerHTML = '<i class="cog-ic"></i>' + (lobbyOnly ? 'Настройки на играта' : 'Настройки');
     // the version marker (tap = changelog) belongs to the pre-game start screen only
     $('appVer').classList.toggle('hidden', inGame || lobbyOnly);
     // reflect persisted owner controls
