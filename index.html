@@ -325,6 +325,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-actions-icons{ justify-content:center; gap:14px; margin-top:0; }
 .btn.iconbtn{ flex:none; width:40px; height:40px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:0; }
 .iconbtn .ic-book, .iconbtn .ic-archive{ color:var(--gen-brass-bright); }
+/* settings glyph (hamburger) drawn gold inside the icon button, like the other footer icons */
+.btn.iconbtn .burger{ position:relative; width:18px; height:2px; background:var(--gen-brass-bright); border-radius:2px;
+  box-shadow:0 -5px 0 var(--gen-brass-bright), 0 5px 0 var(--gen-brass-bright); }
 /* CSS-drawn open book (rules) */
 .ic-book{ position:relative; display:block; width:22px; height:17px; }
 .ic-book::before{ content:''; position:absolute; inset:0; border:2px solid currentColor; border-radius:2px; }
@@ -1534,7 +1537,6 @@ body.modal-open{ overflow:hidden; }
       <div class="setup-titlerow">
         <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
         <div class="setup-hambwrap">
-          <button id="setupMenuBtn" class="rank menubtn setuphamb" title="Настройки" aria-label="Настройки"><span class="burger"></span></button>
           <button id="devCogBtn" class="rank menubtn setuphamb devcog hidden" title="Разработчик" aria-label="Разработчик"><i class="cog-ic"></i></button>
         </div>
       </div>
@@ -1554,6 +1556,7 @@ body.modal-open{ overflow:hidden; }
     <footer class="setup-footer">
       <div class="setup-actions setup-actions-icons">
         <button id="howtoBtn" class="btn iconbtn" title="Правила" aria-label="Правила"><i class="ic-book" aria-hidden="true"></i></button>
+        <button id="setupMenuBtn" class="btn iconbtn" title="Настройки" aria-label="Настройки"><span class="burger" aria-hidden="true"></span></button>
         <button id="archiveBtn" class="btn iconbtn" title="Военен архив" aria-label="Военен архив"><i class="ic-archive" aria-hidden="true"></i></button>
       </div>
       <!-- play button: one surface — tap left=зарове, right=отчет, middle=старт; or swipe ←/→ to pick -->
@@ -2200,10 +2203,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.30.0';
+  var APP_VERSION = '1.30.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.30.1', items: [
+      ['chg', 'Бутонът за настройки се премести между „Правила“ и „Архив“ в долния панел, със същия вид като тях.'] ] },
     { v: '1.30.0', items: [
       ['chg', 'Начален екран: фиксиран горен ред (заглавие, правила, настройки) и долен панел (правила/архив, БОЙ!, тип игра); списъкът с бойци се скролва, ако не побира.'],
       ['chg', 'Правила и архив са вече малки иконки; типът игра в архива се показва със зар/молив вместо текст.'],
