@@ -2252,10 +2252,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.36.0';
+  var APP_VERSION = '1.37.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.37.0', items: [
+      ['rem', 'Настройки: „Нови зарове“ махнато (живее при стопанина/звездата и в „?“ бутона); „Облози“ вече не се показва по време на игра.'] ] },
     { v: '1.36.0', items: [
       ['chg', 'Бутон за старт: златното петно следва пръста при плъзгане (в границите на бутона) и щрака към най-близкия край при пускане.'] ] },
     { v: '1.35.4', items: [
@@ -6116,9 +6118,10 @@ body.modal-open{ overflow:hidden; }
         if (game) (expMode ? expRenderAll : renderAll)();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
-    // Облози — the wager flavour; its own switch now (used to ride on КАЗАРМА).
+    // Облози — the wager flavour; its own switch now (used to ride on КАЗАРМА). Pre-game only:
+    // assigned at game start, so it's hidden in-game (for every mode/ruleset).
     // gameShared: broadcast to all devices in a net game → shown in the lobby's game-settings view
-    { key: 'bets', label: 'Облози', gameShared: true, onChange: function () {
+    { key: 'bets', label: 'Облози', preGameOnly: true, gameShared: true, onChange: function () {
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
     // Титли — rare-name notifications (own switch, independent of КАЗАРМА); its hidden
@@ -6135,10 +6138,8 @@ body.modal-open{ overflow:hidden; }
         setupPlayers.forEach(swapCensorName);
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
-    // Нови зарове — tray display: ON = раздели (group the fresh batch), OFF = подреди (sort+accent).
-    // This is the saved DEFAULT; per-player it's toggled live from the „?“ on the fire button.
-    { key: 'newDiceBatch', label: 'Нови зарове', labelFn: function (v) { return 'Нови зарове: ' + (v ? 'раздели' : 'подреди'); },
-      onChange: function () { if (game && !manualMode) (expMode ? expRenderAll : renderAll)(); } },
+    // (Нови зарове — tray display — moved out of the general settings; it now lives on the owner
+    //  token/owner defaults and the in-game „?“ keep/throw bubble, so it's not duplicated here.)
     // (Акустична мрежа + Дебъг режим moved to the developer menu — Debug / Experimental)
   ];
   function buildSettingsRows(inGame, lobbyOnly) {
