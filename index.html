@@ -2259,10 +2259,13 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.40.2';
+  var APP_VERSION = '1.40.3';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.40.3', items: [
+      ['fix', 'Архив: кривата на точките се показва и за играчи без записани ходове (взима се от резултатите) — вече се вижда линия за всички.'],
+      ['fix', 'Архив: разпознаване на по-стари мрежови игри (без минуси) и по липсващите облози.'] ] },
     { v: '1.40.2', items: [
       ['fix', 'Архив: по-старите мрежови игри (без явен маркер) се разпознават по записа на ходовете — вече не се водят грешно като игри на устройството.'] ] },
     { v: '1.40.1', items: [
@@ -7208,7 +7211,14 @@ body.modal-open{ overflow:hidden; }
   // cumulative category points for player pi, round by round (starts at 0)
   function progressSeries(pi) {
     var log = moveLog[pi] || [], sc = game.players[pi].scores || {}, run = 0, pts = [0];
-    for (var r = 0; r < log.length; r++) { var v = sc[log[r].category]; run += (typeof v === 'number' ? v : 0); pts.push(run); }
+    if (log.length) {
+      for (var r = 0; r < log.length; r++) { var v = sc[log[r].category]; run += (typeof v === 'number' ? v : 0); pts.push(run); }
+    } else {
+      // no move log (e.g. an older networked game saved only its scores) — fall back to the scored
+      // categories in board order so the player still gets a progression line
+      var cats = sumCats();
+      for (var c = 0; c < cats.length; c++) { var sv = sc[cats[c].key]; if (typeof sv === 'number') { run += sv; pts.push(run); } }
+    }
     return pts;
   }
   // §1.6 milestones for the highlighted player — tab-aware, good AND bad events
@@ -7669,13 +7679,17 @@ body.modal-open{ overflow:hidden; }
   var viewingHistory = false, histSnapshot = null, dossierCtx = null, currentHistRec = null;
 
   function recIsExp(rec) { return !!(rec && rec.ruleset === 'experimental'); }
-  // local vs network game. New records carry an explicit `net` flag; for older ones we infer it from
-  // the move log — a networked game recorded remote players' fill order with a `remote` marker.
+  // local vs network game. New records carry an explicit `net` flag; for older ones we infer it:
+  // a networked game recorded remote players' fill order with a `remote` marker, and (standard
+  // ruleset) left every player's bet empty — local games always carry a random bet.
   function recIsNet(rec) {
     if (!rec) return false;
     if (typeof rec.net === 'boolean') return rec.net;
     var ml = rec.moveLog;
-    return !!(ml && ml.some && ml.some(function (log) { return log && log.some && log.some(function (m) { return m && m.remote; }); }));
+    if (ml && ml.some && ml.some(function (log) { return log && log.some && log.some(function (m) { return m && m.remote; }); })) return true;
+    var ps = rec.players;
+    if (ps && ps.length && ps.every(function (p) { return p.bet === ''; })) return true;
+    return false;
   }
   // per-player total, ALWAYS computed per the record's ruleset (so scoring-rule fixes — e.g. the
   // minus −50 — apply to old saves too, and the entry matches the details view). The stored `pts`
