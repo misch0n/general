@@ -951,10 +951,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
    the .upchip variants beat the later .upchip colour rule so the SUGGESTION box colours too */
 .tile.up .pts.pos, .tile.up .pts.upchip.pos{ color:#1c7a1c; }
 .tile.up .pts.neg, .tile.up .pts.upchip.neg{ color:#b02525; }
-.tile.up.done .pts.pos{ color:#6f9a6f; } .tile.up.done .pts.neg{ color:#bf8b86; }   /* SUBMITTED values: muted red/green */
+.tile.up.done .pts.pos{ color:#6f9a6f; } .tile.up.done .pts.neg{ color:#a8453d; }   /* SUBMITTED values: muted green / darker red (legible) */
 .tile.low.fullspan{ grid-column:1 / -1; }   /* фул хаус spans both columns */
 /* experimental mini cell-board (peek): muted sign-coloured (submitted) number part + full-house span */
-.miniboard .mtile.up .mval.pos{ color:#6f9a6f; } .miniboard .mtile.up .mval.neg{ color:#bf8b86; }
+.miniboard .mtile.up .mval.pos{ color:#6f9a6f; } .miniboard .mtile.up .mval.neg{ color:#a8453d; }
 .miniboard .mtile.low.fullspan{ grid-column:1 / -1; }
 .expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
   background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
@@ -2286,10 +2286,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.47.0';
+  var APP_VERSION = '1.47.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.47.1', items: [
+      ['fix', 'Игра с минуси: записаните минус-точки на горния ред са с по-наситен, по-тъмночервен оттенък — вече се четат по-лесно.'] ] },
     { v: '1.47.0', items: [
       ['chg', 'Наблюдение по мрежа: между всяко действие на боеца (първи хвърл, преподреждане, записване) има пауза от ~2,5 сек, за да се проследи ходът.'],
       ['new', 'Наблюдение: новохвърлените зарове и избраната графа примигват за половин секунда.'],
