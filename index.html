@@ -250,7 +250,15 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .playbtn .pb-go{ flex:1; display:grid; place-items:center; cursor:pointer; background:var(--gen-brass); color:var(--gen-ink);
   font-family:var(--gen-font-display); font-weight:700; font-size:17px; letter-spacing:1.5px; text-transform:uppercase; }
 .playbtn .pb-go:active{ box-shadow:inset 0 3px 10px rgba(0,0,0,.3); }
-.pcard{ background:rgba(20,22,12,.72); border:1px solid var(--gen-pill-line); border-radius:10px; padding:12px; }
+.pcard{ position:relative; overflow:hidden; border:1px solid var(--gen-pill-line); border-radius:10px; }
+.pcard.swipeable{ touch-action:pan-y; }
+/* swipe-to-remove: a red „МАХНИ" sits behind the card; the foreground slides left to reveal it */
+.pc-fg{ position:relative; z-index:1; background:rgba(20,22,12,.72); padding:12px; border-radius:inherit; }
+.pc-fg.snap{ transition:transform .22s cubic-bezier(.3,.7,.4,1); }
+.pc-bg{ position:absolute; inset:0; z-index:0; display:flex; align-items:center; justify-content:flex-end; padding-right:16px;
+  background:#b23a2e; border-radius:inherit; opacity:0; pointer-events:none; }
+.pc-bg.show{ opacity:1; }
+.pc-bg .pcrm{ font-family:var(--gen-font-display); font-weight:800; font-size:16px; letter-spacing:4px; color:#fff; text-transform:uppercase; white-space:nowrap; }
 .pcard .name{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:15px; text-transform:uppercase; letter-spacing:.5px;
   color:var(--gen-text); background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:9px 11px; }
 .pcard .name:focus{ outline:none; border-color:var(--gen-brass); }
@@ -2133,10 +2141,12 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.25.2';
+  var APP_VERSION = '1.26.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.26.0', items: [
+      ['new', 'Начален екран: плъзни боец наляво, за да го махнеш (червено „МАХНИ" се разкрива; готово при 50%).'] ] },
     { v: '1.25.0', items: [
       ['new', 'Нов бутон за старт: „игра / В БОЙ! / отчет“ — избери режим (докосни страна или плъзни), стартирай от средата.'],
       ['chg', '„С минуси“ е по подразбиране за нови игри; редът на избора е „с минуси · без минуси“.'] ] },
@@ -2603,8 +2613,53 @@ body.modal-open{ overflow:hidden; }
 
       // rare-name brag bubble (dismissable); awards the bonus unless disabled
       var bub0 = rarityBubbleEl(p); if (bub0) card.appendChild(bub0);
+      // wrap the content in a sliding foreground so the card can be swiped left to remove it
+      var fg = document.createElement('div'); fg.className = 'pc-fg';
+      while (card.firstChild) fg.appendChild(card.firstChild);
+      if (setupPlayers.length > 1) {
+        var rmbg = document.createElement('div'); rmbg.className = 'pc-bg'; rmbg.innerHTML = '<span class="pcrm">МАХНИ</span>';
+        card.appendChild(rmbg); card.classList.add('swipeable');
+        attachSwipeRemove(card, fg, rmbg, p);
+      }
+      card.appendChild(fg);
       list.appendChild(card);
     });
+  }
+  // swipe a player card left to remove it; it completes past 50% of the width, else snaps back
+  function attachSwipeRemove(card, fg, bg, p) {
+    var sx = 0, sy = 0, w = 1, active = false, decided = false, swiping = false, pid = null;
+    function settle() { setTimeout(function () { bg.classList.remove('show'); fg.classList.remove('snap'); fg.style.transform = ''; }, 240); }
+    card.addEventListener('pointerdown', function (e) {
+      if (drag) return;                                            // a reorder drag is running
+      if (e.target.closest && e.target.closest('.grip')) return;  // the grip owns reorder
+      if (e.button != null && e.button > 0) return;
+      active = true; decided = false; swiping = false; sx = e.clientX; sy = e.clientY; w = card.offsetWidth || 1; pid = e.pointerId;
+      fg.classList.remove('snap');
+    });
+    card.addEventListener('pointermove', function (e) {
+      if (!active || e.pointerId !== pid) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true; swiping = (Math.abs(dx) > Math.abs(dy)) && dx < 0;   // a clear horizontal-left gesture
+        if (swiping) { bg.classList.add('show'); try { card.setPointerCapture(pid); } catch (x) {} }
+        else { active = false; return; }                           // vertical → leave it for scroll
+      }
+      if (!swiping) return;
+      e.preventDefault();
+      fg.style.transform = 'translateX(' + Math.min(0, dx) + 'px)';   // follow the finger (left only)
+    });
+    function end(e) {
+      if (!active || (e.pointerId != null && e.pointerId !== pid)) return;
+      if (!swiping) { active = false; return; }
+      var dx = e.clientX - sx; active = false; fg.classList.add('snap');
+      if (-dx >= w * 0.5) {   // past halfway → remove
+        fg.style.transform = 'translateX(-100%)';
+        setTimeout(function () { var ix = setupPlayers.indexOf(p); if (ix >= 0) { setupPlayers.splice(ix, 1); renderSetup(); } }, 200);
+      } else { fg.style.transform = 'translateX(0)'; settle(); }     // not far enough → snap back
+    }
+    card.addEventListener('pointerup', end);
+    card.addEventListener('pointercancel', function () { if (active && swiping) { fg.classList.add('snap'); fg.style.transform = 'translateX(0)'; settle(); } active = false; });
   }
   $('addPlayer').onclick = function () { addSetupPlayer(false); };
 
