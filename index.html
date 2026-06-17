@@ -1186,13 +1186,21 @@ body.modal-open{ overflow:hidden; }
 .histform .rk.r4{ background:rgba(255,255,255,.12); color:var(--gen-muted); }
 .histform .rk.rx{ background:rgba(255,255,255,.06); color:var(--gen-disabled); }   /* unranked (single-player) game */
 .ho-noranked{ font-size:9px; color:var(--gen-muted); font-style:italic; }
-.hg-mode{ text-transform:uppercase; font-size:8.5px; letter-spacing:.4px; color:var(--gen-label); opacity:.9; }
+.hg-mode{ color:var(--gen-label); opacity:.9; }
+.hg-net{ color:var(--gen-label); opacity:.9; margin-left:7px; margin-right:2px; }   /* local/network marker, after the mode glyph */
 /* game-type marker as a tiny CSS glyph (dice = със зарове, pencil = отчет) — mirrors the play button */
 .minidie{ display:inline-block; vertical-align:-2px; width:11px; height:11px; border:1.5px solid currentColor; border-radius:2px; position:relative; }
 .minidie::before{ content:''; position:absolute; top:1.6px; left:1.6px; width:1.5px; height:1.5px; border-radius:50%; background:currentColor;
   box-shadow:3.6px 0 0 currentColor, 0 3.6px 0 currentColor, 3.6px 3.6px 0 currentColor; }
 .minipencil{ display:inline-block; vertical-align:-2px; width:5px; height:13px; position:relative; transform:rotate(43deg); }
 .minipencil::before{ content:''; position:absolute; inset:0; background:currentColor; clip-path:polygon(0 0,100% 0,100% 78%,50% 100%,0 78%); }
+/* local (device) vs network (connected nodes) marker for a history entry */
+.minidev{ display:inline-block; vertical-align:-2px; width:8px; height:12px; border:1.5px solid currentColor; border-radius:2px; position:relative; }
+.minidev::before{ content:''; position:absolute; left:50%; bottom:1px; width:3px; height:1.2px; border-radius:1px; background:currentColor; transform:translateX(-50%); }
+.mininet{ display:inline-block; vertical-align:-2px; width:14px; height:9px; position:relative;
+  background:linear-gradient(currentColor,currentColor) left center/100% 1.5px no-repeat; }
+.mininet::before{ content:''; position:absolute; left:0; top:50%; width:4px; height:4px; margin-top:-2px; border-radius:50%; background:currentColor;
+  box-shadow:5px 0 0 currentColor, 10px 0 0 currentColor; }
 /* manual-game multiplayer / placement annotation (summary) */
 .mpresult{ margin:0 0 11px; padding:9px 11px; border-radius:9px; background:rgba(200,166,75,.1); border:1px solid var(--gen-brass-stroke); }
 .mpresult.hidden{ display:none; }
@@ -2251,10 +2259,13 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.39.0';
+  var APP_VERSION = '1.40.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.40.0', items: [
+      ['new', 'Архив: всеки запис показва и иконка дали играта е била на устройството или по мрежа.'],
+      ['chg', 'Архив: маркерите (зар/молив и устройство/мрежа) са в началото на реда, преди датата/часа.'] ] },
     { v: '1.39.0', items: [
       ['new', 'Картон на боеца: полът се сменя и с плъзване настрани (една стъпка по посока на плъзгането); свайпът за махане не се задейства върху селектора за пол.'] ] },
     { v: '1.38.1', items: [
@@ -5766,7 +5777,7 @@ body.modal-open{ overflow:hidden; }
                personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], scores: p.scores, pts: G.playerTotalExp(p) };
     });
     archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
-      ruleset: 'experimental', manualMode: manualMode, ownerSkipped: !!game.ownerSkipped, players: players, moveLog: moveLog });
+      ruleset: 'experimental', manualMode: manualMode, ownerSkipped: !!game.ownerSkipped, net: !!netMode, players: players, moveLog: moveLog });
   }
   // ---------- AI ----------
   // engine-backed persona policy when the EV table is ready; else heuristic.
@@ -6707,6 +6718,7 @@ body.modal-open{ overflow:hidden; }
       ownerSkipped: !!(game && game.ownerSkipped),
       ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
       selectKeep: !!settings.selectKeep,   // the dice-selection flavour this game was played in
+      net: !!netMode,                       // local vs network game (drives the history marker)
       players: serializePlayers(),
       moveLog: moveLog,
     });
@@ -8349,8 +8361,12 @@ body.modal-open{ overflow:hidden; }
         + '<button type="button" class="hg-count ' + rankCls + '" title="' + esc(rankTitle) + '">' + rankNum + '</button>'
         + '<span class="hg-main"><span class="hg-top">' + primary
         + (skipped ? ' <span class="hg-skip" title="Старшината е пропуснат — извън статистиката">⊘</span>' : '') + '</span>'
-        + '<span class="hg-sub">' + subDate + ' · <span class="hg-mode" title="' + (rec.manualMode ? 'отчет (ръчно)' : 'със зарове') + '">'
-        + (rec.manualMode ? '<i class="minipencil"></i>' : '<i class="minidie"></i>') + '</span>' + pctTag + '</span></span>'
+        + '<span class="hg-sub">'
+        + '<span class="hg-mode" title="' + (rec.manualMode ? 'отчет (ръчно)' : 'със зарове') + '">'
+        +   (rec.manualMode ? '<i class="minipencil"></i>' : '<i class="minidie"></i>') + '</span>'
+        + '<span class="hg-net" title="' + (rec.net ? 'по мрежа' : 'на устройството') + '">'
+        +   (rec.net ? '<i class="mininet"></i>' : '<i class="minidev"></i>') + '</span>'
+        + ' · ' + subDate + pctTag + '</span></span>'
         + '<span class="hg-pts">' + oTotal + '</span>'
         + '</div>'
         + '<div class="hg-actions">'
