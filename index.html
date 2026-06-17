@@ -269,21 +269,24 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .playbtn{ position:relative; width:100%; height:46px; max-width:238px; margin:6px auto; border-radius:var(--gen-r-tag); overflow:hidden;
   border:2px solid var(--gen-ink-line); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:pan-y;
   --pb-act:#b09551; --pb-inact:var(--gen-pill);    /* active = muted gold, inactive = pill */
-  /* a 200%-wide gradient holding BOTH modes side by side; sliding background-position morphs between
-     them — that slide IS the swap/„flood" animation (and the once-per-session entrance hint).
-     Left half = regular [act | gold | inact]; right half = manual [inact | gold | act]; the seam
-     (pill→pill at 50%) is continuous. At position 0% the visible window reproduces the regular
-     design exactly (act 0-16%, gold 36-64%, inact 84-100%), at 100% the manual mirror image. */
-  background-image:linear-gradient(90deg,
-    var(--pb-act) 0%, var(--pb-act) 8%, var(--gen-brass) 18%, var(--gen-brass) 32%, var(--pb-inact) 42%, var(--pb-inact) 50%,
-    var(--pb-inact) 50%, var(--pb-inact) 58%, var(--gen-brass) 68%, var(--gen-brass) 82%, var(--pb-act) 92%, var(--pb-act) 100%);
-  background-size:200% 100%; background-position:0% 0%;
+  /* TWO layers: a moving GOLD gradient over a STATIC dark base. Only the light gold travels across
+     the button when the mode switches; the dark never moves. The gold layer is 200% wide and
+     transparent over the inactive side (so the dark base shows there). At position 0% the visible
+     window reproduces the regular design (gold 0-16% + 36-64%, dark 84-100%), at 100% the mirror. */
+  background-image:
+    linear-gradient(90deg,
+      var(--pb-act) 0%, var(--pb-act) 8%, var(--gen-brass) 18%, var(--gen-brass) 32%, transparent 42%, transparent 58%,
+      var(--gen-brass) 68%, var(--gen-brass) 82%, var(--pb-act) 92%, var(--pb-act) 100%),
+    linear-gradient(var(--pb-inact), var(--pb-inact));
+  background-repeat:no-repeat, no-repeat;
+  background-size:200% 100%, 100% 100%;
+  background-position:0% 0%, 0% 0%;
   transition:background-position .42s cubic-bezier(.4,.1,.3,1); }
-.playbtn.man{ background-position:100% 0%; }                  /* manual — the slide right→ is the flood */
+.playbtn.man{ background-position:100% 0%, 0% 0%; }           /* only the gold layer slides; the dark stays */
 .playbtn:active{ box-shadow:inset 0 3px 12px rgba(0,0,0,.32); }
-/* once-per-session entrance hint: a gentle sway of the gradient to advertise the swipe affordance */
+/* once-per-session entrance hint: a gentle sway of the gold to advertise the swipe affordance */
 .playbtn.pb-hint{ animation:pbHint 1s ease-in-out .35s 1; }
-@keyframes pbHint { 0%{ background-position:0% 0%; } 32%{ background-position:18% 0%; } 66%{ background-position:5% 0%; } 100%{ background-position:0% 0%; } }
+@keyframes pbHint { 0%{ background-position:0% 0%, 0% 0%; } 32%{ background-position:18% 0%, 0% 0%; } 66%{ background-position:5% 0%, 0% 0%; } 100%{ background-position:0% 0%, 0% 0%; } }
 .playbtn .pb-go{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; color:var(--gen-ink);
   font-family:var(--gen-font-display); font-weight:700; font-size:17px; letter-spacing:1.5px; text-transform:uppercase; white-space:nowrap; }
 /* CSS-drawn mode icons — absolutely placed, fully inside their solid colour zone, never clickable */
@@ -575,6 +578,11 @@ body.modal-open{ overflow:hidden; }
 .netcode-in{ flex:1; min-width:0; text-align:center; text-transform:uppercase; letter-spacing:4px;
   font-family:var(--gen-font-display); font-weight:700; font-size:20px; padding:8px 10px; border-radius:8px;
   background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); }
+/* CSS-drawn network icon — three connected nodes along a link (replaces the globe in the title) */
+.ic-net{ position:relative; display:inline-block; vertical-align:-2px; width:24px; height:9px;
+  background:linear-gradient(currentColor,currentColor) left center/100% 2px no-repeat; color:inherit; }
+.ic-net::before{ content:''; position:absolute; left:1px; top:50%; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:currentColor;
+  box-shadow:8px 0 0 currentColor, 16px 0 0 currentColor; }   /* left + centre + right nodes */
 .nethostcode{ margin:10px 0; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; opacity:.85; }
 .nethostcode .netcode-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; }
 .nethostcode .netcode-show{ font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright);
@@ -2026,10 +2034,10 @@ body.modal-open{ overflow:hidden; }
       <div id="netPickRole">
         <div id="netPickInfo" class="netpickinfo wr-only hidden"></div>
         <div class="setup-actions">
-          <button id="netHost" class="btn primary">📡 Бъди старшина (хост)</button>
+          <button id="netHost" class="btn primary">НАПРАВИ</button>
         </div>
         <div class="setup-actions">
-          <button id="netJoin" class="btn">🎧 Влез в игра</button>
+          <button id="netJoin" class="btn">ВЛЕЗ</button>
         </div>
       </div>
       <!-- join sub-view: explainer + code entry + join/cancel -->
@@ -2250,10 +2258,14 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.34.0';
+  var APP_VERSION = '1.35.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.35.0', items: [
+      ['chg', 'Мрежов изглед: „Игра по мрежа“ с нарисувана икона за мрежа; бутоните са „НАПРАВИ“ и „ВЛЕЗ“ без емоджита.'],
+      ['chg', 'Бутон за старт: при смяна на режим само светлият градиент се движи — тъмният стои на място.'],
+      ['chg', 'Мрежа: докосване извън панела го затваря само на избора хост/гост; докато правиш или влизаш в игра, не се затваря (без случайни откази).'] ] },
     { v: '1.34.0', items: [
       ['new', 'Мрежа: ако старшината откаже лобито, гостите получават съобщение и се връщат към избора хост/гост.'],
       ['fix', 'Мрежа: смяна на фокуса (напр. клавиатурата) вече не разваля изгледа на хост/гост работния поток.'] ] },
@@ -3656,7 +3668,7 @@ body.modal-open{ overflow:hidden; }
     netKind = kind;
     var wr = (kind === 'webrtc');
     if (typeof presetManual === 'boolean') netManual = presetManual;   // webrtc: mode comes from the start-screen play button
-    $('netTitle').textContent = wr ? '🌐 Игра по интернет' : '🔊 Акустична игра';
+    $('netTitle').innerHTML = wr ? '<i class="ic-net" aria-hidden="true"></i> Игра по мрежа' : '🔊 Акустична игра';
     document.querySelectorAll('#netModal .ac-only').forEach(function (e) { e.classList.toggle('hidden', wr); });
     document.querySelectorAll('#netModal .wr-only').forEach(function (e) { e.classList.toggle('hidden', !wr); });
     $('netMeName').textContent = localMeta().name;
@@ -3671,8 +3683,8 @@ body.modal-open{ overflow:hidden; }
     $('netOptical').classList.add('hidden'); $('netOptAdd').classList.add('hidden'); stopScan();
     // optical (QR) pairing replaces the code flow when its toggle is on
     var opt = wr && settings.opticalHandshake;
-    $('netJoin').textContent = opt ? '📷 Сканирай код' : '🎧 Влез в игра';
-    $('netHost').textContent = opt ? '📡 Бъди старшина (покажи QR)' : '📡 Бъди старшина (хост)';
+    $('netJoin').textContent = 'ВЛЕЗ';
+    $('netHost').textContent = 'НАПРАВИ';
     // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
     $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
     if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
@@ -4163,6 +4175,18 @@ body.modal-open{ overflow:hidden; }
   // „Откажи" from the host invite / lobby returns to the host/join role picker (modal stays open)
   function netBackToChoose() { netDisposeSession(); openNetModal(netKind, netManual); }
   $('netLeave').onclick = netBackToChoose;
+  // true only at the idle host/join picker — nothing started yet (no session, no transport, no code view)
+  function netAtPicker() {
+    return netPhase === 'choose' && !net && !netBus
+      && $('netPickRole') && !$('netPickRole').classList.contains('hidden')
+      && $('netJoinCode').classList.contains('hidden')
+      && $('netOptical').classList.contains('hidden');
+  }
+  // tapping the backdrop dismisses the modal ONLY at the picker; once hosting/joining it's locked
+  // so a stray tap can't cancel the connection
+  $('netModal').addEventListener('click', function (e) {
+    if (e.target === $('netModal') && netAtPicker()) leaveNet();
+  });
   $('netClose').onclick = leaveNet;
   // ---- WebRTC capture export (mirrors the acoustic ndCopy: base64 JSON of every logged event) ----
   $('wrCapCopy').onclick = function () {
