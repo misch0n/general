@@ -573,7 +573,8 @@
       if (this._byId(sp.id)) { this._send(T.SPUR, packSpur(sp.id, sp.heat, sp.clicks)); if (this.cb.onSpur) this.cb.onSpur(sp.id, sp.heat, sp.clicks); }   // relay + show
     } else if (pkt.type === T.TACT && this.state === 'IN_GAME') {
       var ta = unpackAct(pkt.payload);
-      if (ta.playerId === this.activeId) { this._send(T.TACT, packAct(ta)); if (this.cb.onAction) this.cb.onAction(ta); }   // relay to all + render locally
+      // a live action proves the active player is alive → reset the silence timer so we don't re-GRANT them
+      if (ta.playerId === this.activeId) { this._armMoveTimeout(); this._send(T.TACT, packAct(ta)); if (this.cb.onAction) this.cb.onAction(ta); }   // relay to all + render locally
     } else if (pkt.type === T.MOVE && this.state === 'IN_GAME') {
       var mv = unpackMove(pkt.payload);
       // turn game: only the active player may move. manual game: any player may fill their OWN board.
@@ -659,8 +660,12 @@
     }
   };
   Session.prototype._applyActive = function (id) {
+    // fire onTurn ONLY when the active seat actually changes. The host re-sends GRANT to a slow
+    // player on its move-timeout; without this guard a re-GRANT would re-run the client's beginTurn
+    // and reset their dice/throws mid-turn. A reloaded client has activeId=null, so it still fires.
+    var changed = this.activeId !== id;
     this.activeId = id;
-    if (this.cb.onTurn) this.cb.onTurn(id, id === this.myId);
+    if (changed && this.cb.onTurn) this.cb.onTurn(id, id === this.myId);
   };
   Session.prototype._rxState = function (s) {
     if (s.kind === 'snapshot') {

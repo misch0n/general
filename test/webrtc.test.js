@@ -326,3 +326,21 @@ test('live spectating: the active player\'s action reaches the host AND the othe
   assert.strictEqual(got.c1[got.c1.length - 1].playerId, host.myId, 'host action reaches clients');
   assert.deepStrictEqual(got.c2[got.c2.length - 1].dice, [6, 6, 6, 2, 1]);
 });
+
+test('re-GRANT idempotency: the host re-granting a slow player does NOT re-fire onTurn', function () {
+  var bus = new StarBus();
+  var turns = [];
+  var host = new MP.Session({ transport: bus.transport(true), isHost: true, me: { name: 'H', color: '#ee0055', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  var c1 = new MP.Session({ transport: bus.transport(false), isHost: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+    callbacks: { onTurn: function (id, mine) { turns.push({ id: id, mine: mine }); } } });
+  host.openLobby(); c1.requestJoin(); bus.drain();
+  assert.ok(host.startGame()); bus.drain();
+  var before = turns.length, active = host.activeId;
+  // simulate the move-timeout retransmit: the host re-sends GRANT for the SAME active seat
+  host._grant(); bus.drain();
+  host._grant(); bus.drain();
+  assert.strictEqual(host.activeId, active, 'active seat unchanged by re-grants');
+  assert.strictEqual(turns.length, before, 'duplicate GRANTs for the same active player did not re-fire onTurn');
+});
