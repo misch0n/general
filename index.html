@@ -2078,7 +2078,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.19.0';
+  var APP_VERSION = '1.19.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -4386,7 +4386,7 @@ body.modal-open{ overflow:hidden; }
         var p = game && game.players[game.current];
         if (p && !p.isAI) p.selectKeep = newKeep;               // the change sticks to THIS player
         if (!p || p.owner || p.isAI) { settings.selectKeep = newKeep; saveSettings(); }  // owner's choice is also the persistent default
-        if (game) renderAll();
+        if (game) (expMode ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
       }
       renderKeepThrowTip();
     };
@@ -4400,7 +4400,7 @@ body.modal-open{ overflow:hidden; }
         var p = game && game.players[game.current];
         if (p && !p.isAI) p.diceBatch = nb;
         if (!p || p.owner || p.isAI) { settings.newDiceBatch = nb; saveSettings(); }
-        if (game) renderAll();
+        if (game) (expMode ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
       }
       renderKeepThrowTip();
     };
@@ -5392,7 +5392,7 @@ body.modal-open{ overflow:hidden; }
     // master switch for the goofy layer (off = core only; on enables
     // callouts, penalties, combo tooltips and bets). Rare-name titles are separate.
     { key: 'barracks', label: 'Сол и хранилки', onChange: function () {
-        if (game) renderAll();
+        if (game) (expMode ? expRenderAll : renderAll)();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
     // Облози — the wager flavour; its own switch now (used to ride on КАЗАРМА).
@@ -5405,7 +5405,7 @@ body.modal-open{ overflow:hidden; }
     { key: 'titles', label: 'Титли', preGameOnly: true, gameShared: true,
       sub: { key: 'titlePoints', label: 'Бонус точки', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
       onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
-    { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
+    { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); (expMode ? expRenderAll : renderAll)(); } } },
     // (the tap-to-throw / tap-to-keep flavour moved to the ? on the in-game fire button)
     // Глупости — ON = profanity (NSFW words allowed); OFF = censored to the SFW set
     { key: 'glupost', label: 'Глупости', onChange: function () {
