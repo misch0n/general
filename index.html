@@ -160,6 +160,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .die.fresh::after{ content:''; position:absolute; top:-3px; left:-3px; width:6px; height:6px; border-radius:50%; background:rgba(255,216,107,.8); }
 /* spectating: dice the active player is about to re-throw — a brief "leaving" accent (distinct from fresh) */
 .die.throwing{ transform:scale(.9); opacity:.62; border-color:#c46; box-shadow:0 0 0 2px rgba(204,68,102,.7), 0 0 12px rgba(204,68,102,.4); }
+/* spectating: a half-second pulsing gold border on just-thrown dice and the chosen category */
+.die.spec-pulse, .tile.spec-pulse{ animation:specPulse .25s ease-out 2; }
+@keyframes specPulse{ 0%{ box-shadow:0 0 0 0 rgba(232,195,86,.95); } 60%{ box-shadow:0 0 0 4px rgba(232,195,86,.5); } 100%{ box-shadow:0 0 0 0 rgba(232,195,86,0); } }
 /* throw-mode (select-to-throw): marked = the dice you're re-rolling — RED outline + small ✕ */
 .die.sel{ transform:translateY(-7px); border-color:#e0584a; box-shadow:0 0 0 2px #e0584a, 0 0 16px rgba(224,88,74,.55), 0 3px 0 rgba(0,0,0,.4); }
 .die.sel .reticle{ color:#f0a097; border-color:#e0584a; }
@@ -2283,10 +2286,14 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.46.0';
+  var APP_VERSION = '1.47.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.47.0', items: [
+      ['chg', 'Наблюдение по мрежа: между всяко действие на боеца (първи хвърл, преподреждане, записване) има пауза от ~2,5 сек, за да се проследи ходът.'],
+      ['new', 'Наблюдение: новохвърлените зарове и избраната графа примигват за половин секунда.'],
+      ['chg', 'Наблюдение: възможните комбинации с текущите зарове се показват и се обновяват при всяко преподреждане; новите зарове се подреждат според предпочитанието на наблюдателя (раздели/подреди).'] ] },
     { v: '1.46.0', items: [
       ['chg', 'Мрежа: бутоните са „ПОКАНИ“ / „ПРИСЪЕДИНИ СЕ“; добавен бутон „Назад“; в изгледа за присъединяване — поставяне (ляво) и камера (дясно) с нови икони.'],
       ['chg', 'Заглавия с нарисувани икони: „Правила“ (книга), „Военен архив“, „Настройки“ (зъбчато колело), „Изчисти архива“ (кошче) — без емоджита.'],
@@ -4442,9 +4449,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   // ---- spectating: a calm, QUEUED replay of the watched player's actions (~2s apart) so a fast
   // player doesn't blur past watchers. New dice are grouped/accented by THE WATCHER's own settings;
   // a reroll first highlights the dice being thrown (distinct accent) for a beat, then reveals them.
-  var SPEC_GAP = 2000, SPEC_HILITE = 500;
+  var SPEC_GAP = 2500, SPEC_HILITE = 500;
   var specQueue = [], specBusy = false, specTimer = null, specEpoch = 0;
-  var specPid = null, specRollNo = 0, specPairs = [], specThrow = null;
+  var specPid = null, specRollNo = 0, specPairs = [], specThrow = null, specPulseOn = false;
   function resetSpecPlay() { specEpoch++; specQueue = []; specBusy = false; clearTimeout(specTimer); specTimer = null; specPid = null; specRollNo = 0; specPairs = []; specThrow = null; }
   function netSpectate(a) {
     if (!netMode || !game) return;
@@ -4467,10 +4474,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     var ep = specEpoch;
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
     if (a.commit) { specSetDice(a); specThrow = null; renderAll(); if (a.category != null) { var ck = catKeyAt(a.category); if (ck) flashTile(ck); } done(); return; }
-    if (!specPairs.length || a.mask === 0) { specThrow = null; specSetDice(a); renderAll(); shakeDice(); done(); return; }   // turn's first roll
-    // a reroll: HIGHLIGHT the dice being thrown on the current frame, then reveal the new batch
+    if (!specPairs.length || a.mask === 0) { specThrow = null; specSetDice(a); specPulseOn = true; renderAll(); specPulseOn = false; shakeDice(); done(); return; }   // turn's first roll
+    // a reroll: HIGHLIGHT the dice being thrown on the current frame, then reveal the new batch (pulsing)
     specThrow = specThrownPositions(a); renderAll();
-    setTimeout(function () { if (ep !== specEpoch) return; specThrow = null; specSetDice(a); renderAll(); shakeDice(); done(); }, SPEC_HILITE);
+    setTimeout(function () { if (ep !== specEpoch) return; specThrow = null; specSetDice(a); specPulseOn = true; renderAll(); specPulseOn = false; shakeDice(); done(); }, SPEC_HILITE);
   }
   // which CURRENTLY-shown dice are being re-thrown — derived from the values that survive the reroll
   function specThrownPositions(a) {
@@ -5098,8 +5105,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       var sel = !watching && !fx.dice && fx.diceKeep == null && selected[i];
       var fresh = !batchMode && !fx.dice && fx.diceKeep == null && diceNew[i];   // freshly thrown — gold accent (off in batch mode)
       var throwing = watching && specThrow && specThrow[i];                       // watcher: dice about to be re-thrown
+      var specNew = specPulseOn && diceGen.length === shown.length && diceGen[i] === specRollNo;   // watcher: pulse the just-thrown dice
       var keepMode = activeKeep();
-      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '') + (throwing ? ' throwing' : '');
+      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '') + (throwing ? ' throwing' : '') + (specNew ? ' spec-pulse' : '');
       b.disabled = !interactive;
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
@@ -5321,12 +5329,17 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   var turnTimer = null;
   function flashTile(key) {
-    // tiles aren't id-keyed; locate the committed tile by its position in its section
-    var cat = G.CATEGORIES.filter(function (c) { return c.key === key; })[0];
+    // tiles aren't id-keyed; locate the committed tile by its position in its section (per ruleset)
+    var cats = sumCats(), cat = cats.filter(function (c) { return c.key === key; })[0]; if (!cat) return;
     var host = cat.group === 'upper' ? $('boardUpper') : $('boardLower');
-    var within = G.CATEGORIES.filter(function (c) { return c.group === cat.group; }).map(function (c) { return c.key; }).indexOf(key);
+    var within = cats.filter(function (c) { return c.group === cat.group; }).map(function (c) { return c.key; }).indexOf(key);
     var el = host.children[within];
-    if (el) el.classList.add('flash');
+    if (!el) return;
+    el.classList.add('flash');
+    if (netWatching()) {   // spectator: a clear pulsing border on the chosen category
+      el.classList.add('spec-pulse');
+      el.addEventListener('animationend', function h() { el.classList.remove('spec-pulse'); el.removeEventListener('animationend', h); });
+    }
   }
   function endTurn() {
     if (G.isGameOver(game)) { endGame(); return; }
