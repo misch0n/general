@@ -2096,7 +2096,7 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.20.0';
+  var APP_VERSION = '1.20.1';
   (function () { var av = $('appVer'); if (av) av.textContent = 'v' + APP_VERSION; })();
   // positive toggles. Титли (rare-name notifications) is its own switch, independent
   // of КАЗАРМА; titlePoints (extra points from rare names) is its hidden sub-toggle.
@@ -6944,8 +6944,16 @@ body.modal-open{ overflow:hidden; }
   // ============================================================ ARCHIVE / HISTORY
   var viewingHistory = false, histSnapshot = null, dossierCtx = null, currentHistRec = null;
 
-  function recTotal(sp) { if (typeof sp.pts === 'number') return sp.pts; var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0); }
-  function recPlacement(rec, i) { var me = recTotal(rec.players[i]); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p) > me) ahead++; }); return ahead + 1; }
+  function recIsExp(rec) { return !!(rec && rec.ruleset === 'experimental'); }
+  // per-player total, ALWAYS computed per the record's ruleset (so scoring-rule fixes — e.g. the
+  // minus −50 — apply to old saves too, and the entry matches the details view). The stored `pts`
+  // is only a fallback for legacy standard records.
+  function recTotal(sp, isExp) {
+    if (isExp) return G.playerTotalExp(sp);   // ruleset-aware: number part (incl. −50 if negative) + combos
+    if (typeof sp.pts === 'number') return sp.pts;
+    var t = 0; G.CATEGORIES.forEach(function (c) { var v = sp.scores[c.key]; if (typeof v === 'number') t += v; }); return t + (sp.bonus || 0);
+  }
+  function recPlacement(rec, i) { var ex = recIsExp(rec), me = recTotal(rec.players[i], ex); var ahead = 0; rec.players.forEach(function (p, j) { if (j !== i && recTotal(p, ex) > me) ahead++; }); return ahead + 1; }
   function recOwnerIdx(rec) { if (rec.ownerSkipped) return -1; for (var i = 0; i < rec.players.length; i++) if (rec.players[i].owner) return i; return 0; } // -1: owner skipped; legacy: seat 0
   // a game counts toward victories / win-rate only when it had MORE THAN ONE player and a
   // known placement. Single-player games (regular or manual) are unranked — they still feed
@@ -7254,7 +7262,7 @@ body.modal-open{ overflow:hidden; }
       var oi = recOwnerIdx(r), o = r.players[oi];
       var ana = isExp ? ((r.moveLog && r.moveLog[oi]) ? (r.manualMode ? analyzeManualGameExp(r.moveLog[oi]) : analyzeGameExp(r.moveLog[oi])) : null) : analyzeRec(r, oi);
       var rk = gameRanking(r);
-      var item = { rec: r, ana: ana, total: recTotal(o), ranked: rk.ranked, place: rk.place, n: r.players.length,
+      var item = { rec: r, ana: ana, total: recTotal(o, isExp), ranked: rk.ranked, place: rk.place, n: r.players.length,
                general: (o.scores.general || 0) > 0, name: o.name, manual: !!r.manualMode };
       if (isExp) { item.secUpper = G.upperStateExp(o.scores).contribution; item.secLower = 0; CATS.forEach(function (c) { if (c.group === 'lower' && typeof o.scores[c.key] === 'number') item.secLower += o.scores[c.key]; }); }
       return item;
@@ -7604,10 +7612,11 @@ body.modal-open{ overflow:hidden; }
     var html = chip + playFilterHeaderHTML(games.length);
     games.slice(0, histShown).forEach(function (rec) {
       var oi = recOwnerIdx(rec), skipped = oi < 0, excluded = !!rec.excluded;
-      var top = rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0];
+      var recEx = recIsExp(rec);
+      var top = rec.players.slice().sort(function (a, b) { return recTotal(b, recEx) - recTotal(a, recEx); })[0];
       var ptsPlayer = skipped ? top : rec.players[oi];
       var rk = gameRanking(rec);                                  // single-player games are unranked (no place / crown)
-      var oTotal = recTotal(ptsPlayer), place = rk.ranked ? rk.place : null;
+      var oTotal = recTotal(ptsPlayer, recEx), place = rk.ranked ? rk.place : null;
       var pct = !excluded && !skipped && !rec.players[oi].isAI ? ownerScorePercentile(ownerScores, oTotal) : null;
       // only flag genuinely standout games: top 5 / 10 / 15 % (bucketed); nothing below that
       var topPct = pct == null ? null : 100 - pct;
@@ -7727,9 +7736,9 @@ body.modal-open{ overflow:hidden; }
   function dayStart(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
   // representative score of a battle: the owner's total (or the top score if skipped)
   function recRepScore(rec) {
-    var oi = recOwnerIdx(rec);
-    var p = oi < 0 ? rec.players.slice().sort(function (a, b) { return recTotal(b) - recTotal(a); })[0] : rec.players[oi];
-    return recTotal(p);
+    var oi = recOwnerIdx(rec), ex = recIsExp(rec);
+    var p = oi < 0 ? rec.players.slice().sort(function (a, b) { return recTotal(b, ex) - recTotal(a, ex); })[0] : rec.players[oi];
+    return recTotal(p, ex);
   }
   // aggregate EVERY archived battle (all rulesets) by calendar day
   function calData() {
@@ -8383,7 +8392,7 @@ body.modal-open{ overflow:hidden; }
     var games = loadHistory().slice().reverse();   // newest first
     if (!games.length) { $('cpList').innerHTML = '<div class="cp-empty">Архивът е празен.</div>'; }
     else $('cpList').innerHTML = games.map(function (g) {
-      var top = g.players && g.players.length ? Math.max.apply(null, g.players.map(function (p) { return recTotal(p); })) : 0;
+      var top = g.players && g.players.length ? Math.max.apply(null, g.players.map(function (p) { return recTotal(p, recIsExp(g)); })) : 0;
       return '<label class="cp-row"><input type="checkbox" data-id="' + esc(g.id) + '"' + (cpSel[g.id] ? ' checked' : '') + '>'
         + '<span class="cp-when">' + esc(fmtDate(g.ts)) + ' · ' + esc(fmtTime(g.ts)) + '</span>'
         + '<span class="cp-meta">' + (g.players ? g.players.length : '?') + ' бойци</span>'
