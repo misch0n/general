@@ -2116,10 +2116,14 @@ body.modal-open{ overflow:hidden; }
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.21.2';
+  var APP_VERSION = '1.22.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.22.0', items: [
+      ['new', '„С минуси“ по мрежа (със зарове): хостът прави играта, всички играят по неговите правила.'],
+      ['fix', 'История: мрежовите игри „с минуси“ се записват с правилния правилник.'],
+      ['chg', '„С минуси“ вече се избира и при „по мрежа“ (на отчет по мрежа предстои).'] ] },
     { v: '1.21.1', items: [
       ['chg', 'В обобщението: „+Xт умение / +Yт късмет“ — за да е ясно, че са точки.'],
       ['new', '„С минуси“: точките на числовата част се натискат — обяснение за −50 при минус.'] ] },
@@ -2641,17 +2645,12 @@ body.modal-open{ overflow:hidden; }
   function syncStartWhereSel() {
     $('startWhereSel').querySelectorAll('.ssel-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-net') === '1') === netPlay); });
     // the play buttons keep their labels regardless of device/network — only the workflow they trigger changes
-    // minus-over-network gameplay isn't wired yet → over the net, only „без минуси“ for now
-    if (netPlay && settings.ruleset === 'experimental') { settings.ruleset = 'standard'; saveSettings(); syncRuleset(); }
-    var expOpt = $('startRuleSel').querySelector('.ssel-opt[data-rs="experimental"]');
-    if (expOpt) { expOpt.classList.toggle('rs-off', netPlay); expOpt.title = netPlay ? 'С минуси по мрежа — очаквай скоро (засега само локално)' : ''; }
     syncStartRuleSel();
-    $('modeHint').textContent = netPlay ? 'По мрежа: хостът дава код, останалите се присъединяват. „С минуси“ по мрежа предстои.'
+    $('modeHint').textContent = netPlay ? 'По мрежа: хостът дава код, останалите се присъединяват. „С минуси“ работи по мрежа само със зарове (не на отчет засега).'
       : 'Полеви отчет: ръчно вписване на точки без зарове — за игра на маса.';
   }
   $('startRuleSel').querySelectorAll('.ssel-opt').forEach(function (b) {
     b.onclick = function () {
-      if (netPlay && b.getAttribute('data-rs') === 'experimental') return;   // disabled over the net for now
       settings.ruleset = b.getAttribute('data-rs'); saveSettings(); syncStartRuleSel(); syncRuleset();
     };
   });
@@ -2659,7 +2658,12 @@ body.modal-open{ overflow:hidden; }
     b.onclick = function () { netPlay = b.getAttribute('data-net') === '1'; syncStartWhereSel(); };
   });
   // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
-  function startNetFlow(manual) { netManual = manual; openNetModal('webrtc', manual); }
+  function startNetFlow(manual) {
+    // minus over the net is wired for REGULAR (dice) games; manual minus net is still pending
+    if (manual && selExp()) { $('setupErr').textContent = '„С минуси“ на отчет по мрежа още не е готово — играй „без минуси“ на отчет, или „с минуси“ със зарове.'; return; }
+    $('setupErr').textContent = '';
+    netManual = manual; openNetModal('webrtc', manual);
+  }
   $('startGame').onclick = function () { if (netPlay) startNetFlow(false); else startFromSetup(false); };
   $('startManual').onclick = function () { if (netPlay) startNetFlow(true); else startFromSetup(true); };
 
@@ -2806,7 +2810,7 @@ body.modal-open{ overflow:hidden; }
     Object.keys(scores).forEach(function (idStr) {
       var seat = netOrder.indexOf(+idStr); if (seat < 0) return;
       var pl = game.players[seat], cells = scores[idStr];
-      Object.keys(cells).forEach(function (cIx) { var key = G.CATEGORIES[+cIx] && G.CATEGORIES[+cIx].key; if (key && !G.isCategoryFilled(pl, key)) pl.scores[key] = cells[cIx]; });
+      Object.keys(cells).forEach(function (cIx) { var key = catKeyAt(+cIx); if (key && !G.isCategoryFilled(pl, key)) pl.scores[key] = cells[cIx]; });
     });
     syncNetDropped(); renderAll();
   }
@@ -2841,7 +2845,7 @@ body.modal-open{ overflow:hidden; }
     netShow('prep');
     renderSettSummary(net.settingsBits);
     $('netHostTools').classList.toggle('hidden', !net.isHost);
-    $('netAddAI').classList.toggle('hidden', net.manual);   // no AI seats in a manual game
+    $('netAddAI').classList.toggle('hidden', net.manual || net.exp);   // no AI seats in a manual game (or minus net — exp AI scoring isn't wired)
     $('netReady').classList.toggle('hidden', net.isHost);   // host has no ready button — it starts
     $('netStart').classList.toggle('hidden', !net.isHost);
     renderNetMeCard(); renderNetPrep();
@@ -3799,7 +3803,9 @@ body.modal-open{ overflow:hidden; }
       pl.owner = (m.id === localPid);                           // ★ each device owns ITS OWN player (history attribution)
       return pl;
     });
-    game = G.createGame(players); game.ownerSkipped = false;
+    var exp = netRuleset() === 'experimental';
+    game = (exp ? X.createGame(players) : G.createGame(players)); game.ownerSkipped = false;
+    game.ruleset = exp ? 'experimental' : 'standard';          // drives sumExp() → exp board/scoring over the net
     manualMode = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
     moveLog = players.map(function () { return []; });
     $('netModal').classList.add('hidden'); $('setup').classList.add('hidden');
@@ -3867,7 +3873,7 @@ body.modal-open{ overflow:hidden; }
     selected = [0, 1, 2, 3, 4].map(function (i) { return !!(a.sel & (1 << i)); });
     specKeepMode = (a.keep != null) ? !!a.keep : null;
     renderAll();
-    if (a.commit) { if (a.category != null) flashTile(G.CATEGORIES[a.category].key); }
+    if (a.commit) { if (a.category != null) { var ck = catKeyAt(a.category); if (ck) flashTile(ck); } }
     else if (!a.selOnly) { shakeDice(); }   // a pure selection change shouldn't re-shake the tray
   }
   // tap your own board while spectating → see your usual during-turn screen (read-only preview)
@@ -3898,8 +3904,9 @@ body.modal-open{ overflow:hidden; }
     net = newSessionWith(nullTp, true); localPid = MP.HOST_ID;
     net.openLobby();
     net.roster.push({ id: net._nextId(), eph: 9001, name: 'Редник Тъпан', color: '#2e9e5b', gender: 'm', ready: true });
-    net.roster.push({ id: net._nextId(), eph: 9002, name: 'Ефрейтор Мечка', color: '#6a52c0', gender: 'f', ready: false });
-    net.addAI({ name: 'Сержант Болт', color: '#e07a2e', gender: 'n' });
+    net.roster.push({ id: net._nextId(), eph: 9002, name: 'Ефрейтор Мечка', color: '#6a52c0', gender: 'f', ready: true });
+    if (!net.exp) net.addAI({ name: 'Сержант Болт', color: '#e07a2e', gender: 'n' });   // exp AI scoring isn't wired
+
     netShow('scan'); renderNetRoster();
     net.startPrep(settingsBits());   // → onPrep → enterNetPrep (the preparation screen)
   }
@@ -3934,7 +3941,7 @@ body.modal-open{ overflow:hidden; }
     throwsLeft = ROLLS - 1; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
     dice = G.rollAll(); sortDice();
     rollNo = 1; diceGen = dice.map(function () { return 1; });
-    curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+    curLog = (evReady && !sumExp()) ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     renderAll(); shakeDice(); showOrder(p);
     netSendAct();   // clients watch the host-driven AI seat roll
     runAiTurn();
@@ -3943,8 +3950,8 @@ body.modal-open{ overflow:hidden; }
     if (!netMode || !game) return;
     if (mv.playerId === localPid) return;                        // my own move is already on my board
     var seat = netOrder.indexOf(mv.playerId); if (seat < 0) return;
-    var pl = game.players[seat], key = G.CATEGORIES[mv.category].key;
-    if (!G.isCategoryFilled(pl, key)) pl.scores[key] = mv.score; // mirror the remote score (no local dice for them)
+    var pl = game.players[seat], key = catKeyAt(mv.category);
+    if (key && !G.isCategoryFilled(pl, key)) pl.scores[key] = mv.score; // mirror the remote score (no local dice for them)
     renderAll();
   }
   // host-only in-game control: flip a (dropped) player to AI play, or hand it back
@@ -4012,6 +4019,11 @@ body.modal-open{ overflow:hidden; }
   var netActiveId = null, specSelf = false, specAct = null;   // spectating: who's playing, am I previewing my own board, last action
   var specKeepMode = null;   // while watching: the active player's keep/throw flavour (null = use my own)
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
+  // experimental category space (for net minus games — the move protocol indexes into THIS list)
+  var CAT_INDEX_EXP = {}, CAT_KEYS_EXP = G.CATEGORIES_EXP.map(function (c) { return c.key; }); G.CATEGORIES_EXP.forEach(function (c, i) { CAT_INDEX_EXP[c.key] = i; });
+  // ruleset-aware index↔key for the net move protocol (standard path unchanged when not sumExp())
+  function catIndexOf(key) { return (sumExp() ? CAT_INDEX_EXP : CAT_INDEX)[key]; }
+  function catKeyAt(i) { return (sumExp() ? CAT_KEYS_EXP : CAT_KEYS)[i]; }
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
   var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face (the 5-dice entry)
@@ -4103,7 +4115,7 @@ body.modal-open{ overflow:hidden; }
       throwsLeft = ROLLS - 1;
       dice = G.rollAll(); sortDice();
       rollNo = 1; diceGen = dice.map(function () { return 1; });
-      curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+      curLog = (evReady && !sumExp()) ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
       renderAll(); shakeDice(); showOrder(p);
       runAiTurn();
     } else {
@@ -4126,7 +4138,7 @@ body.modal-open{ overflow:hidden; }
     awaitingRoll = false;
     dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
     rollNo = 1; diceGen = dice.map(function () { return 1; });   // first throw: every die is generation 1
-    curLog = evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+    curLog = (evReady && !sumExp()) ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
     clearRoast();
     renderAll();
     shakeDice();
@@ -4149,9 +4161,13 @@ body.modal-open{ overflow:hidden; }
 
   // ---------- render ----------
   function renderAll() {
-    renderHeader(); renderPills(); renderBoard();
+    renderHeader(); renderPills();
+    // net minus games run the EXPERIMENTAL sheet (deviation rows + два чифта + number bar); the dice
+    // tray, fire button and net spectating stay shared. Local exp uses expRenderAll, so it's untouched.
+    if (sumExp()) { expRenderBoard(); $('expNumBar').classList.remove('hidden'); }
+    else { renderBoard(); $('expNumBar').classList.add('hidden'); }
     if (manualMode) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
-    renderDice(); renderFire(); renderHint(); syncBottomPad();
+    renderDice(); renderFire(); (sumExp() ? expRenderHint : renderHint)(); syncBottomPad();
   }
 
   // §1 live "best move" hint (toggle; off for serious play)
@@ -4231,7 +4247,7 @@ body.modal-open{ overflow:hidden; }
     var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
     $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
     $('curNumPart').classList.add('hidden');   // number-part chip is experimental-only
-    $('curRound').innerHTML = game.round + '<span class="rsub">/' + G.CATEGORIES.length + '</span>';   // which turn of the game
+    $('curRound').innerHTML = game.round + '<span class="rsub">/' + (sumExp() ? G.CATEGORIES_EXP.length : G.CATEGORIES.length) + '</span>';   // which turn of the game
     $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
@@ -4623,7 +4639,7 @@ body.modal-open{ overflow:hidden; }
       // FREE-FOR-ALL: record + broadcast my entry, then reset for my next category (no turn handover)
       if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: dice.slice(), category: key });
       flashTile(key);
-      if (net) net.submitMove({ category: CAT_INDEX[key], score: value, rolls: [dice.slice()], keeps: [] });
+      if (net) net.submitMove({ category: catIndexOf(key), score: value, rolls: [dice.slice()], keeps: [] });
       locked = true; renderAll();
       if (G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming, same as local
       setTimeout(beginManualEntry, END_DELAY);
@@ -4632,9 +4648,9 @@ body.modal-open{ overflow:hidden; }
     if (netMode) {
       // broadcast my completed turn; the host's STATE + next GRANT drive the rest
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
-      netSendAct({ commit: true, category: CAT_INDEX[key], value: value });   // spectators see the category go in
+      netSendAct({ commit: true, category: catIndexOf(key), value: value });   // spectators see the category go in
       if (netAiActiveId == null && G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming on my own commit
-      var mv = { category: CAT_INDEX[key], score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
+      var mv = { category: catIndexOf(key), score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
       // hold the committed board a beat (comprehension) before the move propagates and the turn passes
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }  // host injects the AI seat's move
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
@@ -4765,12 +4781,24 @@ body.modal-open{ overflow:hidden; }
       // ОПА can rewind this; the turn is logged for category-only analytics (mask BEFORE the pick)
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
       if (exactReady) moveLog[game.current].push({ mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true });
-    } else if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
+    } else if (curLog && !netMode) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
+    var committed = p.scores[key];
+    // ---- net minus (regular): broadcast my completed turn; the host's STATE + next GRANT drive the rest ----
+    if (netMode && !manualMode) {
+      if (tut) tutEvent('commit');
+      var log = curLog; curLog = null;
+      locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
+      netSendAct({ commit: true, category: catIndexOf(key), value: committed });   // spectators see the category go in
+      var mv = { category: catIndexOf(key), score: committed, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [] };
+      if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }
+      else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
+      return;
+    }
     if (tut) tutEvent('commit');
     locked = true; expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
-    var committed = p.scores[key], delay = END_DELAY;
+    var delay = END_DELAY;
     if (!manualMode && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
     turnTimer = setTimeout(expEndTurn, delay);
   }
@@ -6108,6 +6136,7 @@ body.modal-open{ overflow:hidden; }
     archiveGame({
       id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4),
       ts: Date.now(),
+      ruleset: (game && game.ruleset) || 'standard',   // net minus games archive as experimental → correct history totals
       manualMode: manualMode,
       ownerSkipped: !!(game && game.ownerSkipped),
       ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
