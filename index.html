@@ -2382,10 +2382,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.49.3';
+  var APP_VERSION = '1.49.4';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.49.4', items: [
+      ['new', 'Статистика: при старт на мрежова игра се отчита и броят живи играчи в лобито (1–5, без AI).'] ] },
     { v: '1.49.3', items: [
       ['chg', 'Наблюдение по мрежа: при записване графата веднага се показва като попълнена (а не само да примигва).'] ] },
     { v: '1.49.2', items: [
@@ -4567,6 +4569,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     game.ruleset = exp ? 'experimental' : 'standard';          // drives sumExp() → exp board/scoring over the net
     manualMode = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
     trackGame('start');
+    // lobby size by HUMAN players (AI seats excluded), bucketed 1–5
+    var humans = roster.filter(function (m) { return !m.isAI; }).length;
+    track('net-start-' + Math.max(1, Math.min(5, humans)) + 'p');
     moveLog = players.map(function () { return []; });
     $('netModal').classList.add('hidden'); $('setup').classList.add('hidden');
     $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
