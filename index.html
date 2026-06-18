@@ -571,6 +571,7 @@ body.modal-open{ overflow:hidden; }
 .rdie{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:3px; background:#6c6450; color:#cfc7ad; opacity:.5;
   font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
 .rdie.kept{ background:#d8cfa8; color:var(--gen-pip); opacity:1; box-shadow:0 0 0 1px var(--gen-brass); }
+.rdie.combo{ width:17px; height:17px; font-size:11px; }   /* dice that form the scored combo, on the final roll */
 .evrolls .rarrow{ color:var(--gen-disabled); }
 .evrolls .rdie-sep{ width:6px; }   /* divider between kept and freshly-rolled dice (split view) */
 .evrolls.collapsed{ display:none; }   /* a turn's dice line is folded away until its row is tapped */
@@ -2382,10 +2383,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.49.4';
+  var APP_VERSION = '1.49.5';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.49.5', items: [
+      ['chg', 'Ход по ход: задържаните зарове винаги са осветени, а изхвърлените — затъмнени; подреждането следва само твоята настройка „подреди/раздели“. На финалния ред заровете, които правят комбинацията, са малко по-големи.'] ] },
     { v: '1.49.4', items: [
       ['new', 'Статистика: при старт на мрежова игра се отчита и броят живи играчи в лобито (1–5, без AI).'] ] },
     { v: '1.49.3', items: [
@@ -7754,30 +7757,34 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   function nBad(v, d) { return '<b class="nn">' + (d != null ? v.toFixed(d) : v) + '</b>'; }                       // a loss (red)
   function nNeut(v) { return '<b class="nu">' + v + '</b>'; }                                                       // neutral (brass)
 
-  // compact render of a turn's 1–3 rolls. Kept dice are highlighted: on each
-  // non-final roll the dice carried forward (keeps[i]) light up; the final roll
-  // (and any single-roll turn) lights up in full — that's the committed hand.
+  // compact render of a turn's 1–3 rolls. The KEPT dice are always highlighted; on each
+  // non-final roll the dice carried forward (keeps[i]) light up, the rest grey out. The final
+  // roll (and any single-roll turn) lights up in full — that's the committed hand — and the dice
+  // that FORM the scored combo are drawn slightly bigger. Ordering follows the owner's
+  // „нови зарове" preference (order vs split); nothing else is taken from settings.
   function turnDiceHTML(pi, td, manual, collapsed) {
     var log = moveLog[pi] && moveLog[pi][td.turn];
     var seq = manual ? (log && log.dice ? [log.dice] : (td.finalDice ? [td.finalDice] : []))
                      : (log && log.rolls ? log.rolls : (td.finalDice ? [td.finalDice] : []));
     if (!seq.length) return '';
-    var keeps = (log && log.keeps) || [], rec = currentHistRec;
-    // highlight the dice this game's flavour marks (keep-mode → held; throw-mode → re-thrown),
-    // and order/split each roll per the viewer's „нови зарове" preference — like the step replay
-    var keepMode = rec ? !!rec.selectKeep
-      : (game && game.players[pi] && typeof game.players[pi].selectKeep === 'boolean' ? game.players[pi].selectKeep : !!settings.selectKeep);
-    var batchMode = !!settings.newDiceBatch;
+    var keeps = (log && log.keeps) || [];
+    var batchMode = !!settings.newDiceBatch;   // order vs split — the owner's display preference
+    var finalDice = seq[seq.length - 1] || [];
+    // the dice that build the scored combo (skip forfeits/0): a consumable multiset of values
+    var comboVals = (td.score !== 0 && td.category && G.keepToward) ? (G.keepToward(td.category, finalDice) || []).slice() : null;
     var rolls = seq.map(function (d, i) {
       var last = i === seq.length - 1, km = last ? null : (keeps[i] || []);
       var arr = (d || []).map(function (v, j) { return { v: v, kept: km ? !!km[j] : true }; });
       if (batchMode && !last) arr.sort(function (x, y) { return (y.kept - x.kept) || (x.v - y.v); });   // split: kept group → new group
       else arr.sort(function (x, y) { return x.v - y.v; });                                              // order: by value
+      var pool = last && comboVals ? comboVals.slice() : null;   // per-roll consumable copy
       var out = '', prev = null;
       arr.forEach(function (o) {
         if (batchMode && !last && prev !== null && prev !== o.kept) out += '<span class="rdie-sep" aria-hidden="true"></span>';
-        var hl = last ? true : (keepMode ? o.kept : !o.kept);
-        out += '<span class="rdie' + (hl ? ' kept' : '') + '">' + o.v + '</span>';
+        var hl = last || o.kept;   // kept dice always highlighted; the final hand lights up in full
+        var big = false;
+        if (pool) { var k = pool.indexOf(o.v); if (k >= 0) { pool.splice(k, 1); big = true; } }   // a combo die on the final roll
+        out += '<span class="rdie' + (hl ? ' kept' : '') + (big ? ' combo' : '') + '">' + o.v + '</span>';
         prev = o.kept;
       });
       return '<span class="rroll' + (last ? ' last' : '') + '">' + out + '</span>';
