@@ -2286,10 +2286,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.47.1';
+  var APP_VERSION = '1.47.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.47.2', items: [
+      ['chg', 'Присъединяване: бутонът „Постави“ проверява клипборда — приема само код от точно 6 букви и цифри, иначе показва, че копираният код не е правилен.'] ] },
     { v: '1.47.1', items: [
       ['fix', 'Игра с минуси: записаните минус-точки на горния ред са с по-наситен, по-тъмночервен оттенък — вече се четат по-лесно.'] ] },
     { v: '1.47.0', items: [
@@ -3943,9 +3945,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (netKind !== 'webrtc') return;
     if (!(navigator.clipboard && navigator.clipboard.readText)) { netChooseMsg('⚠ Браузърът не дава достъп до клипборда — постави ръчно.'); return; }
     navigator.clipboard.readText().then(function (t) {
-      var code = extractGameCode(t);
-      if (code) { $('netCodeInput').value = code; flashCodeGreen($('netCodePaste')); }
-      else netChooseMsg('⚠ В клипборда няма код за игра.');
+      // sanitize: keep only letters/digits — the code must be exactly six of them
+      var code = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (/^[A-Z0-9]{6}$/.test(code)) { $('netCodeInput').value = code; netChooseMsg(''); flashCodeGreen($('netCodePaste')); }
+      else netChooseMsg('⚠ Копираният код не е правилен — трябва да е 6 букви и цифри.');
     }).catch(function () { netChooseMsg('⚠ Нямам достъп до клипборда — постави ръчно.'); });
   };
   // leave the join sub-view, back to the host/join picker
