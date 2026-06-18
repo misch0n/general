@@ -252,6 +252,18 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
   letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35);
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* press-and-hold = secret dev unlock */
 .setup-title.dev-on{ cursor:pointer; color:var(--gen-brass-bright); text-shadow:0 2px 0 #000, 0 0 22px rgba(232,195,86,.55); }   /* unlocked: tap opens the dev panel */
+/* the second letter „Е" of the title is a CSS-drawn glyph that doubles as a QR-scan mark — three
+   finder corners folded into the letter's own corners. Tapping it pops the page QR (scan to join). */
+.setup-title .qre{ position:relative; display:inline-block; width:1em; height:1em; font-size:.68em;
+  vertical-align:-.07em; color:currentColor; cursor:pointer; filter:drop-shadow(0 2px 0 #000); }   /* match the title's drop shadow */
+.setup-title .qre::before, .setup-title .qre::after{ content:''; position:absolute; }
+.setup-title .qre::before{ left:.12em; top:.12em; width:.1em; height:.76em; background:currentColor; }   /* spine */
+.setup-title .qre::after{ left:.12em; top:.12em; width:.72em; height:.1em; background:currentColor; }    /* top arm (full) */
+.setup-title .qre s{ position:absolute; left:.12em; top:.45em; width:.46em; height:.1em; background:currentColor;
+  box-shadow:0 .33em 0 currentColor; }                                                                   /* mid + bottom (short) */
+.setup-title .qre b{ position:absolute; z-index:3; width:.34em; height:.34em; border:.065em solid currentColor; }
+.setup-title .qre b::before{ content:''; position:absolute; inset:.055em; background:currentColor; }     /* finder centre */
+.setup-title .qre b.tl{ left:0; top:0; } .setup-title .qre b.tr{ right:0; top:0; } .setup-title .qre b.bl{ left:0; bottom:0; }
 /* the title is centred on the screen; the hamburger is overlaid on the right (absolute) so it
    never pushes the title off-centre — it's positioned AFTER the title has centred itself */
 .setup-titlerow{ --ttl:42px; position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 4px;
@@ -1614,7 +1626,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     <!-- header: always visible — title, ruleset selector, settings -->
     <header class="setup-header">
       <div class="setup-titlerow">
-        <h1 id="setupTitle" class="setup-title">ГЕНЕРАЛ</h1>
+        <h1 id="setupTitle" class="setup-title">Г<span id="qrLetter" class="qre" role="button" tabindex="0" aria-label="Е — покажи QR код за играта" title="Покажи QR код за играта"><s></s><b class="tl"></b><b class="tr"></b><b class="bl"></b></span>НЕРАЛ</h1>
       </div>
       <!-- ruleset picker (underline-style, like the in-game keep/throw chooser) -->
       <div class="ssel" id="startRuleSel">
@@ -2232,6 +2244,18 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   </div>
 </div>
 
+<!-- tap the „Е" in the title: a QR of this page so a friend can scan and open the game --><div id="qrShareModal" class="overlay hidden">
+  <div class="modal" style="max-width:300px;text-align:center">
+    <h2>Сканирай и играй</h2>
+    <p class="ht" style="margin-top:0">Дай на приятел да сканира — отваря играта на телефона му.</p>
+    <div class="netcodeqr" id="qrShareBox"></div>
+    <p class="ht" id="qrShareUrl" style="word-break:break-all;font-size:11px;letter-spacing:0;text-transform:none"></p>
+    <div class="setup-actions">
+      <button id="qrShareClose" class="btn primary">Затвори</button>
+    </div>
+  </div>
+</div>
+
 <script src="game.js"></script>
 <script src="ev-table.js"></script>
 <script src="ev-table-exp.js"></script>
@@ -2319,10 +2343,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.47.5';
+  var APP_VERSION = '1.48.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.0', items: [
+      ['new', 'Буквата „Е" в заглавието е нарисувана като QR-знак — докосни я и изскача QR код към играта, който приятел може да сканира, за да я отвори.'] ] },
     { v: '1.47.5', items: [
       ['new', 'Анонимна статистика (GoatCounter, без бисквитки): посещения и събития за игрите — старт/край/отказ, мрежови грешки, хостване/присъединяване, въвеждане на код, прекъсване/възстановяване, изнасяне/внасяне.'] ] },
     { v: '1.47.4', items: [
@@ -6419,6 +6445,24 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   // unlock: build the editor data up front and mark the title as tappable (its tap opens the panel)
   function activateDev() { clearSelection(); settings.dev = true; buildDevCats(); $('setupTitle').classList.add('dev-on'); }
+
+  // the title's „Е" glyph: tap to pop a QR of THIS page (a friend scans it to open the game).
+  // its own pointer handlers swallow the event so the surrounding title's press-hold / dev-tap never fires.
+  function pageShareURL() { return location.origin + location.pathname; }
+  function openQrShare() {
+    var url = pageShareURL();
+    $('qrShareUrl').textContent = url;
+    $('qrShareModal').classList.remove('hidden');
+    renderCodeQRInto($('qrShareBox'), url);
+  }
+  (function () {
+    var lit = $('qrLetter'); if (!lit) return;
+    lit.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    lit.addEventListener('click', function (e) { e.stopPropagation(); openQrShare(); });
+    lit.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openQrShare(); } });
+  })();
+  $('qrShareClose').onclick = function () { $('qrShareModal').classList.add('hidden'); };
+  $('qrShareModal').onclick = function (e) { if (e.target === $('qrShareModal')) $('qrShareModal').classList.add('hidden'); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   // dev modal controls
   $('devClose').onclick = function () { closeDevModal(); };
