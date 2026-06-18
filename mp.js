@@ -68,6 +68,7 @@
   function Writer() { this.b = []; }
   Writer.prototype.u8 = function (v) { this.b.push(v & 0xff); return this; };
   Writer.prototype.u16 = function (v) { this.b.push((v >>> 8) & 0xff, v & 0xff); return this; };
+  Writer.prototype.i16 = function (v) { v = v | 0; if (v < -32768) v = -32768; else if (v > 32767) v = 32767; this.b.push((v >>> 8) & 0xff, v & 0xff); return this; };   // signed: minus-ruleset scores go negative
   Writer.prototype.bytes = function (arr) { for (var i = 0; i < arr.length; i++) this.b.push(arr[i] & 0xff); return this; };
   Writer.prototype.str = function (s, maxLen) { var e = utf8(String(s == null ? '' : s)); if (maxLen && e.length > maxLen) e = e.slice(0, maxLen); this.u8(e.length); this.bytes(e); return this; };
   Writer.prototype.str16 = function (s) { var e = utf8(String(s == null ? '' : s)); this.u16(e.length & 0xffff); this.bytes(e); return this; };   // longer payloads (e.g. a turn log)
@@ -75,6 +76,7 @@
   function Reader(bytes) { this.b = bytes; this.i = 0; }
   Reader.prototype.u8 = function () { return this.b[this.i++]; };
   Reader.prototype.u16 = function () { var v = (this.b[this.i] << 8) | this.b[this.i + 1]; this.i += 2; return v; };
+  Reader.prototype.i16 = function () { var v = this.u16(); return v >= 0x8000 ? v - 0x10000 : v; };   // sign-extend (back-compat: positive values read identically to u16)
   Reader.prototype.bytes = function (n) { var s = this.b.slice(this.i, this.i + n); this.i += n; return s; };
   Reader.prototype.str = function () { return utf8d(this.bytes(this.u8())); };
   Reader.prototype.str16 = function () { return utf8d(this.bytes(this.u16())); };
@@ -117,12 +119,12 @@
   // a roll/reroll (dice + remaining throws + which dice are freshly rolled) or a commit (category+value).
   function packAct(a) {
     var w = new Writer().u8(a.playerId).u8(a.commit ? 1 : 0).u8(a.throwsLeft || 0)
-      .u8(a.category == null ? 255 : a.category).u16(a.value || 0).u8(a.mask || 0);
+      .u8(a.category == null ? 255 : a.category).i16(a.value || 0).u8(a.mask || 0);
     for (var i = 0; i < 5; i++) w.u8((a.dice && a.dice[i]) || 0);
     return w.out();
   }
   function unpackAct(p) {
-    var r = new Reader(p), a = { playerId: r.u8(), commit: !!r.u8(), throwsLeft: r.u8(), category: r.u8(), value: r.u16(), mask: r.u8(), dice: [] };
+    var r = new Reader(p), a = { playerId: r.u8(), commit: !!r.u8(), throwsLeft: r.u8(), category: r.u8(), value: r.i16(), mask: r.u8(), dice: [] };
     if (a.category === 255) a.category = null;
     for (var i = 0; i < 5; i++) a.dice.push(r.u8());
     return a;
@@ -147,7 +149,7 @@
   function unpackGrant(p) { var r = new Reader(p); return { activeId: r.u8(), version: r.u16() }; }
   // MOVE — the active player's completed turn (category + rolls/keeps + score)
   function packMove(m) {
-    var w = new Writer().u8(m.playerId).u16(m.ackVersion).u8(m.category).u16(m.score);
+    var w = new Writer().u8(m.playerId).u16(m.ackVersion).u8(m.category).i16(m.score);
     var rolls = m.rolls || [], nr = rolls.length; w.u8(nr);
     for (var i = 0; i < nr; i++) for (var j = 0; j < 5; j++) w.u8((rolls[i][j] || 0));
     for (i = 0; i < nr - 1; i++) { var mask = 0, kp = (m.keeps && m.keeps[i]) || []; for (j = 0; j < 5; j++) if (kp[j]) mask |= (1 << j); w.u8(mask); }
@@ -155,7 +157,7 @@
     return w.out();
   }
   function unpackMove(p) {
-    var r = new Reader(p), m = { playerId: r.u8(), ackVersion: r.u16(), category: r.u8(), score: r.u16() };
+    var r = new Reader(p), m = { playerId: r.u8(), ackVersion: r.u16(), category: r.u8(), score: r.i16() };
     var nr = r.u8(); m.rolls = []; m.keeps = [];
     for (var i = 0; i < nr; i++) { var d = []; for (var j = 0; j < 5; j++) d.push(r.u8()); m.rolls.push(d); }
     for (i = 0; i < nr - 1; i++) { var mask = r.u8(), k = []; for (j = 0; j < 5; j++) k.push(!!(mask & (1 << j))); m.keeps.push(k); }
@@ -163,17 +165,17 @@
     return m;
   }
   // STATE — sub 0: delta (one applied move); sub 1: full snapshot (re-baseline on resync)
-  function packStateDelta(version, mv) { return new Writer().u8(0).u16(version).u8(mv.playerId).u8(mv.category).u16(mv.score).str16(mv.log || '').out(); }
+  function packStateDelta(version, mv) { return new Writer().u8(0).u16(version).u8(mv.playerId).u8(mv.category).i16(mv.score).str16(mv.log || '').out(); }
   function packStateSnapshot(version, scores) {
     var w = new Writer().u8(1).u16(version), ids = Object.keys(scores); w.u8(ids.length);
-    ids.forEach(function (id) { var cells = scores[id], cs = Object.keys(cells); w.u8(+id).u8(cs.length); cs.forEach(function (c) { w.u8(+c).u16(cells[c]); }); });
+    ids.forEach(function (id) { var cells = scores[id], cs = Object.keys(cells); w.u8(+id).u8(cs.length); cs.forEach(function (c) { w.u8(+c).i16(cells[c]); }); });
     return w.out();
   }
   function unpackState(p) {
     var r = new Reader(p), sub = r.u8(), version = r.u16();
-    if (sub === 0) { var d = { kind: 'delta', version: version, playerId: r.u8(), category: r.u8(), score: r.u16() }; d.log = r.left() > 0 ? r.str16() : ''; return d; }
+    if (sub === 0) { var d = { kind: 'delta', version: version, playerId: r.u8(), category: r.u8(), score: r.i16() }; d.log = r.left() > 0 ? r.str16() : ''; return d; }
     var n = r.u8(), scores = {};
-    for (var i = 0; i < n; i++) { var id = r.u8(), m = r.u8(), cells = {}; for (var j = 0; j < m; j++) { var c = r.u8(); cells[c] = r.u16(); } scores[id] = cells; }
+    for (var i = 0; i < n; i++) { var id = r.u8(), m = r.u8(), cells = {}; for (var j = 0; j < m; j++) { var c = r.u8(); cells[c] = r.i16(); } scores[id] = cells; }
     return { kind: 'snapshot', version: version, scores: scores };
   }
 
@@ -716,7 +718,7 @@
       w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.str(p.name, 28); w.u16(Math.max(0, Math.min(65535, (p.bonus | 0))));
       var mask = 0; catKeys.forEach(function (k, i) { if (typeof (p.scores || {})[k] === 'number') mask |= (1 << i); });
       w.u16(mask);
-      catKeys.forEach(function (k, i) { if (mask & (1 << i)) w.u16(Math.max(0, Math.min(65535, p.scores[k] | 0))); });
+      catKeys.forEach(function (k, i) { if (mask & (1 << i)) w.i16(p.scores[k] | 0); });   // signed: minus-ruleset cells go negative
       var log = (rec.moveLog && rec.moveLog[pi]) || [];
       log = log.slice(0, catKeys.length); w.u8(log.length);
       log.forEach(function (t) {
@@ -733,7 +735,7 @@
     for (var pi = 0; pi < n; pi++) {
       var pf = r.u8(), rgb = r.bytes(3), g = r.u8(), name = r.str(), bonus = r.u16();
       var mask = r.u16(), scores = {};
-      for (var i = 0; i < catKeys.length; i++) if (mask & (1 << i)) scores[catKeys[i]] = r.u16();
+      for (var i = 0; i < catKeys.length; i++) if (mask & (1 << i)) scores[catKeys[i]] = r.i16();
       players.push({ owner: !!(pf & 1), isAI: !!(pf & 2), color: rgbHex(rgb), gender: GENDERS[g] || 'm', name: name, bonus: bonus, scores: scores });
       var nt = r.u8(), turns = [], built = 0;
       for (var ti = 0; ti < nt; ti++) {
@@ -762,7 +764,7 @@
     function d5(a) { a = Array.isArray(a) ? a : []; var o = []; for (var j = 0; j < 5; j++) o.push(clampInt(a[j], 0, 6, 0)); return o; }
     var players = obj.players.map(function (p) {
       p = p || {}; var scores = {};
-      if (p.scores && typeof p.scores === 'object') catKeys.forEach(function (k) { if (typeof p.scores[k] === 'number' && isFinite(p.scores[k])) scores[k] = clampInt(p.scores[k], 0, 1000, 0); });
+      if (p.scores && typeof p.scores === 'object') catKeys.forEach(function (k) { if (typeof p.scores[k] === 'number' && isFinite(p.scores[k])) scores[k] = clampInt(p.scores[k], -1000, 1000, 0); });
       return { name: str(p.name), color: hex(p.color), gender: gen(p.gender), isAI: !!p.isAI, owner: !!p.owner,
                bonus: clampInt(p.bonus, 0, 999, 0), scores: scores,
                ribbons: Array.isArray(p.ribbons) ? p.ribbons.filter(function (x) { return typeof x === 'string' && /^#?[0-9a-fA-F]{3,8}$/.test(x); }).slice(0, 8) : [] };

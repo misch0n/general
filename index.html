@@ -2354,10 +2354,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.5';
+  var APP_VERSION = '1.48.6';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.6', items: [
+      ['fix', 'Мрежова игра „с минуси“: отрицателните точки (горен ред) вече се предават правилно — другото устройство вече не показва огромни погрешни стойности.'] ] },
     { v: '1.48.5', items: [
       ['chg', 'Чашката за кафе вече е точно в средата на екрана, а двата етикета са от двете ѝ страни.'] ] },
     { v: '1.48.4', items: [
