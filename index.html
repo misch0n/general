@@ -574,7 +574,8 @@ body.modal-open{ overflow:hidden; }
 .rdie.combo{ width:17px; height:17px; font-size:11px; }   /* dice that form the scored combo, on the final roll */
 /* a small SQUARE die icon (brass pips on the dark panel); used by both keep metrics.
    side = 40% of the percentage label's line height (--kdlh) so it stays crisp and undistorted */
-.kddie{ display:inline-block; flex:none; width:calc(var(--kdlh) * .4); height:calc(var(--kdlh) * .4); color:var(--gen-brass-bright); vertical-align:middle; }
+.kddie{ display:inline-block; flex:none; box-sizing:border-box; width:calc(var(--kdlh) * .4); height:calc(var(--kdlh) * .4);
+  border:1px solid var(--gen-brass-stroke); border-radius:2px; padding:1px; color:var(--gen-brass-bright); vertical-align:middle; }
 .kddie .face{ width:100%; height:100%; gap:1px; }
 .kddie .pip{ border-radius:1px; } .kddie .pip.on{ background:currentColor; }
 /* dice-keep „chase" distribution: per-face percentage above its die icon */
@@ -582,7 +583,7 @@ body.modal-open{ overflow:hidden; }
 .kdcell{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
 .kdpct{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; line-height:1; color:var(--gen-text); }
 /* throw-keep rows: N dice for the throw number, sitting before the percentage */
-.thd{ --kdlh:24px; display:inline-flex; align-items:center; gap:2px; vertical-align:middle; margin-right:3px; }
+.thd{ --kdlh:28px; display:inline-flex; align-items:center; gap:3px; vertical-align:middle; margin-right:4px; }
 .evrolls .rarrow{ color:var(--gen-disabled); }
 .evrolls .rdie-sep{ width:6px; }   /* divider between kept and freshly-rolled dice (split view) */
 .evrolls.collapsed{ display:none; }   /* a turn's dice line is folded away until its row is tapped */
@@ -2394,10 +2395,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.2';
+  var APP_VERSION = '1.50.3';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.3', items: [
+      ['fix', 'Зар-иконите в статистиките за задържане отново имат рамка (контур на зар).'] ] },
     { v: '1.50.2', items: [
       ['chg', 'Статистики за задържане: зар-иконите вече са квадратни; „Запис на хвърляне“ показва хвърлянето с брой зарове (един/два/три) вместо думи; двете нови метрики имат обяснения при докосване.'] ] },
     { v: '1.50.1', items: [
