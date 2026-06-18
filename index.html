@@ -275,7 +275,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
    both options are the same size; the inactive one is simply MUTED (no scale-down), the active
    one is brass with an underline */
 .ssel{ display:flex; gap:14px; justify-content:center; align-items:center; margin:0 0 7px; -webkit-user-select:none; user-select:none; }
-.ssel-where{ margin:8px 0 7px; }
+/* where-row: a 3-column grid so the coffee mug sits dead-centre on screen with a label on each side */
+.ssel-where{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; margin:8px 0 7px; }
+.ssel-where > .ssel-opt{ white-space:nowrap; }
+.ssel-where .ssel-opt:first-child{ justify-self:end; }
+.ssel-where .ssel-opt:last-child{ justify-self:start; }
 .ssel-opt{ background:none; border:none; border-bottom:2px solid transparent; padding:1px 1px 2px; cursor:pointer; line-height:1;
   font-family:var(--gen-font-display); font-weight:700; font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
 .ssel-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
@@ -2350,10 +2354,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.4';
+  var APP_VERSION = '1.48.5';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.5', items: [
+      ['chg', 'Чашката за кафе вече е точно в средата на екрана, а двата етикета са от двете ѝ страни.'] ] },
     { v: '1.48.4', items: [
       ['chg', 'Бутонът за кафе вече е малка чашка по средата между „на устройството“ и „по мрежа“; плъзгане по целия ред пак сменя избора, а докосване на чашката отваря почерпката.'] ] },
     { v: '1.48.3', items: [
