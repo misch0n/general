@@ -2258,6 +2258,17 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   </div>
 </div>
 
+<!-- rejoin a recent network game (offered on load if one was active in the last 15 min) --><div id="netRejoinModal" class="overlay hidden">
+  <div class="modal" style="max-width:320px;text-align:center">
+    <h2><i class="ic-net" aria-hidden="true"></i>Незавършена мрежова игра</h2>
+    <p class="ht" id="netRejoinInfo"></p>
+    <div class="setup-actions">
+      <button id="netRejoinNo" class="btn">Откажи</button>
+      <button id="netRejoinGo" class="btn primary">Върни се</button>
+    </div>
+  </div>
+</div>
+
 <!-- tap the „Е" in the title: a QR of this page so a friend can scan and open the game --><div id="qrShareModal" class="overlay hidden">
   <div class="modal" style="max-width:300px;text-align:center">
     <h2>Сподели с приятел</h2>
@@ -2357,10 +2368,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.7';
+  var APP_VERSION = '1.48.8';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.8', items: [
+      ['new', 'Мрежова игра: ако презаредиш по време на игра, до 15 минути приложението предлага да се върнеш в нея (по запазения код); по-стари игри се чистят автоматично.'] ] },
     { v: '1.48.7', items: [
       ['fix', 'Наблюдение по мрежа: „Към текущия играч“ вече винаги връща екрана на активния играч (дори преди той да е хвърлил).'],
       ['chg', 'Зареждане на QR: вместо бял квадрат с въртележка сега се показва само анимация върху фона на изгледа.'] ] },
@@ -3727,6 +3740,16 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   function wrEphKey(code) { return 'genrl:wrtc:eph:' + code; }
   function wrLoadEph(code) { var v = lsGet(wrEphKey(code)); v = v && parseInt(v, 10); return (v && v > 0 && v < 65535) ? v : null; }
   function wrSaveEph(code, eph) { try { lsSet(wrEphKey(code), String(eph)); } catch (e) {} }
+  // an in-progress WebRTC game is remembered (code + role + last activity) so a reload/crash within
+  // 15 min can offer to rejoin; older entries are treated as stale and cleaned up.
+  var NET_ACTIVE_KEY = 'genrl:wrtc:active', NET_REJOIN_MS = 15 * 60 * 1000, netRejoinEntry = null;
+  function netActiveSave() {
+    if (netKind !== 'webrtc' || !wrCode || !net) return;
+    try { lsSet(NET_ACTIVE_KEY, JSON.stringify({ code: wrCode, role: net.isHost ? 'host' : 'client', manual: !!net.manual, exp: !!net.exp, ts: Date.now() })); } catch (e) {}
+  }
+  function netActiveLoad() { try { var o = JSON.parse(lsGet(NET_ACTIVE_KEY) || 'null'); return (o && typeof o.code === 'string' && /^[A-Z0-9]{4,8}$/.test(o.code)) ? o : null; } catch (e) { return null; } }
+  function netActiveTouch() { var o = netActiveLoad(); if (o) { o.ts = Date.now(); try { lsSet(NET_ACTIVE_KEY, JSON.stringify(o)); } catch (e) {} } }
+  function netActiveClear() { lsDel(NET_ACTIVE_KEY); }
   // ===================================================== WebRTC transport (PeerJS) ==============
   // A pluggable MP.Session transport over WebRTC data channels. PeerJS provides the public
   // signalling cloud (no account/server needed) just for the handshake; gameplay is P2P.
@@ -4167,12 +4190,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     btn.textContent = '✓ копирано'; clearTimeout(btn._t);
     btn._t = setTimeout(function () { btn.textContent = original; }, 1500);
   }
-  function webrtcHost() {
+  function webrtcHost(presetCode) {
     wrCapReset('host', ''); wrlog('action', { tap: 'host' }); syncWrCapVis();
     netChooseMsg('Свързвам се със сървъра…');
     loadPeerJS(function (ok) {
       if (!ok) { netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
-      var code = genGameCode(); wrCode = code;
+      var code = presetCode || genGameCode(); wrCode = code;   // presetCode: re-hosting the same game on rejoin
       netBus = new PeerBus({ isHost: true, code: code,
         onPeers: function () {}, onLost: function (conn) { netHostLost(conn); } });
       netBus.start().then(function () {
@@ -4535,6 +4558,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       netMyTurn = true; $('undoBottom').classList.add('hidden');   // no ОПА: entries are broadcast immediately
       beginManualEntry();
     }
+    netActiveSave();   // remember this game so a reload within 15 min can offer to rejoin
     // (regular) the first GRANT (onTurn) drives beginTurn
   }
   // manual net: reset the dock for my next category entry (stay on my own sheet)
@@ -4549,6 +4573,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   function myManualDone() { var p = game && game.players[game.current]; return p && sumCats().every(function (c) { return G.isCategoryFilled(p, c.key); }); }
   function netSetTurn(activeId) {
     if (!netMode || !game) return;
+    netActiveTouch();   // keep the rejoin window fresh while the game is live
     var seat = netOrder.indexOf(activeId); if (seat < 0) return;
     netActiveId = activeId; specSelf = false; specAct = null; resetSpecPlay(); syncSpecReturn();   // new turn → fresh spectating
     game.current = seat; netMyTurn = (activeId === localPid);
@@ -4711,6 +4736,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   function netApplyRemote(mv) {
     if (!netMode || !game) return;
+    netActiveTouch();
     if (mv.playerId === localPid) return;                        // my own move is already on my board
     var seat = netOrder.indexOf(mv.playerId); if (seat < 0) return;
     var pl = game.players[seat], key = catKeyAt(mv.category);
@@ -4769,7 +4795,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   loadSettings();   // restore censor + owner name/toggle before the first muster
   paintCamo($('setup'));
   addSetupPlayer(false); addSetupPlayer(false);
-  maybeOfferResume();   // offer to continue an unfinished battle from a prior session
+  if (!maybeOfferNetRejoin()) maybeOfferResume();   // a recent network game takes precedence over a local resume
   syncAcousticUI();     // hide every data-over-sound feature unless Акустика is on
   syncWebrtcUI();       // hide the WebRTC entry unless the experimental toggle is on
   syncStartRuleSel(); syncStartWhereSel();   // start-screen ruleset + local/network selectors
@@ -4857,6 +4883,32 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   $('resumeGo').onclick = function () { var snap = loadResume(); $('resumeModal').classList.add('hidden'); if (snap) resumeGame(snap); };
   $('resumeAbort').onclick = function () { clearResume(); $('resumeModal').classList.add('hidden'); };
+
+  // on load: if a WebRTC game was active within the last 15 min, offer to rejoin it (else clean up)
+  function maybeOfferNetRejoin() {
+    var o = netActiveLoad(); if (!o) return false;
+    if (Date.now() - (o.ts || 0) > NET_REJOIN_MS) { netActiveClear(); return false; }   // stale → forget it
+    netRejoinEntry = o;
+    $('netRejoinInfo').innerHTML = 'Код: <b>' + esc(o.code) + '</b><br>'
+      + (o.role === 'host' ? 'ти беше старшината' : 'присъединяване към играта')
+      + (o.exp ? ' · с минуси' : ' · без минуси') + (o.manual ? ' · отчет' : '');
+    $('netRejoinModal').classList.remove('hidden');
+    return true;
+  }
+  $('netRejoinNo').onclick = function () { netActiveClear(); netRejoinEntry = null; $('netRejoinModal').classList.add('hidden'); };
+  $('netRejoinGo').onclick = function () {
+    var o = netRejoinEntry; $('netRejoinModal').classList.add('hidden'); if (!o) return;
+    settings.ruleset = o.exp ? 'experimental' : 'standard'; syncStartRuleSel();
+    netManual = !!o.manual;
+    openNetModal('webrtc', o.manual);
+    if (o.role === 'host') { webrtcHost(o.code); }   // re-host the same code so a waiting peer can reconnect
+    else {                                            // dial back in; the host re-seats us via our saved eph
+      $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
+      $('netJoinCode').classList.remove('hidden');
+      $('netCodeInput').value = o.code; lastCodeSource = 'manual';
+      $('netCodeJoin').onclick();
+    }
+  };
 
   function beginTurn() {
     locked = false;
@@ -6011,7 +6063,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   function expEndGame() {
     locked = true;
-    if (!viewingHistory) { archiveExpGame(); clearResume(); trackGame('finish'); }
+    if (!viewingHistory) { archiveExpGame(); clearResume(); trackGame('finish'); if (netMode) netActiveClear(); }
     showGameOver(X.ranking(game)[0].player);   // same end screen as standard, sourced from the exp ruleset
   }
   function archiveExpGame() {
@@ -6993,7 +7045,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     });
   }
   function endGame() {
-    if (!viewingHistory) { saveCurrentGame(); clearResume(); trackGame('finish'); }   // archive (each device flags ITS player as owner) + drop resume
+    if (!viewingHistory) { saveCurrentGame(); clearResume(); trackGame('finish'); if (netMode) netActiveClear(); }   // archive + drop resume + clear rejoin
     // dropped/incomplete players can't win or place — rank only those who finished
     var pool = game.players.filter(function (p) { return !isExcluded(p); });
     if (!pool.length) pool = game.players.slice();
@@ -9462,6 +9514,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   function resetNet() {
     if (net) { try { net.dispose(); } catch (e) {} }
     if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} }
+    netActiveClear();   // leaving on purpose → don't offer to rejoin
     net = null; netFSK = null; netMode = false; localPid = null; netMyTurn = false;
     netActiveId = null; specSelf = false; specAct = null; resetSpecPlay(); if ($('specReturn')) $('specReturn').classList.add('hidden');
     $('netLink').classList.add('hidden'); $('netLink').innerHTML = '';
