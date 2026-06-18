@@ -583,6 +583,8 @@ body.modal-open{ overflow:hidden; }
 .keepdist{ --kdlh:34px; display:flex; gap:5px; margin-top:4px; }
 .kdcell{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
 .kdpct{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; line-height:1; color:var(--gen-text); }
+.kdpct.keep{ color:#9bd17e; }   /* held → green */
+.kdpct.drop{ color:#e0786f; font-size:13px; }   /* discarded → red */
 /* throw-keep rows: N dice for the throw number, sitting before the percentage */
 .thd{ --kdlh:28px; display:inline-flex; align-items:center; justify-content:center; gap:3px; vertical-align:middle; margin-right:6px;
   min-width:calc(var(--kdlh) * 1.2 + 6px); }   /* width of the 3-dice row → centre 1/2 dice against it, % stays aligned */
@@ -2397,10 +2399,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.6';
+  var APP_VERSION = '1.50.7';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.7', items: [
+      ['new', 'Статистика „Дръж / хвърли“: под всеки зар вече се вижда и какъв дял изхвърляш (червено), освен какъв дял задържаш (зелено).'] ] },
     { v: '1.50.6', items: [
       ['chg', 'Зар-иконите в статистиките за задържане вече са като заровете от листа с комбинации (светли с тъмни точки).'] ] },
     { v: '1.50.5', items: [
@@ -7749,7 +7753,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     'Късмет': 'luck', 'Изнервяне': 'nerves', 'Спасения': 'bail', 'Нули': 'zero', 'По етапи': 'stages',
     'Чин': 'chin', 'Личен рекорд': 'pr', 'Генерали': 'generali', 'Постоянство': 'consist',
     'Развитие': 'razvitie', 'Най-голяма издънка': 'sev', 'Постижения': 'achievements',
-    'Запис на хвърляне': 'throwkeep', 'Какво задържаш': 'chase',
+    'Запис на хвърляне': 'throwkeep', 'Дръж / хвърли': 'chase',
   };
   var EXPLAIN = {
     ev: '<b>EV (очаквана стойност)</b> — средно колко точки носи едно решение при безброй повторения. Щабът сравнява хода ти с най-добрия възможен; разликата е „<b>загуба EV</b>“ — точките, оставени на масата. Така <span class="luck">късметът</span> (заровете) се отделя от <span class="skill">решенията</span> (какво направи с тях).',
@@ -7772,7 +7776,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     razvitie: '<b>Развитие</b> — накъде върви точността ти през игрите: качваш ли се, спадаш или си стабилен.',
     achievements: '<b>Постижения</b> — категориите, в които най-често правиш върхови, оптимални ходове.',
     throwkeep: '<b>Запис на хвърляне</b> — на кое хвърляне записваш комбинацията: брой зарове = хвърлянето (едно = първо, две = второ, три = трето). Показва дали записваш бързо или гониш до последно.',
-    chase: '<b>Какво задържаш</b> — за всяко число какъв дял от всички задържани при прехвърляне зарове е то. Високите числа издават „гонене“ на едри зарове и комбинации.',
+    chase: '<b>Дръж / хвърли</b> — за всяко число: горе (<span style="color:#9bd17e">зелено</span>) какъв дял от <b>задържаните</b> зарове е то, долу (<span style="color:#e0786f">червено</span>) какъв дял от <b>изхвърлените</b>. Издава какво гониш и какво изхвърляш.',
   };
   function xterm(label, key) { return '<span class="xterm" data-x="' + key + '">' + label + '</span>'; }
   function slbl(label, color) {
@@ -7809,6 +7813,15 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }); });
     return total ? { pct: [1, 2, 3, 4, 5, 6].map(function (v) { return face[v] / total * 100; }), total: total } : null;
   }
+  // dice-drop: the mirror of keep — the share of each face among ALL dice DISCARDED (re-thrown).
+  function diceDropDist(logs) {
+    var face = [0, 0, 0, 0, 0, 0, 0], total = 0;
+    logs.forEach(function (log) { (log || []).forEach(function (t) {
+      var rolls = t && t.rolls, keeps = t && t.keeps; if (!rolls || !keeps || !keeps.length) return;
+      keeps.forEach(function (km, i) { var d = rolls[i] || []; for (var j = 0; j < 5; j++) if (km && !km[j]) { var v = d[j]; if (v >= 1 && v <= 6) { face[v]++; total++; } } });
+    }); });
+    return total ? { pct: [1, 2, 3, 4, 5, 6].map(function (v) { return face[v] / total * 100; }), total: total } : null;
+  }
   function kddie(v) { return '<span class="kddie">' + pipFace(v) + '</span>'; }
   function diceRowHTML(vals) { return '<span class="thd">' + vals.map(kddie).join('') + '</span>'; }
   function throwKeepHTML(dist) {
@@ -7819,12 +7832,14 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       diceRowHTML([4, 5]) + ' ' + nNeut(Math.round(dist.pct[1])) + '%',
       diceRowHTML([6, 6, 6]) + ' ' + nNeut(Math.round(dist.pct[2])) + '%' ]);
   }
-  function diceKeepHTML(dist) {
-    if (!dist) return '';
-    var cells = dist.pct.map(function (p, i) {
-      return '<div class="kdcell"><span class="kdpct">' + Math.round(p) + '%</span>' + kddie(i + 1) + '</div>';
+  // per face: kept % (green, above the die) and dropped % (red, below) — the chase profile
+  function diceKeepHTML(keepDist, dropDist) {
+    if (!keepDist && !dropDist) return '';
+    var cells = [0, 1, 2, 3, 4, 5].map(function (i) {
+      var k = keepDist ? Math.round(keepDist.pct[i]) : 0, d = dropDist ? Math.round(dropDist.pct[i]) : 0;
+      return '<div class="kdcell"><span class="kdpct keep">' + k + '%</span>' + kddie(i + 1) + '<span class="kdpct drop">' + d + '%</span></div>';
     }).join('');
-    return '<div class="evstat">' + slbl('Какво задържаш', RC.chase) + '<div class="keepdist">' + cells + '</div></div>';
+    return '<div class="evstat">' + slbl('Дръж / хвърли', RC.chase) + '<div class="keepdist">' + cells + '</div></div>';
   }
 
   // per-die generation for each roll: 1 on the first throw; a kept die keeps its generation,
@@ -8053,9 +8068,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
         html += stat('Спасения', RC.bail, 'при счупен план (' + fa.bailout.n + ' хода) губиш средно ' + nBad(fa.bailout.avgCost, 1)
           + ' т./ход — ' + (pivots ? '<b class="np">превключваш добре</b>' : '<b class="nn">инатиш се на стария план</b>'));
       }
-      // on which throw you commit, and what you tend to hold (chase profile)
+      // on which throw you commit, and what you tend to hold vs discard (chase profile)
       html += throwKeepHTML(throwKeepDist([moveLog[pi]]));
-      html += diceKeepHTML(diceKeepDist([moveLog[pi]]));
+      html += diceKeepHTML(diceKeepDist([moveLog[pi]]), diceDropDist([moveLog[pi]]));
     }
 
     // zero-out avoidance — each kind on its own row
@@ -8514,7 +8529,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     };
     // keep-pattern metrics aggregated across every owned dice game (manual logs contribute nothing)
     var ownerLogs = data.map(function (d) { return d.rec.moveLog && d.rec.moveLog[recOwnerIdx(d.rec)]; });
-    report.throwKeep = throwKeepDist(ownerLogs); report.diceKeep = diceKeepDist(ownerLogs);
+    report.throwKeep = throwKeepDist(ownerLogs); report.diceKeep = diceKeepDist(ownerLogs); report.diceDrop = diceDropDist(ownerLogs);
     // victories / win-rate / average place are over RANKED games only (>1 player, known place)
     var rankedPlaces = data.filter(function (d) { return d.ranked; }).map(function (d) { return d.place; });
     var rankedN = rankedPlaces.length;
@@ -8768,7 +8783,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (extra.achievements && extra.achievements.length) h += statRows('Постижения', RC.upper, extra.achievements.map(function (a) { return esc(catLabelOf(a.key, rs)) + ' <b>×' + a.n + '</b>'; }));
     if (r.luckFirst != null) h += statRows('Късмет', RC.luck, ['първо хвърляне ' + nSigned(r.luckFirst, 1), 'прехвърляния ' + nSigned(r.luckRerolls, 1), 'в решителния край ' + nSigned(r.clutch, 1)]);
     h += throwKeepHTML(r.throwKeep);
-    h += diceKeepHTML(r.diceKeep);
+    h += diceKeepHTML(r.diceKeep, r.diceDrop);
     if (r.zeroTotal != null) h += statRows('Нули', RC.zero, [nNeut(r.zeroTotal.toFixed(1)) + ' общо', nNeut(r.zeroForced.toFixed(1)) + ' принудени', '<b class="nn">' + r.zeroUnforced.toFixed(1) + '</b> от твоята игра']);
     h += statRows('По етапи', RC.stage, ['начало <b class="nn">' + r.stageEarly.toFixed(1) + '</b> т./ход', 'среда <b class="nn">' + r.stageMid.toFixed(1) + '</b> т./ход', 'край <b class="nn">' + r.stageLate.toFixed(1) + '</b> т./ход']);
     return h;
