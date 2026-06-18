@@ -572,13 +572,17 @@ body.modal-open{ overflow:hidden; }
   font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
 .rdie.kept{ background:#d8cfa8; color:var(--gen-pip); opacity:1; box-shadow:0 0 0 1px var(--gen-brass); }
 .rdie.combo{ width:17px; height:17px; font-size:11px; }   /* dice that form the scored combo, on the final roll */
-/* dice-keep „chase" distribution: per-face percentage over a small die icon (40% of the cell) */
-.keepdist{ display:flex; gap:5px; margin-top:4px; }
-.kdcell{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
-.kdpct{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-text); }
-.kdface{ width:40%; aspect-ratio:1/1; padding:2px; border:1px solid var(--gen-brass-stroke); border-radius:4px; color:var(--gen-brass-bright); }
-.kdface .face{ width:100%; height:100%; gap:1px; }
-.kdface .pip.on{ background:currentColor; }
+/* a small SQUARE die icon (brass pips on the dark panel); used by both keep metrics.
+   side = 40% of the percentage label's line height (--kdlh) so it stays crisp and undistorted */
+.kddie{ display:inline-block; flex:none; width:calc(var(--kdlh) * .4); height:calc(var(--kdlh) * .4); color:var(--gen-brass-bright); vertical-align:middle; }
+.kddie .face{ width:100%; height:100%; gap:1px; }
+.kddie .pip{ border-radius:1px; } .kddie .pip.on{ background:currentColor; }
+/* dice-keep „chase" distribution: per-face percentage above its die icon */
+.keepdist{ --kdlh:34px; display:flex; gap:5px; margin-top:4px; }
+.kdcell{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.kdpct{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; line-height:1; color:var(--gen-text); }
+/* throw-keep rows: N dice for the throw number, sitting before the percentage */
+.thd{ --kdlh:24px; display:inline-flex; align-items:center; gap:2px; vertical-align:middle; margin-right:3px; }
 .evrolls .rarrow{ color:var(--gen-disabled); }
 .evrolls .rdie-sep{ width:6px; }   /* divider between kept and freshly-rolled dice (split view) */
 .evrolls.collapsed{ display:none; }   /* a turn's dice line is folded away until its row is tapped */
@@ -2390,10 +2394,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.1';
+  var APP_VERSION = '1.50.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.2', items: [
+      ['chg', 'Статистики за задържане: зар-иконите вече са квадратни; „Запис на хвърляне“ показва хвърлянето с брой зарове (един/два/три) вместо думи; двете нови метрики имат обяснения при докосване.'] ] },
     { v: '1.50.1', items: [
       ['fix', 'Ход по ход (раздели): заровете се групират по поколение — в реда, в който боецът ги е видял (задържани → нови), а не само задържани/нови. По-малките зарове са центрирани спрямо по-големите.'] ] },
     { v: '1.50.0', items: [
@@ -7730,6 +7736,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     'Късмет': 'luck', 'Изнервяне': 'nerves', 'Спасения': 'bail', 'Нули': 'zero', 'По етапи': 'stages',
     'Чин': 'chin', 'Личен рекорд': 'pr', 'Генерали': 'generali', 'Постоянство': 'consist',
     'Развитие': 'razvitie', 'Най-голяма издънка': 'sev', 'Постижения': 'achievements',
+    'Запис на хвърляне': 'throwkeep', 'Какво задържаш': 'chase',
   };
   var EXPLAIN = {
     ev: '<b>EV (очаквана стойност)</b> — средно колко точки носи едно решение при безброй повторения. Щабът сравнява хода ти с най-добрия възможен; разликата е „<b>загуба EV</b>“ — точките, оставени на масата. Така <span class="luck">късметът</span> (заровете) се отделя от <span class="skill">решенията</span> (какво направи с тях).',
@@ -7751,6 +7758,8 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     consist: '<b>Постоянство</b> — колко стабилни са резултатите и точността ти (± разсейване около средното).',
     razvitie: '<b>Развитие</b> — накъде върви точността ти през игрите: качваш ли се, спадаш или си стабилен.',
     achievements: '<b>Постижения</b> — категориите, в които най-често правиш върхови, оптимални ходове.',
+    throwkeep: '<b>Запис на хвърляне</b> — на кое хвърляне записваш комбинацията: брой зарове = хвърлянето (едно = първо, две = второ, три = трето). Показва дали записваш бързо или гониш до последно.',
+    chase: '<b>Какво задържаш</b> — за всяко число какъв дял от всички задържани при прехвърляне зарове е то. Високите числа издават „гонене“ на едри зарове и комбинации.',
   };
   function xterm(label, key) { return '<span class="xterm" data-x="' + key + '">' + label + '</span>'; }
   function slbl(label, color) {
@@ -7787,17 +7796,20 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }); });
     return total ? { pct: [1, 2, 3, 4, 5, 6].map(function (v) { return face[v] / total * 100; }), total: total } : null;
   }
+  function kddie(v) { return '<span class="kddie">' + pipFace(v) + '</span>'; }
+  function diceRowHTML(vals) { return '<span class="thd">' + vals.map(kddie).join('') + '</span>'; }
   function throwKeepHTML(dist) {
     if (!dist) return '';
+    // the throw is shown as that many dice (1 / two / three), not words
     return statRows('Запис на хвърляне', RC.throwk, [
-      'първо ' + nNeut(Math.round(dist.pct[0])) + '%',
-      'второ ' + nNeut(Math.round(dist.pct[1])) + '%',
-      'трето ' + nNeut(Math.round(dist.pct[2])) + '%' ]);
+      diceRowHTML([1]) + ' ' + nNeut(Math.round(dist.pct[0])) + '%',
+      diceRowHTML([4, 5]) + ' ' + nNeut(Math.round(dist.pct[1])) + '%',
+      diceRowHTML([6, 6, 6]) + ' ' + nNeut(Math.round(dist.pct[2])) + '%' ]);
   }
   function diceKeepHTML(dist) {
     if (!dist) return '';
     var cells = dist.pct.map(function (p, i) {
-      return '<div class="kdcell"><span class="kdpct">' + Math.round(p) + '%</span><span class="kdface">' + pipFace(i + 1) + '</span></div>';
+      return '<div class="kdcell"><span class="kdpct">' + Math.round(p) + '%</span>' + kddie(i + 1) + '</div>';
     }).join('');
     return '<div class="evstat">' + slbl('Какво задържаш', RC.chase) + '<div class="keepdist">' + cells + '</div></div>';
   }
