@@ -2396,10 +2396,13 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.4';
+  var APP_VERSION = '1.50.5';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.5', items: [
+      ['chg', 'Бутонът за записване на комбинация вече казва „ИЗБЕРИ КОМБИНАЦИЯ!“.'],
+      ['fix', 'Игра с минуси: бутонът за хвърляне вече се оцветява правилно след мрежова игра (вече не остава като бутона „избери зарове“).'] ] },
     { v: '1.50.4', items: [
       ['chg', 'Статистика „Запис на хвърляне“: заровете са центрирани спрямо най-дългия ред (три зара), а процентите се подравняват.'] ] },
     { v: '1.50.3', items: [
@@ -5396,7 +5399,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     // nothing marked → prompt to choose; once marked → throw/keep the selection
     var keep = activeKeep(), someSel = selected.some(Boolean), txt;
     if (locked) { txt = '…'; fire.disabled = true; }
-    else if (throwsLeft <= 0) { txt = 'ОТЧЕТИ!'; fire.disabled = true; }
+    else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
     else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
     $('fireTxt').textContent = txt;
@@ -6102,6 +6105,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     $('throws').innerHTML = t;
   }
   function expRenderFire() {
+    $('fire').classList.remove('muted');   // clear leftover spectator styling (e.g. after a net minus game)
     var p = G.currentPlayer(game);
     if (awaitingRoll) {
       $('bottombar').classList.add('preroll');
@@ -6115,7 +6119,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
     var keep = activeKeep(), someSel = selected.some(Boolean), txt;
     if (locked) { txt = '…'; fire.disabled = true; }
-    else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ ПОЛЕ'; fire.disabled = true; }
+    else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
     else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
     $('fireTxt').textContent = txt;
