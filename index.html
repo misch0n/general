@@ -2286,10 +2286,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.47.2';
+  var APP_VERSION = '1.47.3';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.47.3', items: [
+      ['chg', 'Присъединяване: бутонът „Постави“ приема и целия споделен текст от старшината (а не само голия код) — извлича кода от него.'] ] },
     { v: '1.47.2', items: [
       ['chg', 'Присъединяване: бутонът „Постави“ проверява клипборда — приема само код от точно 6 букви и цифри, иначе показва, че копираният код не е правилен.'] ] },
     { v: '1.47.1', items: [
@@ -3945,9 +3947,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (netKind !== 'webrtc') return;
     if (!(navigator.clipboard && navigator.clipboard.readText)) { netChooseMsg('⚠ Браузърът не дава достъп до клипборда — постави ръчно.'); return; }
     navigator.clipboard.readText().then(function (t) {
-      // sanitize: keep only letters/digits — the code must be exactly six of them
-      var code = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (/^[A-Z0-9]{6}$/.test(code)) { $('netCodeInput').value = code; netChooseMsg(''); flashCodeGreen($('netCodePaste')); }
+      // accept a bare 6-char code or the exact host share message; anything else is rejected
+      var code = parsePastedCode(t);
+      if (code) { $('netCodeInput').value = code; netChooseMsg(''); flashCodeGreen($('netCodePaste')); }
       else netChooseMsg('⚠ Копираният код не е правилен — трябва да е 6 букви и цифри.');
     }).catch(function () { netChooseMsg('⚠ Нямам достъп до клипборда — постави ръчно.'); });
   };
@@ -3987,10 +3989,23 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     var hold = container.querySelector('.netcode-show');
     if (hold) hold.onclick = function () { copyGameCode(code, btn); };
   }
+  // the exact message the host shares (kept in one place so paste-parsing can match it)
+  function shareCodeText(code) { return 'Влез в играта ми на ГЕНЕРАЛ с код: ' + code; }
+  // accept only the two formats we hand out: a bare 6-char code, or the host share message
+  function parsePastedCode(raw) {
+    var s = String(raw == null ? '' : raw).trim();
+    if (/^[A-Za-z0-9]{6}$/.test(s)) return s.toUpperCase();
+    var pre = shareCodeText('');   // the share text minus the code
+    if (s.slice(0, pre.length) === pre) {
+      var tail = s.slice(pre.length).trim();
+      if (/^[A-Za-z0-9]{6}$/.test(tail)) return tail.toUpperCase();
+    }
+    return null;
+  }
   // native share sheet (iOS/Android/…) with the game code; ignores the user cancelling
   function shareGameCode(code) {
     if (!navigator.share) { copyGameCode(code); return; }
-    try { navigator.share({ title: 'ГЕНЕРАЛ', text: 'Влез в играта ми на ГЕНЕРАЛ с код: ' + code }).catch(function () {}); } catch (e) {}
+    try { navigator.share({ title: 'ГЕНЕРАЛ', text: shareCodeText(code) }).catch(function () {}); } catch (e) {}
   }
   // render a scannable QR of the code into qbox; qrcode-generator is lazy-loaded the first
   // time (needs internet once, then it's cached), with a graceful offline fallback.
