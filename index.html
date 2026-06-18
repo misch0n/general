@@ -2405,10 +2405,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.9';
+  var APP_VERSION = '1.50.10';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.10', items: [
+      ['fix', 'Мрежова игра „с минуси“: твоите ходове вече се записват, така че финалното обобщение е пълно — записите на играчите се отварят, а не само разделът с категориите.'] ] },
     { v: '1.50.9', items: [
       ['new', 'Плъзгане за избор: задръж и плъзни по заровете, за да маркираш няколко наведнъж (важи и за двата режима, на устройство и по мрежа). Единично докосване пак превключва един зар.'] ] },
     { v: '1.50.8', items: [
@@ -4808,7 +4810,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     throwsLeft = ROLLS - 1; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
     dice = G.rollAll(); sortDice();
     rollNo = 1; diceGen = dice.map(function () { return 1; });
-    curLog = (evReady && !sumExp()) ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+    curLog = startTurnLog(p);
     renderAll(); shakeDice(); showOrder(p);
     netSendAct();   // clients watch the host-driven AI seat roll
     runAiTurn();
@@ -4887,6 +4889,13 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   var aiBusy = false, locked = false, rerolledAll = false, roastIx = 0, roastTimer = null;
   var moveLog = [];   // per player index: array of completed turn logs
   var curLog = null;  // the in-progress turn log
+  // seed the turn's move-log for the active ruleset. Net minus games run the standard turn path
+  // but score by EXP rules, so they need the EXP log shape — otherwise nothing is logged and the
+  // end-game summary can't analyse (players unclickable, only the category board shows).
+  function startTurnLog(p) {
+    return sumExp() ? expStartLog(p)
+      : (evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null);
+  }
   var hintsOn = false;
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var ownerDetached = false; // owner deliberately removed from the roster (only while skipped): seat #1 shows a MUTED token but keeps its own identity until the token is re-activated
@@ -5021,7 +5030,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       throwsLeft = ROLLS - 1;
       dice = G.rollAll(); sortDice();
       rollNo = 1; diceGen = dice.map(function () { return 1; });
-      curLog = (evReady && !sumExp()) ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+      curLog = startTurnLog(p);
       renderAll(); shakeDice(); showOrder(p);
       runAiTurn();
     } else {
@@ -5044,7 +5053,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     awaitingRoll = false;
     dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
     rollNo = 1; diceGen = dice.map(function () { return 1; });   // first throw: every die is generation 1
-    curLog = (evReady && !sumExp()) ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null;
+    curLog = startTurnLog(p);
     clearRoast();
     renderAll();
     shakeDice();
