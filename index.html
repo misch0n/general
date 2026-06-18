@@ -567,7 +567,7 @@ body.modal-open{ overflow:hidden; }
 .evtrow.q-general{ background:linear-gradient(90deg, rgba(232,195,86,.22), rgba(232,195,86,.06)); box-shadow:inset 2px 0 0 var(--gen-brass-bright); }
 .evtrow.q-general .tc{ color:var(--gen-brass-bright); }
 .evrolls{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; padding:1px 10px 6px 38px; font-size:10px; color:var(--gen-muted); border-top:0; }
-.evrolls .rroll{ display:inline-flex; gap:2px; }
+.evrolls .rroll{ display:inline-flex; align-items:center; gap:2px; }   /* centre smaller dice against the bigger combo dice */
 .rdie{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:3px; background:#6c6450; color:#cfc7ad; opacity:.5;
   font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
 .rdie.kept{ background:#d8cfa8; color:var(--gen-pip); opacity:1; box-shadow:0 0 0 1px var(--gen-brass); }
@@ -2390,10 +2390,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.0';
+  var APP_VERSION = '1.50.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.1', items: [
+      ['fix', 'Ход по ход (раздели): заровете се групират по поколение — в реда, в който боецът ги е видял (задържани → нови), а не само задържани/нови. По-малките зарове са центрирани спрямо по-големите.'] ] },
     { v: '1.50.0', items: [
       ['new', 'Нови статистики (в обобщението на играта и в досието на стопанина): „Запис на хвърляне“ — на кое хвърляне записваш (първо/второ/трето), и „Какво задържаш“ — процент задържане за всяко число (зар-икона) като мярка за гоненето.'] ] },
     { v: '1.49.5', items: [
@@ -7800,11 +7802,25 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     return '<div class="evstat">' + slbl('Какво задържаш', RC.chase) + '<div class="keepdist">' + cells + '</div></div>';
   }
 
+  // per-die generation for each roll: 1 on the first throw; a kept die keeps its generation,
+  // a freshly-rolled die takes the current throw number (matched by value across rolls).
+  function rollGens(rolls, keeps) {
+    var gens = [rolls[0] ? rolls[0].map(function () { return 1; }) : []];
+    for (var i = 1; i < rolls.length; i++) {
+      var prev = rolls[i - 1] || [], km = keeps[i - 1] || [], pg = gens[i - 1] || [], pool = [];
+      for (var j = 0; j < prev.length; j++) if (km[j]) pool.push({ v: prev[j], g: pg[j], used: false });
+      gens.push((rolls[i] || []).map(function (v) {
+        for (var k = 0; k < pool.length; k++) if (!pool[k].used && pool[k].v === v) { pool[k].used = true; return pool[k].g; }
+        return i + 1;   // a die rolled fresh on this throw
+      }));
+    }
+    return gens;
+  }
   // compact render of a turn's 1–3 rolls. The KEPT dice are always highlighted; on each
   // non-final roll the dice carried forward (keeps[i]) light up, the rest grey out. The final
   // roll (and any single-roll turn) lights up in full — that's the committed hand — and the dice
-  // that FORM the scored combo are drawn slightly bigger. Ordering follows the owner's
-  // „нови зарове" preference (order vs split); nothing else is taken from settings.
+  // that FORM the scored combo are drawn slightly bigger. „Split" groups each roll by generation
+  // (oldest → newest, as the player saw them); „order" sorts every roll by value.
   function turnDiceHTML(pi, td, manual, collapsed) {
     var log = moveLog[pi] && moveLog[pi][td.turn];
     var seq = manual ? (log && log.dice ? [log.dice] : (td.finalDice ? [td.finalDice] : []))
@@ -7812,23 +7828,24 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (!seq.length) return '';
     var keeps = (log && log.keeps) || [];
     var batchMode = !!settings.newDiceBatch;   // order vs split — the owner's display preference
+    var gens = batchMode ? rollGens(seq, keeps) : null;
     var finalDice = seq[seq.length - 1] || [];
     // the dice that build the scored combo (skip forfeits/0): a consumable multiset of values
     var comboVals = (td.score !== 0 && td.category && G.keepToward) ? (G.keepToward(td.category, finalDice) || []).slice() : null;
     var rolls = seq.map(function (d, i) {
-      var last = i === seq.length - 1, km = last ? null : (keeps[i] || []);
-      var arr = (d || []).map(function (v, j) { return { v: v, kept: km ? !!km[j] : true }; });
-      if (batchMode && !last) arr.sort(function (x, y) { return (y.kept - x.kept) || (x.v - y.v); });   // split: kept group → new group
-      else arr.sort(function (x, y) { return x.v - y.v; });                                              // order: by value
+      var last = i === seq.length - 1, km = last ? null : (keeps[i] || []), g = gens ? (gens[i] || []) : null;
+      var arr = (d || []).map(function (v, j) { return { v: v, kept: km ? !!km[j] : true, gen: g ? g[j] : 1 }; });
+      if (batchMode) arr.sort(function (x, y) { return (x.gen - y.gen) || (x.v - y.v); });   // split: by generation, then value
+      else arr.sort(function (x, y) { return x.v - y.v; });                                   // order: by value
       var pool = last && comboVals ? comboVals.slice() : null;   // per-roll consumable copy
-      var out = '', prev = null;
+      var out = '', prevGen = null;
       arr.forEach(function (o) {
-        if (batchMode && !last && prev !== null && prev !== o.kept) out += '<span class="rdie-sep" aria-hidden="true"></span>';
+        if (batchMode && prevGen !== null && prevGen !== o.gen) out += '<span class="rdie-sep" aria-hidden="true"></span>';   // divider between generation groups
         var hl = last || o.kept;   // kept dice always highlighted; the final hand lights up in full
         var big = false;
         if (pool) { var k = pool.indexOf(o.v); if (k >= 0) { pool.splice(k, 1); big = true; } }   // a combo die on the final roll
         out += '<span class="rdie' + (hl ? ' kept' : '') + (big ? ' combo' : '') + '">' + o.v + '</span>';
-        prev = o.kept;
+        prevGen = o.gen;
       });
       return '<span class="rroll' + (last ? ' last' : '') + '">' + out + '</span>';
     }).join('<span class="rarrow">→</span>');
