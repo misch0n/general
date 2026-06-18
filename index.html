@@ -572,6 +572,14 @@ body.modal-open{ overflow:hidden; }
   font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
 .rdie.kept{ background:#d8cfa8; color:var(--gen-pip); opacity:1; box-shadow:0 0 0 1px var(--gen-brass); }
 .evrolls .rarrow{ color:var(--gen-disabled); }
+.evrolls .rdie-sep{ width:6px; }   /* divider between kept and freshly-rolled dice (split view) */
+/* per-turn fold: the row is the tap target; its dice throws reveal below (collapsed by default) */
+.evturn > summary{ cursor:pointer; list-style:none; }
+.evturn > summary::-webkit-details-marker{ display:none; }
+.evturn > summary::marker{ content:''; }
+.evturn[open] > summary{ background:rgba(255,255,255,.05); }
+.evturn > summary .tc::before{ content:'▸'; display:inline-block; margin-right:5px; color:var(--gen-disabled); font-size:9px; vertical-align:1px; transition:transform .12s; }
+.evturn[open] > summary .tc::before{ transform:rotate(90deg); }
 
 /* AI persona subtitle in the header */
 .ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); }
@@ -2368,10 +2376,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.8';
+  var APP_VERSION = '1.49.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.49.0', items: [
+      ['new', 'Ход по ход (край на игра и архив): всеки ход се разгъва при докосване и показва хвърлянията/презахвърлянията; заровете следват избора „задръж/хвърли“ и подреждането „подреди/раздели“.'] ] },
     { v: '1.48.8', items: [
       ['new', 'Мрежова игра: ако презаредиш по време на игра, до 15 минути приложението предлага да се върнеш в нея (по запазения код); по-стари игри се чистят автоматично.'] ] },
     { v: '1.48.7', items: [
@@ -7439,7 +7449,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     // tap a turn rating → a small bubble with a tailored coach note for that turn
     $('ranks').querySelectorAll('.qicon').forEach(function (b) {
       b.onclick = function (e) {
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();   // don't toggle the turn's collapsible row
         var qpi = +b.getAttribute('data-pi'), qt = +b.getAttribute('data-turn');
         var ana = summary.ana[qpi]; if (!ana || !ana.turns || !ana.turns[qt]) return;
         showMedalTip(b, turnComment(qpi, ana.turns[qt], ana));
@@ -7722,14 +7732,25 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     var seq = manual ? (log && log.dice ? [log.dice] : (td.finalDice ? [td.finalDice] : []))
                      : (log && log.rolls ? log.rolls : (td.finalDice ? [td.finalDice] : []));
     if (!seq.length) return '';
-    var keeps = (log && log.keeps) || [];
+    var keeps = (log && log.keeps) || [], rec = currentHistRec;
+    // highlight the dice this game's flavour marks (keep-mode → held; throw-mode → re-thrown),
+    // and order/split each roll per the viewer's „нови зарове" preference — like the step replay
+    var keepMode = rec ? !!rec.selectKeep
+      : (game && game.players[pi] && typeof game.players[pi].selectKeep === 'boolean' ? game.players[pi].selectKeep : !!settings.selectKeep);
+    var batchMode = !!settings.newDiceBatch;
     var rolls = seq.map(function (d, i) {
       var last = i === seq.length - 1, km = last ? null : (keeps[i] || []);
-      var dice = (d || []).map(function (v, j) {
-        var on = last || km[j];
-        return '<span class="rdie' + (on ? ' kept' : '') + '">' + v + '</span>';
-      }).join('');
-      return '<span class="rroll' + (last ? ' last' : '') + '">' + dice + '</span>';
+      var arr = (d || []).map(function (v, j) { return { v: v, kept: km ? !!km[j] : true }; });
+      if (batchMode && !last) arr.sort(function (x, y) { return (y.kept - x.kept) || (x.v - y.v); });   // split: kept group → new group
+      else arr.sort(function (x, y) { return x.v - y.v; });                                              // order: by value
+      var out = '', prev = null;
+      arr.forEach(function (o) {
+        if (batchMode && !last && prev !== null && prev !== o.kept) out += '<span class="rdie-sep" aria-hidden="true"></span>';
+        var hl = last ? true : (keepMode ? o.kept : !o.kept);
+        out += '<span class="rdie' + (hl ? ' kept' : '') + '">' + o.v + '</span>';
+        prev = o.kept;
+      });
+      return '<span class="rroll' + (last ? ' last' : '') + '">' + out + '</span>';
     }).join('<span class="rarrow">→</span>');
     return '<div class="evrolls">' + rolls + '</div>';
   }
@@ -7943,13 +7964,16 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       // luck then decision (no letters; left = късмет, right = избор)
       var ev = '<span class="tev">' + (fa.manual ? '' : '<span class="tl xterm" data-x="ev" title="късмет (EV)">' + evNum(td.luck) + '</span>')
         + '<span class="tl xterm" data-x="ev" title="избор (EV)">' + evNum(td.skill) + '</span></span>';
-      html += '<div class="evtrow ' + q.cls + (genRow ? ' q-general' : '') + '">'
-        + '<span class="tn">Х' + (td.turn + 1) + '</span>'
+      var rowInner = '<span class="tn">Х' + (td.turn + 1) + '</span>'
         + '<span class="tc' + (forfeit ? ' forfeit' : '') + '">' + esc(sumLabel(td.category)) + '</span>'
         + '<span class="tv">' + td.score + ' т.</span>'
         + ev
-        + qualityIcon(td.skill, pi, td.turn) + '</div>';
-      html += turnDiceHTML(pi, td, fa.manual);
+        + qualityIcon(td.skill, pi, td.turn);
+      var dice = turnDiceHTML(pi, td, fa.manual);
+      var rowCls = 'evtrow ' + q.cls + (genRow ? ' q-general' : '');
+      // each turn folds open to reveal its dice throws/rerolls; collapsed by default
+      if (dice) html += '<details class="evturn"><summary class="' + rowCls + '">' + rowInner + '</summary>' + dice + '</details>';
+      else html += '<div class="' + rowCls + '">' + rowInner + '</div>';
     });
     html += '</details>';
 
