@@ -660,11 +660,14 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 .netcode-in.flash-green{ border-color:#2e9e5b; color:#8fe0ac; background:rgba(46,158,91,.16); transition:border-color .12s, color .12s, background .12s; }
 /* the game-code QR (host side / in-game reconnect) — always shown above the code */
 .netcodeqr{ width:100%; max-width:172px; margin:10px auto 8px; background:#fff; padding:8px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+.netcodeqr.loading{ background:transparent; box-shadow:none; padding:0; }   /* while loading/error: sit on the view bg, no white tile */
 .netcodeqr svg{ display:block; width:100%; height:auto; }
 .netcodeqr .qr-load{ display:block; padding:18px 6px; color:#16160e; font-size:12px; text-transform:none; letter-spacing:0; }
-/* QR loading spinner — shown in the host code box until the QR is generated */
+.netcodeqr.loading .qr-load{ color:var(--gen-muted); }
+/* QR loading spinner — shown until the QR is generated (brass on the view bg, dark only on the white tile) */
 .netcodeqr .qr-spin{ display:block; width:34px; height:34px; margin:0 auto 10px; border-radius:50%;
   border:3px solid rgba(22,22,14,.18); border-top-color:#16160e; animation:qrspin .8s linear infinite; }
+.netcodeqr.loading .qr-spin{ border-color:rgba(232,195,86,.25); border-top-color:var(--gen-brass-bright); }
 @keyframes qrspin { to { transform:rotate(360deg); } }
 .netcode-lbl{ margin-bottom:2px; }
 /* share-QR url line: not selectable; a tap copies it and flashes green (like the host code) */
@@ -2354,10 +2357,13 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.6';
+  var APP_VERSION = '1.48.7';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.7', items: [
+      ['fix', 'Наблюдение по мрежа: „Към текущия играч“ вече винаги връща екрана на активния играч (дори преди той да е хвърлил).'],
+      ['chg', 'Зареждане на QR: вместо бял квадрат с въртележка сега се показва само анимация върху фона на изгледа.'] ] },
     { v: '1.48.6', items: [
       ['fix', 'Мрежова игра „с минуси“: отрицателните точки (горен ред) вече се предават правилно — другото устройство вече не показва огромни погрешни стойности.'] ] },
     { v: '1.48.5', items: [
@@ -4105,18 +4111,20 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   function renderCodeQRInto(qbox, code) {
     if (!qbox) return;
     if (window.qrcode) { renderCodeQR(qbox, code); return; }
+    qbox.classList.add('loading');   // spinner sits on the view bg, not a white tile
     qbox.innerHTML = '<span class="qr-load"><span class="qr-spin"></span>Зареждам QR…</span>';
     loadOpticalLibs(function (ok) {
       if (ok && window.qrcode) renderCodeQR(qbox, code);
-      else qbox.innerHTML = '<span class="qr-load">⚠ Няма QR (нужен е интернет първия път).</span>';
+      else qbox.innerHTML = '<span class="qr-load">⚠ Няма QR (нужен е интернет първия път).</span>';   // stays .loading
     });
   }
   function renderCodeQR(qbox, code) {
     try {
       var qr = window.qrcode(0, 'M'); qr.addData(String(code)); qr.make();
+      qbox.classList.remove('loading');   // a real QR needs the white tile to scan
       qbox.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
       var svg = qbox.querySelector('svg'); if (svg) { svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto'; }
-    } catch (e) { qbox.innerHTML = '<span class="qr-load">⚠ Грешка при QR.</span>'; }
+    } catch (e) { qbox.classList.add('loading'); qbox.innerHTML = '<span class="qr-load">⚠ Грешка при QR.</span>'; }
   }
   // host lobby: show the QR up top so a guest can scan it, with the code + copy button beneath.
   function renderHostCode(code) {
@@ -4567,7 +4575,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   var SPEC_GAP = 2500, SPEC_HILITE = 500;
   var specQueue = [], specBusy = false, specTimer = null, specEpoch = 0;
   var specPid = null, specRollNo = 0, specPairs = [], specThrow = null, specPulseOn = false;
-  function resetSpecPlay() { specEpoch++; specQueue = []; specBusy = false; clearTimeout(specTimer); specTimer = null; specPid = null; specRollNo = 0; specPairs = []; specThrow = null; }
+  function resetSpecPlay() { specEpoch++; specQueue = []; specBusy = false; clearTimeout(specTimer); specTimer = null; specPid = null; specRollNo = 0; specPairs = []; specThrow = null; specSaved = null; }
   function netSpectate(a) {
     if (!netMode || !game) return;
     if (a.playerId === localPid) return;                 // my own action — already on my board
@@ -4625,6 +4633,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   function previewSelf() {
     if (!netMode || localPid == null) return;
     var seat = netOrder.indexOf(localPid); if (seat < 0) return;
+    // snapshot the watched view so RETURN restores it exactly (even if the active player hasn't rolled yet)
+    if (!specSelf) specSaved = { dice: dice.slice(), diceGen: diceGen.slice(), diceNew: diceNew.slice(), throwsLeft: throwsLeft,
+      selected: selected.slice(), specPairs: specPairs.slice(), specRollNo: specRollNo, specThrow: specThrow };
     specSelf = true; specThrow = null;
     game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
     dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false]; diceGen = [];
@@ -4632,10 +4643,17 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   function returnToCurrent() {
     specSelf = false;
-    if (netActiveId != null && specPairs.length) {
-      var seat = netOrder.indexOf(netActiveId);
-      if (seat >= 0) { game.current = seat; netMyTurn = (netActiveId === localPid); locked = !netMyTurn; awaitingRoll = false; renderAll(); }
+    // always jump the board back to the current active player (don't require spectated dice to exist)
+    var seat = netActiveId != null ? netOrder.indexOf(netActiveId) : -1;
+    if (seat >= 0) {
+      game.current = seat; netMyTurn = (netActiveId === localPid); locked = !netMyTurn; awaitingRoll = false;
+      if (specSaved) {   // restore the exact watch-view we left
+        dice = specSaved.dice; diceGen = specSaved.diceGen; diceNew = specSaved.diceNew; throwsLeft = specSaved.throwsLeft;
+        selected = specSaved.selected; specPairs = specSaved.specPairs; specRollNo = specSaved.specRollNo; specThrow = specSaved.specThrow;
+      }
+      renderAll();
     }
+    specSaved = null;
     syncSpecReturn();
     specPump();   // resume the paced replay
   }
@@ -4771,7 +4789,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
   var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
-  var netActiveId = null, specSelf = false, specAct = null;   // spectating: who's playing, am I previewing my own board, last action
+  var netActiveId = null, specSelf = false, specAct = null, specSaved = null;   // spectating: who's playing, am I previewing my own board, last action, saved watch-view
   // true while we're rendering a watched opponent's read-only frame (not my turn, not my own-board preview)
   function netWatching() { return netMode && locked && !netMyTurn && !specSelf && netActiveId != null && netActiveId !== localPid; }
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
