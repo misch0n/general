@@ -351,7 +351,17 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 /* footer rules + archive: small icon-only buttons (CSS-drawn glyphs, no text) */
 .setup-actions-icons{ justify-content:center; gap:14px; margin-top:0; }
 .btn.iconbtn{ flex:none; width:40px; height:40px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:0; }
-.iconbtn .ic-book, .iconbtn .ic-archive, .iconbtn .ic-combos{ color:var(--gen-brass-bright); }
+.iconbtn .ic-book, .iconbtn .ic-archive, .iconbtn .ic-combos, .iconbtn .ic-coffee{ color:var(--gen-brass-bright); }
+/* coffee row: a single centred icon button above the rules/settings/history row */
+.setup-actions-coffee{ justify-content:center; margin-top:0; margin-bottom:2px; }
+/* CSS-drawn cup of coffee (currentColor) — mug body + handle + two steam wisps */
+.ic-coffee{ position:relative; display:block; width:22px; height:20px; }
+.ic-coffee::before{ content:''; position:absolute; left:1px; bottom:0; width:15px; height:12px; border:2px solid currentColor;
+  border-radius:2px 2px 5px 5px; }   /* the mug body */
+.ic-coffee::after{ content:''; position:absolute; left:14px; top:9px; width:7px; height:8px; border:2px solid currentColor;
+  border-left:none; border-radius:0 6px 6px 0; }   /* the handle */
+.ic-coffee b{ position:absolute; left:5px; top:0; width:2px; height:4px; background:currentColor; border-radius:2px;
+  box-shadow:5px 0 0 currentColor; opacity:.85; }   /* two steam wisps */
 /* CSS-drawn combinations list — two bullets + two lines (the scoring combos) */
 .ic-combos{ position:relative; display:block; width:19px; height:14px; }
 .ic-combos::before{ content:''; position:absolute; left:0; top:2px; width:4px; height:4px; border-radius:1px; background:currentColor; box-shadow:0 7px 0 currentColor; }
@@ -1620,6 +1630,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     <footer class="setup-footer">
       <!-- transient info note for ruleset / network changes -->
       <div id="infoToast" class="infotoast" role="status" aria-live="polite"><i class="info-ic" aria-hidden="true"></i><span class="info-txt" id="infoToastTxt"></span></div>
+      <div class="setup-actions setup-actions-coffee">
+        <a id="coffeeBtn" class="btn iconbtn" href="https://buymeacoffee.com/mischon" target="_blank" rel="noopener noreferrer" title="Почерпи ме с кафе" aria-label="Почерпи ме с кафе"><i class="ic-coffee" aria-hidden="true"><b></b></i></a>
+      </div>
       <div class="setup-actions setup-actions-icons">
         <button id="howtoBtn" class="btn iconbtn" title="Правила" aria-label="Правила"><i class="ic-book" aria-hidden="true"></i></button>
         <button id="setupMenuBtn" class="btn iconbtn" title="Настройки" aria-label="Настройки"><span class="burger" aria-hidden="true"></span></button>
@@ -2286,10 +2299,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   var $ = function (id) { return document.getElementById(id); };
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.47.3';
+  var APP_VERSION = '1.47.4';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.47.4', items: [
+      ['new', 'Начален екран: бутон с чаша кафе над „Настройки“ — отваря профила за почерпка (Buy Me a Coffee) в нов раздел.'] ] },
     { v: '1.47.3', items: [
       ['chg', 'Присъединяване: бутонът „Постави“ приема и целия споделен текст от старшината (а не само голия код) — извлича кода от него.'] ] },
     { v: '1.47.2', items: [
