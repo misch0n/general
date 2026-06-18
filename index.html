@@ -368,7 +368,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .btn.iconbtn{ flex:none; width:40px; height:40px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:0; }
 .iconbtn .ic-book, .iconbtn .ic-archive, .iconbtn .ic-combos, .iconbtn .ic-coffee{ color:var(--gen-brass-bright); }
 /* coffee row: a single centred icon button above the rules/settings/history row */
-.setup-actions-coffee{ justify-content:center; margin-top:0; margin-bottom:2px; }
+/* Buy-Me-a-Coffee mug — sits centred between the local/network labels, scaled down to their size.
+   negative margin collapses the glyph's box so the selector's flex gap stays equal on both sides */
+.ssel-coffee{ display:inline-flex; align-items:center; justify-content:center; color:var(--gen-brass-bright);
+  text-decoration:none; line-height:0; -webkit-tap-highlight-color:transparent; }
+.ssel-coffee .ic-coffee{ transform:scale(.7); transform-origin:center; margin:-3px; }
 /* CSS-drawn cup of coffee (currentColor) — mug body + handle + two steam wisps */
 .ic-coffee{ position:relative; display:block; width:22px; height:20px; }
 .ic-coffee::before{ content:''; position:absolute; left:1px; bottom:0; width:15px; height:12px; border:2px solid currentColor;
@@ -1649,9 +1653,6 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     <footer class="setup-footer">
       <!-- transient info note for ruleset / network changes -->
       <div id="infoToast" class="infotoast" role="status" aria-live="polite"><i class="info-ic" aria-hidden="true"></i><span class="info-txt" id="infoToastTxt"></span></div>
-      <div class="setup-actions setup-actions-coffee">
-        <a id="coffeeBtn" class="btn iconbtn" href="https://buymeacoffee.com/mischon" target="_blank" rel="noopener noreferrer" title="Почерпи ме с кафе" aria-label="Почерпи ме с кафе"><i class="ic-coffee" aria-hidden="true"><b></b></i></a>
-      </div>
       <div class="setup-actions setup-actions-icons">
         <button id="howtoBtn" class="btn iconbtn" title="Правила" aria-label="Правила"><i class="ic-book" aria-hidden="true"></i></button>
         <button id="setupMenuBtn" class="btn iconbtn" title="Настройки" aria-label="Настройки"><span class="burger" aria-hidden="true"></span></button>
@@ -1664,9 +1665,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
         <span class="pb-go" id="pbGo">БОЙ!</span>
         <i class="pb-ic pb-pencil" aria-hidden="true"></i>
       </div>
-      <!-- local vs network: decides what the play button above does -->
+      <!-- local vs network: decides what the play button above does (coffee mug centred between) -->
       <div class="ssel ssel-where" id="startWhereSel">
         <button type="button" class="ssel-opt" data-net="0">на устройството</button>
+        <a id="coffeeBtn" class="ssel-coffee" href="https://buymeacoffee.com/mischon" target="_blank" rel="noopener noreferrer" draggable="false" title="Почерпи ме с кафе" aria-label="Почерпи ме с кафе"><i class="ic-coffee" aria-hidden="true"><b></b></i></a>
         <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
       </div>
       <div class="setup-actions">
@@ -2348,10 +2350,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.3';
+  var APP_VERSION = '1.48.4';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.4', items: [
+      ['chg', 'Бутонът за кафе вече е малка чашка по средата между „на устройството“ и „по мрежа“; плъзгане по целия ред пак сменя избора, а докосване на чашката отваря почерпката.'] ] },
     { v: '1.48.3', items: [
       ['chg', 'QR прозорец: при копиране адресът за кратко се сменя с „копирано!“ (докато трае зеленото просветване).'] ] },
     { v: '1.48.2', items: [
@@ -3221,6 +3225,8 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   // ruleset row: [с минуси | без минуси]; where row: [на устройството | по мрежа]
   attachSelSwipe($('startRuleSel'), function () { setStartRuleset('experimental'); }, function () { setStartRuleset('standard'); });
   attachSelSwipe($('startWhereSel'), function () { setStartWhere(false); }, function () { setStartWhere(true); });
+  // the coffee mug lives inside the where-selector: a tap opens the link, but a swipe across it must not
+  $('coffeeBtn').addEventListener('click', function (e) { if ($('startWhereSel')._swiped) { $('startWhereSel')._swiped = false; e.preventDefault(); } });
   // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
   function startNetFlow(manual) {
     $('setupErr').textContent = '';
