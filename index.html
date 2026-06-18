@@ -254,8 +254,9 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-title.dev-on{ cursor:pointer; color:var(--gen-brass-bright); text-shadow:0 2px 0 #000, 0 0 22px rgba(232,195,86,.55); }   /* unlocked: tap opens the dev panel */
 /* the second letter „Е" of the title is a CSS-drawn glyph that doubles as a QR-scan mark — three
    finder corners folded into the letter's own corners. Tapping it pops the page QR (scan to join). */
-.setup-title .qre{ position:relative; display:inline-block; width:1em; height:1em; font-size:.68em;
-  vertical-align:-.07em; color:currentColor; cursor:pointer; filter:drop-shadow(0 2px 0 #000); }   /* match the title's drop shadow */
+.setup-title .qre{ position:relative; display:inline-block; width:1em; height:1em;
+  font-size:.71em; font-size:1cap;   /* 1cap = the title font's cap height → exactly as tall as the letters (em fallback) */
+  vertical-align:baseline; color:currentColor; cursor:pointer; filter:drop-shadow(0 2px 0 #000); }   /* match the title's drop shadow */
 .setup-title .qre::before, .setup-title .qre::after{ content:''; position:absolute; }
 .setup-title .qre::before{ left:.12em; top:.12em; width:.1em; height:.76em; background:currentColor; }   /* spine */
 .setup-title .qre::after{ left:.12em; top:.12em; width:.72em; height:.1em; background:currentColor; }    /* top arm (full) */
@@ -2246,8 +2247,8 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 
 <!-- tap the „Е" in the title: a QR of this page so a friend can scan and open the game --><div id="qrShareModal" class="overlay hidden">
   <div class="modal" style="max-width:300px;text-align:center">
-    <h2>Сканирай и играй</h2>
-    <p class="ht" style="margin-top:0">Дай на приятел да сканира — отваря играта на телефона му.</p>
+    <h2>Сподели с приятел</h2>
+    <p class="ht" style="margin-top:0">Сподели този QR с приятел, за да зареди страницата в браузъра си.</p>
     <div class="netcodeqr" id="qrShareBox"></div>
     <p class="ht" id="qrShareUrl" style="word-break:break-all;font-size:11px;letter-spacing:0;text-transform:none"></p>
     <div class="setup-actions">
@@ -2343,10 +2344,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.0';
+  var APP_VERSION = '1.48.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.1', items: [
+      ['chg', 'Заглавието: QR-буквата „Е" вече е точно толкова висока, колкото останалите букви; текстът на QR прозореца е „Сподели с приятел“.'] ] },
     { v: '1.48.0', items: [
       ['new', 'Буквата „Е" в заглавието е нарисувана като QR-знак — докосни я и изскача QR код към играта, който приятел може да сканира, за да я отвори.'] ] },
     { v: '1.47.5', items: [
