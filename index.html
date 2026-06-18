@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Генерал · ЩАБ</title>
+<!-- privacy-friendly, cookieless analytics (page visits + custom game events) -->
+<script data-goatcounter="https://mischon.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -2298,11 +2300,31 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     } catch (e) { exactReady = false; }
   })();
   var $ = function (id) { return document.getElementById(id); };
+  // ---- analytics (GoatCounter custom events; cookieless, no personal data) ----
+  // page visits (city/country/OS/browser) are counted automatically by count.js;
+  // these helpers fire the named game events. Always best-effort — never throws.
+  function track(name) {
+    try {
+      if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: name, title: name, event: true });
+    } catch (e) {}
+  }
+  // one game lifecycle event ('start' | 'finish' | 'abort' | 'error'), tagged net/local + manual/regular;
+  // a finished game also reports this device's dice-flavour (keep-vs-throw, order-vs-separate)
+  function trackGame(kind) {
+    var p = (netMode ? 'net' : 'local') + '-' + (manualMode ? 'manual' : 'regular');
+    track(p + '-' + kind);
+    if (kind === 'finish') {
+      track(settings.selectKeep ? 'finish-keep' : 'finish-throw');
+      track(settings.newDiceBatch ? 'finish-order' : 'finish-separate');
+    }
+  }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.47.4';
+  var APP_VERSION = '1.47.5';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.47.5', items: [
+      ['new', 'Анонимна статистика (GoatCounter, без бисквитки): посещения и събития за игрите — старт/край/отказ, мрежови грешки, хостване/присъединяване, въвеждане на код, прекъсване/възстановяване, изнасяне/внасяне.'] ] },
     { v: '1.47.4', items: [
       ['new', 'Начален екран: бутон с чаша кафе над „Настройки“ — отваря профила за почерпка (Buy Me a Coffee) в нов раздел.'] ] },
     { v: '1.47.3', items: [
@@ -3321,7 +3343,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
         else if (net.isHost) setFlavour($('netStatus'), 'hostSearch');
       },
       onJoined: function (id, manual, exp) {
-        localPid = id;
+        localPid = id; track('join-success');
         // what I SELECTED on the start screen, before adopting the host's actual game
         var selM = netManual, selE = selExp();
         var hostM = (typeof manual === 'boolean') ? manual : selM, hostE = !!exp;
@@ -3330,7 +3352,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
         netJoinMismatch(selM, selE, hostM, hostE);   // warn (don't block) if it differs from my selection
         renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait');
       },
-      onReject: function (reason) { netOnReject(reason); },
+      onReject: function (reason) { track('join-error'); netOnReject(reason); },
       onHostGone: function () { netHostGone(); },             // host cancelled the lobby → back to picker
       onBeacon: function () { if (!net.isHost && net.myId == null) setFlavour($('netStatus'), 'clientSaw'); },
       onPrep: function () { enterNetPrep(); },
@@ -3344,6 +3366,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       onDrop: function (id, dropped) { netOnDrop(id, dropped); },
       onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
+      onError: function () { if (netMode && game) trackGame('error'); },   // mid-game data/link failure
     };
   }
   // mirror the host's dropped flags onto the live players, refresh the board, and surface it
@@ -3906,7 +3929,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     netStartTransport(function () {
       net = newSession(true); localPid = MP.HOST_ID;
       netShow('scan'); $('netToPrep').classList.add('hidden');
-      net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
+      net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch'); track('host-success');
     });
   };
   $('netJoin').onclick = function () {
@@ -3926,6 +3949,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   };
   // guest: scan the host's QR to fill the code field (no typing). reuses the optical scan view.
   var codeScanActive = false;
+  // how the join code reached the field — reported once when the guest taps „Влез с кода"
+  var lastCodeSource = 'manual';
+  if ($('netCodeInput')) $('netCodeInput').addEventListener('input', function () { lastCodeSource = 'manual'; });
   function codeScanShow() {
     codeScanActive = true;
     optShow(false, true); optStatus('Насочи камерата към QR кода на старшината…'); optNextBtn(null);
@@ -3935,7 +3961,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       if (!code) { optStatus('⚠ Това не е код за игра. Опитай пак.'); optNextBtn('📷 Опитай пак', codeScanShow); return; }
       codeScanActive = false; stopScan(); optHideView();
       netShow('choose'); $('netPickRole').classList.add('hidden'); $('netJoinCode').classList.remove('hidden');
-      $('netCodeInput').value = code; netChooseMsg(''); flashCodeGreen();   // scan feedback = code box only
+      $('netCodeInput').value = code; lastCodeSource = 'qr'; netChooseMsg(''); flashCodeGreen();   // scan feedback = code box only
     });
   }
   // pull a 4–6 char game code out of whatever the QR carried (plain code, or with stray chars)
@@ -3964,7 +3990,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     navigator.clipboard.readText().then(function (t) {
       // accept a bare 6-char code or the exact host share message; anything else is rejected
       var code = parsePastedCode(t);
-      if (code) { $('netCodeInput').value = code; netChooseMsg(''); flashCodeGreen($('netCodePaste')); }
+      if (code) { $('netCodeInput').value = code; lastCodeSource = 'paste'; netChooseMsg(''); flashCodeGreen($('netCodePaste')); }
       else netChooseMsg('⚠ Копираният код не е правилен — трябва да е 6 букви и цифри.');
     }).catch(function () { netChooseMsg('⚠ Нямам достъп до клипборда — постави ръчно.'); });
   };
@@ -4093,8 +4119,8 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
         net = newSessionWith(netBus, true); localPid = MP.HOST_ID;
         netShow('scan'); $('netToPrep').classList.add('hidden'); netChooseMsg('');
         renderHostCode(code);
-        net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
-      }).catch(function (e) { netChooseMsg('⚠ Неуспешно свързване със сървъра: ' + ((e && (e.type || e.message)) || 'грешка') + '. Опитай пак.'); netBus = null; });
+        net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch'); track('host-success');
+      }).catch(function (e) { track('host-error'); netChooseMsg('⚠ Неуспешно свързване със сървъра: ' + ((e && (e.type || e.message)) || 'грешка') + '. Опитай пак.'); netBus = null; });
     });
   }
   // ---- WebRTC client: dial the host's code, then ask to join the lobby ----
@@ -4102,13 +4128,14 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (netKind !== 'webrtc') return;
     var code = ($('netCodeInput').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4) { netChooseMsg('⚠ Въведи валиден код (поне 4 знака).'); return; }
+    track('code-' + lastCodeSource);   // how this code was entered: qr / paste / manual
     wrCapReset('client', code); wrlog('action', { tap: 'joinCode', code: code }); syncWrCapVis();
     $('netCodeJoin').disabled = true; netChooseMsg('Свързвам се с код ' + code + '…');
     loadPeerJS(function (ok) {
       if (!ok) { $('netCodeJoin').disabled = false; netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
       netBus = new PeerBus({ isHost: false, code: code,
         onLost: function () { netClientLost(); },
-        onReup: function () { wrlog('reup', {}); netReconnecting = false; syncNetLink(); if (net) net.rejoin(); netSay('Връзката се възстанови — наваксвам…'); } });
+        onReup: function () { wrlog('reup', {}); netReconnecting = false; syncNetLink(); if (net) net.rejoin(); track('net-reconnect'); netSay('Връзката се възстанови — наваксвам…'); } });
       netBus.start().then(function () {
         var savedEph = wrLoadEph(code);                 // reuse our identity if we've played this game before
         net = newSessionWith(netBus, false, savedEph || undefined);
@@ -4117,7 +4144,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
         netShow('scan'); $('netToPrep').classList.add('hidden');
         net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
       }).catch(function (e) {
-        $('netCodeJoin').disabled = false;
+        $('netCodeJoin').disabled = false; track('join-error');
         var et = e && (e.type || e.message);
         // a timeout/negotiation failure = signalling worked but the P2P link couldn't form (NAT/TURN);
         // 'peer-unavailable' = the code/host wasn't found at all
@@ -4138,7 +4165,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     net.markDropped(pid, true);
   }
   function netClientLost() {
-    if (netMode) { netReconnecting = true; syncNetLink(); netSay('Връзката с хоста прекъсна — опитвам да се върна…'); }
+    if (netMode) { track('net-disconnect'); netReconnecting = true; syncNetLink(); netSay('Връзката с хоста прекъсна — опитвам да се върна…'); }
     else netChooseMsg('⚠ Връзката прекъсна. Опитай пак.');
   }
   // ===================================================== OPTICAL (QR) handshake ==============
@@ -4251,7 +4278,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       if (!ok) { netChooseMsg('⚠ Неуспешно зареждане на QR библиотеките (нужен е интернет първия път).'); return; }
       optBus = new RtcBus({ isHost: true, onLost: function (conn) { netHostLost(conn); } });
       netBus = optBus; net = newSessionWith(optBus, true); localPid = MP.HOST_ID;
-      net.openLobby();
+      net.openLobby(); track('host-success');
       opticalNewOffer();
     });
   }
@@ -4434,6 +4461,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     game = (exp ? X.createGame(players) : G.createGame(players)); game.ownerSkipped = false;
     game.ruleset = exp ? 'experimental' : 'standard';          // drives sumExp() → exp board/scoring over the net
     manualMode = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
+    trackGame('start');
     moveLog = players.map(function () { return []; });
     $('netModal').classList.add('hidden'); $('setup').classList.add('hidden');
     $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
@@ -4719,6 +4747,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     game.ownerSkipped = skipOwnerNext || ownerDetached; // record so this game is excluded from owner trends
     skipOwnerNext = false; ownerDetached = false;        // the skip/detach is a one-game decision
     manualMode = !!manual;
+    trackGame('start');
     undoStack = [];
     moveLog = players.map(function () { return []; });
     $('setup').classList.add('hidden');
@@ -5388,6 +5417,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   var EXP_CELLS = X ? X.KEYS.length : 15;
   function expStartGame(players, manual) {
     expMode = true; netMode = false; manualMode = !!manual;
+    trackGame('start');
     clearAllPenalties();
     game = X.createGame(players);
     game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
@@ -5911,7 +5941,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   function expEndGame() {
     locked = true;
-    if (!viewingHistory) { archiveExpGame(); clearResume(); }
+    if (!viewingHistory) { archiveExpGame(); clearResume(); trackGame('finish'); }
     showGameOver(X.ranking(game)[0].player);   // same end screen as standard, sourced from the exp ruleset
   }
   function archiveExpGame() {
@@ -6287,6 +6317,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   $('menuHowto').onclick = function () { $('menuModal').classList.add('hidden'); openHowto(); };
   // aborting a live battle to the muster screen — keeps the SAME roster so the lineup can be tweaked
   function abortToStart() {
+    if (game) trackGame('abort');   // before resetNet() clears netMode/manualMode
     $('menuModal').classList.add('hidden'); $('abortModal').classList.add('hidden');
     $('overModal').classList.add('hidden');
     resetNet();
@@ -6867,7 +6898,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     });
   }
   function endGame() {
-    if (!viewingHistory) { saveCurrentGame(); clearResume(); }   // archive (each device flags ITS player as owner) + drop resume
+    if (!viewingHistory) { saveCurrentGame(); clearResume(); trackGame('finish'); }   // archive (each device flags ITS player as owner) + drop resume
     // dropped/incomplete players can't win or place — rank only those who finished
     var pool = game.players.filter(function (p) { return !isExcluded(p); });
     if (!pool.length) pool = game.players.slice();
@@ -8870,6 +8901,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   // ---- export / import a game (share local history across devices) ----
   var currentExportRec = null;
   function exportGame(rec) {
+    track('export');
     currentExportRec = rec;
     $('exportText').value = JSON.stringify(rec, null, 2);
     $('exportCopied').classList.add('hidden');
@@ -8988,6 +9020,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (!psel || !gsel) { importError('Избери играч и битка.'); return; }
     var err = mergePlayerIntoGame(importParsed, +psel.getAttribute('data-val'), gsel.getAttribute('data-gid'));
     if (err) { importError(err); return; }
+    track('import');
     $('importModal').classList.add('hidden');
     openHistory();
   }
@@ -9015,6 +9048,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     rec.ts = rec.ts || Date.now();
     rec.manualMode = !!rec.manualMode;
     var arr = loadHistory(); arr.push(rec); arr.sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); }); persistHistory(arr);
+    track('import');
     $('importModal').classList.add('hidden');
     openHistory();
   }
