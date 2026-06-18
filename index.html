@@ -254,7 +254,7 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .setup-title.dev-on{ cursor:pointer; color:var(--gen-brass-bright); text-shadow:0 2px 0 #000, 0 0 22px rgba(232,195,86,.55); }   /* unlocked: tap opens the dev panel */
 /* the second letter „Е" of the title is a CSS-drawn glyph that doubles as a QR-scan mark — three
    finder corners folded into the letter's own corners. Tapping it pops the page QR (scan to join). */
-.setup-title .qre{ position:relative; display:inline-block; width:1em; height:1em;
+.setup-title .qre{ position:relative; display:inline-block; width:1em; height:1em; margin-right:6px;   /* inline-blocks don't get the title's trailing letter-spacing — add it back so spacing stays uniform */
   font-size:.71em; font-size:1cap;   /* 1cap = the title font's cap height → exactly as tall as the letters (em fallback) */
   vertical-align:baseline; color:currentColor; cursor:pointer; filter:drop-shadow(0 2px 0 #000); }   /* match the title's drop shadow */
 .setup-title .qre::before, .setup-title .qre::after{ content:''; position:absolute; }
@@ -659,6 +659,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   border:3px solid rgba(22,22,14,.18); border-top-color:#16160e; animation:qrspin .8s linear infinite; }
 @keyframes qrspin { to { transform:rotate(360deg); } }
 .netcode-lbl{ margin-bottom:2px; }
+/* share-QR url line: not selectable; a tap copies it and flashes green (like the host code) */
+#qrShareUrl{ display:inline-block; cursor:pointer; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  border-radius:6px; padding:3px 7px; transition:color .12s, background .12s; }
+#qrShareUrl.copied{ color:#8fe0ac; background:rgba(46,158,91,.16); }
 .netjoinview{ margin:6px 0; }
 /* regular vs manual network-game switcher */
 .netmodeswitch{ display:flex; gap:0; margin:4px 0 12px; border:1px solid var(--gen-pill-line); border-radius:9px; overflow:hidden; background:rgba(0,0,0,.25); }
@@ -2344,10 +2348,13 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.48.1';
+  var APP_VERSION = '1.48.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.48.2', items: [
+      ['fix', 'Заглавието: разстоянието около QR-буквата „Е" е изравнено с останалите букви.'],
+      ['chg', 'QR прозорец: адресът отдолу не се маркира — докосни го, за да го копираш (светва зелено).'] ] },
     { v: '1.48.1', items: [
       ['chg', 'Заглавието: QR-буквата „Е" вече е точно толкова висока, колкото останалите букви; текстът на QR прозореца е „Сподели с приятел“.'] ] },
     { v: '1.48.0', items: [
@@ -6466,6 +6473,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   })();
   $('qrShareClose').onclick = function () { $('qrShareModal').classList.add('hidden'); };
   $('qrShareModal').onclick = function (e) { if (e.target === $('qrShareModal')) $('qrShareModal').classList.add('hidden'); };
+  // tap the url line to copy it (no text selection) — flash green like the host code
+  $('qrShareUrl').onclick = function () {
+    copyToClipboard(this.textContent);
+    this.classList.add('copied'); clearTimeout(this._t);
+    var el = this; el._t = setTimeout(function () { el.classList.remove('copied'); }, 1600);
+  };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   // dev modal controls
   $('devClose').onclick = function () { closeDevModal(); };
