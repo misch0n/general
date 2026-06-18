@@ -574,10 +574,11 @@ body.modal-open{ overflow:hidden; }
 .rdie.combo{ width:17px; height:17px; font-size:11px; }   /* dice that form the scored combo, on the final roll */
 /* a small SQUARE die icon (brass pips on the dark panel); used by both keep metrics.
    side = 40% of the percentage label's line height (--kdlh) so it stays crisp and undistorted */
-.kddie{ display:inline-block; flex:none; box-sizing:border-box; width:calc(var(--kdlh) * .4); height:calc(var(--kdlh) * .4);
-  border:1px solid var(--gen-brass-stroke); border-radius:2px; padding:1px; color:var(--gen-brass-bright); vertical-align:middle; }
-.kddie .face{ width:100%; height:100%; gap:1px; }
-.kddie .pip{ border-radius:1px; } .kddie .pip.on{ background:currentColor; }
+/* same die look as the combinations reference sheet (.csdie): light body, dark pips */
+.kddie{ display:inline-grid; place-items:center; flex:none; box-sizing:border-box; width:calc(var(--kdlh) * .4); height:calc(var(--kdlh) * .4);
+  background:#d8cfa8; border:1px solid var(--gen-ink-line); border-radius:2px; vertical-align:middle; }
+.kddie .face{ width:70%; height:70%; gap:1px; }
+.kddie .pip{ border-radius:1px; }
 /* dice-keep „chase" distribution: per-face percentage above its die icon */
 .keepdist{ --kdlh:34px; display:flex; gap:5px; margin-top:4px; }
 .kdcell{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
@@ -2396,10 +2397,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.5';
+  var APP_VERSION = '1.50.6';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.6', items: [
+      ['chg', 'Зар-иконите в статистиките за задържане вече са като заровете от листа с комбинации (светли с тъмни точки).'] ] },
     { v: '1.50.5', items: [
       ['chg', 'Бутонът за записване на комбинация вече казва „ИЗБЕРИ КОМБИНАЦИЯ!“.'],
       ['fix', 'Игра с минуси: бутонът за хвърляне вече се оцветява правилно след мрежова игра (вече не остава като бутона „избери зарове“).'] ] },
