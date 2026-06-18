@@ -176,6 +176,11 @@ button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
 .pip.on{ background:var(--gen-pip); }
 .reticle{ position:absolute; top:-9px; right:-9px; width:22px; height:22px; display:grid; place-items:center;
   background:var(--gen-ink); color:var(--gen-brass); border:1.5px solid var(--gen-brass); border-radius:50%; font-size:12px; }
+/* „roll all" — sits just above the dice in keep-mode, re-throws every die at once */
+.rollall{ display:block; margin:0 auto 7px; padding:5px 14px; font-family:var(--gen-font-display); font-weight:700; font-size:12px;
+  letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass-bright); background:rgba(0,0,0,.25);
+  border:1px solid var(--gen-pill-line); border-radius:999px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.rollall:active{ transform:translateY(1px); }
 .fire{ height:54px; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-tag); background:var(--gen-brass); color:var(--gen-ink); cursor:pointer;
   font-family:var(--gen-font-display); font-weight:700; font-size:18px; text-transform:uppercase; letter-spacing:2px;
   box-shadow:0 4px 0 var(--gen-brass-dark); transition:transform .08s ease; }
@@ -1750,6 +1755,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   <!-- fixed overlay bottom bar: dice on top, action button below (page scrolls beneath it) -->
   <div id="bottombar" class="bottombar">
     <div id="diceFooter" class="gamefooter">
+      <button type="button" id="rollAll" class="rollall hidden">↻ Хвърли всички</button>
       <div id="dice" class="dice"></div>
     </div>
     <div id="firebar" class="firebar">
@@ -2399,10 +2405,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.7';
+  var APP_VERSION = '1.50.8';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.8', items: [
+      ['new', 'Режим „избери кои да държиш“: бутон „↻ Хвърли всички“ над заровете хвърля наново всичките пет наведнъж.'] ] },
     { v: '1.50.7', items: [
       ['new', 'Статистика „Дръж / хвърли“: под всеки зар вече се вижда и какъв дял изхвърляш (червено), освен какъв дял задържаш (зелено).'] ] },
     { v: '1.50.6', items: [
@@ -5375,7 +5383,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 
   function renderFire() {
     $('fire').classList.remove('muted');   // clear any leftover spectator styling
-    syncSpecReturn();
+    syncSpecReturn(); syncRollAll();
     if (manualMode) { $('bottombar').classList.remove('preroll'); return; }
     // ---- network spectating: previewing my own board, or watching an opponent's turn ----
     if (netMode && specSelf) {
@@ -5421,6 +5429,22 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     // (no live broadcast of selections — watchers see the throw highlighted at reroll time instead)
   }
   $('fire').onclick = function () { humanFire(); };
+  // „roll all": keep-mode helper that re-throws every die (keep nothing → reroll all)
+  function syncRollAll() {
+    var btn = $('rollAll'); if (!btn) return;
+    var p = game && game.players && game.players[game.current];
+    var watching = netMode && (!netMyTurn || specSelf);
+    var show = !manualMode && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0
+      && p && !p.isAI && !watching && activeKeep() && dice.length === G.DICE_COUNT;
+    btn.classList.toggle('hidden', !show);
+  }
+  $('rollAll').onclick = function () {
+    var p = game && game.players && game.players[game.current];
+    if (manualMode || awaitingRoll || locked || aiBusy || throwsLeft <= 0 || !p || p.isAI) return;
+    if (netMode && (!netMyTurn || specSelf)) return;
+    selected = [false, false, false, false, false];   // hold nothing → the reroll mask covers all five
+    humanFire();   // routes to expHumanFire when expMode
+  };
   $('specReturn').onclick = function () { returnToCurrent(); };
   $('expAgain').onclick = function () { var ps = game.players; $('expOver').classList.add('hidden'); expStartGame(ps); };
   $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); expMode = false; openHistory(); };
@@ -6113,6 +6137,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   function expRenderFire() {
     $('fire').classList.remove('muted');   // clear leftover spectator styling (e.g. after a net minus game)
+    syncRollAll();
     var p = G.currentPlayer(game);
     if (awaitingRoll) {
       $('bottombar').classList.add('preroll');
