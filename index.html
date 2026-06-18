@@ -2355,11 +2355,22 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   // ---- analytics (GoatCounter custom events; cookieless, no personal data) ----
   // page visits (city/country/OS/browser) are counted automatically by count.js;
   // these helpers fire the named game events. Always best-effort — never throws.
+  // Events fired before the async count.js has loaded are QUEUED and flushed once it's ready,
+  // so early network events (host/join/code) aren't dropped on a slow (mobile) connection.
+  var _gcQueue = [];
+  function _gcSend(name) { window.goatcounter.count({ path: name, title: name, event: true }); }
   function track(name) {
     try {
-      if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: name, title: name, event: true });
+      if (window.goatcounter && window.goatcounter.count) _gcSend(name);
+      else { _gcQueue.push(name); if (_gcQueue.length > 50) _gcQueue.shift(); }
     } catch (e) {}
   }
+  (function gcFlush(n) {
+    try {
+      if (window.goatcounter && window.goatcounter.count) { while (_gcQueue.length) { try { _gcSend(_gcQueue[0]); } catch (e) {} _gcQueue.shift(); } return; }
+    } catch (e) {}
+    if (n < 150) setTimeout(function () { gcFlush(n + 1); }, 200);   // poll up to ~30s for count.js to load
+  })(0);
   // one game lifecycle event ('start' | 'finish' | 'abort' | 'error'), tagged net/local + manual/regular;
   // a finished game also reports this device's dice-flavour (keep-vs-throw, order-vs-separate)
   function trackGame(kind) {
@@ -2371,10 +2382,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.49.1';
+  var APP_VERSION = '1.49.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.49.2', items: [
+      ['fix', 'Статистика: събитията се изчакват, докато се зареди броячът, и не се губят (важно за мрежовите събития при бавна връзка).'] ] },
     { v: '1.49.1', items: [
       ['fix', 'Ход по ход: редовете отново са като преди (без стрелки и разместване); докосване сгъва/разгъва само реда със заровете, а първият ход е разгънат по подразбиране.'] ] },
     { v: '1.49.0', items: [
