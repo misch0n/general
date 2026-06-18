@@ -2405,10 +2405,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.8';
+  var APP_VERSION = '1.50.9';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.50.9', items: [
+      ['new', 'Плъзгане за избор: задръж и плъзни по заровете, за да маркираш няколко наведнъж (важи и за двата режима, на устройство и по мрежа). Единично докосване пак превключва един зар.'] ] },
     { v: '1.50.8', items: [
       ['new', 'Режим „избери кои да държиш“: бутон „↻ Хвърли всички“ над заровете хвърля наново всичките пет наведнъж.'] ] },
     { v: '1.50.7', items: [
@@ -5371,7 +5373,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       var specNew = specPulseOn && diceGen.length === shown.length && diceGen[i] === specRollNo;   // watcher: pulse the just-thrown dice
       var keepMode = activeKeep();
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '') + (throwing ? ' throwing' : '') + (specNew ? ' spec-pulse' : '');
-      b.disabled = !interactive;
+      b.disabled = !interactive; b.setAttribute('data-i', i);
       b.setAttribute('aria-label', 'Зар ' + v + (sel ? (keepMode ? ', задържан' : ', за хвърляне') : ''));
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
       if (interactive) b.onclick = function () { toggleSelect(i); };
@@ -5421,13 +5423,53 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
 
   // ---------- dice interaction (select-to-reroll) ----------
+  var diceSlideSuppress = false;
   function toggleSelect(i) {
+    if (diceSlideSuppress) return;   // a slide gesture handled selection; swallow the trailing tap
     if (aiBusy || locked || throwsLeft <= 0) return;
     selected[i] = !selected[i];
     if (expMode) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
     // (no live broadcast of selections — watchers see the throw highlighted at reroll time instead)
   }
+  // slide-to-select: drag across the dice to mark a run (works in both rulesets, local + net).
+  // A plain tap still toggles one die (handled by each die's click); a drag paints toward the
+  // first die's opposite state and swallows the trailing click so the start die isn't re-toggled.
+  (function diceSlide() {
+    var box = $('dice'); if (!box) return;
+    box.style.touchAction = 'none';
+    var pid = null, startIdx = -1, paintVal = false, slid = false;
+    function selOk() { var p = game && game.players && game.players[game.current]; return !manualMode && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0 && p && !p.isAI && !(netMode && (!netMyTurn || specSelf)); }
+    function dieIdxAt(x, y) {
+      var el = document.elementFromPoint(x, y); el = el && el.closest ? el.closest('.die') : null;
+      if (!el || el.disabled || el.classList.contains('preroll')) return -1;
+      var i = el.getAttribute('data-i'); return i == null ? -1 : +i;
+    }
+    function setSel(i, val) {
+      if (i < 0 || i >= selected.length || selected[i] === val) return;
+      selected[i] = val;
+      if (expMode) { expRenderDice(); expRenderFire(); } else { renderDice(); renderFire(); }
+    }
+    box.addEventListener('pointerdown', function (e) {
+      if (!selOk()) return;
+      var i = dieIdxAt(e.clientX, e.clientY); if (i < 0) return;
+      pid = e.pointerId; startIdx = i; paintVal = !selected[i]; slid = false;
+      // NB: don't capture here — a plain tap must still deliver its click to the die button
+    });
+    box.addEventListener('pointermove', function (e) {
+      if (pid == null || e.pointerId !== pid) return;
+      var i = dieIdxAt(e.clientX, e.clientY); if (i < 0) return;
+      if (!slid && i !== startIdx) { slid = true; try { box.setPointerCapture(pid); } catch (x) {} setSel(startIdx, paintVal); }   // a real slide began
+      if (slid) setSel(i, paintVal);
+    });
+    function end(e) {
+      if (e.pointerId !== pid) return;
+      if (slid) { diceSlideSuppress = true; setTimeout(function () { diceSlideSuppress = false; }, 0); }
+      pid = null; startIdx = -1; slid = false;
+    }
+    box.addEventListener('pointerup', end);
+    box.addEventListener('pointercancel', end);
+  })();
   $('fire').onclick = function () { humanFire(); };
   // „roll all": keep-mode helper that re-throws every die (keep nothing → reroll all)
   function syncRollAll() {
@@ -6127,7 +6169,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       var b = document.createElement('button');
       var sel = selected[i], keepMode = activeKeep(), fresh = !batchMode && diceNew[i];
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
-      b.disabled = !interactive;
+      b.disabled = !interactive; b.setAttribute('data-i', i);
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
       if (interactive) b.onclick = function () { toggleSelect(i); };
       box.appendChild(b);
