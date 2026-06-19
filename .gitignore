@@ -3,3 +3,4 @@ node_modules/
 # exact-EV intermediate (7MB, regenerable via tools/build-ev-exp-exact.js --full)
 ev-exp-exact.bin
 ev-exp-exact.meta.json
+dist/

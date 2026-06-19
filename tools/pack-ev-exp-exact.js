@@ -51,6 +51,6 @@ var js =
 '})(typeof self !== "undefined" ? self : this, function () {\n' +
 '  return { par: ' + meta.par.toFixed(4) + ', scale: ' + SCALE + ', ncat: ' + meta.ncat + ', gz: "' + b64 + '" };\n' +
 '});\n';
-var outPath = path.join(__dirname, '..', 'ev-exp-exact-table.js');
+var outPath = path.join(__dirname, '..', 'public', 'ev-exp-exact-table.js');
 fs.writeFileSync(outPath, js);
 console.log('wrote ' + outPath + ' (' + (js.length / 1e6).toFixed(2) + ' MB JS; gz payload ' + (gz.length / 1e6).toFixed(2) + ' MB; par ' + meta.par.toFixed(2) + ')');

@@ -2,9 +2,9 @@
 
 var test = require('node:test');
 var assert = require('node:assert');
-var General = require('../game.js');
-var EV = require('../engine.js');
-var TABLE = require('../ev-table.js');
+var General = require('../public/game.js');
+var EV = require('../public/engine.js');
+var TABLE = require('../public/ev-table.js');
 
 EV.setTable(TABLE.V);
 
