@@ -43,11 +43,11 @@
     netMode = false;   // a normal local game is never networked
     // experimental ruleset runs its own separate three-column flow (not for ОТЧЕТ)
     if (settings.ruleset === 'experimental') { expStartGame(players, manual); return; }
-    expMode = false;
     document.querySelector('.sheet').classList.remove('hidden');
     $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden'); $('expNumBar').classList.add('hidden');
     clearAllPenalties();
     game = G.createGame(players);
+    game.ruleset = 'standard';
     game.ownerSkipped = skipOwnerNext || ownerDetached; // record so this game is excluded from owner trends
     skipOwnerNext = false; ownerDetached = false;        // the skip/detach is a one-game decision
     manualMode = !!manual;
@@ -68,6 +68,7 @@
     clearAllPenalties();
     if (snap.ruleset === 'experimental') { resumeExpGame(snap); return; }
     game = G.createGame(reconstructPlayers(snap));
+    game.ruleset = 'standard';
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
     manualMode = !!snap.manualMode; undoStack = []; viewingHistory = false;
     moveLog = snap.moveLog || game.players.map(function () { return []; });
@@ -225,7 +226,7 @@
 
   // §1 live "best move" hint (toggle; off for serious play)
   $('hintBtn').onclick = function () {
-    if (expMode) { if (!exactReady) return; hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); expRenderHint(); return; }
+    if (gExp()) { if (!exactReady) return; hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); expRenderHint(); return; }
     if (!evReady) return;
     hintsOn = !hintsOn; $('hintBtn').classList.toggle('on', hintsOn); renderHint();
   };
@@ -458,7 +459,7 @@
     manualCounts[face]++;
     dice = manualDiceArray();
     undoStack.push({ t: 'tap', face: face });
-    expMode ? expRenderAll() : renderAll();
+    gExp() ? expRenderAll() : renderAll();
   }
 
   // ОПА — undoes action by action across the whole game: dice taps first, then
@@ -481,7 +482,7 @@
     }
     locked = false;
     clearRoast();
-    expMode ? expRenderAll() : renderAll();
+    gExp() ? expRenderAll() : renderAll();
   }
   $('undoBottom').onclick = popUndo;
   $('overUndo').onclick = popUndo;
@@ -575,7 +576,7 @@
     if (diceSlideSuppress) return;   // a slide gesture handled selection; swallow the trailing tap
     if (aiBusy || locked || throwsLeft <= 0) return;
     selected[i] = !selected[i];
-    if (expMode) { expRenderDice(); expRenderFire(); return; }
+    if (gExp()) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
     // (no live broadcast of selections — watchers see the throw highlighted at reroll time instead)
   }
@@ -595,7 +596,7 @@
     function setSel(i, val) {
       if (i < 0 || i >= selected.length || selected[i] === val) return;
       selected[i] = val;
-      if (expMode) { expRenderDice(); expRenderFire(); } else { renderDice(); renderFire(); }
+      if (gExp()) { expRenderDice(); expRenderFire(); } else { renderDice(); renderFire(); }
     }
     box.addEventListener('pointerdown', function (e) {
       if (!selOk()) return;
@@ -632,11 +633,11 @@
     if (manualMode || awaitingRoll || locked || aiBusy || throwsLeft <= 0 || !p || p.isAI) return;
     if (netMode && (!netMyTurn || specSelf)) return;
     selected = [false, false, false, false, false];   // hold nothing → the reroll mask covers all five
-    humanFire();   // routes to expHumanFire when expMode
+    humanFire();   // routes to expHumanFire when gExp()
   };
   $('specReturn').onclick = function () { returnToCurrent(); };
   $('expAgain').onclick = function () { var ps = game.players; $('expOver').classList.add('hidden'); expStartGame(ps); };
-  $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); expMode = false; openHistory(); };
+  $('expToArchive').onclick = function () { $('expOver').classList.add('hidden'); openHistory(); };
   $('expOver').onclick = function (e) { if (e.target === $('expOver')) $('expOver').classList.add('hidden'); };
   // throw/keep chooser — the ? on the fire button. The flavour is PER HUMAN PLAYER:
   // activeKeep() reads the current player's own preference (falling back to the default).
@@ -679,7 +680,7 @@
         var p = game && game.players[game.current];
         if (p && !p.isAI) p.selectKeep = newKeep;               // the change sticks to THIS player
         if (!p || p.owner || p.isAI) { settings.selectKeep = newKeep; saveSettings(); }  // owner's choice is also the persistent default
-        if (game) (expMode ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
+        if (game) (gExp() ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
       }
       renderKeepThrowTip();
     };
@@ -693,7 +694,7 @@
         var p = game && game.players[game.current];
         if (p && !p.isAI) p.diceBatch = nb;
         if (!p || p.owner || p.isAI) { settings.newDiceBatch = nb; saveSettings(); }
-        if (game) (expMode ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
+        if (game) (gExp() ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
       }
       renderKeepThrowTip();
     };
@@ -714,7 +715,7 @@
     diceGen = paired.map(function (x) { return x.g; });
   }
   function humanFire() {
-    if (expMode) { expHumanFire(); return; }
+    if (gExp()) { expHumanFire(); return; }
     if (awaitingRoll) { firstRoll(); return; }   // first throw via the ХВЪРЛИ! button
     if (aiBusy || locked || throwsLeft <= 0) return;
     if (tut) { tutReroll(); return; }            // tutorial: scripted reroll

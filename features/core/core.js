@@ -358,6 +358,9 @@
   function fun() { return !!settings.barracks; } // is the goofy layer enabled?
   function namePointsOn() { return !!(settings.titles && settings.titlePoints); } // rare-name bonus points enabled
   function total(p) { return (game && game.ruleset === 'experimental') ? X.total(p) : G.playerTotal(p) + (p.bonus || 0); } // includes name bonus
+  // single source of truth for the live ruleset: read off the game object (set at creation in every
+  // path — local/net, standard/experimental). Replaces the old `gExp()` global.
+  function gExp() { return !!(game && game.ruleset === 'experimental'); }
   // dice-roll footer + fire bar vs the manual-entry footer
   function setDockUI(manual) { if (manual) $('bottombar').classList.remove('preroll'); $('firebar').classList.toggle('hidden', manual); $('diceFooter').classList.toggle('hidden', manual); $('manualDock').classList.toggle('hidden', !manual); }
   // reserve scroll space under the fixed overlay bar so nothing stays hidden behind it
@@ -424,10 +427,10 @@
   // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
   function saveResume() {
     if (!game || !game.players || !game.players.length || viewingHistory || tut) return;   // tutorial games aren't resumable
-    var over = expMode ? X.isGameOver(game) : G.isGameOver(game);
+    var over = gExp() ? X.isGameOver(game) : G.isGameOver(game);
     if (over) { clearResume(); return; }
     lsSet(RESUME_KEY, JSON.stringify({
-      v: 1, ts: Date.now(), ruleset: expMode ? 'experimental' : 'standard', manualMode: manualMode,
+      v: 1, ts: Date.now(), ruleset: game.ruleset || 'standard', manualMode: manualMode,
       current: game.current, round: game.round, ownerSkipped: !!game.ownerSkipped, players: serializePlayers(), moveLog: moveLog,
     }));
   }

@@ -1,13 +1,13 @@
 'use strict';
 // Experimental ruleset (single-column Генерал): exact evaluator, hints, rendering.
   // ============================================================ EXPERIMENTAL flow (single column)
-  var expMode = false;
   var EXP_CELLS = X ? X.KEYS.length : 15;
   function expStartGame(players, manual) {
-    expMode = true; netMode = false; manualMode = !!manual;
+    netMode = false; manualMode = !!manual;
     trackGame('start');
     clearAllPenalties();
     game = X.createGame(players);
+    game.ruleset = 'experimental';
     game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
     undoStack = []; moveLog = players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
@@ -20,7 +20,7 @@
     expBeginTurn();
   }
   function resumeExpGame(snap) {
-    expMode = true; netMode = false; manualMode = false;
+    netMode = false; manualMode = false;
     var players = snap.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
       pl.gender = sp.gender || 'm'; pl.owner = !!sp.owner; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.scores = sp.scores || {};
@@ -29,6 +29,7 @@
       return pl;
     });
     game = X.createGame(players);
+    game.ruleset = 'experimental';
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
     undoStack = []; viewingHistory = false; moveLog = snap.moveLog || players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
