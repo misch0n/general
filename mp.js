@@ -20,7 +20,6 @@
     SPUR: 18,                                               // lobby „ДАЙ ЗОР" cheer (player id + heat)
     JOIN_NAK: 19,                                           // host rejects a join (e.g. game-mode mismatch)
     BYE: 25,                                                // host disbands the lobby — clients return to host/join
-    XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
   };
   var HOST_ID = 0, UNASSIGNED = 15;          // SENDER nibble: host is 0, pre-join client is 15
   var GENDERS = ['m', 'n', 'f'];
@@ -188,9 +187,8 @@
     this._ct = opts.clearTimeout || function (id) { clearTimeout(id); };
     this.rand = opts.rand || Math.random;
     this.p = {};
-    // intervals are LONG: each acoustic frame takes ~1-3 s and the link is half-duplex,
-    // so re-sends must be spaced past a frame's airtime or transmits just pile up and
-    // the device never opens a listening window.
+    // intervals are deliberately relaxed: beacons/joins re-send on a slow cadence so
+    // retransmits don't pile up on a flaky link — comfortable defaults for WebRTC.
     var dflt = { beacon: 3500, joinRetry: 4500, moveTimeout: 20000, retransmit: 4 };
     for (var k in dflt) this.p[k] = (opts.params && opts.params[k] != null) ? opts.params[k] : dflt[k];
 
@@ -699,8 +697,6 @@
     if (this.cb.onMove) this.cb.onMove({ playerId: s.playerId, category: s.category, score: s.score, log: s.log });
   };
 
-  function crc16(bytes) { var c = 0xffff; for (var i = 0; i < bytes.length; i++) { c ^= bytes[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
-
   // NOTE: the compact binary game-record codec (packRecord/unpackRecord) was
   // removed with the acoustic transport (Task A slice 5c) — it was a third,
   // competing serialization of a game alongside serializeGame() and the live
@@ -744,7 +740,7 @@
   }
 
   var api = {
-    T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, crc16: crc16, utf8: utf8, utf8d: utf8d,
+    T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, utf8: utf8, utf8d: utf8d,
     sanitizeRecord: sanitizeRecord,
     Writer: Writer, Reader: Reader, frame: frame, unframe: unframe,
     hexRGB: hexRGB, rgbHex: rgbHex,
