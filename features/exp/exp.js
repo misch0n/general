@@ -38,6 +38,7 @@
     game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: faces }).turn;
     game.turn.curLog = expStartLog(G.currentPlayer(game));   // log seeds from game.turn.dice, so build it after the roll lands
     clearRoast(); renderAll(); shakeDice();
+    netSendAct();   // let spectators watch my initial roll (mirrors standard firstRoll)
     if (tut) tutEvent('roll');
   }
   function expHumanFire() {
@@ -52,6 +53,7 @@
     game.turn.selected = [false, false, false, false, false];
     game.turn.throwsLeft--;
     renderAll(); shakeDice();
+    netSendAct();   // spectators see my reroll (newly-thrown dice accented), like standard humanFire
   }
   function expCommit(key, value) {
     var p = G.currentPlayer(game);
