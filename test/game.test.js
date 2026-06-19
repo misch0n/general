@@ -2,7 +2,7 @@
 
 var test = require('node:test');
 var assert = require('node:assert');
-var G = require('../public/game.js');
+var G = require('../game.js');
 
 // Deterministic RNG: makes rollDie produce exactly the given faces, in order.
 function fixedDice(faces) {

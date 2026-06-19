@@ -2,8 +2,8 @@
 
 var test = require('node:test');
 var assert = require('node:assert');
-var G = require('../public/game.js');
-var X = require('../public/exp.js');
+var G = require('../game.js');
+var X = require('../exp.js');
 
 function player(name) { return X.createPlayerCard({ name: name, scores: {} }); }
 

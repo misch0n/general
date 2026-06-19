@@ -8,8 +8,8 @@
 
 var test = require('node:test');
 var assert = require('node:assert');
-var MP = require('../public/mp.js');
-var General = require('../public/game.js');
+var MP = require('../mp.js');
+var General = require('../game.js');
 
 var noTimers = { setTimeout: function () { return 0; }, clearTimeout: function () {} };
 

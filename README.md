@@ -1,29 +1,19 @@
 # Генерал 🎲
 
 A web player for **Генерал** (General), the Bulgarian dice game in the family of
-Yahtzee / Generala. A phone-first single-page app, built with **Vite**.
+Yahtzee / Generala. Single-page, **no build step, no dependencies, no network** —
+just open `index.html`.
 
-The UI is a comically over-decorated **military parody** (ЩАБ edition):
-camouflage field, classification banner, brass medals and stencil type. Under the
-gloss sits a real **expected-value engine** that solves the game optimally and
-powers the AI, the hints and a deep post-game analysis.
+The UI is a phone-first, comically over-decorated **military parody** (ЩАБ
+edition): camouflage field, classification banner, brass medals and stencil type.
+Under the gloss sits a real **expected-value engine** that solves the game
+optimally and powers the AI, the hints and a deep post-game analysis.
 
 ```bash
-npm install                      # one-time
-npm run dev                      # dev server with HMR → http://localhost:5173
-npm run build                    # production bundle → dist/ (serve over http)
-npm run preview                  # preview the built dist/
-npm run typecheck                # tsc --noEmit (incremental TypeScript)
-npm test                         # the dependency-free unit suite (node --test)
+# it's a static page — just open it, or serve the folder:
+python3 -m http.server 8000      # → http://localhost:8000
+node --test                      # run the dependency-free test suite
 ```
-
-**Layout:** `index.html` (shell) → `src/main.ts` (entry) → `src/app.js` (the UI)
-+ `src/styles.css`. The rules / EV / netcode live in dependency-free UMD modules
-under `public/` (`game.js`, `engine.js`, `exp.js`, `mp.js`, the `ev-*` tables);
-they load as classic `<script>`s that install `window.General`, `window.MP`, …
-before the bundled UI runs — which keeps the eager EV tables out of the bundle and
-lets the Node test-suite `require()` the exact same source. Deploy by serving
-`dist/` from any static host (path-relative, so any sub-path works).
 
 ## Architecture at a glance
 

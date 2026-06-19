@@ -2,8 +2,8 @@
 
 var test = require('node:test');
 var assert = require('node:assert');
-var MP = require('../public/mp.js');
-var General = require('../public/game.js');
+var MP = require('../mp.js');
+var General = require('../game.js');
 var CATS = General.CATEGORIES.map(function (c) { return c.key; });
 
 // ---- a mock broadcast bus: every node hears every send except its own (half-duplex),
@@ -479,7 +479,7 @@ test('takeover: lobby AI seats are host-controlled from the first grant', functi
 
 // ---- performance-matched takeover policy ----
 test('botPolicyForAccuracy ladders strength to measured accuracy', function () {
-  var EV = require('../public/engine.js');
+  var EV = require('../engine.js');
   assert.strictEqual(EV.botPolicyForAccuracy(1.0).type, 'optimal');
   assert.strictEqual(EV.botPolicyForAccuracy(0.85).type, 'softmax');
   assert.strictEqual(EV.botPolicyForAccuracy(0.6).type, 'epsilon');
