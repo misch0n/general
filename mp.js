@@ -416,6 +416,7 @@
     })();
   };
   Session.prototype._filled = function (id) { return Object.keys(this.scores[id] || {}).length; };
+  Session.prototype._boardDone = function (id) { return this._filled(id) >= this.rounds; };
   // a seat still owes turns unless its board is full, or it has dropped and isn't AI-driven
   // (a dropped player is skipped so the rest can finish; an AI takeover keeps playing the seat)
   Session.prototype._needsTurn = function (id) {
@@ -424,7 +425,18 @@
     if (e && e.dropped && !this.isAIControlled(id)) return false;
     return true;
   };
-  Session.prototype._allDone = function () { var self = this; return this.order.every(function (id) { return !self._needsTurn(id); }); };
+  // the game ENDS only when every board is full. A turn game keeps running while any board is
+  // incomplete — even a merely DROPPED seat keeps it open (waiting for a reconnect / AI takeover)
+  // instead of ending and stranding that player's remaining categories. A manual (free-for-all)
+  // game still lets a dropped seat go so the rest can finish.
+  Session.prototype._allDone = function () {
+    var self = this;
+    return this.order.every(function (id) {
+      if (self._boardDone(id)) return true;
+      if (self.manual) { var e = self._byId(id); return !!(e && e.dropped && !self.isAIControlled(id)); }
+      return false;
+    });
+  };
 
   // ---------- applying a move (host authoritative) ----------
   Session.prototype._applyMove = function (mv) {
@@ -482,6 +494,7 @@
     if (this.cb.onTakeover) this.cb.onTakeover(id, !!on);
     // resuming on a stalled seat: re-grant so the AI gets prompted immediately
     if (on && this.state === 'IN_GAME' && this.activeId === id) { if (this.cb.onTurn) this.cb.onTurn(id, false); }
+    if (on) this._resumeIfPaused();   // the rotation was paused on this (now AI-driven) seat → carry on
   };
   // host: flag/unflag a player as dropped (connection lost). A dropped seat is skipped in the
   // rotation; if it drops while holding the turn, advance immediately so nobody waits on it.
@@ -495,7 +508,7 @@
     if (on && this.state === 'IN_GAME') {
       if (this.manual) { this._maybeEnd(); }   // a dropped player no longer blocks the finish
       else if (this.activeId === id && !this.isAIControlled(id)) { this._ct(this._timers.move); this._advance(); }   // skip the seat that just vanished mid-turn
-    }
+    } else if (!on) { this._resumeIfPaused(); }   // a seat came back → resume the rotation if we were waiting on it
   };
   Session.prototype.submitMoveFor = function (playerId, mv) {
     if (!this.isHost || this.state !== 'IN_GAME' || playerId !== this.activeId) return false;
@@ -505,9 +518,48 @@
   };
   Session.prototype._advance = function () {
     if (this._allDone()) { this.state = 'GAME_OVER'; this._send(T.END, new Uint8Array(0)); if (this.cb.onEnd) this.cb.onEnd(); return; }
-    var n = this.order.length, guard = 0;
-    do { this.turnIx++; } while (++guard <= n && !this._needsTurn(this.order[this.turnIx % n]));   // skip full + dropped seats
-    this._grant();
+    var n = this.order.length, ix = this.turnIx, guard = 0;
+    do { ix++; } while (guard++ < n && !this._needsTurn(this.order[ix % n]));   // skip full + dropped seats
+    if (!this._needsTurn(this.order[ix % n])) {   // everyone who still owes a turn is dropped → pause until one returns
+      this.activeId = null; this._ct(this._timers.move);
+      if (this.cb.onWait) this.cb.onWait();
+      return;
+    }
+    this.turnIx = ix; this._grant();
+  };
+  // resume a paused rotation (a dropped seat returned, or a takeover began)
+  Session.prototype._resumeIfPaused = function () {
+    if (this.isHost && this.state === 'IN_GAME' && !this.manual && this.activeId == null) this._advance();
+  };
+  // ---------- host crash recovery: snapshot the authoritative state, rebuild it on a fresh host ----------
+  // the host persists this; after a reload it re-hosts the SAME code, restore()s, and resumeHost()s.
+  // Clients reconnect by eph (the normal mid-game rejoin path) and get caught up via START + STATE.
+  Session.prototype.snapshot = function () {
+    if (!this.isHost || this.state !== 'IN_GAME') return null;
+    return { v: 1, roster: JSON.parse(JSON.stringify(this.roster)), order: this.order.slice(),
+      scores: JSON.parse(JSON.stringify(this.scores)), version: this.version, turnIx: this.turnIx,
+      activeId: this.activeId, manual: !!this.manual, exp: !!this.exp, settingsBits: this.settingsBits || 0,
+      rounds: this.rounds, takeover: JSON.parse(JSON.stringify(this.takeover || {})) };
+  };
+  Session.prototype.restore = function (snap) {
+    if (!this.isHost || !snap || !Array.isArray(snap.roster)) return false;
+    this.roster = snap.roster; this.order = (snap.order || []).slice(); this.scores = snap.scores || {};
+    this.version = snap.version || 0; this.turnIx = snap.turnIx || 0; this.activeId = snap.activeId;
+    this.manual = !!snap.manual; this.exp = !!snap.exp; this.settingsBits = snap.settingsBits || 0;
+    this.rounds = snap.rounds || this.rounds; this.takeover = snap.takeover || {};
+    this.roster.forEach(function (p) { if (p.id !== HOST_ID) p.dropped = true; });   // no live channels yet → all clients dropped until they return
+    this.state = 'IN_GAME';
+    return true;
+  };
+  // after restore: rebuild the host's local game + boards; re-enter the host's own turn if it held it
+  // (a client's turn re-grants when that client reconnects and the host replays START to them).
+  Session.prototype.resumeHost = function () {
+    if (!this.isHost || this.state !== 'IN_GAME') return;
+    if (this.cb.onStart) this.cb.onStart(this.roster.slice(), this.order.slice());
+    if (this.cb.onResync) this.cb.onResync(this.scores, this.version);
+    if (this.manual) return;
+    if (this.activeId === this.myId) { if (this.cb.onTurn) this.cb.onTurn(this.activeId, true); }
+    else if (this.cb.onWait) this.cb.onWait();   // a client held the turn → wait for its reconnect to re-grant
   };
 
   // ---------- client: discovery + join ----------
@@ -576,6 +628,7 @@
         }
         if (was && this.cb.onDrop) this.cb.onDrop(back.id, false);
         if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
+        this._resumeIfPaused();   // the rotation was waiting on a dropped seat → carry on
       }
     } else if (pkt.type === T.SPUR && this.state === 'PREP') {
       var sp = unpackSpur(pkt.payload);

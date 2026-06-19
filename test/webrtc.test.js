@@ -158,13 +158,13 @@ test('the full turn log rides the move to the host and on to the other client (c
   assert.ok(moved, 'a client move carried its log end to end');
 });
 
-test('drop: a vanished client is skipped, the rest finish, its board stays incomplete', function () {
+test('drop: a vanished seat pauses the game (not stranded); the rest play on then it WAITS', function () {
   var bus = new StarBus();
-  var ended = {};
+  var ended = {}, waited = false;
   function mk(isHost, me) {
     return new MP.Session({ transport: bus.transport(isHost), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
       rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
-      callbacks: { onEnd: function () { ended[me.name] = true; } } });
+      callbacks: { onEnd: function () { ended[me.name] = true; }, onWait: function () { if (me.name === 'H') waited = true; } } });
   }
   var host = mk(true, { name: 'H', color: '#ee0055', gender: 'm' });
   var c1tp = bus.transport(false);
@@ -174,28 +174,82 @@ test('drop: a vanished client is skipped, the rest finish, its board stays incom
   host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
   host.startGame(); bus.drain();
   var c1id = c1.myId;
-
-  // play 3 full rounds normally
   var nodes = [host, c1, c2];
   function step() { var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0]; a.submitMove({ category: nextCat(a, a.myId), score: 5, rolls: [[1, 2, 3, 4, 5]], keeps: [] }); bus.drain(); }
   for (var i = 0; i < 9 && host.state === 'IN_GAME'; i++) step();
 
-  // c1 vanishes; host marks it dropped
+  // c1 vanishes mid-game; host marks it dropped
   bus.drop(c1tp); host.markDropped(c1id, true); bus.drain();
   assert.strictEqual(host._byId(c1id).dropped, true, 'host flagged the dropped seat');
-  assert.strictEqual(c2.roster.find(function (p) { return p.id === c1id; }).dropped, true, 'c2 sees it greyed');
 
-  // host + c2 keep playing to the end — c1 must never be granted again
+  // host + c2 keep playing; c1 is never granted; the game does NOT end — it PAUSES on the missing seat
   var guard = 0;
-  while (host.state === 'IN_GAME' && guard++ < 5000) {
+  while (host.state === 'IN_GAME' && host.activeId != null && guard++ < 5000) {
     assert.notStrictEqual(host.activeId, c1id, 'dropped seat is never granted a turn');
-    var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0];
+    var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0]; if (!a) break;
     a.submitMove({ category: nextCat(a, a.myId), score: 5, rolls: [[1, 2, 3, 4, 5]], keeps: [] });
     bus.drain();
   }
-  assert.ok(ended['H'] && ended['B'], 'the connected players finished the game');
-  assert.strictEqual(host._filled(host.myId), General.CATEGORIES.length, 'host board complete');
-  assert.ok(host._filled(c1id) < General.CATEGORIES.length, 'dropped board left incomplete');
+  assert.strictEqual(host.state, 'IN_GAME', 'game is NOT over — it waits for the dropped seat');
+  assert.strictEqual(host.activeId, null, 'rotation paused on the missing seat');
+  assert.ok(waited, 'onWait fired');
+  assert.ok(!ended['H'], 'no premature game-over while a board is incomplete');
+  assert.ok(host._filled(c1id) < General.CATEGORIES.length, 'dropped board still incomplete');
+});
+
+test('drop → reconnect: the returned seat is re-granted and finishes the game', function () {
+  var bus = new StarBus();
+  var ended = {};
+  function cb(name) { return { onEnd: function () { ended[name] = true; } }; }
+  var host = new MP.Session({ transport: bus.transport(true), isHost: true, me: { name: 'H', color: '#ee0055', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: cb('H') });
+  var c1 = new MP.Session({ transport: bus.transport(false), isHost: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  host.openLobby(); c1.requestJoin(); bus.drain();
+  host.startGame(); bus.drain();
+  var c1id = c1.myId;
+  var nodes = [host, c1];
+  function step() { var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0]; if (a) { a.submitMove({ category: nextCat(a, a.myId), score: 5, rolls: [[1, 2, 3, 4, 5]], keeps: [] }); bus.drain(); } }
+  // the host finishes its whole board; c1 still owes turns
+  for (var i = 0; i < 40 && host.state === 'IN_GAME' && host._filled(host.myId) < General.CATEGORIES.length; i++) {
+    if (host.activeId === c1id) step(); else step();   // both play their granted turns
+  }
+  // drop c1 while it still owes categories; the game pauses (no end)
+  host.markDropped(c1id, true); bus.drain();
+  var sane = 0; while (host.state === 'IN_GAME' && host.activeId != null && sane++ < 40) step();
+  assert.strictEqual(host.state, 'IN_GAME', 'paused, not ended');
+  // c1 returns → host resumes and re-grants it → it finishes → game over
+  host.markDropped(c1id, false); bus.drain();
+  var g = 0; while (host.state === 'IN_GAME' && g++ < 40) { assert.strictEqual(host.activeId, c1id, 'only the returned seat owes turns'); step(); }
+  assert.strictEqual(host.state, 'GAME_OVER', 'finished after the returned seat completed');
+  assert.strictEqual(host._filled(c1id), General.CATEGORIES.length, 'returned board completed');
+});
+
+test('host crash recovery: snapshot → restore on a fresh host rebuilds the authoritative state', function () {
+  var bus = new StarBus();
+  var host = new MP.Session({ transport: bus.transport(true), isHost: true, me: { name: 'H', color: '#ee0055', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  var c1 = new MP.Session({ transport: bus.transport(false), isHost: false, me: { name: 'A', color: '#00aa55', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  host.openLobby(); c1.requestJoin(); bus.drain();
+  host.startGame(); bus.drain();
+  var c1id = c1.myId, nodes = [host, c1];
+  for (var i = 0; i < 6 && host.state === 'IN_GAME'; i++) { var a = nodes.filter(function (n) { return n.myId === host.activeId; })[0]; a.submitMove({ category: nextCat(a, a.myId), score: 7, rolls: [[1, 2, 3, 4, 5]], keeps: [] }); bus.drain(); }
+  var snap = host.snapshot();
+  assert.ok(snap && snap.roster.length === 2 && snap.version > 0, 'snapshot captured roster + version');
+
+  // a brand-new host process restores from the snapshot, re-hosting the same code
+  var started = null, resynced = null;
+  var host2 = new MP.Session({ transport: bus.transport(true), isHost: true, me: { name: 'H', color: '#ee0055', gender: 'm' },
+    minPlayers: 2, maxPlayers: 6, rounds: General.CATEGORIES.length, setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+    callbacks: { onStart: function (r) { started = r; }, onResync: function (s) { resynced = s; } } });
+  assert.ok(host2.restore(snap), 'restore accepted the snapshot');
+  assert.strictEqual(host2.state, 'IN_GAME');
+  assert.deepStrictEqual(host2.scores[c1id], host.scores[c1id], 'restored boards match');
+  assert.strictEqual(host2._byId(c1id).dropped, true, 'clients marked dropped until they reconnect');
+  host2.resumeHost();
+  assert.ok(started && resynced, 'resumeHost rebuilt the local game + boards');
+  assert.deepStrictEqual(resynced[c1id], host.scores[c1id], 'resync carried the saved scores');
 });
 
 test('disband: host cancels the lobby → every client is told (onHostGone)', function () {

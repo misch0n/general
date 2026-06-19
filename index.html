@@ -2405,10 +2405,13 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.50.10';
+  var APP_VERSION = '1.51.0';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.51.0', items: [
+      ['chg', 'Мрежова игра: разпаднал се боец вече не се прескача безвъзвратно — играта изчаква да се върне (или го поеми с AI от менюто), вместо да приключи и да го остави недовършен.'],
+      ['new', 'Възстановяване при срив на старшината: ако старшината презареди/затвори, при влизане се предлага „възстанови играта“ — възстановява последното състояние, а гостите се връщат по същия код.'] ] },
     { v: '1.50.10', items: [
       ['fix', 'Мрежова игра „с минуси“: твоите ходове вече се записват, така че финалното обобщение е пълно — записите на играчите се отварят, а не само разделът с категориите.'] ] },
     { v: '1.50.9', items: [
@@ -3510,7 +3513,14 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
       onError: function () { if (netMode && game) trackGame('error'); },   // mid-game data/link failure
+      onWait: function () { netOnWait(); },   // host: the rotation paused on a dropped seat (await reconnect / AI takeover)
     };
+  }
+  // the host's rotation is waiting on a player who dropped — tell everyone and surface the takeover menu
+  function netOnWait() {
+    if (!netMode || !game) return;
+    netNotice('⏳ Чакам разпаднал се боец да се върне… (или го поеми с AI от менюто)');
+    if (net && net.isHost) renderAiTakeover();
   }
   // mirror the host's dropped flags onto the live players, refresh the board, and surface it
   function netOnDrop(id, dropped) {
@@ -3817,10 +3827,18 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   var NET_ACTIVE_KEY = 'genrl:wrtc:active', NET_REJOIN_MS = 15 * 60 * 1000, netRejoinEntry = null;
   function netActiveSave() {
     if (netKind !== 'webrtc' || !wrCode || !net) return;
-    try { lsSet(NET_ACTIVE_KEY, JSON.stringify({ code: wrCode, role: net.isHost ? 'host' : 'client', manual: !!net.manual, exp: !!net.exp, ts: Date.now() })); } catch (e) {}
+    try {
+      var e = { code: wrCode, role: net.isHost ? 'host' : 'client', manual: !!net.manual, exp: !!net.exp, ts: Date.now() };
+      if (net.isHost && net.snapshot) { var s = net.snapshot(); if (s) e.snap = s; }   // host keeps the authoritative state for crash recovery
+      lsSet(NET_ACTIVE_KEY, JSON.stringify(e));
+    } catch (x) {}
   }
   function netActiveLoad() { try { var o = JSON.parse(lsGet(NET_ACTIVE_KEY) || 'null'); return (o && typeof o.code === 'string' && /^[A-Z0-9]{4,8}$/.test(o.code)) ? o : null; } catch (e) { return null; } }
-  function netActiveTouch() { var o = netActiveLoad(); if (o) { o.ts = Date.now(); try { lsSet(NET_ACTIVE_KEY, JSON.stringify(o)); } catch (e) {} } }
+  // host: re-snapshot the authoritative state on every move; client: just refresh the timestamp
+  function netActiveTouch() {
+    if (net && net.isHost) { netActiveSave(); return; }
+    var o = netActiveLoad(); if (o) { o.ts = Date.now(); try { lsSet(NET_ACTIVE_KEY, JSON.stringify(o)); } catch (e) {} }
+  }
   function netActiveClear() { lsDel(NET_ACTIVE_KEY); }
   // ===================================================== WebRTC transport (PeerJS) ==============
   // A pluggable MP.Session transport over WebRTC data channels. PeerJS provides the public
@@ -4261,6 +4279,24 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (!btn) return;
     btn.textContent = '✓ копирано'; clearTimeout(btn._t);
     btn._t = setTimeout(function () { btn.textContent = original; }, 1500);
+  }
+  // crash recovery: re-host the SAME code and rebuild the unfinished game from the saved snapshot.
+  // Clients reconnect by code (their saved eph re-seats them) and the host catches them up via STATE.
+  function webrtcHostRestore(code, snap) {
+    wrCapReset('host', ''); syncWrCapVis();
+    netChooseMsg('Възстановявам играта…');
+    loadPeerJS(function (ok) {
+      if (!ok) { netChooseMsg('⚠ Няма връзка с интернет сървъра (PeerJS). Провери мрежата и опитай пак.'); return; }
+      wrCode = code;
+      netBus = new PeerBus({ isHost: true, code: code, onPeers: function () {}, onLost: function (conn) { netHostLost(conn); } });
+      netBus.start().then(function () {
+        net = newSessionWith(netBus, true); localPid = MP.HOST_ID;
+        netManual = !!snap.manual;
+        if (!net.restore(snap)) { netChooseMsg('⚠ Записът на играта е повреден.'); netBus = null; return; }
+        net.resumeHost();   // → onStart (rebuild game + show the board) + onResync (restore boards) + onTurn/onWait
+        track('host-success');
+      }).catch(function (e) { track('host-error'); netChooseMsg('⚠ Неуспешно свързване със сървъра: ' + ((e && (e.type || e.message)) || 'грешка') + '. Опитай пак.'); netBus = null; });
+    });
   }
   function webrtcHost(presetCode) {
     wrCapReset('host', ''); wrlog('action', { tap: 'host' }); syncWrCapVis();
@@ -4978,7 +5014,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     if (Date.now() - (o.ts || 0) > NET_REJOIN_MS) { netActiveClear(); return false; }   // stale → forget it
     netRejoinEntry = o;
     $('netRejoinInfo').innerHTML = 'Код: <b>' + esc(o.code) + '</b><br>'
-      + (o.role === 'host' ? 'ти беше старшината' : 'присъединяване към играта')
+      + (o.role === 'host' ? (o.snap ? 'възстанови играта (ти си старшината)' : 'ти беше старшината') : 'присъединяване към играта')
       + (o.exp ? ' · с минуси' : ' · без минуси') + (o.manual ? ' · отчет' : '');
     $('netRejoinModal').classList.remove('hidden');
     return true;
@@ -4989,7 +5025,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     settings.ruleset = o.exp ? 'experimental' : 'standard'; syncStartRuleSel();
     netManual = !!o.manual;
     openNetModal('webrtc', o.manual);
-    if (o.role === 'host') { webrtcHost(o.code); }   // re-host the same code so a waiting peer can reconnect
+    if (o.role === 'host') {
+      if (o.snap) webrtcHostRestore(o.code, o.snap);   // rebuild the unfinished game; clients reconnect by the same code
+      else webrtcHost(o.code);                          // re-host the same code so a waiting peer can reconnect
+    }
     else {                                            // dial back in; the host re-seats us via our saved eph
       $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
       $('netJoinCode').classList.remove('hidden');
