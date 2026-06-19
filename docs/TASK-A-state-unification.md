@@ -88,10 +88,25 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    in `playSpecAction`. **Added 4 `APPLY_SCORE` unit tests** (183 pass; local smoke green for both
    rulesets × dice/manual — the net path has no smoke, but the change is a mechanical guard-preserving
    reroute covered by the new pure tests).
-   *Remaining (5c+):* the **net wire codec** (`MP.pack*` in mp.js) and **replay** (`buildReplayActions`)
-   still have their own shapes (the binary protocol + replay reconstruction — larger, not behavior-
-   preserving to fold in casually). (Also pre-existing, left as-is: `resumeExpGame` hard-codes
-   `game.manual = false`, ignoring `snap.manualMode`.)
+   **5c (partial) DONE** — closed the two *safe, behavior-preserving* halves of "5c+":
+   - **Replay extracts from state.** `rpStateAt` (`features/history/history.js`) no longer rebuilds
+     the board with its own loop over committed cells; it folds each commit through the shared reducer
+     (`GReduce.reduce` `APPLY_SCORE`), so replay uses the *same* "a committed score lands on a seat"
+     rule (+ filled-cell guard) as live/net play. The roll/commit *render* vocabulary in
+     `buildReplayActions` is intentionally kept — it carries display-only data the reducer has no
+     concept of (`gens` batch-ordering, `keep`/`reroll` highlight masks, `rollNo`). Added 2 reducer
+     tests (round-robin fold + scrub-prefix) and a **replay round-trip to `scripts/smoke.js`** (play a
+     standard game → open its archived record → step every frame → assert the reconstructed board
+     matches) — the first app-level coverage of the replay path.
+   - **Removed the dead acoustic record codec.** `packRecord`/`unpackRecord` (`mp.js`) were a *third*,
+     competing game serialization (compact binary record) alongside `serializeGame()` and the live
+     wire; they outlived the acoustic transport but had no remaining caller. Deleted (+ their export,
+     the pure round-trip test, and the stale README/CLAUDE.md references). `sanitizeRecord` stays — it
+     still hardens the live JSON-paste import (`settings.js`).
+
+   *Deferred (the net wire **payload** rewrite — needs test coverage first):* see the dedicated
+   handoff section **"5c-remainder"** below. (Also still pre-existing, left as-is: `resumeExpGame`
+   hard-codes `game.manual = false`, ignoring `snap.manualMode`.)
 
 ## Target schema (sketch)
 ```
@@ -130,8 +145,8 @@ reduce(state, action) -> nextState   // local play and net-apply both dispatch a
 - **Resume** — `saveResume`/`loadResume` (`features/core/core.js`), snapshot at each `beginTurn`.
 - **Archive** — `archiveGame` + the record shape (core.js; exp games archive via `exp.js` ~L543 — a
   separate path that Slice 4/5 should unify).
-- **Net wire** — `MP.packMove`/`packStateDelta`/`packStateSnapshot` + `packRecord` (`mp.js`); net move =
-  `{category index, score, rolls, keeps, log}`.
+- **Net wire** — `MP.packMove`/`packStateDelta`/`packStateSnapshot` (`mp.js`); net move =
+  `{category index, score, rolls, keeps, log}`. (`packRecord` was removed in 5c.)
 - **Replay** — reconstructs actions from `moveLog` (`features/history/history.js`).
 
 ## Verification each slice
@@ -148,3 +163,82 @@ reduce(state, action) -> nextState   // local play and net-apply both dispatch a
 - When replacing a global via perl, **exclude the write sites** (`name =`) and property access
   (`.name`) or you'll mangle them (Slice 1 hit `gExp() = false` once — fixed). Prefer explicit edits
   for writes, perl only for bare reads with a negative-lookbehind for `.`.
+
+---
+
+## 5c-remainder — net wire **payload** → canonical schema (DEFERRED; read this first)
+
+**Status:** not started. Deliberately deferred from the 5c session because it touches **live
+multiplayer, which has ZERO app-level test coverage**, and the value is mostly architectural purity
+(the schema is already authoritative at the receive boundary — see below). **Do not start the payload
+rewrite until the test harness in step 0 exists.**
+
+### The vision (from the repo owner)
+One **grand unified schema** (the Target schema above) + `reduce(state, action)` as the *only* mutator;
+**ruleset is a reduction** (a parameterization of reduce), not a parallel path. **Local play, network,
+resume, and replay are all just different *sources of actions/state* feeding that one schema.**
+**Transport is a means to get data, NOT something that defines state.** The acoustic transport that
+once forced everything into a constrained binary protocol is **scrapped** — so that constraint is
+gone. **Version mismatch is a non-issue** (everyone plays the single live version). The owner explicitly
+**accepts a one-time loss of old-history rendering** as long as games created *going forward* process
+correctly through the unified schema.
+
+### What's already true (so you don't re-discover it — this session's findings)
+- **The receive/apply path is already on the schema (slice 5b).** `netApplyRemote`
+  (`features/net/net.js`) and `netApplySnapshot` already translate inbound wire data into a reducer
+  `APPLY_SCORE` action — they do **not** mutate `pl.scores` inline. So "network feeds data *into* the
+  schema" is essentially done; what remains is cosmetic on the *encoding* side.
+- **The wire already carries canonical JSON.** `packMove`/`packStateDelta` embed a
+  **JSON-stringified turn-log entry** (`mv.log`) — that's how every device reconstructs full
+  per-player history. The other fields (`category` **index**, `score`, `rolls`, `keeps`) are a
+  binary sidecar that's partly redundant with `log`.
+- **No record is transferred over WebRTC during normal play.** Game-end fires `T.END`; each device
+  builds its **own** local archive from its own `moveLog` via `serializeGame()` (slice 5a). (The
+  `packRecord` codec that *used* to transfer a whole game was acoustic-only and was deleted in 5c.)
+
+### The actual remaining work
+Replace the bespoke binary field-packing in **three** codecs so the payload *is* the canonical
+shape (a serialized action, or a `serializeGame()`-shaped projection), making transport a dumb pipe:
+| Codec (`mp.js`) | Today (binary fields) | Target (canonical) |
+|---|---|---|
+| `packMove`/`unpackMove` | `[playerId u8][ackVersion u16][category u8][score i16][rolls…][keeps…][log str16]` | a move **action** payload `{seat, key, score, log}` (+ ack/seq stays in the **frame header**, which is unchanged) |
+| `packStateDelta`/`unpackState` (delta) | `[sub=0][version u16][playerId u8][category u8][score i16][log str16]` | the same move action + version |
+| `packStateSnapshot`/`unpackState` (snapshot) | `[sub=1][version u16]` then per-player/per-cell `[catIdx u8][score i16]` | a `serializeGame()`-shaped scores projection |
+- **Keep the frame layer.** `MP.Session` framing is `[type u8][sender u8][seq u8][payload…][crc8]`
+  with ack/resend/gossip — that's the *reliable-link* machinery and must stay. Only the **payload
+  bytes** change (from hand-packed primitives to a UTF-8 JSON string — the `log` field already does
+  exactly this, so framing/CRC/seq/ack are unaffected).
+- **Category index ↔ key boundary (gotcha).** The wire carries `category` as a **numeric index**;
+  the reducer/schema use a **string key**. `net.js` already bridges via `catKeyAt`/`catIndexOf`
+  (`features/game/game.js`). Decide explicitly whether the new payload carries the index (translate
+  at the edge, smaller) or the key (self-describing); keep the translation in *one* place.
+
+### Step 0 — PREREQUISITE: stand up net test coverage (do this first)
+There is **no** automated coverage of two peers actually exchanging moves — only pure codec
+round-trips in `test/mp.test.js`/`test/webrtc.test.js` and single-process app smoke in
+`scripts/smoke.js`. Before rewriting any payload:
+1. **Loopback two-`Session` harness** (Node, no network): construct a host `MP.Session` and a client
+   `MP.Session`, wire each one's `_send` to deliver bytes straight into the other's `_rx`, and drive a
+   full game (START → GRANT → MOVE → STATE delta → END). Assert both sides converge to the same
+   `serializeGame()`. `mp.js` is already `require`-able by the test suite, and the callback/dispatch
+   map is fully inventoried below — this is the missing safety net that makes the payload rewrite safe.
+2. Optionally extend `scripts/smoke.js` with a two-page (two browser contexts) loopback, but the Node
+   harness is the higher-value, lower-flake option.
+
+### Wiring map (so you don't re-explore — current as of 5c)
+- **Receive dispatch:** `Session._rx(bytes)` → `unframe` → `_rxHost`/`_rxClient` switch on `pkt.type`
+  (`mp.js`). Type constants `T.*` at `mp.js:15-26`.
+- **Callbacks the app assigns** (`netCallbacks()` in `features/net/net.js`, passed as
+  `opts.callbacks`): `onStart(roster,order)`→`startNetGame`; `onTurn(activeId,isMe)`→`netSetTurn`;
+  `onMove(mv)`→`netApplyRemote` (mv = `{playerId, category(index), score, log}`);
+  `onResync(scores,version)`→`netApplySnapshot` (scores = `{id:{catIdx:score}}`); `onEnd`→`endGame`;
+  plus lobby/roster/spectate hooks (`onRoster`,`onStart`,`onAction`,`onSpur`,`onDrop`,…).
+- **Send chain:** local commit → `commitScore`→`afterCommit` builds `mv` (`features/game/game.js`,
+  search `var mv = {`) → `net.submitMove(mv)` → host `_applyMove`→`_send(T.STATE, packStateDelta)`;
+  client `_send(T.MOVE, packMove)`. Host AI seats: `net.submitMoveFor(id, mv)`. Reconnect catch-up:
+  `Session.rebroadcast()`→`_send(T.STATE, packStateSnapshot)`.
+
+### Also still dormant (not part of 5c-remainder, separate cleanup if ever wanted)
+The broader acoustic **modem** layer is still present and unused: `PROFILES`, the adaptive link layer
+(`_rxAdaptive`, `AdaptiveController`, `LinkMeter`), and the `XOFFER`/`XWANT`/`XDATA`/`XACK`/`XDONE`
+type constants. Left in place intentionally — removing it is a large, orthogonal sweep.
