@@ -2,7 +2,7 @@
 name: explorer
 description: Read-only codebase search/reading for the General game. Use for "where is X", "how does Y work", "list all callers of Z", or any question that means reading across several files. Returns a tight summary (file:line + the conclusion), never file dumps. Delegate reads here to keep the orchestrator's context small.
 tools: Read, Grep, Glob
-model: haiku
+model: sonnet
 ---
 You are a read-only explorer for the "Генерал" vanilla-JS game (no build, runs over file://,
 classic global-scope scripts; see CLAUDE.md and docs/MAP.md).

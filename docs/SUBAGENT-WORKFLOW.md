@@ -9,10 +9,10 @@ re-reading its own accumulated context every turn; fan-out keeps that context le
 
 | Role | Who | Reads/writes | Returns to orchestrator |
 |---|---|---|---|
-| **Orchestrator** | the main session (you) | delegates; reviews; integrates | — |
-| **explorer** | `.claude/agents/explorer.md` (haiku) | read-only | `file:line` + conclusion (≤~25 lines) |
-| **implementer** | `.claude/agents/implementer.md` (inherit) | read-write + runs tests | what changed + verify result + risks |
-| **reviewer** | `.claude/agents/reviewer.md` (sonnet) | read-only (diff) | findings only |
+| **Orchestrator** | the main session (you) — **opus** | delegates; reviews; integrates | — |
+| **explorer** | `.claude/agents/explorer.md` (**sonnet**) | read-only | `file:line` + conclusion (≤~25 lines) |
+| **implementer** | `.claude/agents/implementer.md` (**inherit → opus**) | read-write + runs tests | what changed + verify result + risks |
+| **reviewer** | `.claude/agents/reviewer.md` (**opus**) | read-only (diff) | findings only |
 
 ## The orchestrator's discipline
 1. **Don't read broadly yourself.** Any "where/how/which across files" → spawn **explorer**. You keep
@@ -45,9 +45,17 @@ reviewer  → independent diff review (risky changes)  (returns findings)
 orchestrator → integrate, fix, commit, next slice
 ```
 
-## Cost notes
-- explorer on **haiku**, reviewer on **sonnet**, implementer **inherits** the orchestrator's model.
-  Tune in each agent's frontmatter `model:` if quality/cost needs shift (haiku may miss nuance in the
-  global-scope coupling — bump explorer to sonnet for subtle traces).
+## Model assignment — tier by *verifiability*, not by a blanket cheap-out
+The big saving from subagents is **context isolation** (the orchestrator never carries the reads),
+**not** running them on cheaper models. So tier each role by "can the orchestrator cheaply verify
+this output?":
+- **Orchestrator: opus.** Highest judgment; integrates summaries it can't fully re-derive. Non-negotiable.
+- **implementer: inherit (→ opus).** Writes code, but is gated by `node --test` + the reviewer, so a
+  lower tier is *tolerable* — kept at opus here since implementation quality matters and it's cheap insurance.
+- **reviewer: opus.** The verifier of last resort — nothing checks it, and the risky diffs (Task A
+  state machine, serialization) are where opus catches what smaller models miss.
+- **explorer: sonnet.** Its summaries are *trusted but unverified*, so don't go too cheap — haiku can
+  miss the global-scope/load-order coupling. Sonnet orients reliably and is still far below opus cost.
+  Drop a given lookup to haiku only if you've confirmed it's purely mechanical (locate/list).
 - Keep orchestrator sessions **task-scoped**; `/clear` between unrelated tasks so the cached prefix
   doesn't grow unbounded.
