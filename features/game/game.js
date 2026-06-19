@@ -204,15 +204,14 @@
   }
 
   // ---------- render ----------
-  // single render entry for BOTH rulesets and BOTH sources (local + net). The genuinely
-  // ruleset-specific pieces (header, board, hint) dispatch internally; the dice tray, fire button
-  // and net spectating are shared. The exp board (signed deviation rows + два чифта + number bar)
-  // is also what net-minus games render. Header/pills only switch to the exp layout for LOCAL exp —
-  // net-exp keeps the shared net-aware header/pills (same as before this merge).
+  // single render entry for BOTH rulesets and BOTH sources (local + net). Every piece is now a
+  // shared function: header/pills branch to the exp layout internally for LOCAL exp (net-exp keeps
+  // the net-aware header/pills), and board/hint dispatch on sumExp(). The dice tray, fire button
+  // and net spectating are shared outright. The exp board (signed deviation rows + два чифта +
+  // number bar) is also what net-minus games render.
   function renderAll() {
-    var localExp = gExp() && !netMode;
-    (localExp ? expRenderHeader : renderHeader)();
-    renderPills();   // shared: pills are identical; the peek modal (openPeek) picks the exp board by ruleset
+    renderHeader();   // shared: branches to the exp 2-line layout internally for local exp
+    renderPills();    // shared: pills are identical; the peek modal (openPeek) picks the exp board by ruleset
     if (sumExp()) { expRenderBoard(); $('expNumBar').classList.remove('hidden'); }
     else { renderBoard(); $('expNumBar').classList.add('hidden'); }
     if (gManual()) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
@@ -284,24 +283,42 @@
     line.classList.remove('hidden');
   }
 
+  // single header for both rulesets. LOCAL exp uses a constant 2-line name (persona inline, no
+  // ribbons) and counts the round from filled cells; standard/net use the 1-line name + ribbons and
+  // the net-aware round counter. The total + number-part chip are shared (total() is ruleset-aware,
+  // and penalties only ever apply to local-standard play, so they're a no-op for exp).
   function renderHeader() {
     // a 'pretend next turn' penalty briefly shows the next player in the header
     var idx = fx.pretendNext ? (game.current + 1) % game.players.length : game.current;
     var p = game.players[idx];
-    $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
-    var per = $('curPersona');
-    if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
-    else per.classList.add('hidden');
-    // temporary penalties trim the DISPLAYED total: a fine, plus any zeroed-out combos
+    if (gExp() && !netMode) {
+      // constant 2-line name: first two words on line 1, the rest + persona on line 2
+      var words = esc(p.name).split(/\s+/);
+      var l1 = (isOwnerP(p) ? ownerTokenHTML(true) : '') + words.slice(0, 2).join(' ');
+      var rest = words.slice(2).join(' ');
+      var persona = (p.isAI && p.persona) ? '<span class="pn-persona">⚙ ' + esc(p.persona.name) + '</span>' : (p.isAI ? '<span class="pn-persona">AI</span>' : '');
+      var word2 = rest ? '<span class="pn-a">' + rest + '</span>' : '';   // spilled word keeps the full name style
+      var line2 = (rest || persona) ? word2 + (rest && persona ? ' ' : '') + persona : '&nbsp;';
+      $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-line2">' + line2 + '</span></span>';
+      $('curPersona').classList.add('hidden'); $('curRibbons').innerHTML = '';   // persona inline; no ribbons
+      var filled = X.filledCount(p.scores);
+      $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
+    } else {
+      $('curName').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI ? '<span class="badge-ai">AI</span>' : '');
+      var per = $('curPersona');
+      if (p.isAI && p.persona) { per.textContent = '⚙ ' + p.persona.name; per.classList.remove('hidden'); }
+      else per.classList.add('hidden');
+      // which turn of the game. net games don't run the local turn counter, so derive it from the
+      // shown player's progress (their filled categories + 1) — works for the active AND watched player.
+      var totalCats = sumExp() ? G.CATEGORIES_EXP.length : G.CATEGORIES.length;
+      var roundNum = netMode ? Math.min(totalCats, filledCount(p) + 1) : game.round;
+      $('curRound').innerHTML = roundNum + '<span class="rsub">/' + totalCats + '</span>';
+      $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
+    }
+    // temporary penalties trim the DISPLAYED total: a fine, plus any zeroed-out combos (local-standard only)
     var blankCut = (fx.blank || []).reduce(function (s, k) { return s + (p.scores[k] || 0); }, 0);
     $('curTotal').textContent = total(p) - (fx.points || 0) - blankCut;
     $('curNumPart').classList.add('hidden');   // number-part chip is experimental-only
-    // which turn of the game. net games don't run the local turn counter, so derive it from the
-    // shown player's progress (their filled categories + 1) — works for the active AND watched player.
-    var totalCats = sumExp() ? G.CATEGORIES_EXP.length : G.CATEGORIES.length;
-    var roundNum = netMode ? Math.min(totalCats, filledCount(p) + 1) : game.round;
-    $('curRound').innerHTML = roundNum + '<span class="rsub">/' + totalCats + '</span>';
-    $('curRibbons').innerHTML = (p.ribbons || RIBBON_COLORS).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
   }
 
   // readable number colour for a pill painted in the player's own colour

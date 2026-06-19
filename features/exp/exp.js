@@ -343,27 +343,11 @@
   }
 
   // ----- experimental rendering -----
-  // The standard renderAll() (features/game/game.js) is the single render entry; it dispatches to
-  // these exp-specific pieces (header, pills, board, hint). The dice tray + fire button are shared
-  // (the standard renderDice/renderFire already cover the local-exp case — no net/penalty extras).
-  function expRenderHeader() {
-    var p = G.currentPlayer(game);
-    // constant 2-line name: first two words on line 1, the rest + persona on line 2
-    var words = esc(p.name).split(/\s+/);
-    var l1 = (isOwnerP(p) ? ownerTokenHTML(true) : '') + words.slice(0, 2).join(' ');
-    var rest = words.slice(2).join(' ');
-    var persona = (p.isAI && p.persona) ? '<span class="pn-persona">⚙ ' + esc(p.persona.name) + '</span>' : (p.isAI ? '<span class="pn-persona">AI</span>' : '');
-    var word2 = rest ? '<span class="pn-a">' + rest + '</span>' : '';   // spilled word keeps the full name style
-    var line2 = (rest || persona) ? word2 + (rest && persona ? ' ' : '') + persona : '&nbsp;';
-    $('curName').innerHTML = '<span class="pn2"><span class="pn-a">' + l1 + '</span><span class="pn-line2">' + line2 + '</span></span>';
-    $('curPersona').classList.add('hidden'); $('curRibbons').innerHTML = '';   // persona inline; no ribbons
-    $('curTotal').textContent = X.total(p);
-    $('curNumPart').classList.add('hidden');   // number-part summary now sits between the board sections
-    var filled = X.filledCount(p.scores);
-    $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
-  }
-  // expRenderPills/expPeek were folded into the shared renderPills + openPeek (which now picks
-  // expMiniBoard via sumExp()); local exp uses them directly now.
+  // The standard renderAll() (features/game/game.js) is the single render entry. The header/pills
+  // were folded into the shared renderHeader/renderPills (they branch on local-exp internally);
+  // only the genuinely-different board + hint stay as exp-specific helpers below. The dice tray +
+  // fire button are shared too (the standard renderDice/renderFire cover the local-exp case).
+  // expRenderHeader/expRenderPills/expPeek were folded into renderHeader/renderPills + openPeek.
   // experimental mini cell-board (peek / summary recap) — same look as the standard miniBoard,
   // with the signed number part (colour by value), the number-part bar, and фул хаус spanning two.
   function expMiniBoard(p) {
