@@ -198,6 +198,25 @@ test('NEXT_TURN advances the seat and bumps the round on wrap', function () {
   assert.strictEqual(b.round, 2);   // wrapped → new round
 });
 
+test('NEXT_TURN done-mask skips finished seats (free-order exp)', function () {
+  var four = st({ players: [{}, {}, {}, {}], current: 0, round: 1 });
+  // seats 1 and 2 are done → from seat 0 we land on seat 3
+  var a = R.reduce(four, { type: 'NEXT_TURN', done: [false, true, true, false] });
+  assert.strictEqual(a.current, 3);
+  assert.strictEqual(a.round, 1);
+  // wrapping past a done seat still bumps the round once for the wrap
+  var b = R.reduce(Object.assign({}, four, { current: 3 }), { type: 'NEXT_TURN', done: [true, false, false, false] });
+  assert.strictEqual(b.current, 1);   // seat 0 done → skipped to seat 1
+  assert.strictEqual(b.round, 2);     // wrapped through 0
+});
+
+test('NEXT_TURN done-mask with everyone finished still advances exactly once', function () {
+  var two = st({ players: [{}, {}], current: 0, round: 1 });
+  var a = R.reduce(two, { type: 'NEXT_TURN', done: [true, true] });
+  assert.strictEqual(a.current, 1);   // no infinite loop; single plain advance
+  assert.strictEqual(a.round, 1);
+});
+
 // ----------------------------------------------------------------- END_GAME
 
 test('END_GAME is a recognised no-op (end screen is pure UI)', function () {

@@ -39,10 +39,22 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    coverage for the app game-loop (177 tests pass; smoke green for both rulesets × dice/manual).
    *Not yet routed (by design):* the exp first-roll/commit path (slice 4) and the net commit/snapshot
    mutations (slice 5); `BEGIN_TURN mode:'net'` is wired but the rest of the net turn flow is slice 5.
-4. ⬜ **Merge the exp parallel path** — `reduce()` picks engine fns by `state.ruleset`
-   (`G.scoreFor` vs `G.scoreForExp`, `G.CATEGORIES` vs `G.CATEGORIES_EXP`, `G.assignScore` vs
-   `X.assignScore`). Delete `expStartGame`/`expBeginTurn`/`expCommit` duplication and the
-   `gExp() ? expRenderAll : renderAll` dispatch where possible. **Riskiest slice.**
+4. 🟡 **IN PROGRESS** — *merge the exp parallel path.* **4a DONE** — the exp **turn-flow state
+   machine** now routes through `GReduce.reduce`, exactly like the standard path: `expBeginTurn`
+   (BEGIN_TURN `manual`/`dice` + AI FIRST_ROLL), `expFirstRoll` (FIRST_ROLL), `expCommit`'s local
+   lock (COMMIT), and `expEndTurn` (END_GAME + NEXT_TURN) no longer mutate `game.turn` inline.
+   Free-order exp needs to skip finished seats, so `reduce()`'s `NEXT_TURN` gained an optional
+   `action.done` boolean[] skip-mask (standard passes none → identical single advance); the shell
+   computes `done = players.map(X.playerDone)`. The exp **net** commit branches stay inline (slice 5,
+   same as standard `afterCommit`). **Added 2 `NEXT_TURN` skip tests** (179 pass; smoke green both
+   rulesets × dice/manual). *Score assignment stays shell-side* (`G.assignScore` vs `X.assignScore`)
+   by design — `reduce()` COMMIT only locks; it does not pick engine fns.
+   **4b REMAINING (riskiest):** collapse the rendering duplication — `expRenderAll` /
+   `expRenderHeader` / `expRenderPills` / `expRenderDice` / `expRenderFire` and the ~10
+   `gExp() ? expRenderAll : renderAll` dispatch sites (game.js, modals.js, tutorial.js). The exp
+   board (15 signed rows + number bar) genuinely differs, so this is a render-layer merge, deferred
+   from 4a to keep that slice safe. `expStartGame`/`resumeExpGame` also still duplicate the
+   start/resume scaffolding (could fold into `startGame`/`resumeGame` once rendering unifies).
 5. ⬜ **Unify serialization** — resume / archive / net wire codec / replay all read **one** schema via
    shared serialize/deserialize. Make the net-apply path **emit the same actions** as local play.
 

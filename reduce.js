@@ -150,11 +150,17 @@
       }
 
       // Advance the cursor to the next seat (wrapping bumps the round) — the pure
-      // analogue of G.nextTurn.
+      // analogue of G.nextTurn / X.nextTurn. `action.done` (optional boolean[] per
+      // seat) makes it skip already-finished players, which the free-order
+      // experimental ruleset needs (a player can fill all rows before the others).
+      // Standard play passes no `done`, so it's always a single plain advance.
       case 'NEXT_TURN': {
         var n = state.players.length;
-        var cur = (state.current + 1) % n;
-        var rnd = cur === 0 ? state.round + 1 : state.round;
+        var done = action.done;
+        var allDone = done && done.every(Boolean);   // every seat finished → stop after one step
+        var cur = state.current, rnd = state.round;
+        do { cur = (cur + 1) % n; if (cur === 0) rnd++; }
+        while (done && !allDone && done[cur]);
         return Object.assign({}, state, { current: cur, round: rnd });
       }
 

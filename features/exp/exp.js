@@ -44,25 +44,26 @@
     expBeginTurn();
   }
   function expBeginTurn() {
-    game.turn.locked = false; game.turn.rerolledAll = false; game.turn.diceNew = [false, false, false, false, false]; game.turn.diceGen = []; game.turn.rollNo = 0;
+    // same turn-flow state machine as the standard beginTurn (reduce.js), just with
+    // the exp-specific renderer + AI; local-only (net minus runs the standard beginTurn).
     hintsOn = false; $('hintBtn').classList.remove('on'); $('hintBtn').classList.toggle('hidden', !exactReady || !settings.advice);  // hints need the exact table AND the advice toggle
     clearRoast();
     var p = G.currentPlayer(game);
     if (!netMode) saveResume();
     document.documentElement.style.setProperty('--pc', p.color);
-    game.turn.selected = [false, false, false, false, false];
     if (gManual()) {                          // ОТЧЕТ: tap the five dice in, then pick a row
-      game.turn.manualCounts = [0, 0, 0, 0, 0, 0, 0]; game.turn.awaitingRoll = false; game.turn.throwsLeft = 0; game.turn.dice = []; game.turn.curLog = null;
+      game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'manual' }).turn;
       expRenderAll();
-    } else if (p.isAI) {
-      game.turn.awaitingRoll = false; game.turn.throwsLeft = ROLLS - 1;
-      game.turn.dice = G.rollAll(); sortDice();
-      game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
+      return;
+    }
+    game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'dice' }).turn;
+    if (p.isAI) {
+      // AI rolls immediately — replay the human first-roll transition, then drive the bot
+      game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: G.rollAll() }).turn;
       game.turn.curLog = expStartLog(p);
       expRenderAll(); shakeDice();
       expRunAiTurn();
     } else {
-      game.turn.awaitingRoll = true; game.turn.throwsLeft = ROLLS - 1; game.turn.dice = []; game.turn.curLog = null;
       expRenderAll();
     }
   }
@@ -72,9 +73,9 @@
   function expFirstRoll() {
     if (!game.turn.awaitingRoll || game.turn.locked) return;
     if (tut && !tutGate('roll')) return;
-    game.turn.awaitingRoll = false; game.turn.dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
-    game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
-    game.turn.curLog = expStartLog(G.currentPlayer(game));
+    var faces = (tut && tut.dice) ? tut.dice.slice() : G.rollAll();
+    game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: faces }).turn;
+    game.turn.curLog = expStartLog(G.currentPlayer(game));   // log seeds from game.turn.dice, so build it after the roll lands
     clearRoast(); expRenderAll(); shakeDice();
     if (tut) tutEvent('roll');
   }
@@ -128,16 +129,23 @@
       return;
     }
     if (tut) tutEvent('commit');
-    game.turn.locked = true; expRenderAll(); $('fire').disabled = true;
+    game.turn = GReduce.reduce(game, { type: 'COMMIT' }).turn;   // lock the turn
+    expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
     var delay = END_DELAY;
     if (!gManual() && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
     turnTimer = setTimeout(expEndTurn, delay);
   }
   function expEndTurn() {
-    if (X.isGameOver(game)) { expEndGame(); return; }
-    X.nextTurn(game);
-    if (tut) { while (game.players[game.current].isAI) X.nextTurn(game); }   // tutorial: the opponent never plays
+    if (X.isGameOver(game)) { GReduce.reduce(game, { type: 'END_GAME' }); expEndGame(); return; }
+    // free order: skip seats that have already filled all 15 rows (the done-mask is
+    // what the standard NEXT_TURN doesn't need — everyone there finishes together)
+    function advance() {
+      var done = game.players.map(function (pl) { return X.playerDone(pl); });
+      var n = GReduce.reduce(game, { type: 'NEXT_TURN', done: done }); game.current = n.current; game.round = n.round;
+    }
+    advance();
+    if (tut) { while (game.players[game.current].isAI) advance(); }   // tutorial: the opponent never plays
     expBeginTurn();
   }
   function expRunAiTurn() { game.turn.aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
