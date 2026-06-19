@@ -23,7 +23,7 @@
   var netReconnecting = false;
   function syncNetLink() {
     var nl = $('netLink'); if (!nl) return;
-    if (!netMode || netKind !== 'webrtc') return;
+    if (!netMode) return;
     var up = !!(netBus && netBus.conns && netBus.conns.length > 0);
     var cls, lbl;
     if (net && net.isHost) { cls = 'up'; lbl = 'хост'; }
@@ -333,7 +333,7 @@
   // 15 min can offer to rejoin; older entries are treated as stale and cleaned up.
   var NET_ACTIVE_KEY = 'genrl:wrtc:active', NET_REJOIN_MS = 15 * 60 * 1000, netRejoinEntry = null;
   function netActiveSave() {
-    if (netKind !== 'webrtc' || !wrCode || !net) return;
+    if (!wrCode || !net) return;
     try {
       var e = { code: wrCode, role: net.isHost ? 'host' : 'client', manual: !!net.manual, exp: !!net.exp, ts: Date.now() };
       if (net.isHost && net.snapshot) { var s = net.snapshot(); if (s) e.snap = s; }   // host keeps the authoritative state for crash recovery
@@ -360,7 +360,7 @@
   // ===================================================== WebRTC transport (PeerJS) ==============
   // A pluggable MP.Session transport over WebRTC data channels. PeerJS provides the public
   // signalling cloud (no account/server needed) just for the handshake; gameplay is P2P.
-  // It emulates the acoustic BROADCAST bus: the host sends to every client connection, a client
+  // It runs a BROADCAST bus: the host sends to every client connection, a client
   // sends to the host, and the host re-broadcasts state — so the session needs no topology change.
   var PEER_PREFIX = 'genrl1-';                 // namespaces our peer ids on the shared PeerJS cloud
   // ICE servers for NAT traversal. STUN handles same-network play; a real TURN RELAY is needed
@@ -438,7 +438,7 @@
   function syncWrCapStatus() { var el = $('wrCapStatus'); if (el) el.textContent = settings.webrtcDebug ? (wrLog.length + ' събития записани') : 'дебъгът е изключен'; }
   function syncWrCapVis() {
     var box = $('wrCap'); if (!box) return;
-    var show = !$('netModal').classList.contains('hidden') && netKind === 'webrtc' && settings.webrtc && settings.webrtcDebug;
+    var show = !$('netModal').classList.contains('hidden') && settings.webrtc && settings.webrtcDebug;
     box.classList.toggle('hidden', !show); syncWrCapStatus(); if (show) syncIceField();
   }
   function syncIceField() { var t = $('wrIce'); if (t) t.value = settings.iceServers || ''; iceStatus(); }
@@ -555,14 +555,10 @@
     this.conns.forEach(function (c) { try { c.close(); } catch (e) {} }); this.conns = [];
     if (this.peer) { try { this.peer.destroy(); } catch (e) {} } this.peer = null;
   };
-  // open the multiplayer modal in the chosen transport mode ('acoustic' | 'webrtc')
-  function openNetModal(kind, presetManual) {
-    netKind = kind;
-    var wr = (kind === 'webrtc');
-    if (typeof presetManual === 'boolean') netManual = presetManual;   // webrtc: mode comes from the start-screen play button
+  // open the multiplayer (WebRTC) lobby modal
+  function openNetModal(presetManual) {
+    if (typeof presetManual === 'boolean') netManual = presetManual;   // mode comes from the start-screen play button
     $('netTitle').innerHTML = '<i class="ic-net" aria-hidden="true"></i><span>Игра по мрежа</span>';
-    document.querySelectorAll('#netModal .ac-only').forEach(function (e) { e.classList.toggle('hidden', wr); });
-    document.querySelectorAll('#netModal .wr-only').forEach(function (e) { e.classList.toggle('hidden', !wr); });
     $('netMeName').textContent = localMeta().name;
     netShow('choose');
     $('netPickRole').classList.remove('hidden');                       // back to the role picker
@@ -575,7 +571,7 @@
     $('netOptical').classList.add('hidden'); stopScan();
     $('netJoin').textContent = 'ПРИСЪЕДИНИ СЕ';
     $('netHost').textContent = 'ПОКАНИ';
-    if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
+    wrCapReset('', '');   // start a fresh capture session (records the environment)
     syncNetMode();
     $('netModal').classList.remove('hidden');
     syncWrCapVis();
@@ -646,7 +642,6 @@
     if (btn) { btn.classList.add('copied'); clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied'); }, 1600); }
   }
   $('netCodeScan').onclick = function () {
-    if (netKind !== 'webrtc') return;
     netChooseMsg('Зареждам QR библиотеки…');
     loadOpticalLibs(function (ok) {
       if (!ok) { netChooseMsg('⚠ Неуспешно зареждане на QR библиотеките (нужен е интернет първия път).'); return; }
@@ -655,7 +650,6 @@
   };
   // paste: pull the code straight from the clipboard into the field (paste button + code box flash green)
   $('netCodePaste').onclick = function () {
-    if (netKind !== 'webrtc') return;
     if (!(navigator.clipboard && navigator.clipboard.readText)) { netChooseMsg('⚠ Браузърът не дава достъп до клипборда — постави ръчно.'); return; }
     navigator.clipboard.readText().then(function (t) {
       // accept a bare 6-char code or the exact host share message; anything else is rejected
@@ -818,7 +812,6 @@
   }
   // ---- WebRTC client: dial the host's code, then ask to join the lobby ----
   $('netCodeJoin').onclick = function () {
-    if (netKind !== 'webrtc') return;
     var code = ($('netCodeInput').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4) { netChooseMsg('⚠ Въведи валиден код (поне 4 знака).'); return; }
     track('code-' + lastCodeSource);   // how this code was entered: qr / paste / manual
@@ -958,12 +951,12 @@
   function netHostGone() {
     if (!netMode && !net) return;
     netDisposeSession();
-    openNetModal(netKind, netManual);
+    openNetModal(netManual);
     netChooseMsg('⚠ Старшината отказа играта. Можеш да създадеш своя или да влезеш в друга.');
   }
   function leaveNet() { netDisposeSession(); $('netModal').classList.add('hidden'); }   // ✕ — back to the start screen
   // „Откажи" from the host invite / lobby returns to the host/join role picker (modal stays open)
-  function netBackToChoose() { netDisposeSession(); openNetModal(netKind, netManual); }
+  function netBackToChoose() { netDisposeSession(); openNetModal(netManual); }
   $('netLeave').onclick = netBackToChoose;
   // true only at the idle host/join picker — nothing started yet (no session, no transport, no code view)
   function netAtPicker() {
@@ -1053,10 +1046,10 @@
     beginTurn();
   }
   // ---------- live spectating: broadcast my actions; watch the active player's actions ----------
-  // the active player broadcasts each completed action so everyone else can watch (WebRTC only —
-  // an acoustic link is too slow for per-action traffic). Works for my own turn AND a host-driven AI seat.
+  // the active player broadcasts each completed action so everyone else can watch.
+  // Works for my own turn AND a host-driven AI seat.
   function netSendAct(extra) {
-    if (!(netMode && netKind === 'webrtc' && net)) return;
+    if (!(netMode && net)) return;
     var pid = (netAiActiveId != null && net.isHost) ? netAiActiveId : (netMyTurn ? localPid : null);
     if (pid == null) return;
     var mask = 0;
@@ -1165,8 +1158,8 @@
   function devMockLobby() {
     try { leaveNet(); } catch (e) {}
     var nullTp = { maxPayload: 60000, onReceive: function () {}, send: function () { return Promise.resolve(); } };
-    netKind = 'webrtc'; wrCode = 'MOCK01';
-    openNetModal('webrtc');
+    wrCode = 'MOCK01';
+    openNetModal();
     net = newSessionWith(nullTp, true); localPid = MP.HOST_ID;
     net.openLobby();
     net.roster.push({ id: net._nextId(), eph: 9001, name: 'Редник Тъпан', color: '#2e9e5b', gender: 'm', ready: true });
@@ -1180,8 +1173,7 @@
   function devMockLobbyClient() {
     try { leaveNet(); } catch (e) {}
     var nullTp = { maxPayload: 60000, onReceive: function () {}, send: function () { return Promise.resolve(); } };
-    netKind = 'webrtc';
-    openNetModal('webrtc');
+    openNetModal();
     net = newSessionWith(nullTp, false); localPid = 3; net.myId = 3; net._acked = true; net.state = 'PREP';
     net.settingsBits = settingsBits() || 0b011;   // pretend a couple of gameplay settings are on
     net.roster = [
@@ -1221,7 +1213,7 @@
     if (key && !G.isCategoryFilled(pl, key)) {
       game.players = GReduce.reduce(game, { type: 'APPLY_SCORE', seat: seat, key: key, score: mv.score }).players;   // mirror the remote score
       // store this player's FULL turn log (relayed as JSON) so history is complete on every device.
-      // If no log came through (older peer / acoustic), fall back to a fill-order-only marker.
+      // If no log came through (older peer), fall back to a fill-order-only marker.
       if (moveLog[seat]) {
         var entry = null;
         if (mv.log) { try { entry = JSON.parse(mv.log); } catch (e) {} }
@@ -1255,7 +1247,7 @@
   // host (WebRTC): show the game code in-game so a dropped player can read it and rejoin
   function renderMenuNetCode() {
     var box = $('menuNetCode'); if (!box) return;
-    if (!netMode || !net || !net.isHost || netKind !== 'webrtc' || !wrCode) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    if (!netMode || !net || !net.isHost || !wrCode) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     box.classList.remove('hidden');
     box.innerHTML = '<div class="netcode-lbl">Код за връщане в играта</div><div class="netcodeqr"></div>' + codeCopyLine(wrCode) + '<div class="mnc-hint">Разпаднал се боец може да влезе пак с този код — или да сканира QR-а.</div>';
     wireCodeCopy(box, wrCode);
@@ -1265,7 +1257,7 @@
   // (shown only with the debug toggle on) so a connection hiccup can be captured the moment it happens.
   function renderMenuWrLog() {
     var btn = $('menuWrLog'); if (!btn) return;
-    var show = netMode && net && netKind === 'webrtc' && settings.webrtcDebug;
+    var show = netMode && net && settings.webrtcDebug;
     btn.classList.toggle('hidden', !show);
     if (!show) return;
     btn.onclick = function () {

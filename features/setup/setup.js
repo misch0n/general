@@ -466,7 +466,7 @@
   // network: the play button picks the MODE (regular vs manual); ruleset comes from the selector
   function startNetFlow(manual) {
     $('setupErr').textContent = '';
-    netManual = manual; openNetModal('webrtc', manual);
+    netManual = manual; openNetModal(manual);
   }
   // ---- play button: one surface. Tap the ACTIVE end or the middle = старт; tap the INACTIVE end =
   //      switch to it; swipe ←/→ picks a mode (the gradient slides/floods to the new mode) ----

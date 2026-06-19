@@ -441,14 +441,12 @@
   </div>
 </div>
 
-<!-- network (acoustic) multiplayer lobby -->
+<!-- network (WebRTC) multiplayer lobby -->
 <div id="netModal" class="overlay hidden">
   <div class="modal" style="max-width:330px;text-align:center">
     <button class="x-close" id="netClose">✕</button>
-    <h2 id="netTitle">🔊 Акустична игра</h2>
-    <p class="ht ac-only">Играй на няколко телефона наблизо — звукът пренася ходовете. Дръж телефоните на ~1 м, със звук нагоре.</p>
-    <p class="ht wr-only hidden">Играй на няколко телефона по интернет. Хостът дава код, останалите го въвеждат.</p>
-    <div class="acwarn ac-only"><span class="acw-ic">🎧</span><span><b>Без слушалки!</b> Звукът трябва да минава през високоговорителя и микрофона — със слушалки преносът не работи.</span></div>
+    <h2 id="netTitle">Игра по мрежа</h2>
+    <p class="ht">Играй на няколко телефона по интернет. Хостът дава код, останалите го въвеждат.</p>
     <div id="netChoose">
       <p class="ht">Ти играеш като <b id="netMeName">—</b>.</p>
       <!-- regular (dice) vs manual (ОТЧЕТ) network game -->
@@ -458,7 +456,7 @@
       </div>
       <!-- pick a role: host or join -->
       <div id="netPickRole">
-        <div id="netPickInfo" class="netpickinfo wr-only hidden"></div>
+        <div id="netPickInfo" class="netpickinfo"></div>
         <div class="setup-actions">
           <button id="netHost" class="btn primary">ПОКАНИ</button>
         </div>
@@ -471,12 +469,11 @@
       </div>
       <!-- join sub-view: explainer + code entry + join/cancel -->
       <div id="netJoinCode" class="netjoinview hidden">
-        <p class="ht wr-only hidden">Въведи кода, който старшината ти даде, и натисни „Влез с кода“.</p>
-        <p class="ht ac-only">Слушам за игра наблизо…</p>
+        <p class="ht">Въведи кода, който старшината ти даде, и натисни „Влез с кода“.</p>
         <div class="netjoincode">
           <input id="netCodeInput" class="netcode-in" maxlength="6" placeholder="КОД" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" />
-          <button type="button" id="netCodePaste" class="codecopy wr-only hidden" title="Постави от клипборда" aria-label="Постави код от клипборда"><i class="paste-ic"></i></button>
-          <button type="button" id="netCodeScan" class="codecopy wr-only hidden" title="Сканирай QR код" aria-label="Сканирай QR код"><i class="cam-ic"><b></b></i></button>
+          <button type="button" id="netCodePaste" class="codecopy" title="Постави от клипборда" aria-label="Постави код от клипборда"><i class="paste-ic"></i></button>
+          <button type="button" id="netCodeScan" class="codecopy" title="Сканирай QR код" aria-label="Сканирай QR код"><i class="cam-ic"><b></b></i></button>
         </div>
         <div class="setup-actions">
           <button id="netCodeJoin" class="btn primary">Влез с кода</button>

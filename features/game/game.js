@@ -23,7 +23,7 @@
   var ownerDetached = false; // owner deliberately removed from the roster (only while skipped): seat #1 shows a MUTED token but keeps its own identity until the token is re-activated
   // ОТЧЕТ mode (manual point entry, no app dice rolls) now lives on `game.manual`; read via gManual().
   var netMode = false, net = null, localPid = null, netOrder = [], netMyTurn = false; // networked play (WebRTC)
-  var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
+  var netBus = null, netManual = false;   // regular/manual(ОТЧЕТ) network game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var netActiveId = null, specSelf = false, specAct = null, specSaved = null;   // spectating: who's playing, am I previewing my own board, last action, saved watch-view
   // true while we're rendering a watched opponent's read-only frame (not my turn, not my own-board preview)
@@ -104,8 +104,8 @@
     if (!m || !settings.webrtc) return false;
     var code = m[1].toUpperCase().slice(0, 6);
     try { history.replaceState(null, '', location.pathname); } catch (e) {}   // don't re-trigger on reload
-    netManual = false; netKind = 'webrtc';
-    openNetModal('webrtc', false);
+    netManual = false;
+    openNetModal(false);
     $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
     $('netJoinCode').classList.remove('hidden');
     $('netCodeInput').value = code; lastCodeSource = 'qr';
@@ -128,7 +128,7 @@
     var o = netRejoinEntry; $('netRejoinModal').classList.add('hidden'); if (!o) return;
     settings.ruleset = o.exp ? 'experimental' : 'standard'; syncStartRuleSel();
     netManual = !!o.manual;
-    openNetModal('webrtc', o.manual);
+    openNetModal(o.manual);
     if (o.role === 'host') {
       if (o.snap) webrtcHostRestore(o.code, o.snap);   // rebuild the unfinished game; clients reconnect by the same code
       else webrtcHost(o.code);                          // re-host the same code so a waiting peer can reconnect
