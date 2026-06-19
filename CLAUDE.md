@@ -60,6 +60,9 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
 - CSS mirrors this under `features/<name>/<name>.css` (+ `features/base/base.css`).
 
 **Per-file function index:** `docs/MAP.md` (regenerate: `bash scripts/genmap.sh`).
+**Active task:** `docs/TASK-B-net-stack-slimming.md` — remove the dormant acoustic / adaptive-link
+layer from `mp.js` (profiles, `LinkMeter`/`AdaptiveController`, `RELAY`/`GOSSIP`, the `X*` constants,
+`crc16`), leaving framing + session + game codecs (what WebRTC actually uses).
 **Completed refactor (historic context):** `docs/completed/TASK-A-state-unification.md` — state
 unification: one `GameState` + `GReduce.reduce`, one serialize/deserialize across
 resume/archive/net/replay, canonical-JSON net wire, and std/exp merged into one parameterized flow.
