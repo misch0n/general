@@ -237,6 +237,7 @@
     if (this.tp.setRole) this.tp.setRole(this.isHost ? 'host' : 'client');   // carrier-sense priority for the orchestrator
     this.settingsBits = 0;             // host's enabled pre-game settings (summary shown to clients)
     this.takeover = {};                // host: id → true when that seat is AI-driven mid-game
+    this.paused = {};                  // host: id → true when a dropped seat is paused (skipped; doesn't block the finish)
     if (this.isHost) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender, ready: true, isAI: false });
   }
   Session.prototype._applyProfile = function (p) { this.profile = p; if (this.tp.setProfile) this.tp.setProfile(p); if (this.cb.onProfile) this.cb.onProfile(p); };
@@ -421,6 +422,7 @@
   // (a dropped player is skipped so the rest can finish; an AI takeover keeps playing the seat)
   Session.prototype._needsTurn = function (id) {
     if (this._filled(id) >= this.rounds) return false;
+    if (this.paused[id]) return false;                                  // host paused this seat → skip it in the rotation
     var e = this._byId(id);
     if (e && e.dropped && !this.isAIControlled(id)) return false;
     return true;
@@ -433,6 +435,7 @@
     var self = this;
     return this.order.every(function (id) {
       if (self._boardDone(id)) return true;
+      if (self.paused[id]) return true;   // a paused seat no longer blocks the finish (it forfeits unless it returns in time)
       if (self.manual) { var e = self._byId(id); return !!(e && e.dropped && !self.isAIControlled(id)); }
       return false;
     });
@@ -496,6 +499,17 @@
     if (on && this.state === 'IN_GAME' && this.activeId === id) { if (this.cb.onTurn) this.cb.onTurn(id, false); }
     if (on) this._resumeIfPaused();   // the rotation was paused on this (now AI-driven) seat → carry on
   };
+  // host: pause/unpause a dropped seat. A paused seat is skipped and no longer blocks the finish, so the
+  // game can conclude without it; if it reconnects in time the pause auto-reverts and it catches up.
+  Session.prototype.setPaused = function (id, on) {
+    if (!this.isHost || id === this.myId) return;
+    if (on) this.paused[id] = true; else delete this.paused[id];
+    if (this.cb.onPaused) this.cb.onPaused(id, !!on);
+    if (this.state !== 'IN_GAME') return;
+    if (this.manual) { if (on) this._maybeEnd(); return; }
+    if (this.activeId === id) { this._ct(this._timers.move); this._advance(); }   // they held the token → move on (or end)
+    else if (this.activeId == null) this._advance();   // we were waiting → re-evaluate now that this seat is skippable
+  };
   // host: flag/unflag a player as dropped (connection lost). A dropped seat is skipped in the
   // rotation; if it drops while holding the turn, advance immediately so nobody waits on it.
   Session.prototype.markDropped = function (id, on) {
@@ -539,14 +553,14 @@
     return { v: 1, roster: JSON.parse(JSON.stringify(this.roster)), order: this.order.slice(),
       scores: JSON.parse(JSON.stringify(this.scores)), version: this.version, turnIx: this.turnIx,
       activeId: this.activeId, manual: !!this.manual, exp: !!this.exp, settingsBits: this.settingsBits || 0,
-      rounds: this.rounds, takeover: JSON.parse(JSON.stringify(this.takeover || {})) };
+      rounds: this.rounds, takeover: JSON.parse(JSON.stringify(this.takeover || {})), paused: JSON.parse(JSON.stringify(this.paused || {})) };
   };
   Session.prototype.restore = function (snap) {
     if (!this.isHost || !snap || !Array.isArray(snap.roster)) return false;
     this.roster = snap.roster; this.order = (snap.order || []).slice(); this.scores = snap.scores || {};
     this.version = snap.version || 0; this.turnIx = snap.turnIx || 0; this.activeId = snap.activeId;
     this.manual = !!snap.manual; this.exp = !!snap.exp; this.settingsBits = snap.settingsBits || 0;
-    this.rounds = snap.rounds || this.rounds; this.takeover = snap.takeover || {};
+    this.rounds = snap.rounds || this.rounds; this.takeover = snap.takeover || {}; this.paused = snap.paused || {};
     this.roster.forEach(function (p) { if (p.id !== HOST_ID) p.dropped = true; });   // no live channels yet → all clients dropped until they return
     this.state = 'IN_GAME';
     return true;
@@ -617,7 +631,7 @@
       var rj = unpackJoinReq(pkt.payload), back = null;
       this.roster.forEach(function (p) { if (p.eph === rj.eph) back = p; });
       if (back) {
-        var was = back.dropped; back.dropped = false;
+        var was = back.dropped; back.dropped = false; delete this.paused[back.id];   // returning seat: revert pause so it catches up
         this._send(T.JOIN_ACK, packJoinAck(rj.eph, back.id, this.manual, this.exp));
         this._send(T.ROSTER, packRoster(this.roster));
         if (this.state === 'IN_GAME') {

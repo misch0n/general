@@ -784,6 +784,11 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 .aitk-row{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:5px; font-size:12.5px; }
 .aitk-row .netdot{ width:11px; height:11px; border-radius:50%; flex:none; }
 .aitk-row .ai-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* compact AI / pause toggles (two per row) */
+.aitk-row .aitk-tg{ flex:none; gap:5px; font-size:11px; }
+.aitk-row .aitk-tg .switch{ width:30px; height:17px; }
+.aitk-row .aitk-tg .switch::after{ width:13px; height:13px; }
+.aitk-row .aitk-tg.on .switch::after{ transform:translateX(13px); }
 /* headphones warning shown before any acoustic (sound) feature */
 .acwarn{ display:flex; align-items:center; gap:8px; text-align:left; margin:10px 0; padding:8px 10px; border-radius:9px;
   background:rgba(224,85,69,.14); border:1px solid rgba(224,85,69,.5); color:#f0c0b8; font-size:11.5px; line-height:1.4; }
@@ -2405,10 +2410,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.51.1';
+  var APP_VERSION = '1.51.2';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.51.2', items: [
+      ['new', 'Меню на старшината: освен „AI“, отпаднал боец вече може да се сложи на „Пауза“ — прескача се и не бави края; ако се върне навреме, паузата се сваля и той наваксва пропуснатите ходове.'] ] },
     { v: '1.51.1', items: [
       ['chg', 'QR кодът за покана вече е връзка — сканира се и с камерата на телефона (извън приложението) и отваря играта направо в режим за присъединяване с готов код.'] ] },
     { v: '1.51.0', items: [
@@ -3511,6 +3518,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
       onAction: function (a) { netSpectate(a); },                    // watch the active player roll/reroll/commit live
       onResync: function (scores) { netApplySnapshot(scores); },     // catching up after a reconnect
       onTakeover: function () { if (netMode) { renderAiTakeover(); renderAll && game && renderAll(); } },
+      onPaused: function () { if (netMode) { renderAiTakeover(); netActiveSave(); } },   // host: a seat was paused/resumed
       onDrop: function (id, dropped) { netOnDrop(id, dropped); },
       onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
@@ -4884,14 +4892,19 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     var others = net.roster.filter(function (m) { return m.id !== localPid; });
     if (!others.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     box.classList.remove('hidden');
-    box.innerHTML = '<div class="aitk-hd">Замести с AI при отпадане</div>' + others.map(function (m) {
+    box.innerHTML = '<div class="aitk-hd">Отпаднал боец: AI или пауза</div>' + others.map(function (m) {
       var ctl = m.isAI
         ? '<span class="pp-tag">🤖 винаги AI</span>'
-        : '<button class="toggle' + (net.takeover[m.id] ? ' on' : '') + '" data-id="' + m.id + '"><span class="switch"></span><span>AI</span></button>';
+        : '<button class="toggle aitk-tg' + ((net.takeover || {})[m.id] ? ' on' : '') + '" data-tk="' + m.id + '"><span class="switch"></span><span>AI</span></button>'
+        + '<button class="toggle aitk-tg' + ((net.paused || {})[m.id] ? ' on' : '') + '" data-ps="' + m.id + '"><span class="switch"></span><span>Пауза</span></button>';
       return '<div class="aitk-row"><span class="netdot" style="background:' + m.color + '"></span><span class="ai-nm">' + esc(m.name) + '</span>' + ctl + '</div>';
     }).join('');
-    box.querySelectorAll('.toggle[data-id]').forEach(function (t) {
-      t.onclick = function () { var id = +t.getAttribute('data-id'); net.setTakeover(id, !net.takeover[id]); renderAiTakeover(); };
+    // AI and pause are mutually exclusive: turning one on clears the other
+    box.querySelectorAll('.toggle[data-tk]').forEach(function (t) {
+      t.onclick = function () { var id = +t.getAttribute('data-tk'), on = !(net.takeover || {})[id]; if (on) net.setPaused(id, false); net.setTakeover(id, on); netActiveSave(); renderAiTakeover(); };
+    });
+    box.querySelectorAll('.toggle[data-ps]').forEach(function (t) {
+      t.onclick = function () { var id = +t.getAttribute('data-ps'), on = !(net.paused || {})[id]; if (on) net.setTakeover(id, false); net.setPaused(id, on); netActiveSave(); renderAiTakeover(); };
     });
   }
   // host (WebRTC): show the game code in-game so a dropped player can read it and rejoin
