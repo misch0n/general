@@ -547,12 +547,9 @@
     r.classList.toggle('devrow-disabled', !on);
     var tog = r.querySelector('.toggle'); if (tog) tog.disabled = !on;
   }
-  function syncAcousticDebugVis() { greyDevRow('devAcousticDebugRow', settings.acoustic); }
   function renderDevControls(body) {
-    // ---- Debug: the diagnostic sub-switches, each greyed until its feature is on ----
+    // ---- Debug: the diagnostic sub-switches ----
     var dbg = devControlSection('Debug');
-    var adbg = devToggleRow('Акустичен дебъгер', 'acousticDebug', function () { syncAcousticUI(); }); adbg.id = 'devAcousticDebugRow';
-    dbg.list.appendChild(adbg);
     var wrd = devToggleRow('Дебъг WebRTC', 'webrtcDebug', function () { syncWrCapVis(); }); wrd.id = 'devWebrtcDebugRow';
     dbg.list.appendChild(wrd);
     body.appendChild(dbg.sec);
@@ -567,13 +564,9 @@
     var mlBtn = el('button', 'btn small', '🧪 Хост'); mlBtn.onclick = function () { closeDevModal(true); devMockLobby(); };
     var mlcBtn = el('button', 'btn small', '🧪 Гост'); mlcBtn.onclick = function () { closeDevModal(true); devMockLobbyClient(); };
     mlRow.appendChild(mlBtn); mlRow.appendChild(mlcBtn); exp.list.appendChild(mlRow);
-    exp.list.appendChild(devToggleRow('Акустична мрежа', 'acoustic', function () { syncAcousticUI(); syncAcousticDebugVis(); }));
-    // internet play (WebRTC) is now a release feature — no enable toggle here. Optical (QR) pairing stays experimental.
-    var optr = devToggleRow('Оптично сдвояване (QR)', 'opticalHandshake', function () {}); optr.id = 'devOpticalRow';
-    exp.list.appendChild(optr);
+    // internet play (WebRTC) is now a release feature — no enable toggle here.
     // (Нови зарове moved out of dev → the keep/throw „?“ bubble, regular settings, and owner defaults)
     body.appendChild(exp.sec);
-    syncAcousticDebugVis();
   }
   function renderDevModal() {
     if (!devCats) buildDevCats();

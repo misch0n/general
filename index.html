@@ -67,7 +67,6 @@
         <button type="button" class="ssel-opt" data-net="1">по мрежа</button>
       </div>
       <div class="setup-actions">
-        <button id="netBtn" class="btn netfeature hidden">🔊 Акустична игра</button>
       </div>
     </footer>
   </div>
@@ -399,34 +398,6 @@
   </div>
 </div>
 
-<!-- choose transfer method: text (clipboard) vs sound (acoustic) -->
-<div id="methodModal" class="overlay hidden">
-  <div class="modal" style="max-width:280px;text-align:center">
-    <button class="x-close" id="methodClose">✕</button>
-    <h2 id="methodTitle">Метод</h2>
-    <div class="setup-actions" style="flex-direction:column">
-      <button id="methodText" class="btn primary"><span class="ic ic-text"></span>Текст</button>
-      <button id="methodSound" class="btn"><span class="ic ic-sound"></span>Звук</button>
-    </div>
-    <div class="acwarn"><span class="acw-ic">🎧</span><span><b>Звук</b> работи само без слушалки — през говорителя и микрофона.</span></div>
-  </div>
-</div>
-
-<!-- acoustic record transfer progress -->
-<div id="xferModal" class="overlay hidden">
-  <div class="modal" style="max-width:320px;text-align:center">
-    <button class="x-close" id="xferClose">✕</button>
-    <h2 id="xferTitle">🔊 Пренос по звук</h2>
-    <p class="ht">Дръж телефоните близо (~1 м), със звук нагоре.</p>
-    <div class="acwarn"><span class="acw-ic">🎧</span><span><b>Без слушалки!</b> Преносът минава през говорителя и микрофона.</span></div>
-    <div id="xferStage" class="xferstage">Свързване…</div>
-    <div class="xferbar"><div id="xferFill" class="xferfill"></div></div>
-    <div id="xferBars" class="netbars"></div>
-    <div id="xferStatus" class="netstatus xferflavour"></div>
-    <div class="setup-actions"><button id="xferCancel" class="btn">Откажи</button></div>
-  </div>
-</div>
-
 <!-- import a game from pasted JSON (games tracked on another device) -->
 <div id="importModal" class="overlay hidden">
   <div class="modal" style="max-width:340px">
@@ -514,9 +485,6 @@
           <button id="netJoinCancel" class="btn small">Назад</button>
         </div>
       </div>
-      <div class="setup-actions">
-        <button id="netDiagBtn" class="btn small hidden">🔧 Тест на звука (диагностика)</button>
-      </div>
       <div id="netChooseMsg" class="netstatus netflavour"></div>
     </div>
     <!-- optical (QR) handshake: exchange WebRTC offer/answer by camera, no server -->
@@ -551,42 +519,11 @@
       <div id="wrIceStatus" class="nd-capstat"></div>
       <div class="nd-hint">Празно = вградените STUN + безплатен TURN (ненадежден). За игра по различни мрежи сложи свой TURN — напр. безплатен ключ от metered.ca. JSON масив от <b>iceServers</b>. Важи и за двете устройства.</div>
     </div>
-    <!-- acoustic diagnostics: live tone meters + test tones, to debug the link on real devices -->
-    <div id="netDiag" class="netdiag hidden">
-      <div class="nd-band">Лента: <b id="ndBand">—</b></div>
-      <div class="nd-meters">
-        <div class="nd-m"><span>f0 (0)</span><div class="nd-bar"><i id="ndBar0"></i></div></div>
-        <div class="nd-m"><span>f1 (1)</span><div class="nd-bar"><i id="ndBar1"></i></div></div>
-        <div class="nd-m"><span>синх</span><div class="nd-bar"><i id="ndBarS"></i></div></div>
-      </div>
-      <div id="ndHeard" class="nd-heard">тихо…</div>
-      <div id="ndStats" class="nd-stats"></div>
-      <div class="setup-actions">
-        <button id="ndTone0" class="btn small">🔊 тон f0</button>
-        <button id="ndTone1" class="btn small">🔊 тон f1</button>
-        <button id="ndToneFrame" class="btn small">📦 тестов пакет</button>
-      </div>
-      <div class="nd-hint">Отвори това на <b>двете</b> устройства. Пусни тон на едното — на другото съответната лента трябва да <b>светне</b> (значи се чуват). „тестов пакет" праща истинска рамка: ако другото устройство я декодира, броячът <b>декодирани</b> се вдига.</div>
-      <!-- packet capture: record everything, export base64 JSON from both devices -->
-      <div class="nd-cap">
-        <div class="setup-actions">
-          <button id="ndRec" class="btn small">⏺ Запиши</button>
-          <button id="ndCopy" class="btn small" disabled>📋 Копирай записа</button>
-        </div>
-        <div id="ndCapStatus" class="nd-capstat"></div>
-        <textarea id="ndCapOut" class="nd-capout hidden" readonly></textarea>
-        <div class="nd-hint">Натисни <b>Запиши</b> на двете устройства, пусни „тестов пакет", спри и <b>Копирай записа</b>. Прати и двата записа — те съдържат тоновете тик по тик и опитите за декодиране.</div>
-      </div>
-      <div class="setup-actions"><button id="ndClose" class="btn primary">Затвори</button></div>
-    </div>
     <div id="netLobby" class="hidden">
       <!-- scan phase: the roster fills as devices join -->
       <div id="netScan">
         <div id="netHostCode" class="nethostcode hidden"></div>
         <div id="netRoster" class="netroster"></div>
-        <div class="setup-actions">
-          <button id="netOptAdd" class="btn small hidden">📷 + Добави играч (QR)</button>
-        </div>
         <div class="setup-actions">
           <button id="netToPrep" class="btn primary hidden">✔ Всички са тук — към лобито</button>
         </div>

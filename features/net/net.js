@@ -1,16 +1,13 @@
 'use strict';
-// Networked play: acoustic (mp.js) + WebRTC + optical (QR) transports, lobby, spectating.
-  // ===================================================== acoustic multiplayer (mp.js)
-  // rotating flavour accents per protocol stage — funny filler while sound negotiates
+// Networked play: WebRTC (PeerJS) transport, lobby, spectating.
+  // ===================================================== lobby flavour + net link status
+  // rotating flavour accents per protocol stage — funny filler while the link negotiates
   var FLAV = {
     hostSearch: ['Ехо, има ли някой?', 'Търся някой за игра на Генерал…', 'Хайде да играем!', 'Кой е насреща?', 'Свирка! Сбор!'],
     clientSearch: ['Чувам ли някого?', 'Подушвам игра наблизо…', 'Хост, къде си?', 'Ало-ало?'],
     clientSaw: ['А, видях те!', 'Искам!', 'ГЕНЕРАЛ!', 'Пусни ме вътре!'],
     lobbyWait: ['Кога ще започваме?', 'Готов съм, командире.', 'Заровете тръпнат…', 'Хайде де, мързеливци!'],
     clientReady: ['Нагласи се и натисни „Готов".', 'Избери си цвят и име, войнико.', 'Старшината чака всички да са готови.'],
-    xSendSearch: ['Ало, ще ти пратя една битка…', 'Подай ухо, идва игра по звук.', 'Дръж телефона близо!', 'Чуваш ли ме?'],
-    xRecvSearch: ['Слушам внимателно…', 'Подавай, готов съм.', 'Ушите ми са отворени.', 'Къде си, изпращачо?'],
-    xMove: ['Бип-бууп… пренасям…', 'Не мърдай телефона!', 'Звукът работи, търпение…', 'Почти стигнахме…'],
   };
   var flavTimer = null, flavEl = null, flavKey = null;
   function setFlavour(el, key) {
@@ -22,29 +19,11 @@
   }
   function stopFlavour() { if (flavTimer) clearInterval(flavTimer); flavTimer = null; flavEl = null; flavKey = null; }
 
-  // §4 link-quality signal bars + actionable warnings (tied to the §1 levers)
-  function barsHTML(bars, state) {
-    var cls = 's-' + String(state || 'good').toLowerCase(), b = '';
-    for (var i = 0; i < 4; i++) b += '<span class="bar' + (i < bars ? ' on' : '') + '"></span>';
-    return '<span class="signal ' + cls + '">' + b + '</span>';
-  }
-  function linkWarn(state) {
-    if (state === 'CRITICAL') return '<span class="netwarn">⚠️ Много слаба връзка — приближи телефоните, намали шума, усили звука.</span>';
-    if (state === 'DEGRADING') return '<span class="netwarn">⚠️ Връзката отслабва — приближи се или усили звука.</span>';
-    return '';
-  }
-  function updateNetLink(link) {
-    if (!link) return;
-    var st = link.worst || link.state, html = barsHTML(link.bars, st) + ' ' + (linkWarn(st) || 'Връзка');
-    if ($('netBars')) $('netBars').innerHTML = html;
-    var nl = $('netLink');
-    if (nl) { nl.innerHTML = barsHTML(link.bars, st) + (st !== 'GOOD' ? ' <span class="netwarn">слаба връзка</span>' : ''); nl.classList.toggle('hidden', !netMode); }
-  }
-  // WebRTC connection indicator (acoustic uses the signal bars above): a dot by the turn marker
+  // WebRTC connection indicator: a dot by the turn marker
   var netReconnecting = false;
   function syncNetLink() {
     var nl = $('netLink'); if (!nl) return;
-    if (!netMode || netKind !== 'webrtc') return;   // acoustic is driven by updateNetLink
+    if (!netMode || netKind !== 'webrtc') return;
     var up = !!(netBus && netBus.conns && netBus.conns.length > 0);
     var cls, lbl;
     if (net && net.isHost) { cls = 'up'; lbl = 'хост'; }
@@ -62,8 +41,6 @@
       : '⚠ Хостът отказа връзката.';
     if (net) { try { net.dispose(); } catch (e) {} net = null; }
     if (netBus) { try { netBus.stop(); } catch (e) {} netBus = null; }
-    if (optBus) { try { optBus.stop(); } catch (e) {} optBus = null; }
-    if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} netFSK = null; }
     stopScan(); stopFlavour();
     netShow('choose'); $('netPickRole').classList.remove('hidden'); $('netJoinCode').classList.add('hidden'); $('netOptical').classList.add('hidden');
     netChooseMsg(msg);
@@ -113,7 +90,6 @@
       onTakeover: function () { if (netMode) { renderAiTakeover(); renderAll && game && renderAll(); } },
       onPaused: function () { if (netMode) { renderAiTakeover(); netActiveSave(); } },   // host: a seat was paused/resumed
       onDrop: function (id, dropped) { netOnDrop(id, dropped); },
-      onLink: function (link) { updateNetLink(link); },
       onEnd: function () { if (netMode && game) endGame(); },
       onError: function () { if (netMode && game) trackGame('error'); },   // mid-game data/link failure
       onWait: function () { netOnWait(); },   // host: the rotation paused on a dropped seat (await reconnect / AI takeover)
@@ -160,7 +136,6 @@
   // ---------- lobby preparation UI ----------
   function netShow(phase) {
     netPhase = phase;
-    $('netDiag').classList.add('hidden'); clearInterval(ndStatsTimer);   // leaving diagnostics
     if ($('netOptical')) $('netOptical').classList.add('hidden');         // leaving the QR view
     $('netChoose').classList.toggle('hidden', phase !== 'choose');
     $('netLobby').classList.toggle('hidden', phase === 'choose');
@@ -337,86 +312,11 @@
       $('netReady').innerHTML = netMyReady ? '🔥 ДАЙ ЗОР!' : 'ГОТОВ! <span class="rdy-ic"></span>';
     }
   }
-  function netStartTransport(then) {
-    if (netFSK && netFSK.ctx) { then(); return; }   // reuse an already-open mic (e.g. diagnostics)
-    if (!window.MP || !MP.AudioFSK) { netSay('Звукът не е наличен на това устройство.'); return; }
-    netFSK = new MP.AudioFSK();
-    netSay('🎙 Включвам микрофон/говорител…');
-    netFSK.start().then(function () { then(); }).catch(function () { netSay('Няма достъп до микрофона. Разреши го и опитай пак.'); });
-  }
-  // ---------- acoustic diagnostics (live tone meters + test tones) ----------
-  var ndLast = null, ndMax = 1e-9, ndRaf = 0, ndStatsTimer = null;
-  function ndUpdateBars() {
-    if ($('netDiag').classList.contains('hidden')) { ndRaf = 0; return; }
-    if (ndLast) {
-      ndMax = Math.max(ndMax * 0.96, ndLast.p0, ndLast.p1, ndLast.ps, 1e-9);
-      var sc = ndMax || 1;
-      $('ndBar0').style.width = Math.min(100, 100 * ndLast.p0 / sc) + '%';
-      $('ndBar1').style.width = Math.min(100, 100 * ndLast.p1 / sc) + '%';
-      $('ndBarS').style.width = Math.min(100, 100 * ndLast.ps / sc) + '%';
-      var heard = $('ndHeard'); heard.classList.toggle('on', !!ndLast.clear);
-      heard.textContent = ndLast.clear ? ('ЧУВАМ ' + (ndLast.domIdx === 0 ? 'синх' : ndLast.domIdx === 1 ? 'f0' : 'f1') + ' тон') : 'тихо…';
-    }
-    ndRaf = window.requestAnimationFrame(ndUpdateBars);
-  }
-  function ndUpdateStats() {
-    if (!netFSK || !netFSK.stats) return;
-    var s = netFSK.stats, ago = s.lastRxMs ? Math.round((Date.now() - s.lastRxMs) / 1000) + 'с назад' : '—';
-    $('ndStats').innerHTML = 'декодирани <b>' + s.framesOk + '</b> · CRC-грешки <b>' + s.crcFail + '</b> · шум <b>' + s.junk + '</b><br>'
-      + 'пратени <b>' + s.tx + '</b> · чути тонове <b>' + s.heard + '</b> · последна рамка <b>' + ago + '</b>';
-    ndUpdateCapStatus();
-  }
-  function openNetDiag() {
-    function go() {
-      if (netFSK.setProfile && !net) netFSK.setProfile(MP.ANCHOR);   // diag uses the real gameplay band
-      netFSK.onMonitor(function (m) { ndLast = m; });
-      $('ndBand').textContent = Math.round(netFSK.f0) + ' / ' + Math.round(netFSK.f1) + ' / синх ' + Math.round(netFSK.fsync) + ' Hz · ' + netFSK.baud + ' baud';
-      $('netChoose').classList.add('hidden'); $('netDiag').classList.remove('hidden');
-      if (!ndRaf) ndRaf = window.requestAnimationFrame(ndUpdateBars);
-      clearInterval(ndStatsTimer); ndStatsTimer = setInterval(ndUpdateStats, 500); ndUpdateStats();
-    }
-    if (netFSK && netFSK.ctx) go(); else netStartTransport(go);
-  }
-  function closeNetDiag() {
-    $('netDiag').classList.add('hidden'); clearInterval(ndStatsTimer); ndStatsTimer = null;
-    if (netFSK && netFSK.onMonitor) netFSK.onMonitor(null);
-    if (!net && netFSK && netFSK.stop) { netFSK.stop(); netFSK = null; }   // diag opened the mic standalone → release it
-    $('netChoose').classList.remove('hidden');
-  }
-  $('netDiagBtn').onclick = openNetDiag;
-  $('ndClose').onclick = closeNetDiag;
-  $('ndTone0').onclick = function () { if (netFSK) netFSK.playTone(netFSK.f0, 800); };
-  $('ndTone1').onclick = function () { if (netFSK) netFSK.playTone(netFSK.f1, 800); };
-  $('ndToneFrame').onclick = function () { if (netFSK) netFSK.send(new Uint8Array([MP.T.PING, 0, 0])); };  // a real frame — the other device's „декодирани" rises if it reads it
-  // ---- packet capture (export base64 JSON from both devices for offline analysis) ----
-  function ndUpdateCapStatus() {
-    if (!netFSK) return;
-    if (netFSK._capOn) $('ndCapStatus').textContent = '⏺ записвам… ' + (netFSK._capTicks ? netFSK._capTicks.length : 0) + ' тика';
-    else if (netFSK._capTicks && netFSK._capTicks.length) $('ndCapStatus').textContent = 'записани ' + netFSK._capTicks.length + ' тика · ' + (netFSK._capFrames ? netFSK._capFrames.length : 0) + ' рамки — готово за копиране';
-    else $('ndCapStatus').textContent = '';
-  }
-  $('ndRec').onclick = function () {
-    if (!netFSK) return;
-    if (netFSK._capOn) { netFSK.stopCapture(); $('ndRec').classList.remove('on'); $('ndRec').textContent = '⏺ Запиши'; $('ndCopy').disabled = !(netFSK._capTicks && netFSK._capTicks.length); }
-    else { netFSK.setRole(net ? (net.isHost ? 'host' : 'client') : 'diag'); netFSK.startCapture(); $('ndRec').classList.add('on'); $('ndRec').textContent = '⏹ Спри'; $('ndCopy').disabled = true; $('ndCapOut').classList.add('hidden'); }
-    ndUpdateCapStatus();
-  };
-  $('ndCopy').onclick = function () {
-    if (!netFSK || !netFSK.getCapture) return;
-    var b64; try { b64 = 'GENCAP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(netFSK.getCapture())))); } catch (e) { b64 = 'грешка: ' + e.message; }
-    var ok = copyToClipboard(b64);
-    flashCopied($('ndCopy'), '📋 Копирай записа');
-    var ta = $('ndCapOut'); ta.value = b64; ta.classList.toggle('hidden', ok);   // reveal only if copy failed
-    $('ndCapStatus').textContent = b64.length + ' знака' + (ok ? '' : ' — копирай ръчно ⬇');
-  };
   // the ruleset I'm SELECTING for a net game I host/join (the host's wins after JOIN_ACK adoption)
   function selExp() { return settings.ruleset === 'experimental'; }
   function netRounds() { return selExp() ? (X ? X.KEYS.length : 15) : G.CATEGORIES.length; }
   // the ruleset the net game actually runs by (host-authoritative: net.exp once adopted)
   function netRuleset() { return (net && net.exp) ? 'experimental' : 'standard'; }
-  function newSession(isHost) {
-    return new MP.Session({ transport: netFSK, isHost: isHost, me: localMeta(), manual: netManual, exp: selExp(), minPlayers: 2, maxPlayers: 6, rounds: netRounds(), callbacks: netCallbacks() });
-  }
   function newSessionWith(transport, isHost, eph) {
     return new MP.Session({ transport: transport, isHost: isHost, me: localMeta(), eph: eph, manual: netManual, exp: selExp(), minPlayers: 2, maxPlayers: 6, rounds: netRounds(), callbacks: netCallbacks() });
   }
@@ -656,25 +556,21 @@
     netKind = kind;
     var wr = (kind === 'webrtc');
     if (typeof presetManual === 'boolean') netManual = presetManual;   // webrtc: mode comes from the start-screen play button
-    $('netTitle').innerHTML = wr ? '<i class="ic-net" aria-hidden="true"></i><span>Игра по мрежа</span>' : '🔊 Акустична игра';
+    $('netTitle').innerHTML = '<i class="ic-net" aria-hidden="true"></i><span>Игра по мрежа</span>';
     document.querySelectorAll('#netModal .ac-only').forEach(function (e) { e.classList.toggle('hidden', wr); });
     document.querySelectorAll('#netModal .wr-only').forEach(function (e) { e.classList.toggle('hidden', !wr); });
     $('netMeName').textContent = localMeta().name;
     netShow('choose');
     $('netPickRole').classList.remove('hidden');                       // back to the role picker
-    // the regular/manual switch only matters for acoustic; webrtc mode is preset on the start screen
-    $('netModeSwitch').classList.toggle('hidden', wr);
+    // webrtc mode is preset on the start screen
+    $('netModeSwitch').classList.add('hidden');
     renderNetPickInfo();
     $('netJoinCode').classList.add('hidden'); $('netCodeInput').value = '';
     $('netHostCode').classList.add('hidden'); $('netHostCode').innerHTML = '';
     $('netToPrep').classList.add('hidden'); $('netStart').classList.add('hidden'); netSay(''); netChooseMsg('');
-    $('netOptical').classList.add('hidden'); $('netOptAdd').classList.add('hidden'); stopScan();
-    // optical (QR) pairing replaces the code flow when its toggle is on
-    var opt = wr && settings.opticalHandshake;
+    $('netOptical').classList.add('hidden'); stopScan();
     $('netJoin').textContent = 'ПРИСЪЕДИНИ СЕ';
     $('netHost').textContent = 'ПОКАНИ';
-    // acoustic diagnostics gated behind the debug sub-switch; never shown for WebRTC
-    $('netDiagBtn').classList.toggle('hidden', wr || !settings.acousticDebug);
     if (wr) wrCapReset('', '');   // start a fresh capture session (records the environment)
     syncNetMode();
     $('netModal').classList.remove('hidden');
@@ -705,31 +601,14 @@
   }
   // a status line that is visible during the CHOOSE phase (netStatus lives inside the hidden lobby)
   function netChooseMsg(s) { var el = $('netChooseMsg'); if (el) el.innerHTML = s; }
-  $('netBtn').onclick = function () { openNetModal('acoustic'); };
-  function opticalOn() { return netKind === 'webrtc' && settings.opticalHandshake; }
   $('netHost').onclick = function () {
-    if (opticalOn()) { opticalHost(); return; }              // QR pairing instead of the broker
-    if (netKind === 'webrtc') { webrtcHost(); return; }
-    netStartTransport(function () {
-      net = newSession(true); localPid = MP.HOST_ID;
-      netShow('scan'); $('netToPrep').classList.add('hidden');
-      net.openLobby(); renderNetRoster(); setFlavour($('netStatus'), 'hostSearch'); track('host-success');
-    });
+    webrtcHost();
   };
   $('netJoin').onclick = function () {
-    if (opticalOn()) { opticalJoin(); return; }               // scan the host's QR
-    if (netKind === 'webrtc') {
-      // switch to the join sub-view; deliberately DON'T focus the field (no keyboard until tapped).
-      // the mode selector is the host's choice — joiners adopt it, so hide it here.
-      $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
-      $('netJoinCode').classList.remove('hidden'); netChooseMsg('');
-      return;
-    }
-    netStartTransport(function () {
-      net = newSession(false);
-      netShow('scan'); $('netToPrep').classList.add('hidden');
-      net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
-    });
+    // switch to the join sub-view; deliberately DON'T focus the field (no keyboard until tapped).
+    // the mode selector is the host's choice — joiners adopt it, so hide it here.
+    $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
+    $('netJoinCode').classList.remove('hidden'); netChooseMsg('');
   };
   // guest: scan the host's QR to fill the code field (no typing). reuses the optical scan view.
   var codeScanActive = false;
@@ -784,8 +663,8 @@
   // leave the join sub-view, back to the host/join picker
   $('netJoinCancel').onclick = function () {
     $('netJoinCode').classList.add('hidden'); $('netPickRole').classList.remove('hidden');
-    // the game-type switch is only for acoustic; over the net the mode comes from the start screen
-    $('netModeSwitch').classList.toggle('hidden', netKind === 'webrtc');
+    // over the net the mode comes from the start screen
+    $('netModeSwitch').classList.add('hidden');
     $('netCodeInput').value = ''; netChooseMsg('');
     if (netBus) { netBus.stop(); netBus = null; }
     if (net) { net.dispose(); net = null; }
@@ -978,11 +857,7 @@
     if (netMode) { track('net-disconnect'); netReconnecting = true; syncNetLink(); netSay('Връзката с хоста прекъсна — опитвам да се върна…'); }
     else netChooseMsg('⚠ Връзката прекъсна. Опитай пак.');
   }
-  // ===================================================== OPTICAL (QR) handshake ==============
-  // A serverless WebRTC pairing: each device generates a trickle-less SDP with EMPTY iceServers
-  // (local host/mDNS candidates only), compresses it, and shows it as a QR; the peer scans it with
-  // the camera. Offer (host) → scan → answer (client) → scan → the data channel opens over the LAN.
-  // The resulting RTCDataChannel(s) feed an RtcBus that plugs into the same MP.Session as PeerBus.
+  // ===================================================== QR scan / display helpers (shared: WebRTC join-by-scan + invite QR)
   function loadScriptOnce(test, src, cb) { if (test()) { cb(true); return; } var s = document.createElement('script'); s.src = src; s.onload = function () { cb(test()); }; s.onerror = function () { cb(false); }; document.head.appendChild(s); }
   function loadOpticalLibs(cb) {
     loadScriptOnce(function () { return !!window.LZString; }, 'https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js', function (a) {
@@ -993,70 +868,13 @@
       });
     });
   }
-  function rtcPC() { var R = window.RTCPeerConnection || window.webkitRTCPeerConnection; return new R({ iceServers: [] }); }   // empty → local candidates only
-  // resolve once ICE gathering finishes, so the SDP is trickle-less (all candidates baked in)
-  function rtcGather(pc) {
-    return new Promise(function (resolve) {
-      if (pc.iceGatheringState === 'complete') { resolve(); return; }
-      var done = false, fin = function () { if (!done) { done = true; resolve(); } };
-      pc.addEventListener('icegatheringstatechange', function () { if (pc.iceGatheringState === 'complete') fin(); });
-      pc.addEventListener('icecandidate', function (e) { if (!e.candidate) fin(); });
-      setTimeout(fin, 4000);   // local-only gathering is fast; never hang
-    });
-  }
-  function packSdp(tag, sdp) { return tag + window.LZString.compressToEncodedURIComponent(sdp); }
-  function unpackSdp(tag, payload) { return (payload.indexOf(tag) === 0) ? window.LZString.decompressFromEncodedURIComponent(payload.slice(tag.length)) : null; }
-  // host side: build an offer (+ its data channel) for ONE client
-  function rtcMakeOffer() {
-    var pc = rtcPC(), ch = pc.createDataChannel('general', { ordered: true });
-    return pc.createOffer().then(function (o) { return pc.setLocalDescription(o); }).then(function () { return rtcGather(pc); })
-      .then(function () { return { pc: pc, ch: ch, sdp: pc.localDescription.sdp }; });
-  }
-  // client side: accept an offer, produce an answer; the channel arrives via ondatachannel
-  function rtcMakeAnswer(offerSdp) {
-    var pc = rtcPC(), holder = { ch: null };
-    pc.ondatachannel = function (e) { holder.ch = e.channel; };
-    return pc.setRemoteDescription({ type: 'offer', sdp: offerSdp }).then(function () { return pc.createAnswer(); })
-      .then(function (a) { return pc.setLocalDescription(a); }).then(function () { return rtcGather(pc); })
-      .then(function () { return { pc: pc, holder: holder, sdp: pc.localDescription.sdp }; });
-  }
-  // ---- RtcBus: an MP.Session transport over raw RTCDataChannels (mirrors PeerBus semantics) ----
-  function RtcBus(opts) {
-    this.isHost = !!opts.isHost; this.conns = []; this._rx = null;
-    this.onPeers = opts.onPeers || function () {}; this.onLost = opts.onLost || function () {}; this.onReup = function () {};
-    this.maxPayload = 200000;
-  }
-  RtcBus.prototype.onReceive = function (cb) { this._rx = cb; };
-  RtcBus.prototype.send = function (bytes) {
-    this.conns.forEach(function (c) { if (c.ch && c.ch.readyState === 'open') { try { c.ch.send(bytes); } catch (e) {} } });
-    return Promise.resolve();
-  };
-  RtcBus.prototype.addChannel = function (pc, ch) {
-    var self = this, conn = { pc: pc, ch: ch, _pid: null, peer: 'optical' };
-    this.conns.push(conn);
-    ch.binaryType = 'arraybuffer';
-    ch.onmessage = function (e) {
-      var b = (e.data instanceof ArrayBuffer) ? new Uint8Array(e.data) : new Uint8Array(e.data);
-      if (self.isHost) { try { var u = MP.unframe(b); if (u && u.sender > 0 && u.sender < 15) conn._pid = u.sender; } catch (x) {} }
-      if (self._rx) self._rx(b);
-    };
-    ch.onclose = function () { self.conns = self.conns.filter(function (c) { return c !== conn; }); self.onPeers(self.conns.length); self.onLost(conn); };
-    self.onPeers(this.conns.length);
-  };
-  RtcBus.prototype.stop = function () { this.conns.forEach(function (c) { try { c.ch.close(); } catch (e) {} try { c.pc.close(); } catch (e) {} }); this.conns = []; };
-  // ---- optical UI helpers ----
+  // ---- QR scan / display UI helpers ----
   function optStatus(s) { var el = $('optStatus'); if (el) el.innerHTML = s; }
   function optShow(showQR, showScan) {
     $('netChoose').classList.add('hidden'); $('netLobby').classList.add('hidden'); $('netOptical').classList.remove('hidden');
     $('optQRwrap').classList.toggle('hidden', !showQR); $('optScanWrap').classList.toggle('hidden', !showScan);
   }
   function optHideView() { $('netOptical').classList.add('hidden'); }
-  function optRenderQR(payload) {
-    try { var qr = window.qrcode(0, 'L'); qr.addData(payload); qr.make(); $('optQR').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
-      var svg = $('optQR').querySelector('svg'); if (svg) { svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width = '100%'; svg.style.height = 'auto'; }
-      return true;
-    } catch (e) { optStatus('⚠ Кодът е твърде голям за QR (' + payload.length + ' знака).'); return false; }
-  }
   function optNextBtn(label, fn) { var b = $('optNext'); if (!label) { b.classList.add('hidden'); b.onclick = null; return; } b.textContent = label; b.classList.remove('hidden'); b.onclick = fn; }
   var optStream = null, optScanning = false;
   function startScan(onResult) {
@@ -1080,90 +898,12 @@
     }).catch(function (e) { onResult(null, (e && e.name) || 'camera-denied'); });
   }
   function stopScan() { optScanning = false; if (optStream) { optStream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); optStream = null; } var v = $('optVideo'); if (v) v.srcObject = null; }
-  // ---- optical HOST: run the lobby over an RtcBus; pair each client by QR ----
-  var optBus = null, optPending = null, optClient = null;
-  function opticalHost() {
-    netChooseMsg('Зареждам QR библиотеки…');
-    loadOpticalLibs(function (ok) {
-      if (!ok) { netChooseMsg('⚠ Неуспешно зареждане на QR библиотеките (нужен е интернет първия път).'); return; }
-      optBus = new RtcBus({ isHost: true, onLost: function (conn) { netHostLost(conn); } });
-      netBus = optBus; net = newSessionWith(optBus, true); localPid = MP.HOST_ID;
-      net.openLobby(); track('host-success');
-      opticalNewOffer();
-    });
-  }
-  function opticalNewOffer() {
-    optShow(false, false); optStatus('Подготвям код…'); optNextBtn(null);
-    rtcMakeOffer().then(function (o) {
-      optPending = o;
-      if (optRenderQR(packSdp('GO1', o.sdp))) { optShow(true, false); optStatus('1) Покажи този код на госта. 2) После сканирай неговия отговор.'); }
-      o.ch.onopen = function () { optBus.addChannel(o.pc, o.ch); optPending = null; opticalHostConnected(); };
-      optNextBtn('📷 Сканирай отговора', opticalScanAnswer);
-    }).catch(function (e) { optStatus('⚠ Грешка при създаване на офертата: ' + ((e && e.message) || e)); });
-  }
-  function opticalScanAnswer() {
-    optShow(false, true); optStatus('Сканирай ОТГОВОРА от екрана на госта…'); optNextBtn(null);
-    startScan(function (data, err) {
-      if (!data) { optStatus('⚠ Камерата отказа (' + (err || '') + '). Дай ѝ достъп и опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanAnswer); return; }
-      var sdp = unpackSdp('GA1', data);
-      if (!sdp) { optStatus('⚠ Това не е отговор-код. Опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanAnswer); return; }
-      if (!optPending) { optStatus('⚠ Няма активна оферта.'); return; }
-      optStatus('Свързвам по локалната мрежа…');
-      optPending.pc.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function (e) { optStatus('⚠ Невалиден отговор: ' + ((e && e.message) || e)); optNextBtn('📷 Опитай пак', opticalScanAnswer); });
-    });
-  }
-  function opticalHostConnected() {
-    stopScan(); optHideView();
-    netShow('scan'); $('netToPrep').classList.add('hidden'); $('netHostCode').classList.add('hidden');
-    $('netOptAdd').classList.remove('hidden');   // pair more players from the lobby
-    renderNetRoster(); setFlavour($('netStatus'), 'hostSearch');
-  }
-  // ---- optical CLIENT: scan the host's offer, show an answer, join over the channel ----
-  function opticalJoin() {
-    netChooseMsg('Зареждам QR библиотеки…');
-    loadOpticalLibs(function (ok) {
-      if (!ok) { netChooseMsg('⚠ Неуспешно зареждане на QR библиотеките (нужен е интернет първия път).'); return; }
-      opticalScanOffer();
-    });
-  }
-  function opticalScanOffer() {
-    optShow(false, true); optStatus('Сканирай кода на СТАРШИНАТА…'); optNextBtn(null);
-    startScan(function (data, err) {
-      if (!data) { optStatus('⚠ Камерата отказа (' + (err || '') + '). Дай ѝ достъп и опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanOffer); return; }
-      var sdp = unpackSdp('GO1', data);
-      if (!sdp) { optStatus('⚠ Това не е код за игра. Опитай пак.'); optNextBtn('📷 Опитай пак', opticalScanOffer); return; }
-      optStatus('Подготвям отговор…');
-      rtcMakeAnswer(sdp).then(function (a) {
-        optClient = a;
-        if (optRenderQR(packSdp('GA1', a.sdp))) { optShow(true, false); optStatus('Покажи ТОЗИ код на старшината — после изчакай.'); }
-        optNextBtn(null);
-        opticalAwaitClientChannel();
-      }).catch(function (e) { optStatus('⚠ Грешка: ' + ((e && e.message) || e)); optNextBtn('📷 Опитай пак', opticalScanOffer); });
-    });
-  }
-  function opticalAwaitClientChannel() {
-    optBus = new RtcBus({ isHost: false, onLost: function () { netClientLost(); } });
-    var tries = 0, poll = setInterval(function () {
-      var ch = optClient && optClient.holder.ch;
-      if (ch) {
-        clearInterval(poll);
-        var go = function () { optBus.addChannel(optClient.pc, ch); opticalClientConnected(); };
-        if (ch.readyState === 'open') go(); else ch.onopen = go;
-      } else if (++tries > 600) { clearInterval(poll); }   // ~60s
-    }, 100);
-  }
-  function opticalClientConnected() {
-    stopScan(); optHideView(); netBus = optBus;
-    net = newSessionWith(optBus, false);
-    netShow('scan'); $('netToPrep').classList.add('hidden');
-    net.requestJoin(); setFlavour($('netStatus'), 'clientSearch');
-  }
+  // ✕ on the QR scan view (used by WebRTC join-by-scan): close the camera and return to the picker
   $('optCancel').onclick = function () {
     stopScan(); optHideView();
     if (codeScanActive) { codeScanActive = false; netShow('choose'); $('netPickRole').classList.add('hidden'); $('netJoinCode').classList.remove('hidden'); netChooseMsg(''); return; }
-    if (net && net.isHost && optBus && optBus.conns.length) { opticalHostConnected(); } else { leaveNet(); }
+    leaveNet();
   };
-  $('netOptAdd').onclick = function () { if (net && net.isHost) { optShow(false, false); opticalNewOffer(); } };
   // host closes the scan and moves everyone into preparation
   $('netToPrep').onclick = function () { if (net && net.isHost) net.startPrep(settingsBits()); };
   // host adds an AI seat (generated boец); clients can't
@@ -1192,26 +932,23 @@
       return;
     }
     $('netStart').disabled = true; setFlavour($('netStatus'), 'lobbyWait');
-    if (netKind === 'webrtc') { net.startGame(); return; }   // data channels need no link calibration
-    // §3 calibrate (best-effort — picks the gameplay profile if the modem can't measure)
-    $('netBars').innerHTML = 'Калибрирам… 🔊';
-    net.calibrate(function () { net.startGame(); });
+    net.startGame();   // data channels need no link calibration
   };
   // tear the live session/transport down without touching the modal's visibility
   function netDisposeSession() {
-    stopFlavour(); resetSpur(); clearTimeout(netMetaTimer); clearInterval(ndStatsTimer); ndStatsTimer = null;
-    stopScan(); if (optBus) { try { optBus.stop(); } catch (e) {} } optBus = null; optPending = null; optClient = null;
+    stopFlavour(); resetSpur(); clearTimeout(netMetaTimer);
+    stopScan();
     var disbanding = net && net.isHost;
     if (disbanding) { try { net.disband(); } catch (e) {} }   // tell clients the lobby is cancelled
-    if (net) net.dispose(); if (netFSK && netFSK.stop) netFSK.stop();
+    if (net) net.dispose();
     // stop the transport — deferred briefly when disbanding so the BYE flushes to the clients first
     var bus = netBus;
     if (bus) { if (disbanding) setTimeout(function () { try { bus.stop(); } catch (e) {} }, 250); else bus.stop(); }
-    net = null; netFSK = null; netBus = null; netMode = false; localPid = null;
+    net = null; netBus = null; netMode = false; localPid = null;
     netPhase = 'choose'; netMe = null; netMyReady = false; netAiActiveId = null; netSettCtx = false;
-    $('netBars').innerHTML = ''; $('netLink').classList.add('hidden'); $('netDiag').classList.add('hidden');
+    $('netBars').innerHTML = ''; $('netLink').classList.add('hidden');
     if ($('netCodeJoin')) $('netCodeJoin').disabled = false;
-    if ($('netOptical')) $('netOptical').classList.add('hidden'); if ($('netOptAdd')) $('netOptAdd').classList.add('hidden');
+    if ($('netOptical')) $('netOptical').classList.add('hidden');
   }
   // a client whose host disbanded the lobby: drop the session and return to the host/join picker
   function netHostGone() {
@@ -1238,7 +975,7 @@
   });
   $('netClose').onclick = leaveNet;
   if ($('netChooseBack')) $('netChooseBack').onclick = leaveNet;   // back from the host/join picker → start screen
-  // ---- WebRTC capture export (mirrors the acoustic ndCopy: base64 JSON of every logged event) ----
+  // ---- WebRTC capture export (base64 JSON of every logged event) ----
   $('wrCapCopy').onclick = function () {
     var payload = { v: 1, app: APP_VERSION, role: wrRole, code: wrCode, ts: Date.now(), log: wrLog };
     var b64; try { b64 = 'GENWRCAP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload)))); } catch (e) { b64 = 'грешка: ' + e.message; }

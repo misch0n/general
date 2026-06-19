@@ -764,7 +764,7 @@
       var find = function () { return loadHistory().filter(function (r) { return r.id === id; })[0]; };
       row.querySelector('.hg-count').onclick = function (e) { e.stopPropagation(); toggleExcludeGame(id); };
       row.querySelector('.hg-play').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) openReplay(rec); };
-      row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) chooseMethod('Изнеси играта', function () { exportGame(rec); }, function () { acousticSend(rec); }); };
+      row.querySelector('.hg-exp').onclick = function (e) { e.stopPropagation(); var rec = find(); if (rec) exportGame(rec); };
       row.querySelector('.hg-del').onclick = function (e) { e.stopPropagation(); confirmDeleteGame(row, id); };
       attachSwipe(row, id, find);
     });

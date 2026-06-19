@@ -1,5 +1,5 @@
 'use strict';
-// Settings actions: export/import, acoustic transfer, owner name, ruleset picker, storage gauge, bulk-clear.
+// Settings actions: export/import (text), owner name, ruleset picker, storage gauge, bulk-clear.
   // ---- export / import a game (share local history across devices) ----
   var currentExportRec = null;
   function exportGame(rec) {
@@ -154,92 +154,15 @@
     $('importModal').classList.add('hidden');
     openHistory();
   }
-  $('importBtn').onclick = function () { chooseMethod('Внеси игра', openImport, acousticReceive); };
+  $('importBtn').onclick = function () { openImport(); };
   $('importDo').onclick = importStep;
   $('importCancel').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
   $('importClose').onclick = function () { $('importModal').classList.add('hidden'); openHistory(); };
   $('importModal').onclick = function (e) { if (e.target === $('importModal')) { $('importModal').classList.add('hidden'); openHistory(); } };
 
-  // ---- acoustic record transfer (gated behind the Акустика setting) ----
-  function syncAcousticUI() {
-    var on = !!settings.acoustic;
-    var have = !!(window.MP && MP.AudioFSK);
-    document.querySelectorAll('.netfeature').forEach(function (el) { el.classList.toggle('hidden', !(on && have)); });
-    // the acoustic test/diagnostics + capture live behind the „Дебъг" sub-switch
-    if ($('netDiagBtn')) $('netDiagBtn').classList.toggle('hidden', !(on && have && settings.acousticDebug));
-  }
   function syncWebrtcUI() {
     document.querySelectorAll('.wrfeature').forEach(function (el) { el.classList.toggle('hidden', !settings.webrtc); });
   }
-  var xfer = null, xferFSK = null;
-  function xferStage(s) { $('xferStage').textContent = s; }
-  function xferProgress(done, total) { $('xferFill').style.width = (total ? Math.round(100 * done / total) : 0) + '%'; }
-  // stage + percentage so both owners see exactly how far along the transfer is
-  function xferStep(verb, done, total) { var pct = total ? Math.round(100 * done / total) : 0; xferStage(verb + ' ' + pct + '% (' + done + '/' + total + ')'); xferProgress(done, total); setFlavour($('xferStatus'), 'xMove'); }
-  function openXfer(title) {
-    $('xferTitle').textContent = title; xferStage('Свързване…'); $('xferStatus').textContent = ''; xferProgress(0, 1);
-    $('xferModal').classList.remove('hidden');
-  }
-  function closeXfer() {
-    stopFlavour();
-    if (xfer) { try { xfer.dispose(); } catch (e) {} }
-    if (xferFSK && xferFSK.stop) { try { xferFSK.stop(); } catch (e) {} }
-    xfer = null; xferFSK = null; $('xferBars').innerHTML = ''; $('xferModal').classList.add('hidden');
-  }
-  $('xferCancel').onclick = closeXfer; $('xferClose').onclick = closeXfer;
-  var xferMeter = null;
-  function xferTransport(then) {
-    if (!(window.MP && MP.AudioFSK)) { xferStage('Звукът не е наличен.'); return; }
-    xferFSK = new MP.AudioFSK();
-    if (xferFSK.setProfile) xferFSK.setProfile(MP.getProfile(3));     // fast, close-range transfer profile
-    xferMeter = new MP.LinkMeter();
-    if (xferFSK.onMeter) xferFSK.onMeter(function (ev) { xferMeter.record(ev); var st = xferMeter.state(); $('xferBars').innerHTML = barsHTML(xferMeter.bars(), st) + ' ' + (linkWarn(st) || ''); });
-    xferStage('🎙 Включвам микрофон…');
-    xferFSK.start().then(then).catch(function () { xferStage('Няма достъп до микрофона.'); });
-  }
-  function acousticSend(rec) {
-    currentExportRec = rec || currentExportRec; if (!currentExportRec) return;
-    $('exportModal').classList.add('hidden'); $('historyModal').classList.add('hidden');
-    openXfer('Изпращане на игра');
-    xferTransport(function () {
-      xferStage('Търся приемник…'); setFlavour($('xferStatus'), 'xSendSearch');
-      var blob = MP.packRecord(currentExportRec, CAT_KEYS);
-      xfer = new MP.Transfer({ transport: xferFSK, mode: 'send', data: blob, callbacks: {
-        onProgress: function (done, total) { xferStep('Изпращам', done, total); },
-        onSent: function () { stopFlavour(); xferProgress(1, 1); xferStage('✓ Изпратено!'); $('xferStatus').textContent = 'Готово, командире.'; },
-      } });
-      xfer.start();
-    });
-  }
-  function acousticReceive() {
-    $('historyModal').classList.add('hidden');
-    openXfer('Приемане на игра');
-    xferTransport(function () {
-      xferStage('Търся изпращач…'); setFlavour($('xferStatus'), 'xRecvSearch');
-      xfer = new MP.Transfer({ transport: xferFSK, mode: 'recv', callbacks: {
-        onProgress: function (done, total) { xferStep('Приемам', done, total); },
-        onError: function () { stopFlavour(); xferStage('Грешка при приемане.'); },
-        onComplete: function (blob) {
-          stopFlavour(); xferProgress(1, 1); xferStage('✓ Получено!');
-          var rec; try { rec = MP.sanitizeRecord(MP.unpackRecord(blob, CAT_KEYS), CAT_KEYS); } catch (e) { rec = null; }
-          closeXfer();
-          if (!rec) { openImport(); importError('Получените данни са невалидни.'); return; }
-          openImport(); showImportOwner(rec);   // funnel into the same owner-pick + filing flow
-        },
-      } });
-      xfer.start();
-    });
-  }
-  // expose Текст / Звук when triggering an export/import; with sound off, go straight to text
-  function chooseMethod(title, onText, onSound) {
-    if (!settings.acoustic) { onText(); return; }
-    $('methodTitle').textContent = title;
-    $('methodText').onclick = function () { $('methodModal').classList.add('hidden'); onText(); };
-    $('methodSound').onclick = function () { $('methodModal').classList.add('hidden'); onSound(); };
-    $('methodModal').classList.remove('hidden');
-  }
-  $('methodClose').onclick = function () { $('methodModal').classList.add('hidden'); };
-  $('methodModal').onclick = function (e) { if (e.target === $('methodModal')) $('methodModal').classList.add('hidden'); };
   // a FRESH open (from the start screen / menu) resets to the default ruleset section + page 1
   function openHistory() {
     histTab = (settings.ruleset === 'experimental') ? 'experimental' : 'standard';   // default to the active ruleset
@@ -465,12 +388,11 @@
     resetNet();
     $('overModal').classList.add('hidden'); $('game').classList.add('hidden'); $('setup').classList.remove('hidden');
   };
-  // tear down any acoustic session (returning to the muster screen)
+  // tear down any net session (returning to the muster screen)
   function resetNet() {
     if (net) { try { net.dispose(); } catch (e) {} }
-    if (netFSK && netFSK.stop) { try { netFSK.stop(); } catch (e) {} }
     netActiveClear();   // leaving on purpose → don't offer to rejoin
-    net = null; netFSK = null; netMode = false; localPid = null; netMyTurn = false;
+    net = null; netMode = false; localPid = null; netMyTurn = false;
     netActiveId = null; specSelf = false; specAct = null; resetSpecPlay(); if ($('specReturn')) $('specReturn').classList.add('hidden');
     $('netLink').classList.add('hidden'); $('netLink').innerHTML = '';
   }

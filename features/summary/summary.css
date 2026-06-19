@@ -206,7 +206,7 @@ body.modal-open{ overflow:hidden; }
   background:rgba(20,22,12,.72); border:none; border-radius:9px; box-shadow:none; color:var(--gen-brass-bright); }
 .addbtn:active,.addbtn:focus{ transform:none; border:none; outline:none; box-shadow:none; }
 .modehint{ font-size:11px; color:var(--gen-muted); margin:8px 0 0; }
-/* acoustic multiplayer lobby */
+/* multiplayer lobby */
 .netroster{ display:flex; flex-direction:column; gap:6px; margin:10px 0; }
 /* WebRTC code entry + host code display */
 .netjoincode{ display:flex; gap:6px; margin:8px 0; }

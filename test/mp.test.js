@@ -246,21 +246,6 @@ test('a packed record survives transfer-then-sanitise into a usable game', funct
   assert.strictEqual(clean.moveLog[1][0].category, 'twos');
 });
 
-// ---- chunked acoustic transfer over the mock bus ----
-test('Transfer: a blob sends + reassembles identically', function () {
-  var bus = new Bus();
-  var data = new Uint8Array(140); for (var i = 0; i < data.length; i++) data[i] = (i * 37 + 11) & 0xff;
-  var got = null;
-  var sender = new MP.Transfer({ transport: bus.transport(), mode: 'send', data: data,
-    setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
-  var recv = new MP.Transfer({ transport: bus.transport(), mode: 'recv',
-    setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: { onComplete: function (b) { got = b; } } });
-  recv.start(); sender.start();
-  for (var k = 0; k < 200 && !got; k++) bus.drain();
-  assert.ok(got, 'receiver completed');
-  assert.deepStrictEqual(Array.from(got), Array.from(data), 'blob identical end to end');
-});
-
 // ---- adaptive link layer ----
 test('pickProfile takes the fastest comfortably-below-threshold profile', function () {
   var L = MP.CAL_LADDER; // fastest → safest
@@ -486,82 +471,4 @@ test('botPolicyForAccuracy ladders strength to measured accuracy', function () {
   assert.strictEqual(EV.botPolicyForAccuracy(0.2).type, 'greedy');
   assert.strictEqual(EV.botPolicyForAccuracy(null).type, 'softmax');   // unknown → solid default
   assert.ok(EV.botPolicyForAccuracy(0.85).tau < EV.botPolicyForAccuracy(0.72).tau, 'higher accuracy → sharper softmax');
-});
-
-// ---- L0 AudioFSK: the timestamp-based decoder actually reassembles a frame ----
-test('AudioFSK decoder round-trips a frame (software TX→RX over the symbol timer)', function () {
-  var fsk = new MP.AudioFSK({}); fsk.ctx = { sampleRate: 48000 }; fsk.baud = 12; fsk.os = 8; fsk._reset();
-  var got = null; fsk.onReceive(function (p) { got = Array.from(p); });
-  function crc16(b) { var c = 0xffff; for (var i = 0; i < b.length; i++) { c ^= b[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
-  var payload = [7, 42, 200, 13, 0], crc = crc16(payload), full = [payload.length].concat(payload, [(crc >> 8) & 255, crc & 255]);
-  var bits = []; full.forEach(function (B) { for (var b = 7; b >= 0; b--) bits.push((B >> b) & 1); });
-  var bitMs = 1000 / fsk.baud, tick = bitMs / 8, t = 0;        // ~8 reads/bit, evenly clocked
-  for (var i = 0; i < 80; i++) { fsk._decode(1, 0.01, 0.01, 0, true, t); t += tick; }                // preamble (sync tone)
-  bits.forEach(function (bit) { for (var j = 0; j < 8; j++) { fsk._decode(0.01, bit ? 0.02 : 1, bit ? 1 : 0.02, bit ? 2 : 1, true, t); t += tick; } });
-  for (var s = 0; s < 20; s++) { fsk._decode(0, 0, 0, -1, false, t); t += tick; }                    // trailing silence flushes the last bit
-  assert.deepStrictEqual(got, payload, 'payload decoded intact through the FSK symbol decoder');
-  assert.strictEqual(fsk.stats.framesOk, 1);
-});
-
-test('AudioFSK packet capture records ticks + frame outcomes', function () {
-  var fsk = new MP.AudioFSK({}); fsk.ctx = { sampleRate: 48000 }; fsk.baud = 12; fsk.os = 8; fsk._reset();
-  fsk.setRole('host'); fsk.startCapture();
-  fsk._cap(10, 0.5, 0.1, 0.1, 0, true, false); fsk._cap(20, 0.1, 0.6, 0.1, 1, true, false);
-  fsk._capFrame('ok', new Uint8Array([3, 1, 2, 3, 4, 5]));
-  fsk.stopCapture();
-  var cap = fsk.getCapture();
-  assert.strictEqual(cap.role, 'host');
-  assert.ok(cap.meta.baud === 12 && cap.meta.os === 8);
-  assert.strictEqual(cap.ticks.length, 2);
-  assert.strictEqual(cap.frames.length, 1);
-  assert.strictEqual(cap.frames[0].result, 'ok');
-  assert.ok(/^[0-9a-f]+$/.test(cap.frames[0].hex));
-});
-
-// ---- L0 end-to-end: synthesize a frame as AUDIO and decode it through the real
-// ring-buffer + Goertzel + symbol-timer path (sample-accurate, immune to setInterval throttling) ----
-test('AudioFSK decodes a frame from synthesized audio buffers (full DSP pipeline)', function () {
-  var sr = 48000, fsk = new MP.AudioFSK({}); fsk.ctx = { sampleRate: sr }; fsk.baud = 12;
-  fsk._ringSize = 16384; fsk._ring = new Float32Array(fsk._ringSize); fsk._ringPos = 0; fsk._samples = 0; fsk._reset();
-  var got = null; fsk.onReceive(function (p) { got = Array.from(p); });
-  function crc16(b) { var c = 0xffff; for (var i = 0; i < b.length; i++) { c ^= b[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
-  var payload = [10, 20, 30, 200, 7], crc = crc16(payload), full = [payload.length].concat(payload, [(crc >> 8) & 255, crc & 255]);
-  var bits = []; full.forEach(function (B) { for (var b = 7; b >= 0; b--) bits.push((B >> b) & 1); });
-  var spb = Math.round(sr / fsk.baud), sig = [], ph = 0;
-  function tone(freq, nsamp) { var w = 2 * Math.PI * freq / sr; for (var i = 0; i < nsamp; i++) { sig.push(0.4 * Math.sin(ph)); ph += w; } }
-  function sil(nsamp) { for (var i = 0; i < nsamp; i++) sig.push(0); }
-  sil(spb); tone(fsk.fsync, spb * 10); bits.forEach(function (bit) { tone(bit ? fsk.f1 : fsk.f0, spb); }); sil(spb * 2);
-  for (var p = 0; p < sig.length; p += 512) fsk._onAudio(new Float32Array(sig.slice(p, p + 512)));   // audio-thread buffers
-  assert.deepStrictEqual(got, payload, 'frame recovered from real audio through the FSK pipeline');
-  assert.strictEqual(fsk.stats.framesOk, 1);
-});
-
-// ---- carrier-sense MAC: don't transmit over another device; host has floor priority ----
-test('AudioFSK carrier sense defers a transmit while the air is busy, then emits when idle', function () {
-  var timers = [];
-  function fakeCtx() { return { currentTime: 0, destination: {},
-    createOscillator: function () { return { frequency: {}, connect: function () {}, start: function () {}, stop: function () {} }; },
-    createGain: function () { return { gain: { setValueAtTime: function () {}, exponentialRampToValueAtTime: function () {} }, connect: function () {} }; } }; }
-  var fsk = new MP.AudioFSK({ role: 'client', busyMs: 350, rand: function () { return 0.5; },
-    setTimeout: function (f, ms) { timers.push({ f: f, ms: ms }); return timers.length; }, clearTimeout: function () {} });
-  fsk.ctx = fakeCtx();
-  fsk._lastHeardMs = performance.now();           // a tone just heard → channel busy
-  assert.ok(fsk.channelBusy());
-  fsk.send(new Uint8Array([1, 2, 3]));
-  assert.strictEqual(fsk.stats.tx, 0, 'did not talk over the busy channel');
-  assert.strictEqual(fsk.stats.deferred, 1, 'deferred the transmit');
-  fsk._lastHeardMs = performance.now() - 5000;     // channel now idle
-  timers[timers.length - 1].f();                   // run the backoff retry
-  assert.strictEqual(fsk.stats.tx, 1, 'transmitted once the air cleared');
-});
-
-test('AudioFSK backoff: host re-checks the channel sooner than a client (floor priority)', function () {
-  function mk(role) {
-    var timers = [];
-    var fsk = new MP.AudioFSK({ role: role, rand: function () { return 0.5; },
-      setTimeout: function (f, ms) { timers.push(ms); return timers.length; }, clearTimeout: function () {} });
-    fsk.ctx = { currentTime: 0 }; fsk._lastHeardMs = performance.now();   // busy
-    fsk.send(new Uint8Array([1])); return timers[timers.length - 1];
-  }
-  assert.ok(mk('host') < mk('client'), 'host backs off less than a client');
 });

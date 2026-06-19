@@ -20,7 +20,7 @@
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var ownerDetached = false; // owner deliberately removed from the roster (only while skipped): seat #1 shows a MUTED token but keeps its own identity until the token is re-activated
   var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
-  var netMode = false, net = null, netFSK = null, localPid = null, netOrder = [], netMyTurn = false; // acoustic multiplayer
+  var netMode = false, net = null, localPid = null, netOrder = [], netMyTurn = false; // networked play (WebRTC)
   var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var netActiveId = null, specSelf = false, specAct = null, specSaved = null;   // spectating: who's playing, am I previewing my own board, last action, saved watch-view

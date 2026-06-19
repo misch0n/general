@@ -148,30 +148,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 .aitk-row .aitk-tg .switch{ width:30px; height:17px; }
 .aitk-row .aitk-tg .switch::after{ width:13px; height:13px; }
 .aitk-row .aitk-tg.on .switch::after{ transform:translateX(13px); }
-/* headphones warning shown before any acoustic (sound) feature */
-.acwarn{ display:flex; align-items:center; gap:8px; text-align:left; margin:10px 0; padding:8px 10px; border-radius:9px;
-  background:rgba(224,85,69,.14); border:1px solid rgba(224,85,69,.5); color:#f0c0b8; font-size:11.5px; line-height:1.4; }
-.acwarn .acw-ic{ flex:none; font-size:16px; }
-.acwarn b{ color:#f3d9d3; }
 .netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
-/* acoustic diagnostics panel */
-.netdiag{ text-align:left; }
-.nd-band{ font-size:11px; color:var(--gen-muted); text-align:center; margin-bottom:8px; }
-.nd-band b{ color:var(--gen-brass-bright); font-family:var(--gen-font-body); }
-.nd-meters{ display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
-.nd-m{ display:flex; align-items:center; gap:8px; }
-.nd-m > span{ flex:none; width:54px; font-size:10px; color:var(--gen-muted); text-transform:uppercase; letter-spacing:.5px; }
-.nd-bar{ flex:1; height:12px; border-radius:6px; background:rgba(255,255,255,.07); overflow:hidden; }
-.nd-bar i{ display:block; height:100%; width:0; background:var(--gen-brass); transition:width .08s linear; }
-#ndBarS{ background:#6fa8e8; }
-.nd-heard{ text-align:center; font-size:12px; font-weight:700; color:var(--gen-muted); margin-bottom:8px; }
-.nd-heard.on{ color:#9bd17e; }
-.nd-stats{ font-size:11px; color:var(--gen-label); text-align:center; line-height:1.7; margin-bottom:8px; }
-.nd-stats b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+/* WebRTC debug capture (shared hint/output styling) */
 .nd-hint{ font-size:10.5px; color:var(--gen-muted); line-height:1.5; margin:6px 0; }
 .nd-hint b{ color:var(--gen-label); }
-.nd-cap{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-pill-line); }
-.nd-cap #ndRec.on{ background:rgba(178,58,46,.55); color:#fff; border-color:var(--gen-alert-line); }
 .nd-capstat{ font-size:11px; color:var(--gen-label); text-align:center; margin:6px 0; min-height:14px; }
 .nd-capout{ width:100%; height:70px; font-size:9px; font-family:monospace; color:var(--gen-muted); background:rgba(0,0,0,.3);
   border:1px solid var(--gen-pill-line); border-radius:7px; padding:6px; resize:vertical; word-break:break-all; }
@@ -193,10 +173,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 @keyframes condotpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 .netlink .condot.down{ background:#c0392b; }
 .netlink .conlbl{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.4px; color:var(--gen-muted); }
-.xferbar{ height:10px; border-radius:6px; background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); overflow:hidden; margin:12px 0 4px; }
-.xferfill{ height:100%; width:0; background:var(--gen-brass); transition:width .2s; }
-.xferstage{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; color:var(--gen-brass-bright); font-size:14px; margin-top:6px; }
-.xferflavour, .netflavour{ font-style:italic; color:var(--gen-label); min-height:18px; }
+.netflavour{ font-style:italic; color:var(--gen-label); min-height:18px; }
 .reorder{ display:flex; flex-direction:column; gap:2px; }
 .reorder button{ width:24px; height:18px; border-radius:5px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:10px; line-height:1; }
 .reorder button:hover:not(:disabled){ color:var(--gen-brass); }
