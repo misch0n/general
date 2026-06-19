@@ -8,13 +8,9 @@
   var game = null;
   var roastIx = 0, roastTimer = null;
   var moveLog = [];   // per player index: array of completed turn logs
-  // the live per-turn fields, defaulted; beginTurn() overwrites them at each turn boundary
-  function freshTurn() {
-    return { dice: [], selected: [false, false, false, false, false],
-             diceNew: [false, false, false, false, false], diceGen: [], throwsLeft: 0, rollNo: 0,
-             awaitingRoll: false, locked: false, aiBusy: false, rerolledAll: false,
-             manualCounts: [0, 0, 0, 0, 0, 0, 0], curLog: null };
-  }
+  // the live per-turn fields, defaulted; beginTurn() overwrites them at each turn boundary.
+  // Shape (and the whole turn-flow state machine) lives in reduce.js — see GReduce.
+  function freshTurn() { return GReduce.freshTurn(); }
   // seed the turn's move-log for the active ruleset. Net minus games run the standard turn path
   // but score by EXP rules, so they need the EXP log shape — otherwise nothing is logged and the
   // end-game summary can't analyse (players unclickable, only the category board shows).
@@ -143,10 +139,6 @@
   };
 
   function beginTurn() {
-    game.turn.locked = false;
-    game.turn.rerolledAll = false;
-    game.turn.diceNew = [false, false, false, false, false];   // no "fresh" accent on a turn's first roll
-    game.turn.diceGen = []; game.turn.rollNo = 0;                          // generations are seeded by the turn's first roll
     hintsOn = false; $('hintBtn').classList.remove('on');   // advice is per-turn: re-click each turn
     clearRoast();
     var p = G.currentPlayer(game);
@@ -154,36 +146,27 @@
     document.documentElement.style.setProperty('--pc', p.color);
     if (netMode) {
       // the active player drives input on their own device; everyone else watches
-      game.turn.selected = [false, false, false, false, false];
-      game.turn.dice = []; game.turn.throwsLeft = 0; game.turn.curLog = null;
-      if (netMyTurn) { game.turn.awaitingRoll = true; game.turn.locked = false; game.turn.throwsLeft = ROLLS - 1; renderAll(); showOrder(p); }   // my turn: a first roll + (ROLLS-1) rerolls
-      else { game.turn.awaitingRoll = false; game.turn.locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
+      game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'net', myTurn: netMyTurn }).turn;
+      if (netMyTurn) { renderAll(); showOrder(p); }
+      else { renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
       return;
     }
     if (gManual()) {
-      game.turn.manualCounts = [0,0,0,0,0,0,0];
-      game.turn.dice = []; game.turn.throwsLeft = 0; game.turn.curLog = null;
+      game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'manual' }).turn;
       renderAll();
       showOrder(p);
       return;
     }
-    game.turn.selected = [false,false,false,false,false];
+    game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'dice' }).turn;
     if (p.isAI) {
-      // AI rolls immediately
-      game.turn.awaitingRoll = false;
-      game.turn.throwsLeft = ROLLS - 1;
-      game.turn.dice = G.rollAll(); sortDice();
-      game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
+      // AI rolls immediately — replay the human first-roll transition, then drive the bot
+      game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: G.rollAll() }).turn;
       game.turn.curLog = startTurnLog(p);
       renderAll(); shakeDice(); showOrder(p);
       runAiTurn();
     } else {
       // human: the first roll waits for a tap of the dice — adds anticipation
       // after the general's order
-      game.turn.awaitingRoll = true;
-      game.turn.throwsLeft = ROLLS - 1;
-      game.turn.dice = [];
-      game.turn.curLog = null;
       renderAll();
       showOrder(p);
     }
@@ -194,10 +177,9 @@
     if (!game.turn.awaitingRoll || game.turn.locked) return;
     if (tut && !tutGate('roll')) return;          // tutorial: only roll on a roll step
     var p = G.currentPlayer(game);
-    game.turn.awaitingRoll = false;
-    game.turn.dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
-    game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });   // first throw: every die is generation 1
-    game.turn.curLog = startTurnLog(p);
+    var faces = (tut && tut.dice) ? tut.dice.slice() : G.rollAll();
+    game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: faces }).turn;
+    game.turn.curLog = startTurnLog(p);   // log seeds from game.turn.dice, so build it after the roll lands
     clearRoast();
     renderAll();
     shakeDice();
@@ -437,11 +419,7 @@
   // Requiring the full hand lets the board suggest every fillable category (so
   // nothing is missed mentally) AND enables category-decision analytics.
 
-  function manualDiceArray() {
-    var d = [];
-    for (var f = 1; f <= 6; f++) for (var k = 0; k < game.turn.manualCounts[f]; k++) d.push(f);
-    return d;
-  }
+  function manualDiceArray() { return GReduce.manualDiceFromCounts(game.turn.manualCounts); }
 
   function renderManualDock() {
     var sel = $('manualSel'), diceBox = $('manualDice');
@@ -459,10 +437,9 @@
     })(f);
   }
   function tapManualDie(face) {
-    if (game.turn.locked) return;
-    if (game.turn.dice.length >= G.DICE_COUNT) return; // a roll is 5 dice
-    game.turn.manualCounts[face]++;
-    game.turn.dice = manualDiceArray();
+    var next = GReduce.reduce(game, { type: 'TAP_MANUAL', face: face });
+    if (next === game) return;   // reduce no-ops when locked or the hand is already full
+    game.turn = next.turn;
     undoStack.push({ t: 'tap', face: face });
     gExp() ? expRenderAll() : renderAll();
   }
@@ -474,18 +451,12 @@
     clearTimeout(turnTimer);                    // undoing mid-handover must not double-advance
     $('overModal').classList.add('hidden');     // in case we're undoing the final entry
     var a = undoStack.pop();
-    if (a.t === 'tap') {
-      if (game.turn.manualCounts[a.face] > 0) game.turn.manualCounts[a.face]--;
-      game.turn.dice = manualDiceArray();
-    } else { // commit
+    if (a.t === 'commit') {   // score delete + moveLog pop are score/log-coupled → shell's job
       delete game.players[a.playerIdx].scores[a.key];
-      game.current = a.playerIdx;
-      game.round = a.prevRound;
       if (moveLog[a.playerIdx] && moveLog[a.playerIdx].length) moveLog[a.playerIdx].pop();
-      game.turn.manualCounts = a.counts.slice();
-      game.turn.dice = manualDiceArray();
     }
-    game.turn.locked = false;
+    var next = GReduce.reduce(game, { type: 'UNDO', entry: a });   // rewinds the hand + cursor
+    game.turn = next.turn; game.current = next.current; game.round = next.round;
     clearRoast();
     gExp() ? expRenderAll() : renderAll();
   }
@@ -711,13 +682,9 @@
   // „Нов набор зарове": stamp each die with its generation (the roll it was last thrown in) and
   // sort by (generation, value) so kept dice group on the left and the fresh batch lands ordered on the right.
   function applyReroll(rr) {
-    game.turn.rollNo++;
-    var paired = game.turn.dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i], g: rr[i] ? game.turn.rollNo : (game.turn.diceGen[i] || 1) }; });
-    if (activeBatch()) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
-    else paired.sort(function (a, b) { return a.v - b.v; });
-    game.turn.dice = paired.map(function (x) { return x.v; });
-    game.turn.diceNew = paired.map(function (x) { return x.nw; });
-    game.turn.diceGen = paired.map(function (x) { return x.g; });
+    // the shell rolls the masked dice (keeps reduce deterministic), reduce does the regroup/sort
+    var faces = rr.map(function (m) { return m ? G.rollDie() : 0; });
+    game.turn = GReduce.reduce(game, { type: 'REROLL', mask: rr, faces: faces, batch: activeBatch() }).turn;
   }
   function humanFire() {
     if (gExp()) { expHumanFire(); return; }
@@ -792,7 +759,7 @@
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: game.turn.manualCounts.slice() });
       if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: game.turn.dice.slice(), category: key });
     }
-    game.turn.locked = true;
+    game.turn = GReduce.reduce(game, { type: 'COMMIT' }).turn;   // lock the turn
     renderAll();
     flashTile(key);
     $('fire').disabled = true;
@@ -816,9 +783,10 @@
     }
   }
   function endTurn() {
-    if (G.isGameOver(game)) { endGame(); return; }
-    G.nextTurn(game);
-    if (tut) { while (game.players[game.current].isAI) G.nextTurn(game); }   // tutorial: the opponent never plays
+    if (G.isGameOver(game)) { GReduce.reduce(game, { type: 'END_GAME' }); endGame(); return; }
+    function advance() { var n = GReduce.reduce(game, { type: 'NEXT_TURN' }); game.current = n.current; game.round = n.round; }
+    advance();
+    if (tut) { while (game.players[game.current].isAI) advance(); }   // tutorial: the opponent never plays
     beginTurn();
   }
 

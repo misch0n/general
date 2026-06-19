@@ -26,10 +26,19 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
      hand-care (local `dice` params/vars in exp.js EV-helpers + `$('dice')` strings + `dice:` keys must
      NOT be rewritten); the rest were a guarded perl (`(?<!.)\bNAME\b(?!:)` → `game.turn.NAME`, valid
      for reads AND writes). Also added `scripts/smoke.js` (commit `638ad1a`) as the app-loop safety net.
-3. ⬜ **Introduce `reduce(state, action)`** for the turn flow (`BEGIN_TURN`, `FIRST_ROLL`, `REROLL`,
-   `COMMIT`, `TAP_MANUAL`, `UNDO`, `NEXT_TURN`, `END_GAME`). Route existing mutators through it.
-   **Add `reduce()` unit tests** — this is the first real coverage for the app game-loop (today only
-   the engine is unit-tested; the loop is puppeteer-only). reduce() being pure makes it testable.
+3. ✅ **DONE** — *introduce `reduce(state, action)` for the turn flow.* New pure, DOM-free module
+   `reduce.js` (UMD → `window.GReduce`, loaded after `mp.js`, before the features) implements the turn
+   state machine: `BEGIN_TURN` (mode `dice`|`manual`|`net`), `FIRST_ROLL`, `REROLL`, `COMMIT`,
+   `TAP_MANUAL`, `UNDO`, `NEXT_TURN`, `END_GAME`. It never mutates its input and rolls **no** random
+   dice — the imperative shell rolls and passes faces in via the action, which keeps reduce
+   deterministic/testable; side effects (render, net send, timers, AI scheduling, per-turn logging,
+   ruleset-coupled score assignment) stay in the shell. `freshTurn()`/`manualDiceArray()` now delegate
+   to `GReduce`. Routed mutators in `features/game/game.js`: `beginTurn`, `firstRoll`, `applyReroll`
+   (still called by `ai.js`/`exp.js` unchanged), `tapManualDie`, `popUndo`, the local commit-lock in
+   `afterCommit`, and `endTurn`. **Added 21 `reduce()` unit tests** (`test/reduce.test.js`) — the first
+   coverage for the app game-loop (177 tests pass; smoke green for both rulesets × dice/manual).
+   *Not yet routed (by design):* the exp first-roll/commit path (slice 4) and the net commit/snapshot
+   mutations (slice 5); `BEGIN_TURN mode:'net'` is wired but the rest of the net turn flow is slice 5.
 4. ⬜ **Merge the exp parallel path** — `reduce()` picks engine fns by `state.ruleset`
    (`G.scoreFor` vs `G.scoreForExp`, `G.CATEGORIES` vs `G.CATEGORIES_EXP`, `G.assignScore` vs
    `X.assignScore`). Delete `expStartGame`/`expBeginTurn`/`expCommit` duplication and the
