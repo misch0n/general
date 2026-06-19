@@ -119,7 +119,7 @@
   $('abortModal').onclick = function (e) { if (e.target === $('abortModal')) { $('abortModal').classList.add('hidden'); $('menuModal').classList.remove('hidden'); } };
 
   // ---------- settings (with a secret developer mode) ----------
-  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || gManual() || !settings.advice); }
+  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !(gExp() ? exactReady : evReady) || gManual() || !settings.advice); }
   var SETTINGS_ROWS = [
     // master switch for the goofy layer (off = core only; on enables
     // callouts, penalties, combo tooltips and bets). Rare-name titles are separate.

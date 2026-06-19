@@ -39,15 +39,16 @@
   var tut = null;          // active tutorial controller (scripted dice + coach bubbles), null otherwise
   var fx = {};             // combo-reminder penalties folded into one override (see rebuildFx)
 
+  // one start path for both rulesets: only the engine factory, the ruleset tag and the begin-turn
+  // function differ (exp keeps its own free-order turn flow); everything else is shared scaffolding.
   function startGame(players, manual) {
     netMode = false;   // a normal local game is never networked
-    // experimental ruleset runs its own separate three-column flow (not for ОТЧЕТ)
-    if (settings.ruleset === 'experimental') { expStartGame(players, manual); return; }
-    document.querySelector('.sheet').classList.remove('hidden');
+    var exp = settings.ruleset === 'experimental';
+    document.querySelector('.sheet').classList.remove('hidden');   // both rulesets reuse the tile board
     $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden'); $('expNumBar').classList.add('hidden');
     clearAllPenalties();
-    game = G.createGame(players);
-    game.ruleset = 'standard';
+    game = (exp ? X : G).createGame(players);
+    game.ruleset = exp ? 'experimental' : 'standard';
     game.ownerSkipped = skipOwnerNext || ownerDetached; // record so this game is excluded from owner trends
     skipOwnerNext = false; ownerDetached = false;        // the skip/detach is a one-game decision
     game.manual = !!manual;
@@ -61,23 +62,25 @@
     paintCamo($('game'));
     syncHintBtn();
     setDockUI(gManual());
-    beginTurn();
+    (exp ? expBeginTurn : beginTurn)();
   }
 
-  // rebuild an unfinished game from its resume snapshot and continue
+  // rebuild an unfinished game from its resume snapshot and continue (both rulesets)
   function resumeGame(snap) {
     clearAllPenalties();
-    if (snap.ruleset === 'experimental') { resumeExpGame(snap); return; }
-    game = G.createGame(reconstructPlayers(snap));
-    game.ruleset = 'standard';
+    var exp = snap.ruleset === 'experimental';
+    game = (exp ? X : G).createGame(reconstructPlayers(snap));
+    game.ruleset = exp ? 'experimental' : 'standard';
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
     game.manual = !!snap.manualMode; game.turn = freshTurn(); undoStack = []; viewingHistory = false;
     moveLog = snap.moveLog || game.players.map(function () { return []; });
+    document.querySelector('.sheet').classList.remove('hidden');
+    $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden'); $('expNumBar').classList.add('hidden');
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     syncHintBtn();
     setDockUI(gManual());
-    beginTurn();
+    (exp ? expBeginTurn : beginTurn)();
   }
   function maybeOfferResume() {
     var snap = loadResume(); if (!snap) return;

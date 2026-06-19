@@ -2,40 +2,8 @@
 // Experimental ruleset (single-column Генерал): exact evaluator, hints, rendering.
   // ============================================================ EXPERIMENTAL flow (single column)
   var EXP_CELLS = X ? X.KEYS.length : 15;
-  function expStartGame(players, manual) {
-    netMode = false;
-    trackGame('start');
-    clearAllPenalties();
-    game = X.createGame(players);
-    game.ruleset = 'experimental';
-    game.manual = !!manual;
-    game.turn = freshTurn();
-    game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
-    undoStack = []; moveLog = players.map(function () { return []; });
-    $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
-    paintCamo($('game'));
-    $('hintBtn').classList.toggle('hidden', !exactReady || gManual() || !settings.advice);
-    document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
-    $('expBoard').classList.add('hidden');
-    $('expReserve').classList.add('hidden');
-    setDockUI(gManual());
-    expBeginTurn();
-  }
-  function resumeExpGame(snap) {
-    netMode = false;
-    game = X.createGame(reconstructPlayers(snap));   // shared deserializer (same as standard resume)
-    game.ruleset = 'experimental';
-    game.manual = false;
-    game.turn = freshTurn();
-    game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
-    undoStack = []; viewingHistory = false; moveLog = snap.moveLog || game.players.map(function () { return []; });
-    $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
-    paintCamo($('game'));
-    $('hintBtn').classList.toggle('hidden', !exactReady || !settings.advice);
-    document.querySelector('.sheet').classList.remove('hidden'); $('expBoard').classList.add('hidden'); $('expReserve').classList.add('hidden');
-    setDockUI(false);
-    expBeginTurn();
-  }
+  // expStartGame/resumeExpGame were folded into startGame/resumeGame (features/game/game.js) —
+  // the start/resume scaffolding is shared; only the engine factory + begin-turn fn are ruleset-picked.
   function expBeginTurn() {
     // same turn-flow state machine as the standard beginTurn (reduce.js), just with
     // the exp-specific renderer + AI; local-only (net minus runs the standard beginTurn).
