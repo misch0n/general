@@ -1,0 +1,215 @@
+/* ===== overlays ===== */
+.overlay{ position:fixed; inset:0; background:rgba(8,10,5,.78); backdrop-filter:blur(3px); display:grid; place-items:center; padding:18px; z-index:40; overscroll-behavior:contain; }
+#settingsModal{ z-index:50; }   /* opened from the lobby — must sit ABOVE the net modal (both .overlay) */
+#menuModal{ z-index:60; } /* always above floating bubbles/penalties */
+.modal{ width:340px; max-width:100%; max-height:88vh; overflow:auto; overscroll-behavior:contain; background:var(--gen-ink); border:2px solid var(--gen-brass); border-radius:14px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.6); }
+/* lock the page behind any open overlay so only the panel scrolls */
+body.modal-open{ overflow:hidden; }
+.modal h2{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1.5px; color:var(--gen-brass); font-size:18px; margin:0 0 12px; }
+.modal .sub{ color:var(--gen-label); font-size:12px; margin:0 0 14px; }
+/* editable battle title (history detail): the title sits in a dashed box with a pencil */
+.overhead{ display:flex; align-items:flex-start; gap:10px; margin:0 0 12px; }
+.overhead .oh-titles{ flex:1; min-width:0; }
+.overhead h2{ margin:0; }
+.overhead.editable h2{ cursor:pointer; display:inline-block; padding:4px 9px; border:1px dashed var(--gen-brass-stroke); border-radius:8px; background:rgba(255,255,255,.03); }
+.overhead.editable h2:hover{ border-color:var(--gen-brass); }
+.oh-x{ flex:none; width:30px; height:30px; border-radius:7px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-muted);
+  font-size:15px; line-height:1; cursor:pointer; display:grid; place-items:center; }
+.oh-x:hover{ border-color:var(--gen-brass); color:var(--gen-brass); }
+.oversubdate{ color:var(--gen-muted); font-size:11px; letter-spacing:.4px; margin:4px 0 0; font-variant-numeric:tabular-nums; }
+/* the summary header stays pinned at the top while the rest scrolls beneath it */
+#overModal .modal{ padding-top:0; }
+#overHead{ position:sticky; top:0; z-index:6; background:var(--gen-ink); margin:0 -18px 12px; padding:18px 18px 10px; }
+.titlerename{ font-family:var(--gen-font-display); font-weight:700; font-size:17px; color:var(--gen-text); letter-spacing:.5px;
+  padding:4px 9px; border:1px solid var(--gen-brass); border-radius:8px; background:rgba(0,0,0,.3); width:100%; max-width:240px; }
+.titlerename:focus{ outline:none; }
+.rankrow{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:7px; }
+.rankrow.first{ border-color:var(--gen-brass); }
+.rankrow .pos{ width:22px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-muted); }
+.rankrow .nm{ flex:1; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:13px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rankrow .tt{ font-family:var(--gen-font-display); font-weight:700; font-variant-numeric:tabular-nums; color:var(--gen-brass); }
+.betmsgs{ margin:14px 0 6px; }
+.bet{ display:flex; align-items:center; gap:8px; padding:8px 11px; border-radius:8px; margin-bottom:6px; font-size:13px; font-weight:700; }
+.bet.kept{ background:rgba(75,140,60,.16); color:#9bd17e; }
+.bet.lost{ background:rgba(178,58,46,.16); color:#e88; }
+.tierow{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:7px; }
+.tierow.win{ border-color:var(--gen-brass); }
+.tierow .nm{ flex:1; font-family:var(--gen-font-display); text-transform:uppercase; font-size:13px; letter-spacing:.5px; }
+.tiedie{ width:40px; height:40px; border-radius:6px; background:#d8cfa8; padding:6px; }
+.tiedie .face{ width:100%; height:100%; }
+.tiedie.empty{ display:grid; place-items:center; color:var(--gen-disabled); font-size:18px; background:var(--gen-pill); }
+.peekrow{ display:flex; justify-content:space-between; padding:7px 9px; border-radius:7px; font-size:13px; }
+.peekrow:nth-child(odd){ background:rgba(255,255,255,.04); }
+.peekrow .pv{ font-family:var(--gen-font-display); font-weight:700; font-variant-numeric:tabular-nums; }
+.peekrow.empty .pv{ color:var(--gen-disabled); }
+.peektot{ display:flex; justify-content:space-between; margin-top:10px; padding:10px 11px; border-radius:8px; background:rgba(200,166,75,.12); border:1px solid var(--gen-brass-stroke); }
+.peektot b{ font-family:var(--gen-font-display); color:var(--gen-brass); }
+.modal .x-close{ float:right; width:32px; height:32px; border-radius:7px; color:var(--gen-muted); font-size:17px; }
+
+/* persona picker (setup) */
+.minibtn{ margin-left:auto; font-family:var(--gen-font-display); font-size:10px; font-weight:700; letter-spacing:1px;
+  color:var(--gen-label); background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:var(--gen-r-pill); padding:4px 8px; }
+.minibtn.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
+.personas{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+.pcap{ font-family:var(--gen-font-display); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gen-muted); }
+.persona{ display:flex; align-items:center; gap:8px; text-align:left; padding:8px 10px; border-radius:8px;
+  background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); color:var(--gen-text); }
+.persona.sel{ border-color:var(--gen-brass); box-shadow:inset 0 0 0 1px var(--gen-brass); }
+.persona .pn2{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:13px; }
+.persona .pf{ flex:1; color:var(--gen-muted); font-size:11px; }
+.persona .pstr{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-size:12px; font-variant-numeric:tabular-nums; }
+
+/* live hint line */
+.hintline{ text-align:center; background:rgba(0,0,0,.3); border:1px solid var(--gen-alert-line); border-radius:8px; padding:6px 10px; }
+.hintline .hh{ font-family:var(--gen-font-display); font-weight:600; font-size:12px; letter-spacing:.4px; color:var(--gen-brass-bright); }
+.hintline .krs{ display:flex; flex-direction:column; gap:5px; align-items:stretch; margin-top:6px; }
+.hintline .kr{ display:flex; align-items:center; justify-content:center; gap:5px;
+  font-family:var(--gen-font-body); font-size:11px; color:var(--gen-label); background:rgba(255,255,255,.05);
+  border:1px solid var(--gen-pill-line); border-radius:6px; padding:4px 7px; }
+.hintline .kr b{ color:var(--gen-brass); }
+.hintline .krd{ display:inline-flex; gap:2px; }
+.hintline .hdie{ display:inline-grid; place-items:center; width:18px; height:18px; background:#d8cfa8; border:1px solid var(--gen-ink-line); border-radius:3px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
+.hintline .hdie .face{ width:12px; height:12px; gap:1px; } .hintline .hdie .pip{ border-radius:1px; }
+.hintline .kr-none{ color:var(--gen-disabled); }
+
+/* summary: ranks + EV panel */
+.rkbadge{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:11px;
+  color:var(--gen-brass); background:rgba(0,0,0,.32); border:1px solid currentColor; border-radius:5px; padding:3px 7px; min-width:62px; text-align:center; flex:none; }
+.rankrow.first .rkbadge{ box-shadow:0 0 9px rgba(232,195,86,.30); }
+.rankrow .nm{ display:flex; flex-direction:column; }
+.rsub{ font-family:var(--gen-font-body); font-weight:500; text-transform:none; letter-spacing:0; font-size:10px; color:var(--gen-muted); }
+.evpanel{ margin-top:12px; padding:12px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--gen-pill-line); }
+.evhead{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.5px; color:var(--gen-brass); font-size:13px; margin-bottom:8px; }
+.evline{ font-family:var(--gen-font-display); font-size:15px; letter-spacing:.3px; margin-bottom:6px; }
+.evline b{ color:var(--gen-text); } .evline .luck{ color:#9bd17e; } .evline .skill{ color:#e8b06a; }
+.evsub{ font-size:11px; color:var(--gen-muted); margin:3px 0; }
+.evsub b{ color:var(--gen-brass-bright); }
+.evpick{ font-size:12px; margin-top:6px; padding:5px 8px; border-radius:6px; }
+.evpick.sharp{ background:rgba(75,140,60,.16); color:#9bd17e; }
+.evpick.blunder{ background:rgba(178,58,46,.16); color:#e88; }
+.evpick .gap{ font-weight:700; }
+.evpick .epk-h{ font-weight:700; }
+.evpick .epk-d{ font-size:11px; opacity:.9; margin-top:2px; }
+/* multi-line stat list (each item on its own indented row) */
+.evstat .stlist{ margin-top:2px; }
+.evstat .stlist > div{ padding:1px 0 1px 12px; line-height:1.4; }
+/* EV explainer box */
+.evexplain{ margin:4px 0 10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.18); }
+.evexplain summary{ cursor:pointer; padding:7px 10px; font-family:var(--gen-font-display); font-weight:700; font-size:11.5px; letter-spacing:.4px; color:var(--gen-brass-bright); list-style:none; }
+.evexplain summary::-webkit-details-marker{ display:none; }
+.evexplain summary::before{ content:'❔ '; }
+.evexplain p{ font-size:11px; color:var(--gen-label); line-height:1.5; margin:0; padding:0 10px 9px; }
+.evexplain p b{ color:var(--gen-text); }
+/* combined playstyle box */
+.stylebox{ margin:8px 0; padding:10px 11px; border-radius:10px; background:rgba(0,0,0,.28); border:1px solid var(--gen-pill-line); }
+.styhead{ display:flex; align-items:center; justify-content:space-between; gap:7px; }
+.styleft{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+.stychip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-ink); border-radius:5px; padding:2px 8px; }
+.genbadge{ display:inline-flex; align-items:center; gap:3px; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase;
+  letter-spacing:.4px; font-size:10px; color:var(--gen-ink); background:var(--gen-brass-bright); border-radius:5px; padding:2px 7px; white-space:nowrap; }
+.styopt{ font-family:var(--gen-font-display); font-size:13px; letter-spacing:.4px; color:var(--gen-brass-bright); font-weight:700; white-space:nowrap; }
+.stydesc{ font-size:11px; color:var(--gen-label); margin:5px 0 4px; line-height:1.4; }
+.stymetrics{ font-size:11.5px; color:var(--gen-muted); }
+/* coloured stat lines (laser-scannable labels + numbers) */
+.evstat{ font-size:11.5px; color:var(--gen-label); margin:4px 0; line-height:1.45; }
+.evstat .slbl{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; }
+/* tappable explainer term: a light dotted underline accent (section labels + EV references) */
+.xterm{ text-decoration:underline; text-decoration-style:dotted; text-decoration-color:rgba(232,225,200,.5); text-underline-offset:2px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.np{ color:#9bd17e; font-weight:700; } .nn{ color:#e8807a; font-weight:700; } .nu{ color:var(--gen-brass-bright); font-weight:700; }
+/* playstyle fingerprint chip (colour = the archetype) — legacy alias */
+.stylechip{ display:inline-block; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  font-size:11px; color:var(--gen-ink); border-radius:5px; padding:2px 7px; margin-right:4px; }
+/* turn-by-turn breakdown (collapsed by default) */
+.evturns, .evboard{ margin-top:10px; border:1px solid var(--gen-pill-line); border-radius:8px; background:rgba(0,0,0,.18); }
+.evturns summary, .evboard summary{ cursor:pointer; padding:7px 10px; font-family:var(--gen-font-display); font-weight:700; font-size:12px;
+  letter-spacing:.5px; color:var(--gen-brass); list-style:none; }
+.evturns summary::-webkit-details-marker, .evboard summary::-webkit-details-marker{ display:none; }
+.evturns summary::before, .evboard summary::before{ content:'▸ '; }
+.evturns[open] summary::before, .evboard[open] summary::before{ content:'▾ '; }
+.evboard .miniboard{ padding:0 10px 10px; }
+/* left: [Хn][combo] · right: [points][luck/decision EV][quality thumb] — uniform columns so rows line up */
+.evtrow{ display:grid; grid-template-columns:26px minmax(0,1fr) 40px 64px 38px; align-items:center; column-gap:6px; padding:4px 10px; font-size:11px;
+  color:var(--gen-label); border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; }
+.evtrow .tn{ color:var(--gen-muted); font-family:var(--gen-font-display); font-weight:700; }
+.evtrow .tc{ font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.2px; color:var(--gen-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.evtrow .tc.forfeit{ color:#e8807a; }
+.evtrow .tv{ color:var(--gen-brass); font-weight:700; text-align:right; white-space:nowrap; }
+.evtrow .tev{ display:flex; gap:6px; justify-content:flex-end; white-space:nowrap; font-size:10px; color:var(--gen-muted); }
+.evtrow .tev .tl{ display:inline-flex; align-items:baseline; }
+/* per-turn quality thumb (CSS/SVG, theme-coloured) */
+.qicon{ display:inline-flex; align-items:center; justify-content:flex-end; gap:1px; -webkit-appearance:none; appearance:none; background:none; border:0; padding:3px 0 3px 8px; margin:-3px 0; cursor:pointer; color:inherit; position:relative; }
+.qicon .thumb{ width:14px; height:14px; display:block; }
+.qicon.great .thumb{ fill:#9bd17e; } .qicon.ok .thumb{ fill:var(--gen-brass-bright); }
+.qicon.bad .thumb{ fill:#e8a05a; } .qicon.blunder .thumb{ fill:#e0584a; }
+.evtrow.q-great{ background:rgba(75,140,60,.10); } .evtrow.q-bad{ background:rgba(200,120,40,.10); } .evtrow.q-blunder{ background:rgba(178,58,46,.13); }
+/* Генерал rolled — celebrate the row */
+.evtrow.q-general{ background:linear-gradient(90deg, rgba(232,195,86,.22), rgba(232,195,86,.06)); box-shadow:inset 2px 0 0 var(--gen-brass-bright); }
+.evtrow.q-general .tc{ color:var(--gen-brass-bright); }
+.evrolls{ display:flex; align-items:center; flex-wrap:wrap; gap:3px; padding:1px 10px 6px 38px; font-size:10px; color:var(--gen-muted); border-top:0; }
+.evrolls .rroll{ display:inline-flex; align-items:center; gap:2px; }   /* centre smaller dice against the bigger combo dice */
+.rdie{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:3px; background:#6c6450; color:#cfc7ad; opacity:.5;
+  font-family:var(--gen-font-display); font-weight:700; font-size:9px; }
+.rdie.kept{ background:#d8cfa8; color:var(--gen-pip); opacity:1; box-shadow:0 0 0 1px var(--gen-brass); }
+.rdie.combo{ width:17px; height:17px; font-size:11px; }   /* dice that form the scored combo, on the final roll */
+/* a small SQUARE die icon (brass pips on the dark panel); used by both keep metrics.
+   side = 40% of the percentage label's line height (--kdlh) so it stays crisp and undistorted */
+/* same die look as the combinations reference sheet (.csdie): light body, dark pips */
+.kddie{ display:inline-grid; place-items:center; flex:none; box-sizing:border-box; width:calc(var(--kdlh) * .4); height:calc(var(--kdlh) * .4);
+  background:#d8cfa8; border:1px solid var(--gen-ink-line); border-radius:2px; vertical-align:middle; }
+.kddie .face{ width:70%; height:70%; gap:1px; }
+.kddie .pip{ border-radius:1px; }
+/* dice-keep „chase" distribution: per-face percentage above its die icon */
+.keepdist{ --kdlh:34px; display:flex; gap:5px; margin-top:4px; }
+.kdcell{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.kdpct{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; line-height:1; color:var(--gen-text); }
+.kdpct.keep{ color:#9bd17e; }   /* held → green */
+.kdpct.drop{ color:#e0786f; font-size:13px; }   /* discarded → red */
+/* throw-keep rows: N dice for the throw number, sitting before the percentage */
+.thd{ --kdlh:28px; display:inline-flex; align-items:center; justify-content:center; gap:3px; vertical-align:middle; margin-right:6px;
+  min-width:calc(var(--kdlh) * 1.2 + 6px); }   /* width of the 3-dice row → centre 1/2 dice against it, % stays aligned */
+.evrolls .rarrow{ color:var(--gen-disabled); }
+.evrolls .rdie-sep{ width:6px; }   /* divider between kept and freshly-rolled dice (split view) */
+.evrolls.collapsed{ display:none; }   /* a turn's dice line is folded away until its row is tapped */
+.evtrow.clik{ cursor:pointer; }       /* row taps fold the dice (no arrow — the first row shows by default) */
+
+/* AI persona subtitle in the header */
+.ppersona{ font-family:var(--gen-font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass); }
+/* ribbons + AI persona share one row beneath the name (persona no longer pushes a row) */
+.pmeta{ display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0; overflow:hidden; }
+.pmeta .ppersona{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* experimental header: constant 2-line name (so the footer never shifts), persona inline, no ribbons */
+.pn2{ display:flex; flex-direction:column; gap:1px; min-width:0; line-height:1.12; }
+.pn2 .pn-a{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }   /* row 1 + the spilled-over word share this (full name style) */
+.pn2 .pn-line2{ display:flex; align-items:baseline; gap:6px; min-width:0; min-height:14px; }
+.pn2 .pn-line2 .pn-a{ flex:0 1 auto; }
+.pn2 .pn-persona{ flex:none; font-size:12px; letter-spacing:.5px; color:var(--gen-brass); text-transform:uppercase; }
+.numpart{ display:flex; align-items:baseline; gap:5px; margin-top:1px; font-family:var(--gen-font-display); font-variant-numeric:tabular-nums; }
+.numpart .np-x{ font-weight:700; font-size:13px; }
+.numpart .np-x.pos{ color:#86c986; } .numpart .np-x.neg{ color:#e8807a; } .numpart .np-x.zero{ color:var(--gen-brass-bright); }
+.numpart .np-y{ font-size:9px; font-weight:600; letter-spacing:.5px; color:var(--gen-muted); }
+/* number-part summary bar between the two board sections (experimental) */
+.expnumbar{ display:flex; align-items:baseline; justify-content:center; gap:6px; margin:6px 0; font-family:var(--gen-font-display); font-variant-numeric:tabular-nums; }
+.expnumbar .np-x{ font-weight:700; font-size:14px; }
+.expnumbar .np-x.pos{ color:#86c986; } .expnumbar .np-x.neg{ color:#e8807a; } .expnumbar .np-x.zero{ color:var(--gen-brass-bright); }
+.expnumbar .np-unit{ font-size:11px; color:var(--gen-muted); }   /* peek: neutral т. after the total */
+/* in-game bar: stack the coloured total over a small точки label (like ТОЧКИ, thinner/smaller) */
+#expNumBar.expnumbar{ flex-direction:column; align-items:center; gap:0; }
+#expNumBar .np-cap{ font-size:7px; font-weight:400; letter-spacing:1.5px; text-transform:uppercase; color:var(--gen-muted); margin-top:1px; }
+.np-x.np-tap{ cursor:pointer; text-decoration:underline dotted currentColor; text-underline-offset:3px; }
+#numPartTip{ max-width:240px; }
+#numPartTip .np-tip-txt{ font-size:11.5px; line-height:1.5; color:var(--gen-label); }
+#numPartTip .np-tip-pen{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-ink-line); font-size:11.5px; line-height:1.5; color:var(--gen-label); }
+#numPartTip .np-tip-pen b, #numPartTip .np-tip-txt b{ color:var(--gen-brass-bright); }
+
+/* setup: add-button, reorder arrows, manual mode */
+.addbtn{ flex:none; align-self:center; width:15%; display:block; margin:6px auto 22px; padding:9px 0; font-size:20px; line-height:1; font-weight:700;
+  background:rgba(20,22,12,.72); border:none; border-radius:9px; box-shadow:none; color:var(--gen-brass-bright); }
+.addbtn:active,.addbtn:focus{ transform:none; border:none; outline:none; box-shadow:none; }
+.modehint{ font-size:11px; color:var(--gen-muted); margin:8px 0 0; }
+/* acoustic multiplayer lobby */
+.netroster{ display:flex; flex-direction:column; gap:6px; margin:10px 0; }
+/* WebRTC code entry + host code display */
+.netjoincode{ display:flex; gap:6px; margin:8px 0; }
+.netcode-in{ flex:1; min-width:0; text-align:center; text-transform:uppercase; letter-spacing:4px;
+  font-family:var(--gen-font-display); font-weight:700; font-size:20px; padding:8px 10px; border-radius:8px;
+  background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); }

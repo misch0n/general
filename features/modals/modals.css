@@ -1,0 +1,156 @@
+/* manual entry modal */
+.entryinput{ width:100%; font-family:var(--gen-font-display); font-weight:700; font-size:28px; text-align:center; color:var(--gen-text);
+  background:rgba(0,0,0,.3); border:2px solid var(--gen-pill-line); border-radius:10px; padding:10px; }
+.entryinput:focus{ outline:none; border-color:var(--gen-brass); }
+.entryquick{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:12px 0; }
+.entryquick button{ min-width:38px; height:34px; border-radius:7px; font-family:var(--gen-font-display); font-weight:700;
+  background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-text); }
+.entryquick button:hover{ border-color:var(--gen-brass); }
+
+/* summary tabs + mini scoreboard */
+.tabs{ display:flex; gap:6px; margin-bottom:12px; }
+.tab{ flex:1; font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:12px;
+  padding:8px; border-radius:8px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); color:var(--gen-muted); }
+.tab.on{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-brass); }
+.tabs4{ gap:4px; } .tabs4 .tab{ font-size:11px; padding:7px 3px; letter-spacing:.2px; }
+.tabs4 .tab.hidden{ display:none; }
+/* §1.1–1.5 winner headline + verdict + badges */
+.winhead{ text-align:center; margin:-2px 0 10px; }
+.winhead .wh-name{ font-family:var(--gen-font-display); font-weight:800; text-transform:uppercase; letter-spacing:.5px; font-size:26px; line-height:1.1; }
+.winhead .wh-won{ font-family:var(--gen-font-display); font-size:15px; letter-spacing:.3px; color:var(--gen-text); margin-top:1px; }
+.winhead .wh-won b{ color:var(--gen-brass-bright); }
+.winhead .wh-split{ font-family:var(--gen-font-body); font-size:12px; color:var(--gen-muted); margin-top:3px; }
+.winhead .wh-verdict{ display:inline-block; margin-top:7px; padding:5px 11px; border-radius:8px; font-size:12.5px; line-height:1.35;
+  font-family:var(--gen-font-body); background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line); }
+.winhead .wh-verdict b{ font-family:var(--gen-font-display); letter-spacing:.4px; }
+.winhead .v-total{ border-color:#9bd17e; } .winhead .v-total b{ color:#9bd17e; }
+.winhead .v-earned{ border-color:var(--gen-brass); } .winhead .v-earned b{ color:var(--gen-brass-bright); }
+.winhead .v-lucky{ border-color:#e0b85a; } .winhead .v-lucky b{ color:#e0b85a; }
+.winbadges{ display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-bottom:12px; }
+.winbadges:empty{ display:none; }
+.wbadge{ display:inline-flex; flex-direction:column; align-items:center; line-height:1.15; font-family:var(--gen-font-display);
+  padding:3px 8px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--c); box-shadow:inset 0 0 10px -7px var(--c);
+  cursor:pointer; -webkit-appearance:none; appearance:none; color:inherit; }
+.wbadge::after{ content:'?'; position:absolute; top:-5px; right:-5px; width:13px; height:13px; display:grid; place-items:center; border-radius:50%;
+  font-family:var(--gen-font-body); font-weight:700; font-size:8px; color:var(--gen-ink); background:var(--gen-brass); }
+.wbadge{ position:relative; }
+.wbadge .wb-title{ font-weight:700; font-size:11px; letter-spacing:.3px; text-transform:uppercase; color:var(--gen-text); }
+/* medal explainer bubble (tap a badge) — top level so it shows over the summary overlay */
+.medaltip{ position:fixed; z-index:70; max-width:240px; padding:9px 11px; border-radius:10px; background:var(--gen-ink);
+  border:1.5px solid var(--gen-brass-stroke); color:var(--gen-text); font-size:11.5px; line-height:1.45; box-shadow:0 8px 22px rgba(0,0,0,.5); cursor:pointer; }
+.medaltip .mt-holder{ margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.12); }
+/* tutorial coach bubble + spotlight */
+/* tutorial coach bubble — its own fixed overlay layer, pinned in a static spot above the
+   footer; never displaces in-game items (the related item is ringed via .tut-spot) */
+.tutbubble{ position:fixed; z-index:88; padding:13px 15px 11px; border-radius:13px; background:var(--gen-ink);
+  border:2px solid var(--gen-brass); color:var(--gen-text); font-size:13px; line-height:1.5; box-shadow:0 14px 38px rgba(0,0,0,.7); }
+.tutbubble.hidden{ display:none; }
+.tutbubble.nudge{ animation:tutnudge .32s ease; }
+@keyframes tutnudge{ 0%,100%{ transform:translateX(0); } 20%,60%{ transform:translateX(-6px); } 40%,80%{ transform:translateX(6px); } }
+.tutbubble .tb-text{ outline:none; }
+.tutbubble .tb-text b{ color:var(--gen-brass-bright); }
+.tutbubble .tb-text[contenteditable]:focus{ outline:1px dashed var(--gen-brass-stroke); outline-offset:3px; border-radius:4px; }
+.tutbubble .tb-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:11px; gap:10px; }
+.tutbubble .tb-step{ font-size:10px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+.tutbubble .tb-actions{ display:flex; align-items:center; gap:8px; }
+.tutbubble .tb-copy{ width:26px; height:26px; border-radius:6px; border:1px solid var(--gen-pill-line); background:transparent; color:var(--gen-muted); cursor:pointer; font-size:12px; }
+.tutbubble .tb-copy:hover{ border-color:var(--gen-brass); color:var(--gen-brass); }
+.tutbubble .tb-skip{ background:transparent; border:none; color:var(--gen-muted); font-size:10px; text-decoration:underline; cursor:pointer; padding:2px 4px; }
+.tutbubble .tb-skip:hover{ color:var(--gen-brass); }
+.tutbubble .tb-copybox{ display:block; width:100%; height:118px; margin-top:8px; font-family:monospace; font-size:10px; line-height:1.4;
+  background:rgba(0,0,0,.3); color:var(--gen-text); border:1px solid var(--gen-pill-line); border-radius:6px; resize:none; }
+.tutbubble .tb-next{ padding:7px 16px; border-radius:8px; background:var(--gen-brass); color:var(--gen-ink); font-weight:700; border:none; cursor:pointer; font-family:var(--gen-font-display); letter-spacing:.5px; }
+.tutbubble .tb-next:hover{ background:var(--gen-brass-bright); }
+.tutbubble .tb-hint{ font-size:11px; color:var(--gen-brass-bright); font-weight:700; }
+.tut-spot{ position:relative; }
+.tut-spot::after{ content:''; position:absolute; inset:-4px; border:2px solid var(--gen-brass-bright); border-radius:11px;
+  box-shadow:0 0 0 3px rgba(232,195,86,.22), 0 0 18px rgba(232,195,86,.4); pointer-events:none; z-index:6; animation:tutpulse 1.3s ease-in-out infinite; }
+@keyframes tutpulse{ 0%,100%{ opacity:.45; } 50%{ opacity:1; } }
+.tut-hint-sm{ font-size:9px; font-weight:600; color:var(--gen-muted); text-transform:none; letter-spacing:0; }
+.medaltip b{ color:var(--gen-brass-bright); }
+/* §1.5 category board — in-game scoreboard layout, each cell tinted by the record holder */
+.catboard{ margin-bottom:12px; }
+.catboard .cb-legend{ font-size:10px; color:var(--gen-muted); text-align:center; margin-bottom:8px; }
+.catboard .cb-legend b{ color:var(--gen-label); font-weight:700; }
+.catgrid .cgtile{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 3px; border-radius:5px;
+  background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); text-align:center; min-width:0; }
+.catgrid .cgtile.none{ opacity:.45; }
+.catgrid .lower .cgtile.fullspan{ grid-column:1 / -1; }   /* minus board: фул хаус spans both columns */
+.catgrid .cb-upline{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; margin:1px 0; font-size:9.5px; color:var(--gen-muted); }
+.catgrid .cb-upline b{ color:var(--gen-text); font-variant-numeric:tabular-nums; }
+.catgrid .cb-upline .cbu-ar{ font-size:10px; color:var(--gen-muted); }
+.catgrid .cb-upline .cbu-box{ font-family:var(--gen-font-display); font-weight:800; font-size:13px; line-height:1; padding:3px 8px; border-radius:5px;
+  border:1px solid var(--gen-pill-line); background:rgba(255,255,255,.04); color:var(--gen-text); font-variant-numeric:tabular-nums; }
+.catgrid .cgtile.dim{ opacity:.4; }   /* a player is expanded → mute the other record-holders' colours */
+.catgrid .cgtile.good{ background:rgba(123,184,90,.16); border-color:rgba(123,184,90,.5); }
+.catgrid .cgtile.bad{ background:rgba(224,85,69,.18); border-color:rgba(224,85,69,.55); }
+.catgrid .cg-lab{ font-family:var(--gen-font-display); font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:.2px;
+  color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.catgrid .cg-pct{ font-size:9px; color:var(--gen-muted); font-variant-numeric:tabular-nums; line-height:1.3; }
+.catgrid .cg-rec{ font-family:var(--gen-font-display); font-weight:800; font-size:15px; color:var(--gen-text); font-variant-numeric:tabular-nums; line-height:1.05; }
+.catgrid .cg-leak{ font-size:8.5px; color:var(--gen-muted); font-variant-numeric:tabular-nums; }
+/* career category read-tips, hidden behind a ? */
+.cc-help{ display:inline-block; }
+.cc-help summary.cc-q{ display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; cursor:pointer; list-style:none;
+  font-family:var(--gen-font-body); font-weight:700; font-size:10px; color:var(--gen-ink); background:var(--gen-brass); vertical-align:1px; }
+.cc-help summary::-webkit-details-marker{ display:none; }
+/* collapsible career category fold — a bordered bar that reads as expandable */
+.catfold{ margin-top:12px; }
+.catfold-bar{ display:flex; align-items:center; gap:8px; cursor:pointer; padding:9px 12px; border:1px solid var(--gen-pill-line);
+  border-radius:9px; background:rgba(255,255,255,.03); }
+.catfold-bar .cf-lab{ font-family:var(--gen-font-display); font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:11px; color:var(--gen-brass); }
+.cc-qbtn{ flex:none; display:grid; place-items:center; width:16px; height:16px; line-height:1; padding:0; border-radius:50%; cursor:pointer; border:none;
+  font-family:var(--gen-font-body); font-weight:700; font-size:11px; color:var(--gen-ink); background:var(--gen-brass); }
+.cc-qbtn:hover{ background:var(--gen-brass-bright); }
+.cf-caret{ margin-left:auto; flex:none; width:9px; height:9px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted);
+  transform:rotate(45deg); transition:transform .15s; }
+.catfold.open .cf-caret{ transform:rotate(225deg); border-color:var(--gen-brass); }
+.catfold .cc-tips{ margin-top:8px; }
+.catgrid-wrap{ margin-top:8px; }
+.cc-tips{ margin-top:6px; padding:8px 10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line);
+  font-size:10.5px; color:var(--gen-label); font-weight:400; text-transform:none; letter-spacing:0; line-height:1.5; }
+.cc-tips > div{ padding:1px 0; }
+.cc-tips b{ color:var(--gen-text); } .cc-g{ color:#9bd17e !important; } .cc-n{ color:var(--gen-muted) !important; } .cc-r{ color:#e8807a !important; }
+.catboard .cb-master{ margin-top:10px; text-align:center; font-size:12px; color:var(--gen-label); }
+/* §1.7 luck panel */
+/* §1.6 chart swing label */
+.pc-swing{ font-size:8px; font-weight:700; font-family:var(--gen-font-body); }
+/* §1.8 per-game coaching line */
+.coachline{ margin:8px 0; padding:8px 11px; border-radius:9px; font-size:12.5px; color:var(--gen-text);
+  background:rgba(123,184,90,.10); border:1px solid rgba(123,184,90,.35); }
+.coachline b{ color:#9bd17e; }
+.rankrow{ cursor:pointer; }
+.rankrow.picked{ box-shadow:inset 0 0 0 2px var(--gen-brass); }
+.rankrow.nodata{ cursor:default; }
+.rankrow.excluded{ opacity:.45; filter:grayscale(.7); }   /* dropped/incomplete: out of the ranking */
+.rankrow .persub{ font-family:var(--gen-font-body); font-weight:500; text-transform:none; letter-spacing:0; font-size:10px; color:var(--gen-brass); }
+/* tap affordance: a chevron that points down when the player's report is open */
+.rankrow .rkcaret{ flex:none; width:10px; height:10px; margin-left:2px; border-right:2px solid var(--gen-muted); border-bottom:2px solid var(--gen-muted);
+  transform:rotate(-45deg); transition:transform .15s; }
+.rankrow .rkcaret.open{ transform:rotate(45deg); border-color:var(--gen-brass); }
+/* the expanded player's report, injected between the rows */
+.evinline{ margin:-2px 0 9px; }
+.evinline .evpanel{ margin-top:0; border-color:var(--gen-brass); }
+/* collapsible progress chart */
+.progchart .pc-details summary{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:6px; }
+.progchart .pc-details summary::-webkit-details-marker{ display:none; }
+.progchart .pc-details summary::before{ content:'▾'; color:var(--gen-brass); font-size:10px; }
+.progchart .pc-details:not([open]) summary::before{ content:'▸'; }
+/* EV help box in the ? window */
+.evxhd{ font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.4px; color:var(--gen-brass-bright); padding:8px 10px 0; }
+.evexplain .evxhd + p{ padding:6px 10px 9px; }
+.miniboard{ display:flex; flex-direction:column; gap:6px; }
+.miniboard .upper,.miniboard .lower{ display:grid; gap:5px; }
+.miniboard .upper{ grid-template-columns:repeat(6,1fr); }
+.miniboard .lower{ grid-template-columns:repeat(2,1fr); }
+.mtile{ background:var(--gen-canvas); color:var(--gen-canvas-ink); border:1px solid var(--gen-ink-line); border-radius:4px;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.14); padding:5px 4px; text-align:center; }
+.mtile.empty{ background:rgba(205,198,160,.18); color:var(--gen-muted); }
+.mtile.up{ display:flex; flex-direction:column; gap:1px; }
+.mtile .mlab{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
+.mtile.low .mlab{ font-size:9px; }
+.mtile .mval{ font-family:var(--gen-font-display); font-weight:700; font-size:13px; font-variant-numeric:tabular-nums; }
+/* forfeited (0) cell on the Дъска board: greyed out entirely — not red (too loud) */
+.mtile.forfeit{ background:rgba(150,150,138,.18); color:var(--gen-muted); border-color:var(--gen-ink-line); box-shadow:inset 0 0 0 2px rgba(255,255,255,.05); }
+.mtile.forfeit .mval, .mtile.forfeit .mlab{ color:var(--gen-muted); }
+.mtile.low{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }

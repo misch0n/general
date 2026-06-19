@@ -1,0 +1,213 @@
+/* net modal title: icon vertically centred with the text */
+#netTitle{ display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+/* CSS-drawn network icon — three connected nodes along a link (replaces the globe in the title) */
+.ic-net{ position:relative; display:inline-block; width:24px; height:9px;
+  background:linear-gradient(currentColor,currentColor) left center/100% 2px no-repeat; color:inherit; }
+.ic-net::before{ content:''; position:absolute; left:1px; top:50%; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:currentColor;
+  box-shadow:8px 0 0 currentColor, 16px 0 0 currentColor; }   /* left + centre + right nodes */
+.nethostcode{ margin:10px 0; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; opacity:.85; }
+.nethostcode .netcode-line{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px; }
+.nethostcode .netcode-show{ font-size:30px; letter-spacing:7px; color:var(--gen-brass-bright);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:pointer; }
+.codecopy{ display:inline-grid; place-items:center; width:30px; height:30px; flex:none;
+  border-radius:7px; background:rgba(255,255,255,.06); border:1px solid var(--gen-pill-line); color:var(--gen-brass-bright); cursor:pointer; transition:background .15s, border-color .15s, color .15s; }
+/* join-code row: the scan/paste buttons match the code field's height, kept square */
+.netjoincode .codecopy{ width:auto; height:auto; aspect-ratio:1/1; min-width:38px; }
+/* CSS-drawn copy glyph: two overlapping document sheets */
+.copy-ic{ position:relative; width:13px; height:14px; display:block; color:inherit; }
+.copy-ic::before{ content:''; position:absolute; top:0; right:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; }
+.copy-ic::after{ content:''; position:absolute; bottom:0; left:0; width:8px; height:10px; border:1.5px solid currentColor; border-radius:2px; background:var(--gen-ink,#16160e); }
+/* tapped: green tint (no text) */
+.codecopy.copied{ background:rgba(46,158,91,.3); border-color:#2e9e5b; color:#8fe0ac; }
+.netcode-show.copied{ color:#8fe0ac; transition:color .12s; }   /* tapping the code copies → flash it green too */
+/* CSS-drawn camera glyph: rounded body + lens + flash dot (thin strokes) */
+.cam-ic{ position:relative; width:20px; height:15px; display:block; color:inherit; }
+.cam-ic::before{ content:''; position:absolute; bottom:0; left:0; right:0; height:13px; border:1.7px solid currentColor; border-radius:5px; }
+.cam-ic::after{ content:''; position:absolute; bottom:3.4px; left:50%; transform:translateX(-50%); width:6px; height:6px; border:1.7px solid currentColor; border-radius:50%; }
+.cam-ic b{ position:absolute; top:3px; right:3px; width:2px; height:2px; background:currentColor; border-radius:50%; }   /* flash */
+/* CSS-drawn paste glyph: a sheet with text lines (thin strokes) */
+.paste-ic{ position:relative; width:14px; height:17px; display:block; color:inherit; }
+.paste-ic::before{ content:''; position:absolute; inset:0; border:1.7px solid currentColor; border-radius:2.5px; }
+.paste-ic::after{ content:''; position:absolute; left:3px; right:3px; top:4.5px; height:1.5px; background:currentColor; box-shadow:0 4px 0 currentColor, 0 8px 0 currentColor; }
+/* CSS-drawn trash glyph: lid (with handle) + bin body */
+.trash-ic{ position:relative; display:inline-block; vertical-align:-2px; width:13px; height:15px; color:inherit; }
+.trash-ic::before{ content:''; position:absolute; top:3px; left:1px; right:1px; bottom:0; border:1.7px solid currentColor; border-top:none; border-radius:0 0 3px 3px; }
+.trash-ic::after{ content:''; position:absolute; top:1.5px; left:-1px; right:-1px; height:1.7px; background:currentColor; border-radius:1px; box-shadow:0 -2.4px 0 -3px currentColor; }
+/* drawn icons sitting inside a modal title render inline with the text */
+h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:middle; margin-right:6px; }
+/* CSS-drawn share glyph (iOS-style): a box with an up-arrow rising out of it */
+.share-ic{ position:relative; width:15px; height:16px; display:block; color:inherit; }
+.share-ic::before{ content:''; position:absolute; left:1px; right:1px; bottom:0; top:6px; border:2px solid currentColor; border-top:none; border-radius:0 0 3px 3px; }
+.share-ic::after{ content:''; position:absolute; left:50%; top:0; width:9px; height:10px; transform:translateX(-50%); background:currentColor;
+  clip-path:polygon(50% 0, 100% 45%, 71% 45%, 71% 100%, 29% 100%, 29% 45%, 0 45%); }   /* the up arrow */
+/* code box green flash (paste/scan feedback) */
+.netcode-in.flash-green{ border-color:#2e9e5b; color:#8fe0ac; background:rgba(46,158,91,.16); transition:border-color .12s, color .12s, background .12s; }
+/* the game-code QR (host side / in-game reconnect) — always shown above the code */
+.netcodeqr{ width:100%; max-width:172px; margin:10px auto 8px; background:#fff; padding:8px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+.netcodeqr.loading{ background:transparent; box-shadow:none; padding:0; }   /* while loading/error: sit on the view bg, no white tile */
+.netcodeqr svg{ display:block; width:100%; height:auto; }
+.netcodeqr .qr-load{ display:block; padding:18px 6px; color:#16160e; font-size:12px; text-transform:none; letter-spacing:0; }
+.netcodeqr.loading .qr-load{ color:var(--gen-muted); }
+/* QR loading spinner — shown until the QR is generated (brass on the view bg, dark only on the white tile) */
+.netcodeqr .qr-spin{ display:block; width:34px; height:34px; margin:0 auto 10px; border-radius:50%;
+  border:3px solid rgba(22,22,14,.18); border-top-color:#16160e; animation:qrspin .8s linear infinite; }
+.netcodeqr.loading .qr-spin{ border-color:rgba(232,195,86,.25); border-top-color:var(--gen-brass-bright); }
+@keyframes qrspin { to { transform:rotate(360deg); } }
+.netcode-lbl{ margin-bottom:2px; }
+/* share-QR url line: not selectable; a tap copies it and flashes green (like the host code) */
+#qrShareUrl{ display:inline-block; cursor:pointer; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  border-radius:6px; padding:3px 7px; transition:color .12s, background .12s; }
+#qrShareUrl.copied{ color:#8fe0ac; background:rgba(46,158,91,.16); }
+.netjoinview{ margin:6px 0; }
+/* regular vs manual network-game switcher */
+.netmodeswitch{ display:flex; gap:0; margin:4px 0 12px; border:1px solid var(--gen-pill-line); border-radius:9px; overflow:hidden; background:rgba(0,0,0,.25); }
+.netmodeswitch .nms-opt{ flex:1; padding:9px 6px; font-family:var(--gen-font-display); font-weight:700; font-size:12.5px; letter-spacing:.4px; text-transform:uppercase;
+  background:transparent; color:var(--gen-muted); border:none; cursor:pointer; }
+.netmodeswitch .nms-opt.on{ background:var(--gen-brass); color:var(--gen-ink); }
+/* optical (QR) handshake view */
+.netoptical{ margin:6px 0; }
+.optqr{ width:100%; max-width:280px; margin:10px auto; background:#fff; padding:10px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+.optqr svg{ display:block; width:100%; height:auto; }
+.optscan{ position:relative; width:100%; max-width:300px; margin:10px auto; border-radius:12px; overflow:hidden; background:#000; aspect-ratio:1/1; }
+.optscan video{ width:100%; height:100%; object-fit:cover; display:block; }
+.opt-reticle{ position:absolute; inset:14%; border:3px solid rgba(212,160,46,.9); border-radius:14px; box-shadow:0 0 0 9999px rgba(0,0,0,.22); pointer-events:none; }
+.wrcap{ margin-top:12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:left; }
+.wrcap-hd{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; color:var(--gen-brass-bright); margin-bottom:6px; }
+.devrow-disabled{ opacity:.4; }
+.devrow-disabled .toggle{ pointer-events:none; }
+.menunetcode{ margin:0 0 12px; padding:10px; border-radius:8px; background:rgba(0,0,0,.25); border:1px solid var(--gen-pill-line); text-align:center; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.5px; font-size:12px; }
+.menunetcode .netcode-show{ display:block; margin-top:4px; font-size:26px; letter-spacing:6px; color:var(--gen-brass-bright); }
+.menunetcode .mnc-hint{ margin-top:6px; font-size:10px; color:var(--gen-muted); text-transform:none; letter-spacing:0; }
+.netp{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line);
+  font-family:var(--gen-font-display); font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:13px; }
+.netp .netdot{ width:12px; height:12px; border-radius:50%; flex:none; }
+.netp b{ color:var(--gen-brass-bright); }
+.netp.dropped{ opacity:.5; }
+.netp .netdrop{ font-size:11px; color:#c0392b; }
+/* lobby preparation */
+.netprep-hd{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; font-size:11px; color:var(--gen-brass); margin:4px 0 8px; }
+.netmecard{ padding:11px; border-radius:10px; border:1px solid var(--gen-brass-stroke); background:rgba(0,0,0,.22); margin-bottom:10px; transition:border-color .2s, background .2s, box-shadow .2s; }
+/* readied: fields stay editable but the card gets a calm green tint */
+.netmecard.ready{ border-color:#3f9e5b; background:rgba(46,158,91,.12); box-shadow:0 0 0 1px rgba(46,158,91,.35); }
+.netmecard .nm-row{ display:flex; align-items:center; gap:8px; }
+.netmecard .nm-name{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; font-size:14px; color:var(--gen-text);
+  background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:8px 10px; }
+.netmecard .nm-name:focus{ outline:none; border-color:var(--gen-brass); }
+.netmecard .gender{ margin-top:9px; }
+.netproster{ display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+.netpp{ position:relative; display:flex; align-items:center; gap:14px; padding:8px 11px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--gen-pill-line); font-size:12.5px;
+  --heat:0; box-shadow:inset 0 0 0 200px rgba(201,52,40,calc(var(--heat)*0.45)), 0 0 calc(var(--heat)*13px) rgba(224,80,60,calc(var(--heat)*0.75)); }
+.netpp .netdot{ width:13px; height:13px; border-radius:50%; flex:none; }
+.netpp .pp-nm{ flex:1; min-width:0; text-align:left; padding-left:2px; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* „ДАЙ ЗОР" cheer bubble that pops over the spurred player's row */
+.netpp .pp-spur{ position:absolute; right:10px; top:-11px; font-family:var(--gen-font-display); font-weight:800; font-size:12px; letter-spacing:.5px; color:#fff;
+  background:#c0392b; padding:2px 9px; border-radius:11px; white-space:nowrap; pointer-events:none; opacity:0; box-shadow:0 2px 7px rgba(0,0,0,.45); transition:opacity .1s; }
+/* full rage: garbled cursing — brighter, jittering */
+.netpp .pp-spur.rage{ background:#e23a26; color:#ffe; box-shadow:0 0 10px rgba(226,58,38,.85); animation:ragejit .08s steps(2) infinite; }
+@keyframes ragejit{ 0%{ transform:translate(0,0) rotate(-1.5deg); } 100%{ transform:translate(1px,-1px) rotate(1.5deg); } }
+.netpp .pp-tag{ font-size:9px; letter-spacing:.4px; text-transform:uppercase; color:var(--gen-muted); flex:none; }
+.netpp .pp-rdy{ flex:none; }
+/* readied: a green circle with a white tick */
+.netpp .pp-rdy.ready{ position:relative; display:inline-block; width:18px; height:18px; border-radius:50%; background:#2e9e5b; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+.netpp .pp-rdy.ready::after{ content:''; position:absolute; left:50%; top:50%; width:4px; height:7px; border:solid #fff; border-width:0 2px 2px 0; transform:translate(-50%,-58%) rotate(45deg); }
+/* the same green-circle tick, inline in the „ГОТОВ!" button — as tall as the label, vertically centred */
+#netReady{ display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+.rdy-ic{ position:relative; display:inline-block; width:1.2em; height:1.2em; border-radius:50%; background:#2e9e5b; box-shadow:0 0 0 1px rgba(0,0,0,.3); flex:none; }
+/* CSS-drawn checkmark — always centred regardless of font */
+.rdy-ic::after{ content:''; position:absolute; left:50%; top:50%; width:.26em; height:.46em; border:solid #fff; border-width:0 .14em .14em 0; transform:translate(-50%,-58%) rotate(45deg); }
+/* still configuring: animated „typing" dots */
+.netpp .pp-cfg{ display:inline-flex; gap:4px; align-items:center; flex:none; padding:0 4px; }
+.netpp .pp-cfg i{ width:5px; height:5px; border-radius:50%; background:var(--gen-muted); animation:cfgdot 1.05s infinite ease-in-out; }
+.netpp .pp-cfg i:nth-child(2){ animation-delay:.18s; }
+.netpp .pp-cfg i:nth-child(3){ animation-delay:.36s; }
+@keyframes cfgdot{ 0%,70%,100%{ opacity:.25; transform:translateY(0); } 35%{ opacity:1; transform:translateY(-3px); } }
+.netpp .pp-kick{ flex:none; width:22px; height:22px; border-radius:6px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:13px; line-height:1; }
+/* the spammable „ДАЙ ЗОР" button (client ready→spur, host pre-start) */
+.btn.spur{ background:linear-gradient(180deg,#e0552e,#c0392b); color:#fff; border-color:#7a2018; box-shadow:0 3px 0 #7a2018; letter-spacing:1px; }
+.btn.spur:active{ transform:translateY(2px); box-shadow:0 1px 0 #7a2018; }
+/* host „ГОТОВ!" confirm (armed by editing a field) */
+.btn.confirm{ background:linear-gradient(180deg,#3fae66,#2e9e5b); color:#fff; border-color:#1f6b3c; box-shadow:0 3px 0 #1f6b3c; letter-spacing:1px; }
+.btn.confirm:active{ transform:translateY(2px); box-shadow:0 1px 0 #1f6b3c; }
+.netsett{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-bottom:10px; }
+.netsett .sc{ font-size:10px; letter-spacing:.3px; padding:3px 8px; border-radius:999px; background:rgba(201,166,75,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
+.netsett .sc.none{ background:transparent; border-color:var(--gen-pill-line); color:var(--gen-muted); }
+.netsett .sc.mode{ background:var(--gen-brass); border-color:var(--gen-brass); color:var(--gen-ink); font-weight:700; }
+.netpickinfo{ display:flex; gap:6px; justify-content:center; margin:0 0 12px; }
+.netpickinfo .npi-chip{ font-size:11px; padding:3px 10px; border-radius:999px; background:var(--gen-brass); color:var(--gen-ink);
+  font-weight:700; font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.3px; }
+.netprep-tools{ margin-bottom:6px; }
+.btn.small{ padding:8px 10px; font-size:11px; }
+/* in-game AI-takeover roster (host menu) */
+.aitk{ margin:4px 0 10px; }
+.aitk-hd{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.6px; font-size:10px; text-transform:uppercase; color:var(--gen-muted); margin-bottom:6px; }
+.aitk-row{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); margin-bottom:5px; font-size:12.5px; }
+.aitk-row .netdot{ width:11px; height:11px; border-radius:50%; flex:none; }
+.aitk-row .ai-nm{ flex:1; min-width:0; font-family:var(--gen-font-display); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* compact AI / pause toggles (two per row) */
+.aitk-row .aitk-tg{ flex:none; gap:5px; font-size:11px; }
+.aitk-row .aitk-tg .switch{ width:30px; height:17px; }
+.aitk-row .aitk-tg .switch::after{ width:13px; height:13px; }
+.aitk-row .aitk-tg.on .switch::after{ transform:translateX(13px); }
+/* headphones warning shown before any acoustic (sound) feature */
+.acwarn{ display:flex; align-items:center; gap:8px; text-align:left; margin:10px 0; padding:8px 10px; border-radius:9px;
+  background:rgba(224,85,69,.14); border:1px solid rgba(224,85,69,.5); color:#f0c0b8; font-size:11.5px; line-height:1.4; }
+.acwarn .acw-ic{ flex:none; font-size:16px; }
+.acwarn b{ color:#f3d9d3; }
+.netstatus{ min-height:18px; font-size:12px; color:var(--gen-label); margin:8px 0; }
+/* acoustic diagnostics panel */
+.netdiag{ text-align:left; }
+.nd-band{ font-size:11px; color:var(--gen-muted); text-align:center; margin-bottom:8px; }
+.nd-band b{ color:var(--gen-brass-bright); font-family:var(--gen-font-body); }
+.nd-meters{ display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+.nd-m{ display:flex; align-items:center; gap:8px; }
+.nd-m > span{ flex:none; width:54px; font-size:10px; color:var(--gen-muted); text-transform:uppercase; letter-spacing:.5px; }
+.nd-bar{ flex:1; height:12px; border-radius:6px; background:rgba(255,255,255,.07); overflow:hidden; }
+.nd-bar i{ display:block; height:100%; width:0; background:var(--gen-brass); transition:width .08s linear; }
+#ndBarS{ background:#6fa8e8; }
+.nd-heard{ text-align:center; font-size:12px; font-weight:700; color:var(--gen-muted); margin-bottom:8px; }
+.nd-heard.on{ color:#9bd17e; }
+.nd-stats{ font-size:11px; color:var(--gen-label); text-align:center; line-height:1.7; margin-bottom:8px; }
+.nd-stats b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+.nd-hint{ font-size:10.5px; color:var(--gen-muted); line-height:1.5; margin:6px 0; }
+.nd-hint b{ color:var(--gen-label); }
+.nd-cap{ margin-top:8px; padding-top:8px; border-top:1px solid var(--gen-pill-line); }
+.nd-cap #ndRec.on{ background:rgba(178,58,46,.55); color:#fff; border-color:var(--gen-alert-line); }
+.nd-capstat{ font-size:11px; color:var(--gen-label); text-align:center; margin:6px 0; min-height:14px; }
+.nd-capout{ width:100%; height:70px; font-size:9px; font-family:monospace; color:var(--gen-muted); background:rgba(0,0,0,.3);
+  border:1px solid var(--gen-pill-line); border-radius:7px; padding:6px; resize:vertical; word-break:break-all; }
+.wr-ice{ width:100%; height:54px; font-size:10px; font-family:monospace; color:var(--gen-ink-bright,#f0ead6); background:rgba(0,0,0,.3);
+  border:1px solid var(--gen-pill-line); border-radius:7px; padding:6px; resize:vertical; word-break:break-all; }
+/* link-quality signal bars + warnings */
+.netbars{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:var(--gen-muted); min-height:16px; margin:6px 0; }
+.netbars:empty{ display:none; }
+.signal{ display:inline-flex; align-items:flex-end; gap:2px; height:14px; }
+.signal .bar{ width:4px; background:var(--gen-disabled); border-radius:1px; }
+.signal .bar:nth-child(1){ height:5px; } .signal .bar:nth-child(2){ height:8px; } .signal .bar:nth-child(3){ height:11px; } .signal .bar:nth-child(4){ height:14px; }
+.signal.s-good .bar.on{ background:#9bd17e; } .signal.s-degrading .bar.on{ background:var(--gen-brass-bright); } .signal.s-critical .bar.on{ background:#e8807a; }
+.netwarn{ color:#e8807a; font-weight:600; }
+.netlink{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px;
+  background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); font-size:10px; }
+.netlink .condot{ width:8px; height:8px; border-radius:50%; flex:none; }
+.netlink .condot.up{ background:#2e9e5b; box-shadow:0 0 6px rgba(46,158,91,.7); }
+.netlink .condot.warn{ background:#e0a92e; box-shadow:0 0 6px rgba(224,169,46,.7); animation:condotpulse .9s ease-in-out infinite; }
+@keyframes condotpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+.netlink .condot.down{ background:#c0392b; }
+.netlink .conlbl{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.4px; color:var(--gen-muted); }
+.xferbar{ height:10px; border-radius:6px; background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); overflow:hidden; margin:12px 0 4px; }
+.xferfill{ height:100%; width:0; background:var(--gen-brass); transition:width .2s; }
+.xferstage{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:.4px; color:var(--gen-brass-bright); font-size:14px; margin-top:6px; }
+.xferflavour, .netflavour{ font-style:italic; color:var(--gen-label); min-height:18px; }
+.reorder{ display:flex; flex-direction:column; gap:2px; }
+.reorder button{ width:24px; height:18px; border-radius:5px; color:var(--gen-muted); background:var(--gen-pill); border:1px solid var(--gen-pill-line); font-size:10px; line-height:1; }
+.reorder button:hover:not(:disabled){ color:var(--gen-brass); }
+.reorder button:disabled{ opacity:.35; }
+
+/* manual-entry dock + ОПА */
+.dock.manual{ align-items:center; gap:14px; }
+.manualhint{ color:var(--gen-label); font-size:12px; text-align:center; }
+.undo{ font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; font-size:15px; text-transform:uppercase;
+  color:var(--gen-ink); background:var(--gen-alert); border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-tag);
+  padding:10px 22px; box-shadow:0 4px 0 var(--gen-alert-line); }
+.undo:active:not(:disabled){ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-alert-line); }
+.undo:disabled{ background:var(--gen-disabled); color:#cfcca8; box-shadow:none; border-color:var(--gen-disabled-line); }
+

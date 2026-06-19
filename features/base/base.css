@@ -1,0 +1,53 @@
+:root {
+  --gen-field:#4a5223; --gen-field-dark:#14160c; --gen-ink:#15160d; --gen-ink-line:#20220f;
+  --gen-panel:rgba(27,29,16,.84);
+  --gen-camo-1:#39401a; --gen-camo-2:#717449; --gen-camo-3:#26261a;
+  --gen-brass:#c8a64b; --gen-brass-dark:#7a6020; --gen-brass-bright:#e8c356; --gen-brass-stroke:#6e5418;
+  --gen-alert:#b23a2e; --gen-alert-line:#7a4632;
+  --gen-canvas:#cdc6a0; --gen-canvas-done:#a39d7c; --gen-canvas-ink:#26280f; --gen-canvas-sub:#7a4a12; --gen-canvas-locked:#5c5a40;
+  --gen-text:#efe9cf; --gen-muted:#9aa07a; --gen-label:#cdc9a8; --gen-pip:#1c1d16;
+  --gen-pill:#1b1d10; --gen-pill-line:#5a5e3a; --gen-disabled:#6f7250; --gen-disabled-line:#4a4d30;
+  --gen-r-board:22px; --gen-r-tag:7px; --gen-r-tile:4px; --gen-r-die:6px; --gen-r-pill:5px;
+  --gen-font-display:'Oswald',sans-serif; --gen-font-body:'Roboto Mono','Courier New',monospace;
+  --gen-dur-roll:.44s; --gen-dur-stamp:.5s;
+  --pc:var(--gen-brass);
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; }
+body{ min-height:100vh; display:flex; justify-content:center; align-items:stretch; padding:6px;
+  background:var(--gen-field-dark); font-family:var(--gen-font-body); color:var(--gen-text); -webkit-font-smoothing:antialiased; }
+button{ font:inherit; color:inherit; cursor:pointer; border:0; background:none; }
+.hidden{ display:none !important; }
+button:focus-visible{ outline:2px solid var(--gen-brass); outline-offset:2px; }
+
+/* ===== board shell (shared by setup + game) ===== */
+.board{ position:relative; width:100%; max-width:760px; margin:0 auto; min-height:calc(100vh - 12px);
+  border-radius:var(--gen-r-board); overflow:hidden; display:flex; flex-direction:column;
+  border:3px solid #1c1d12; box-shadow:0 24px 60px rgba(0,0,0,.6); }
+/* the in-game screen pins a dice footer to the bottom; everything else scrolls beneath it */
+#game.board{ height:100vh; height:100dvh; min-height:0; }
+/* the start screen: fixed header + footer, scrollable roster between them */
+#setup.board{ height:100vh; height:100dvh; min-height:0; }
+.gamebody{ position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; z-index:1; }   /* fills the screen + scrolls beneath the bar */
+.bottombar{ position:absolute; left:0; right:0; bottom:0; z-index:30; background:var(--gen-panel); border-top:2px solid var(--gen-brass); }
+.gamefooter{ position:relative; z-index:1; padding:13px 16px 6px; }   /* dice on top */
+.gamefooter .dice{ margin:0; }
+.gamefooter.manual{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:12px 16px calc(20px + env(safe-area-inset-bottom, 0px)); }
+.firebar{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:12px 18px calc(22px + env(safe-area-inset-bottom, 0px)); }   /* simple padding above the button, more below it */
+.bottombar.preroll{ display:flex; flex-direction:column; justify-content:center; }   /* before the first throw: only the throw button, centred in the bar's locked height */
+.bottombar.preroll #diceFooter{ display:none; }
+.bottombar.preroll #firebar{ padding-top:0; padding-bottom:0; justify-content:center; }
+.bottombar.preroll #fire{ height:72px; font-size:21px; }   /* a taller throw button (same width) */
+.camo{ position:absolute; inset:0; width:100%; height:100%; z-index:0; }
+.scrim{ position:absolute; inset:0; z-index:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(16,18,9,.62), rgba(16,18,9,.12) 20%, rgba(16,18,9,.12) 74%, rgba(16,18,9,.66)); }
+.banner,.hd,.pstrip,.sheet,.divider,.dock,.setup-body{ position:relative; z-index:1; }
+
+/* classification banner */
+.banner{ height:24px; display:flex; align-items:center; justify-content:center; background:var(--gen-ink);
+  color:var(--gen-brass); font-family:var(--gen-font-display); font-weight:700; font-size:11px; letter-spacing:2px;
+  border-bottom:2px solid var(--gen-brass); overflow:hidden; }
+.banner::before,.banner::after{ content:''; position:absolute; top:0; bottom:0; width:30px;
+  background:repeating-linear-gradient(45deg, var(--gen-brass) 0 6px, var(--gen-ink) 6px 12px); }
+.banner::before{ left:0; } .banner::after{ right:0; }
+

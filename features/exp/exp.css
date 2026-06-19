@@ -1,0 +1,135 @@
+/* ===== experimental: number-part bar + reused tile board ===== */
+.expboard{ position:relative; z-index:1; padding:4px 16px 0; }   /* lift above the camo layer */
+.numbar{ display:flex; align-items:center; gap:8px; padding:5px 11px; border-radius:9px; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); }
+.numbar.ok{ border-color:var(--gen-brass-stroke); }
+.numbar.neg{ border-color:#9c3b34; background:rgba(170,50,40,.14); }
+.numbar .nb-l{ font-family:var(--gen-font-display); font-weight:700; font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); }
+.numbar .nb-v{ font-family:var(--gen-font-display); font-weight:700; font-size:16px; color:var(--gen-brass); font-variant-numeric:tabular-nums; margin-left:auto; }
+.numbar.neg .nb-v, .numbar.neg .nb-sub{ color:#e8807a; }
+.numbar .nb-sub{ font-size:10px; color:var(--gen-muted); }
+/* experimental number-part tiles: colour the value by sign (red − / black 0 / green +).
+   the .upchip variants beat the later .upchip colour rule so the SUGGESTION box colours too */
+.tile.up .pts.pos, .tile.up .pts.upchip.pos{ color:#1c7a1c; }
+.tile.up .pts.neg, .tile.up .pts.upchip.neg{ color:#b02525; }
+.tile.up.done .pts.pos{ color:#6f9a6f; } .tile.up.done .pts.neg{ color:#a8453d; }   /* SUBMITTED values: muted green / darker red (legible) */
+.tile.low.fullspan{ grid-column:1 / -1; }   /* фул хаус spans both columns */
+/* experimental mini cell-board (peek): muted sign-coloured (submitted) number part + full-house span */
+.miniboard .mtile.up .mval.pos{ color:#6f9a6f; } .miniboard .mtile.up .mval.neg{ color:#a8453d; }
+.miniboard .mtile.low.fullspan{ grid-column:1 / -1; }
+.expbadge{ font-size:9px; font-weight:700; letter-spacing:.5px; padding:1px 5px; border-radius:5px; vertical-align:middle;
+  background:rgba(232,195,86,.16); border:1px solid var(--gen-brass-stroke); color:var(--gen-brass-bright); }
+/* archive ruleset selector — the underline-style picker from the start screen */
+.hist-rsel{ margin:0 0 12px; }
+/* compact recap table (end-of-game summary only) */
+.expgrid{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.expgrid th{ font-family:var(--gen-font-display); font-weight:700; font-size:11px; color:var(--gen-muted); padding:3px 0; text-align:center; }
+.expgrid th.act{ color:var(--gen-brass-bright); }
+.expgrid .ec-lab{ font-family:var(--gen-font-display); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--gen-text); padding:2px 6px 2px 2px; white-space:nowrap; }
+.expgrid td.ec-cell{ width:18%; text-align:center; padding:3px 2px; border:1px solid var(--gen-pill-line); border-radius:5px; font-weight:700; font-size:13px; color:var(--gen-muted); }
+.expgrid td.ec-cell.done{ color:var(--gen-text); background:rgba(255,255,255,.04); }
+.expgrid td.ec-cell.done.neg{ color:#e8807a; }
+.expgrid td.ec-cell.av{ cursor:pointer; color:var(--gen-brass-bright); border-color:var(--gen-brass-stroke); background:rgba(232,195,86,.1); }
+.expgrid td.ec-cell.av:hover{ background:rgba(232,195,86,.2); }
+.expgrid tr.ec-sub td, .expgrid tr.ec-tot td{ text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:11px; padding:4px 2px; }
+.expgrid tr.ec-sub td{ color:var(--gen-muted); border-top:1px solid var(--gen-pill-line); }
+.expgrid tr.ec-sub td.neg{ color:#e8807a; }
+.expgrid tr.ec-tot td{ color:var(--gen-brass); font-size:13px; }
+.expgrid tr.ec-sub td:first-child, .expgrid tr.ec-tot td:first-child{ text-align:right; color:var(--gen-muted); font-size:9px; letter-spacing:.4px; padding-right:6px; }
+.expcardwrap{ margin-top:10px; }
+.expcardwrap .ecw-name{ font-family:var(--gen-font-display); font-weight:700; font-size:13px; letter-spacing:.4px; margin:8px 0 3px; display:flex; align-items:center; gap:7px; }
+.expcardwrap .ecw-tot{ margin-left:auto; color:var(--gen-brass); }
+.winrow{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; margin-bottom:5px; background:rgba(255,255,255,.04); border:1px solid var(--gen-pill-line); }
+.winrow .wr-pl{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); width:16px; text-align:center; }
+.winrow .wr-nm{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.winrow .wr-nmtop{ font-family:var(--gen-font-display); font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wr-ana{ font-size:10px; color:var(--gen-muted); }
+.wr-ana b{ color:var(--gen-brass-bright); font-variant-numeric:tabular-nums; }
+.wr-blun{ font-size:10px; color:#e08a82; }
+.wr-blun b{ font-variant-numeric:tabular-nums; }
+.winrow .wr-pts{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-brass); font-variant-numeric:tabular-nums; }
+
+/* unrolled placeholder dice (tap to make the first throw) */
+.die.ghost{ background:linear-gradient(155deg,#e9e4cf,#c9c2a0); cursor:pointer; animation:ghostpulse 1.4s ease-in-out infinite; }
+.die.preroll{ opacity:.26; cursor:default; box-shadow:none; }   /* blank placeholder before the first throw (no ?) */
+.die.ghost .ghostq{ display:grid; grid-template-columns:repeat(6,1fr); grid-template-rows:repeat(6,1fr); gap:2px; width:42px; height:42px; }
+.die.ghost .ghostq span{ border-radius:2px; }
+.die.ghost .ghostq span.on{ background:var(--gen-pip); box-shadow:inset 0 1px 1px rgba(0,0,0,.5); }
+@keyframes ghostpulse{ 0%,100%{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 3px 0 rgba(0,0,0,.4); } 50%{ box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 3px 0 rgba(0,0,0,.4),0 0 14px rgba(200,166,75,.6); } }
+
+/* manual console: tap-the-dice entry */
+.manualsel{ text-align:center; font-family:var(--gen-font-display); font-size:13px; letter-spacing:.3px; color:var(--gen-label); }
+.manualsel b{ color:var(--gen-text); } .manualsel .livescore{ color:var(--gen-brass-bright); font-size:16px; }
+.die.mdie{ position:relative; cursor:pointer; touch-action:none; }
+.die.mdie.counted{ border-color:var(--gen-brass); box-shadow:0 0 0 2px var(--gen-brass),0 3px 0 rgba(0,0,0,.4); }
+.mcount{ position:absolute; top:-8px; right:-8px; min-width:22px; height:22px; padding:0 4px; display:grid; place-items:center;
+  background:var(--gen-brass); color:var(--gen-ink); border:1.5px solid var(--gen-ink-line); border-radius:11px;
+  font-family:var(--gen-font-display); font-weight:700; font-size:12px; }
+.manualbtns{ display:flex; gap:10px; justify-content:center; align-items:center; }
+.manualbtns .fire{ padding:0 26px; }
+.ghostbtn{ background:transparent; color:var(--gen-alert); border:1px solid var(--gen-alert-line); }
+/* ОПА — sits under the tooltip / between submit & forfeit; subtler than the tooltip */
+.opabtn{ flex:none; background:transparent; color:var(--gen-alert); border:1px solid var(--gen-alert-line); opacity:.85; }
+.opabtn:hover:not(:disabled){ opacity:1; border-color:var(--gen-alert); }
+.opabtn:disabled{ opacity:.35; }
+
+/* drag-to-reorder setup cards */
+.pcardtop{ display:flex; align-items:center; gap:8px; }
+/* owner star (CSS-drawn), to the right of the name box */
+.ownerstar{ flex:none; width:22px; height:22px; padding:0; border:none; cursor:pointer; background:var(--gen-brass);
+  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  box-shadow:0 0 8px rgba(200,166,75,.5); }
+.ownerstar:hover{ background:var(--gen-brass-bright); }
+.grip{ flex:none; width:34px; height:40px; display:grid; place-items:center; cursor:grab; color:var(--gen-brass);
+  background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; touch-action:none; user-select:none; -webkit-user-select:none; }
+.grip .gripdots{ display:grid; grid-template-columns:repeat(2,4px); grid-template-rows:repeat(3,4px); gap:2px 7px; }
+.grip .gripdots i{ width:4px; height:4px; border-radius:50%; background:currentColor; }
+.grip:active{ cursor:grabbing; }   /* no colour highlight when grabbed */
+/* the lifted card's highlight renders INWARD (inset on the foreground) so it never overlaps the
+   neighbouring entry as the card slides past it */
+.pcard.dragging{ opacity:.92; box-shadow:0 10px 26px rgba(0,0,0,.5); }
+.pcard.dragging .pc-fg{ box-shadow:inset 0 0 0 2px var(--gen-brass); }
+
+/* hamburger menu, how-to button */
+/* hamburger sits in the header where the rank box was (replaces the initials) */
+.rank.menubtn{ padding:0; cursor:pointer; gap:0; }
+.rank.menubtn .burger{ position:relative; width:18px; height:2px; background:var(--gen-brass); border-radius:2px; box-shadow:0 -5px 0 var(--gen-brass), 0 5px 0 var(--gen-brass); }
+.rank.menubtn:hover{ border-color:var(--gen-brass); }
+.rank.menubtn:hover .burger,.rank.menubtn:hover .burger{ background:var(--gen-brass-bright); box-shadow:0 -5px 0 var(--gen-brass-bright), 0 5px 0 var(--gen-brass-bright); }
+.rank.menubtn:active{ transform:translateY(1px); }
+.howtobtn{ width:100%; margin-top:10px; }
+/* tappable combo names + upper commit chip */
+.face-n.tappable,.cname.tappable{ cursor:help; }
+.cname.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); }
+.face-n.tappable{ border-bottom:1px dotted rgba(38,40,15,.4); padding-bottom:1px; }
+.tile.up .pts.upchip{ background:var(--gen-brass); color:var(--gen-ink); border-radius:4px; padding:0 6px; font-weight:800; }
+.tile.up .pts.xchip{ color:var(--gen-alert); border:1px solid var(--gen-alert-line); border-radius:4px; padding:0 6px; font-weight:800; }
+/* combo reminder tooltip (tap anywhere on it to dismiss) */
+.combotip{ position:fixed; z-index:50; max-width:280px; background:#f3ead0; color:#2a230c; border:2px solid var(--gen-ink-line);
+  border-radius:10px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.55); font-size:12.5px; line-height:1.4; cursor:pointer; }
+/* penalty-expiry bubble, floated next to the area the penalty hit */
+.fxbubble{ position:fixed; z-index:50; max-width:240px; background:var(--gen-brass-bright); color:var(--gen-ink);
+  border:2px solid var(--gen-brass-stroke); border-radius:9px; padding:6px 10px; box-shadow:0 6px 18px rgba(0,0,0,.5);
+  font-family:var(--gen-font-display); font-weight:700; font-size:12px; letter-spacing:.3px; cursor:pointer; }
+/* small guide tooltip: "tap the exact number" for multi-way combos */
+.guidetip{ position:fixed; z-index:50; max-width:220px; background:var(--gen-ink); color:var(--gen-brass-bright);
+  border:1px solid var(--gen-brass-stroke); border-radius:8px; padding:6px 10px; box-shadow:0 6px 16px rgba(0,0,0,.55);
+  font-family:var(--gen-font-display); font-weight:600; font-size:11.5px; letter-spacing:.3px; }
+.combotip .shame{ font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); margin-bottom:5px; }
+.combotip .cdesc{ color:#2a230c; }
+.combotip .cfine{ margin-top:6px; font-family:var(--gen-font-display); font-weight:700; color:var(--gen-alert); font-size:11px; letter-spacing:.3px; }
+/* YOU LOSE prank overlay */
+.youlose{ position:absolute; inset:0; z-index:40; display:grid; place-items:center; background:rgba(8,10,5,.78); }
+.youlose span{ font-family:var(--gen-font-display); font-weight:700; font-size:46px; letter-spacing:3px; color:var(--gen-alert);
+  text-shadow:0 4px 0 #000, 0 0 22px rgba(178,58,46,.7); transform:rotate(-7deg); }
+/* how-to content */
+.ht{ font-size:12.5px; color:var(--gen-label); line-height:1.5; margin:0 0 10px; }
+.ht b{ color:var(--gen-text); }
+.hth{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:13px; margin:14px 0 6px; }
+.htlist{ margin:0 0 8px; padding-left:18px; }
+.htlist li{ font-size:12px; color:var(--gen-text); margin-bottom:5px; line-height:1.4; }
+/* combo reference sheet */
+.cssec{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:1px; color:var(--gen-brass); font-size:12px; margin:12px 0 6px; }
+.settings-titlerow{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.settings-titlerow h2{ margin:0; }
+.app-ver{ font-size:11px; font-weight:700; color:var(--gen-muted); font-variant-numeric:tabular-nums; letter-spacing:.3px; cursor:pointer; text-decoration:underline dotted rgba(255,255,255,.25); text-underline-offset:3px; }
+.app-ver:hover{ color:var(--gen-brass-bright); }

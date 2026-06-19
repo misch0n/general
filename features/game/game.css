@@ -1,0 +1,167 @@
+/* ===== header ===== */
+.hd{ display:flex; align-items:center; gap:11px; padding:12px 16px 8px; z-index:6; }
+/* running points: a plain stacked number above the medals separator (no box), styled like the turn marker */
+.dockhead{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 16px; }
+.pointsbox{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; }
+.pointsbox .ptotal{ font-size:46px; }   /* the points number — big; ТОЧКИ caption stays small */
+/* the advice popup OVERLAYS the points — it starts just below the combo cells (top of this
+   strip) and grows downward over the points/medals, so it never covers the board or the dice */
+.dockhead .hintline{ position:absolute; left:12px; right:12px; top:6px; z-index:9;
+  background:rgba(9,11,6,.97); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:0 6px 18px rgba(0,0,0,.55); }
+.rank{ width:40px; height:40px; flex:none; display:grid; place-items:center; background:var(--gen-pill); color:var(--gen-brass);
+  border:2px solid var(--pc); border-radius:var(--gen-r-tag); font-family:var(--gen-font-display); font-weight:700; font-size:15px;
+  box-shadow:inset 0 0 0 2px var(--gen-ink); }
+.pinfo{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.pn{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; text-transform:uppercase; letter-spacing:.8px;
+  color:var(--gen-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,.6); }
+.ribbons{ display:grid; grid-template-columns:repeat(3,12px); grid-auto-rows:6px; gap:2px; width:max-content; }
+.ribbons i{ display:block; height:6px; border:1px solid rgba(0,0,0,.45); box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
+.totalbox{ display:flex; flex-direction:column; align-items:center; flex:none; position:relative; }
+.ptotal{ font-family:var(--gen-font-display); font-weight:700; font-size:26px; color:var(--gen-brass); line-height:1; font-variant-numeric:tabular-nums; }
+.ptotal.rnum{ font-size:20px; color:var(--gen-text); }   /* round X/14 in the header */
+.ptotal.rnum .rsub{ font-size:11px; font-weight:400; letter-spacing:0; vertical-align:-3px; color:var(--gen-muted); }   /* /14 — smaller, thinner, dropped */
+.tcap{ font-size:8px; letter-spacing:2px; color:var(--gen-muted); margin-top:2px; }
+.badge-ai{ font-family:var(--gen-font-display); font-size:9px; font-weight:700; letter-spacing:1px; color:var(--gen-ink);
+  background:var(--gen-brass); border-radius:3px; padding:1px 4px; margin-left:6px; vertical-align:middle; }
+
+/* player pills */
+.pstrip{ display:flex; gap:12px; padding:5px 16px 8px; flex-wrap:wrap; align-items:center; }   /* roomy gap so the enlarged current pill never shifts its neighbours */
+.ppill{ position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:46px; padding:4px 9px; border-radius:var(--gen-r-pill); font-size:11px; font-weight:700;
+  background:var(--gen-pill); color:#cfcca8; border:1px solid rgba(0,0,0,.35); letter-spacing:.5px;
+  font-variant-numeric:tabular-nums; transition:transform .12s ease; }   /* background is the player's own colour; sized to hold 3 digits without resizing */
+.ppill .pdot{ width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
+/* manual net: „МАМНИК!" shame bubble under the peek marker of someone racing ahead */
+.ppill .mamnik{ position:absolute; top:calc(100% + 5px); left:50%; transform:translateX(-50%); background:#c0392b; color:#fff;
+  font-family:var(--gen-font-display); font-weight:800; font-size:9px; letter-spacing:.4px; padding:2px 7px; border-radius:8px; white-space:nowrap;
+  box-shadow:0 2px 6px rgba(0,0,0,.45); pointer-events:none; z-index:4; animation:mamnikpop .28s cubic-bezier(.2,1.5,.4,1); }
+.ppill .mamnik::before{ content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-bottom-color:#c0392b; }
+@keyframes mamnikpop{ from{ opacity:0; transform:translateX(-50%) translateY(-4px) scale(.7); } to{ opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
+.ppill.on{ transform:scale(1.22); font-weight:800; box-shadow:0 0 0 2px var(--gen-brass), 0 3px 9px rgba(0,0,0,.45); z-index:2; }   /* current player: bigger, not recoloured */
+/* a disconnected player (turns skipped): desaturated, with a fashionable pulsing amber ring */
+.ppill.mine{ text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:2px; }   /* your own board */
+.ppill.dropped{ filter:grayscale(.7); opacity:.7; animation:droppulse 1.6s ease-in-out infinite; }
+@keyframes droppulse{ 0%,100%{ box-shadow:0 0 0 1px rgba(224,122,46,.5), 0 0 7px rgba(224,122,46,.35); opacity:.55; }
+  50%{ box-shadow:0 0 0 2px rgba(224,122,46,.95), 0 0 13px rgba(224,122,46,.6); opacity:.9; } }
+
+/* ===== scoreboard ===== */
+.sheet{ padding:10px 16px 2px; display:flex; flex-direction:column; gap:4px; }
+.upper{ display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
+.lower{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:8px; }
+.tile{ position:relative; background:var(--gen-canvas); color:var(--gen-canvas-ink); border:1px solid var(--gen-ink-line); border-radius:var(--gen-r-tile);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.16), 0 2px 0 rgba(0,0,0,.3); font-family:inherit; }
+.tile.up{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 2px; gap:2px; cursor:pointer; }
+.face-n{ font-family:var(--gen-font-display); font-weight:700; font-size:21px; line-height:1; }
+.pts{ font-size:12px; font-weight:700; color:var(--gen-canvas-sub); }
+.tile.low{ display:flex; align-items:center; justify-content:space-between; padding:9px 11px; min-height:47px; }
+.cname{ font-family:var(--gen-font-display); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.4px; }
+.acts{ display:flex; align-items:center; gap:6px; }
+.chip{ min-width:34px; height:28px; padding:0 8px; border-radius:var(--gen-r-tile); border:1px solid var(--gen-ink-line); background:var(--gen-brass); color:var(--gen-ink);
+  font-family:var(--gen-font-display); font-weight:700; font-size:14px; cursor:pointer; font-variant-numeric:tabular-nums; }
+.chip:active{ transform:translateY(1px); }
+.x{ width:26px; height:26px; border-radius:var(--gen-r-tile); border:1px solid var(--gen-alert-line); background:transparent; color:var(--gen-alert);
+  font-size:14px; cursor:pointer; line-height:1; font-family:inherit; }
+.lval{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; color:var(--gen-canvas-locked); }
+.tile.done{ background:var(--gen-canvas-done); box-shadow:none; cursor:default; }
+.tile.flash{ animation:stamp var(--gen-dur-stamp) ease; }
+@keyframes stamp{ 0%{ box-shadow:inset 0 0 0 2px var(--gen-brass), 0 0 0 6px rgba(200,166,75,.5); } 100%{ box-shadow:inset 0 0 0 2px rgba(0,0,0,0); } }
+.tile.low.void .cname{ color:#7a6a4c; }
+.tile.low.void::after{ content:'ОТКАЗ'; position:absolute; right:9px; top:50%; transform:translateY(-50%) rotate(-9deg);
+  font-family:var(--gen-font-display); font-weight:700; font-size:13px; letter-spacing:1px; color:var(--gen-alert);
+  border:2px solid var(--gen-alert); border-radius:3px; padding:1px 5px; opacity:.78; }
+.tile.up.void .pts,.tile.up.void .face-n{ color:var(--gen-alert); text-decoration:line-through; }
+
+/* ===== medal divider ===== */
+.divider{ display:flex; align-items:center; gap:10px; padding:6px 16px 2px; margin-top:auto; }
+.rule{ flex:1; height:2px; background:linear-gradient(90deg, transparent, var(--gen-brass) 30%, var(--gen-brass) 70%, transparent); }
+.medals{ display:flex; align-items:flex-start; gap:4px; filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+
+/* ===== dice console ===== */
+.dock{ margin-top:14px; padding:14px 18px 18px; display:flex; flex-direction:column; gap:10px;
+  background:var(--gen-panel); border-top:2px solid var(--gen-brass); }
+.dock::before,.dock::after{ content:''; position:absolute; width:6px; height:6px; border-radius:50%; background:var(--gen-brass);
+  box-shadow:344px 0 0 var(--gen-brass); }
+.dock::before{ top:9px; left:12px; } .dock::after{ bottom:10px; left:12px; }
+.throws{ display:none; }   /* the throw-dots used to sit between the dice and the button — replaced by padding */
+.tdot{ width:8px; height:8px; border-radius:50%; background:var(--gen-disabled-line); border:1px solid var(--gen-ink-line); }
+.tdot.on{ background:var(--gen-brass); box-shadow:0 0 6px rgba(200,166,75,.6); }
+.dice{ display:flex; justify-content:center; gap:9px; }
+.die{ position:relative; width:54px; height:54px; padding:0; cursor:pointer; display:grid; place-items:center;
+  background:#d8cfa8; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-die);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 3px 0 rgba(0,0,0,.4); transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.die:disabled{ cursor:default; opacity:.92; }
+/* „Нов набор зарове": a divider between kept dice and the freshly-rolled batch */
+.die-sep{ flex:none; align-self:center; width:2px; height:34px; border-radius:2px; background:rgba(20,18,12,.32);
+  box-shadow:1px 0 0 rgba(255,255,255,.14); margin:0 1px; }
+/* freshly re-rolled dice — a subtle gold hint so you can spot what changed */
+.die.fresh{ outline:1.5px solid rgba(255,216,107,.45); outline-offset:1px; }
+.die.fresh::after{ content:''; position:absolute; top:-3px; left:-3px; width:6px; height:6px; border-radius:50%; background:rgba(255,216,107,.8); }
+/* spectating: dice the active player is about to re-throw — a brief "leaving" accent (distinct from fresh) */
+.die.throwing{ transform:scale(.9); opacity:.62; border-color:#c46; box-shadow:0 0 0 2px rgba(204,68,102,.7), 0 0 12px rgba(204,68,102,.4); }
+/* spectating: a half-second pulsing gold border on just-thrown dice and the chosen category */
+.die.spec-pulse, .tile.spec-pulse{ animation:specPulse .25s ease-out 2; }
+@keyframes specPulse{ 0%{ box-shadow:0 0 0 0 rgba(232,195,86,.95); } 60%{ box-shadow:0 0 0 4px rgba(232,195,86,.5); } 100%{ box-shadow:0 0 0 0 rgba(232,195,86,0); } }
+/* throw-mode (select-to-throw): marked = the dice you're re-rolling — RED outline + small ✕ */
+.die.sel{ transform:translateY(-7px); border-color:#e0584a; box-shadow:0 0 0 2px #e0584a, 0 0 16px rgba(224,88,74,.55), 0 3px 0 rgba(0,0,0,.4); }
+.die.sel .reticle{ color:#f0a097; border-color:#e0584a; }
+/* keep-mode: marked = the dice you're holding (green accent, sits down not up) */
+.die.sel.keep{ transform:translateY(0) scale(.94); border-color:#7bb85a; box-shadow:0 0 0 2px #7bb85a, 0 0 14px rgba(123,184,90,.5), 0 3px 0 rgba(0,0,0,.4); }
+.die.sel.keep .reticle{ color:#9bd17e; border-color:#7bb85a; }
+.face{ width:40px; height:40px; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:3px; }
+.pip{ border-radius:2px; }
+.pip.on{ background:var(--gen-pip); }
+.reticle{ position:absolute; top:-9px; right:-9px; width:22px; height:22px; display:grid; place-items:center;
+  background:var(--gen-ink); color:var(--gen-brass); border:1.5px solid var(--gen-brass); border-radius:50%; font-size:12px; }
+/* „roll all" — sits just above the dice in keep-mode, re-throws every die at once */
+.rollall{ display:block; margin:0 auto 7px; padding:5px 14px; font-family:var(--gen-font-display); font-weight:700; font-size:12px;
+  letter-spacing:1px; text-transform:uppercase; color:var(--gen-brass-bright); background:rgba(0,0,0,.25);
+  border:1px solid var(--gen-pill-line); border-radius:999px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.rollall:active{ transform:translateY(1px); }
+.fire{ height:54px; border:2px solid var(--gen-ink-line); border-radius:var(--gen-r-tag); background:var(--gen-brass); color:var(--gen-ink); cursor:pointer;
+  font-family:var(--gen-font-display); font-weight:700; font-size:18px; text-transform:uppercase; letter-spacing:2px;
+  box-shadow:0 4px 0 var(--gen-brass-dark); transition:transform .08s ease; }
+.fire:active:not(:disabled){ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-brass-dark); }
+.fire:disabled{ background:var(--gen-disabled); color:#cfcca8; box-shadow:none; border-color:var(--gen-disabled-line); cursor:default; }
+/* spectating an opponent's turn: the action button is muted + clearly unclickable */
+.fire.muted{ background:transparent; color:var(--gen-muted); border-color:var(--gen-pill-line); box-shadow:none; letter-spacing:1px; font-size:15px; opacity:.8; }
+.specreturn{ width:100%; }
+.fire-wrap{ position:relative; }
+.fire-wrap .fire{ width:100%; }   /* keep the button full-width like before (it used to be the flex child) */
+/* small ? square on the left of the fire button — opens the throw/keep chooser (works even when the button is disabled) */
+.fire-q{ position:absolute; left:9px; top:calc(50% - 13px); width:26px; height:26px; display:grid; place-items:center; z-index:2;
+  border-radius:6px; border:1.5px solid rgba(28,29,22,.55); background:rgba(0,0,0,.14); color:var(--gen-ink); cursor:pointer;
+  font-family:var(--gen-font-body); font-weight:700; font-size:14px; line-height:1; padding:0; }
+.fire-q:hover{ background:rgba(0,0,0,.22); }
+/* throw/keep chooser bubble */
+.ktbubble{ position:fixed; z-index:70; max-width:250px; padding:11px 14px; border-radius:12px; background:var(--gen-ink);
+  border:1.5px solid var(--gen-brass-stroke); box-shadow:0 8px 22px rgba(0,0,0,.5); text-align:center; }
+.ktbubble .kt-hd{ font-size:11.5px; color:var(--gen-label); margin-bottom:9px; }
+.ktbubble .kt-hd2{ margin-top:11px; padding-top:10px; border-top:1px solid var(--gen-ink-line); }
+.ktbubble .kt-opts{ display:flex; gap:16px; justify-content:center; margin-bottom:9px; }
+.ktbubble .kt-opt{ font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.5px; text-transform:uppercase;
+  background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; padding:1px 3px 3px; color:var(--gen-muted); }
+.ktbubble .kt-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
+.ktbubble .kt-fine{ font-size:10px; color:var(--gen-muted); }
+.aithinking{ height:54px; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:700; letter-spacing:2px; color:var(--gen-brass);
+  border:2px dashed var(--gen-brass-dark); border-radius:var(--gen-r-tag); }
+/* pre-roll placeholder: keeps the dock the same height as after the throw */
+.rollhint{ height:54px; display:grid; place-items:center; font-family:var(--gen-font-display); font-weight:600; letter-spacing:1.5px;
+  text-transform:uppercase; font-size:12px; color:var(--gen-muted); }
+
+.shake{ animation:sh var(--gen-dur-roll) ease; }
+@keyframes sh{ 0%{ transform:translateY(0) rotate(0); } 25%{ transform:translateY(-10px) rotate(-13deg); } 55%{ transform:translateY(-3px) rotate(11deg); } 100%{ transform:translateY(0) rotate(0); } }
+
+/* comic-book roast speech bubble (shown on a disappointing commit) */
+.roast{ position:absolute; left:50%; bottom:var(--roast-bottom,172px); transform:translateX(-50%); z-index:6; width:max-content; max-width:84%; text-align:center; pointer-events:none; transition:bottom .15s ease; }
+.roast .bubble{ display:inline-block; position:relative; padding:11px 16px; border-radius:16px;
+  background:#f7f3e3; color:#15160d; border:3px solid #15160d; box-shadow:0 7px 0 rgba(0,0,0,.35);
+  font-family:var(--gen-font-display); font-weight:700; font-size:15px; letter-spacing:.3px; line-height:1.25;
+  pointer-events:auto; cursor:pointer; } /* tap any bubble to dismiss it */
+.roast .bubble::after{ content:''; position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); border:9px solid transparent; border-top-color:#15160d; }
+.roast .bubble::before{ content:''; position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); border:7px solid transparent; border-top-color:#f7f3e3; z-index:1; }
+.roast.show .bubble{ animation:roastpop .3s cubic-bezier(.2,1.4,.4,1); }
+@keyframes roastpop{ 0%{ transform:scale(.6) translateY(10px); opacity:0; } 60%{ transform:scale(1.06); opacity:1; } 100%{ transform:none; } }
+/* the general's marching order at turn start — brass-rimmed bubble */
+.roast.order .bubble{ background:#f3ead0; border-color:var(--gen-brass-stroke); color:#2a230c; box-shadow:0 7px 0 rgba(110,84,24,.4); }
+.roast.order .bubble::after{ border-top-color:var(--gen-brass-stroke); }
+.roast.order .bubble::before{ border-top-color:#f3ead0; }
+

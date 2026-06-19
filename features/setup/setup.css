@@ -1,0 +1,194 @@
+/* ===== setup ===== */
+.setup-body{ flex:1; min-height:0; display:flex; flex-direction:column; }
+/* header: title + ruleset selector, always visible. Extra top padding above the title, and a
+   generous gap below the ruleset selector before the roster begins. */
+.setup-header{ flex:none; padding:34px 16px 18px; }
+/* roster: the only scrolling region; grows scrollable once the players overflow */
+.setup-scroll{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  display:flex; flex-direction:column; gap:12px; padding:2px 16px 14px; }
+/* footer: a translucent overlay pinned to the bottom, building upward from it */
+.setup-footer{ position:relative; flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(180deg, rgba(16,18,9,0), rgba(16,18,9,.5) 32%, rgba(16,18,9,.72)); }
+/* transient info notification (ruleset / network change) — floats just above the footer controls.
+   CSS-drawn „i" in the active-selector colour, followed by a grey description; auto-hides after 5s. */
+.infotoast{ position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%) translateY(6px);
+  display:flex; align-items:center; gap:9px; width:max-content; max-width:90%; padding:9px 13px; border-radius:10px;
+  background:rgba(16,18,9,.94); border:1px solid var(--gen-pill-line); box-shadow:0 8px 22px rgba(0,0,0,.5);
+  opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:8; }
+.infotoast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.info-ic{ flex:none; position:relative; width:17px; height:17px; border-radius:50%; border:2px solid var(--gen-brass-bright); }
+.info-ic::before{ content:''; position:absolute; top:2.5px; left:50%; width:2px; height:2px; border-radius:50%; background:var(--gen-brass-bright); transform:translateX(-1px); }
+.info-ic::after{ content:''; position:absolute; top:6px; left:50%; width:2px; height:5.5px; border-radius:1px; background:var(--gen-brass-bright); transform:translateX(-1px); }
+.info-txt{ color:var(--gen-muted); font-size:12px; line-height:1.35; text-align:left; }
+.setup-intro{ font-size:12px; color:var(--gen-label); line-height:1.5; }
+.setup-title{ margin:0; text-align:center; font-family:var(--gen-font-display); font-weight:700; font-size:var(--ttl); line-height:1;
+  letter-spacing:6px; color:var(--gen-brass); text-shadow:0 2px 0 #000, 0 0 18px rgba(200,166,75,.35);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* press-and-hold = secret dev unlock */
+.setup-title.dev-on{ cursor:pointer; color:var(--gen-brass-bright); text-shadow:0 2px 0 #000, 0 0 22px rgba(232,195,86,.55); }   /* unlocked: tap opens the dev panel */
+/* the second letter „Е" of the title is a CSS-drawn glyph that doubles as a QR-scan mark — three
+   finder corners folded into the letter's own corners. Tapping it pops the page QR (scan to join). */
+.setup-title .qre{ position:relative; display:inline-block; width:1em; height:1em; margin-right:6px;   /* inline-blocks don't get the title's trailing letter-spacing — add it back so spacing stays uniform */
+  font-size:.71em; font-size:1cap;   /* 1cap = the title font's cap height → exactly as tall as the letters (em fallback) */
+  vertical-align:baseline; color:currentColor; cursor:pointer; filter:drop-shadow(0 2px 0 #000); }   /* match the title's drop shadow */
+.setup-title .qre::before, .setup-title .qre::after{ content:''; position:absolute; }
+.setup-title .qre::before{ left:.12em; top:.12em; width:.1em; height:.76em; background:currentColor; }   /* spine */
+.setup-title .qre::after{ left:.12em; top:.12em; width:.72em; height:.1em; background:currentColor; }    /* top arm (full) */
+.setup-title .qre s{ position:absolute; left:.12em; top:.45em; width:.46em; height:.1em; background:currentColor;
+  box-shadow:0 .33em 0 currentColor; }                                                                   /* mid + bottom (short) */
+.setup-title .qre b{ position:absolute; z-index:3; width:.34em; height:.34em; border:.065em solid currentColor; }
+.setup-title .qre b::before{ content:''; position:absolute; inset:.055em; background:currentColor; }     /* finder centre */
+.setup-title .qre b.tl{ left:0; top:0; } .setup-title .qre b.tr{ right:0; top:0; } .setup-title .qre b.bl{ left:0; bottom:0; }
+/* the title is centred on the screen; the hamburger is overlaid on the right (absolute) so it
+   never pushes the title off-centre — it's positioned AFTER the title has centred itself */
+.setup-titlerow{ --ttl:42px; position:relative; display:flex; align-items:center; justify-content:center; margin:2px 0 4px;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }   /* hold-to-unlock area: never select/callout */
+.setup-hambwrap{ position:absolute; right:0; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:8px; }
+.setuphamb{ flex:none; width:calc(var(--ttl) * .7); height:calc(var(--ttl) * .7); border-color:var(--gen-brass-stroke); }   /* 70% of the title height, vertically centred */
+/* underline-style segmented selectors on the start screen (ruleset + local/network).
+   both options are the same size; the inactive one is simply MUTED (no scale-down), the active
+   one is brass with an underline */
+.ssel{ display:flex; gap:14px; justify-content:center; align-items:center; margin:0 0 7px; -webkit-user-select:none; user-select:none; }
+/* where-row: a 3-column grid so the coffee mug sits dead-centre on screen with a label on each side */
+.ssel-where{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; margin:8px 0 7px; }
+.ssel-where > .ssel-opt{ white-space:nowrap; }
+.ssel-where .ssel-opt:first-child{ justify-self:end; }
+.ssel-where .ssel-opt:last-child{ justify-self:start; }
+.ssel-opt{ background:none; border:none; border-bottom:2px solid transparent; padding:1px 1px 2px; cursor:pointer; line-height:1;
+  font-family:var(--gen-font-display); font-weight:700; font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; color:var(--gen-muted); transition:color .15s, border-color .15s; }
+.ssel-opt.on{ color:var(--gen-brass-bright); border-bottom-color:var(--gen-brass); }
+.ssel-opt.rs-off{ opacity:.32; cursor:not-allowed; }
+/* the play button: a STATIC dark base with a single GOLD blob on top. Only the gold blob moves —
+   it slides between the two sides on a mode switch (and sways once on a fresh load). The dark base
+   never moves. Taps are resolved by pointer X (active end/middle = start, inactive end = switch);
+   swipes by direction. */
+.playbtn{ position:relative; width:100%; height:46px; max-width:238px; margin:6px auto; border-radius:var(--gen-r-tag); overflow:hidden;
+  border:2px solid var(--gen-ink-line); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:pan-y;
+  --pb-act:#b09551; --pb-inact:var(--gen-pill);
+  background:var(--pb-inact); }                                  /* static dark base — never moves */
+/* the LIGHT: a gold blob covering the active side + centre. It overhangs the active edge (clipped)
+   and fades into the dark on the inactive side. Sliding it is the ONLY motion. */
+.pb-gold{ position:absolute; top:0; bottom:0; left:-12%; width:90%; z-index:0; pointer-events:none;
+  background:linear-gradient(90deg, transparent 0%, var(--pb-act) 10%, var(--gen-brass) 27%, var(--gen-brass) 73%, var(--pb-act) 90%, transparent 100%);
+  transition:transform .42s cubic-bezier(.4,.1,.3,1); }
+.playbtn.man .pb-gold{ transform:translateX(34%); }             /* manual: the gold slides to the right side */
+.playbtn:active{ box-shadow:inset 0 3px 12px rgba(0,0,0,.32); }
+/* fresh-load entrance hint: the gold blob sways to advertise the swipe affordance */
+.playbtn.pb-hint .pb-gold{ animation:pbHint 1.05s ease-in-out .3s 1; }
+@keyframes pbHint { 0%{ transform:translateX(0); } 28%{ transform:translateX(12%); } 56%{ transform:translateX(-3%); } 100%{ transform:translateX(0); } }
+.playbtn .pb-go{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:1; color:var(--gen-ink);
+  font-family:var(--gen-font-display); font-weight:700; font-size:17px; letter-spacing:1.5px; text-transform:uppercase; white-space:nowrap; }
+/* CSS-drawn mode icons — absolutely placed inside their colour zone, above the gold, never clickable */
+.pb-ic{ position:absolute; top:50%; z-index:1; pointer-events:none; }
+.pb-dice{ left:8.5%; width:17px; height:17px; margin:-9.5px 0 0 -9.5px; border:2px solid currentColor; border-radius:3px;
+  color:var(--gen-ink); }
+.playbtn.man .pb-dice{ color:var(--gen-disabled); }
+.pb-dice::before{ content:''; position:absolute; top:3px; left:3px; width:2.4px; height:2.4px; border-radius:50%; background:currentColor;
+  box-shadow:5.6px 0 0 currentColor, 0 5.6px 0 currentColor, 5.6px 5.6px 0 currentColor; }   /* four corner pips */
+.pb-pencil{ left:91.5%; width:7px; height:20px; margin:-10px 0 0 -3.5px; color:var(--gen-disabled);
+  transform:rotate(43deg); transform-origin:center; }
+.playbtn.man .pb-pencil{ color:var(--gen-ink); }
+.pb-pencil::before{ content:''; position:absolute; inset:0; background:currentColor;
+  clip-path:polygon(0 0, 100% 0, 100% 78%, 50% 100%, 0 78%); }           /* shaft + sharpened point */
+.pb-pencil::after{ content:''; position:absolute; left:0; right:0; top:18%; height:2px; background:var(--gen-ink-line); }  /* metal ferrule band */
+.pcard{ position:relative; overflow:hidden; border:1px solid var(--gen-pill-line); border-radius:10px; }
+.pcard.swipeable{ touch-action:pan-y; }
+/* swipe-to-remove: a red „МАХНИ" sits behind the card; the foreground slides left to reveal it */
+.pc-fg{ position:relative; z-index:1; background:rgba(20,22,12,.72); padding:12px; border-radius:inherit; }
+.pc-fg.snap{ transition:transform .22s cubic-bezier(.3,.7,.4,1); }
+/* only as wide as the swipe: a right-anchored strip whose width tracks the drag (no bleed-through) */
+.pc-bg{ position:absolute; top:0; right:0; bottom:0; width:0; z-index:0; overflow:hidden; display:flex; align-items:center; justify-content:flex-end;
+  background:#b23a2e; pointer-events:none; }
+.pc-bg.snap{ transition:width .22s cubic-bezier(.3,.7,.4,1); }
+.pc-bg .pcrm{ margin-right:14px; font-family:var(--gen-font-display); font-weight:800; font-size:16px; letter-spacing:4px; color:#fff; text-transform:uppercase; white-space:nowrap; }
+.pcard .name{ width:100%; font-family:var(--gen-font-display); font-weight:600; font-size:15px; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--gen-text); background:rgba(0,0,0,.3); border:1px solid var(--gen-ink-line); border-radius:7px; padding:9px 11px; }
+.pcard .name:focus{ outline:none; border-color:var(--gen-brass); }
+.prow2{ display:flex; align-items:center; gap:10px; margin-top:10px; }
+.prow2 input[type=color]{ -webkit-appearance:none; appearance:none; width:38px; height:38px; padding:0; border:1px solid var(--gen-ink-line); border-radius:8px; background:none; cursor:pointer; }
+.prow2 input[type=color]::-webkit-color-swatch{ border:none; border-radius:6px; }
+.prow2 input[type=color]::-webkit-color-swatch-wrapper{ padding:3px; }
+.gender{ display:inline-flex; gap:2px; padding:2px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; }
+.glabel{ padding:5px 9px; border-radius:6px; background:transparent; color:var(--gen-disabled);
+  font-family:var(--gen-font-display); font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.glabel.on{ font-weight:700; background:rgba(255,255,255,.06); }
+.glabel.on.g-m{ color:#6fa8e8; }
+.glabel.on.g-f{ color:#e88bb0; }
+.glabel.on.g-n{ color:var(--gen-brass-bright); }
+/* locked (owner with a fixed name): no interaction + muted colours */
+.gender.locked{ opacity:.85; cursor:default; }
+.gender.locked .glabel{ cursor:default; }
+.gender.locked .glabel.on{ background:rgba(255,255,255,.04); }
+.gender.locked .glabel.on.g-m, .gender.locked .glabel.on.g-n, .gender.locked .glabel.on.g-f{ color:var(--gen-muted); }
+/* ruleset segmented picker — same chrome as the gender selector */
+.rulebox{ align-items:center; }
+.ruleseg{ display:inline-flex; gap:2px; padding:2px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; }
+.rlabel{ padding:5px 9px; border-radius:6px; background:transparent; color:var(--gen-disabled);
+  font-family:var(--gen-font-display); font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.rlabel.on{ font-weight:700; background:rgba(255,255,255,.06); color:var(--gen-brass-bright); }
+.keepseg{ display:inline-flex; gap:2px; padding:2px; background:var(--gen-pill); border:1px solid var(--gen-pill-line); border-radius:8px; }
+.klabel{ padding:5px 9px; border-radius:6px; background:transparent; color:var(--gen-disabled); cursor:pointer;
+  font-family:var(--gen-font-display); font-size:11px; letter-spacing:.5px; text-transform:uppercase; }
+.klabel.on{ font-weight:700; background:rgba(255,255,255,.06); color:var(--gen-brass-bright); }
+.toggle{ display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-family:var(--gen-font-display); font-size:11px; letter-spacing:1px; color:var(--gen-muted); }
+.switch{ width:40px; height:22px; border-radius:999px; background:rgba(255,255,255,.1); position:relative; transition:.18s; border:1px solid var(--gen-ink-line); }
+.switch::after{ content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#d8cfa8; transition:.18s; }
+.toggle.on .switch{ background:var(--gen-brass); } .toggle.on .switch::after{ transform:translateX(18px); } .toggle.on{ color:var(--gen-brass); }
+.toggle:disabled{ opacity:.4; cursor:not-allowed; }   /* AI switch disabled on the owner seat */
+.prow2 .del{ margin-left:auto; width:34px; height:34px; border-radius:7px; color:var(--gen-muted); font-size:17px; }
+.prow2 .del:hover{ color:var(--gen-alert); }
+.prow2 .ownerstar{ margin-left:auto; }                 /* owner token sits at the right end (where ✕ was) */
+.betline{ margin-top:10px; font-size:12px; color:var(--gen-muted); display:flex; align-items:center; gap:7px; }
+.betline .betval{ color:var(--gen-text); font-weight:700; background:rgba(0,0,0,.22); border:1px solid var(--gen-pill-line); border-radius:7px; padding:3px 9px; }
+.setup-actions{ display:flex; gap:10px; margin-top:4px; }
+/* footer rules + archive: small icon-only buttons (CSS-drawn glyphs, no text) */
+.setup-actions-icons{ justify-content:center; gap:14px; margin-top:0; }
+.btn.iconbtn{ flex:none; width:40px; height:40px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:0; }
+.iconbtn .ic-book, .iconbtn .ic-archive, .iconbtn .ic-combos, .iconbtn .ic-coffee{ color:var(--gen-brass-bright); }
+/* coffee row: a single centred icon button above the rules/settings/history row */
+/* Buy-Me-a-Coffee mug — sits centred between the local/network labels, scaled down to their size.
+   negative margin collapses the glyph's box so the selector's flex gap stays equal on both sides */
+.ssel-coffee{ display:inline-flex; align-items:center; justify-content:center; color:var(--gen-brass-bright);
+  text-decoration:none; line-height:0; -webkit-tap-highlight-color:transparent; }
+.ssel-coffee .ic-coffee{ transform:scale(.7); transform-origin:center; margin:-3px; }
+/* CSS-drawn cup of coffee (currentColor) — mug body + handle + two steam wisps */
+.ic-coffee{ position:relative; display:block; width:22px; height:20px; }
+.ic-coffee::before{ content:''; position:absolute; left:1px; bottom:0; width:15px; height:12px; border:2px solid currentColor;
+  border-radius:2px 2px 5px 5px; }   /* the mug body */
+.ic-coffee::after{ content:''; position:absolute; left:14px; top:9px; width:7px; height:8px; border:2px solid currentColor;
+  border-left:none; border-radius:0 6px 6px 0; }   /* the handle */
+.ic-coffee b{ position:absolute; left:5px; top:0; width:2px; height:4px; background:currentColor; border-radius:2px;
+  box-shadow:5px 0 0 currentColor; opacity:.85; }   /* two steam wisps */
+/* CSS-drawn combinations list — two bullets + two lines (the scoring combos) */
+.ic-combos{ position:relative; display:block; width:19px; height:14px; }
+.ic-combos::before{ content:''; position:absolute; left:0; top:2px; width:4px; height:4px; border-radius:1px; background:currentColor; box-shadow:0 7px 0 currentColor; }
+.ic-combos::after{ content:''; position:absolute; left:8px; top:3px; width:11px; height:2px; background:currentColor; box-shadow:0 7px 0 currentColor; }
+/* centred icon row in the in-game menu (rules + combinations) */
+.menu-iconrow{ display:flex; justify-content:center; gap:14px; margin:2px 0; }
+/* settings glyph (hamburger) drawn gold inside the icon button, like the other footer icons */
+.btn.iconbtn .burger{ position:relative; width:18px; height:2px; background:var(--gen-brass-bright); border-radius:2px;
+  box-shadow:0 -5px 0 var(--gen-brass-bright), 0 5px 0 var(--gen-brass-bright); }
+/* CSS-drawn open book (rules) */
+.ic-book{ position:relative; display:block; width:22px; height:17px; }
+.ic-book::before{ content:''; position:absolute; inset:0; border:2px solid currentColor; border-radius:2px; }
+.ic-book::after{ content:''; position:absolute; top:0; bottom:0; left:50%; width:2px; margin-left:-1px; background:currentColor; }   /* the spine */
+/* CSS-drawn records sheet (archive) — a document with lines */
+.ic-archive{ position:relative; display:block; width:16px; height:19px; }
+.ic-archive::before{ content:''; position:absolute; inset:0; border:2px solid currentColor; border-radius:2px; }
+.ic-archive::after{ content:''; position:absolute; left:3px; right:3px; top:5px; height:2px; background:currentColor;
+  box-shadow:0 4px 0 currentColor, 0 8px 0 currentColor; }   /* three record lines */
+.btn{ flex:1; font-family:var(--gen-font-display); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; font-size:14px;
+  border:2px solid var(--gen-ink-line); border-radius:8px; padding:12px; background:var(--gen-pill); color:var(--gen-text); }
+/* CSS-drawn theme icons (currentColor) — import/export arrows, text/sound methods */
+.ic{ display:inline-block; position:relative; width:13px; height:13px; vertical-align:-2px; margin-right:6px; }
+.ic.solo{ margin:0; vertical-align:middle; }
+.ic-up::after{ content:''; position:absolute; left:1.5px; top:2px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-bottom:5px solid currentColor; }
+.ic-up::before{ content:''; position:absolute; left:4.5px; top:5px; width:3px; height:7px; background:currentColor; }
+.ic-down::after{ content:''; position:absolute; left:1.5px; bottom:1px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid currentColor; }
+.ic-down::before{ content:''; position:absolute; left:4.5px; top:1px; width:3px; height:7px; background:currentColor; }
+.ic-text::before{ content:''; position:absolute; left:2px; top:2px; width:9px; height:2px; background:currentColor; box-shadow:0 3px 0 currentColor, 0 6px 0 currentColor; }
+.ic-sound::before{ content:''; position:absolute; left:1px; top:4px; width:4px; height:4px; border-radius:1px; background:currentColor; }
+.ic-sound::after{ content:''; position:absolute; left:5px; top:0; width:8px; height:12px; border:2px solid currentColor; border-left-color:transparent; border-radius:50%; }
+.btn.primary{ background:var(--gen-brass); color:var(--gen-ink); border-color:var(--gen-ink-line); box-shadow:0 4px 0 var(--gen-brass-dark); }
+.btn.primary:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--gen-brass-dark); }
+.err{ color:var(--gen-alert); font-size:12px; min-height:16px; font-family:var(--gen-font-display); letter-spacing:.5px; }
+
