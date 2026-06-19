@@ -62,8 +62,25 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    start/resume scaffolding (fold into `startGame`/`resumeGame`) and the header/pills exp variants
    themselves (`expRenderHeader`/`expRenderPills` — a 2-line name layout + `expPeek`); these could
    merge later but were left to keep the diff behavior-preserving.
-5. ⬜ **Unify serialization** — resume / archive / net wire codec / replay all read **one** schema via
-   shared serialize/deserialize. Make the net-apply path **emit the same actions** as local play.
+5. 🟡 **IN PROGRESS** — *unify serialization* — resume / archive / net wire codec / replay all read
+   **one** schema via shared serialize/deserialize; make the net-apply path **emit the same actions**
+   as local play.
+   **5a DONE** — one shared **JSON envelope** for resume + archive, both rulesets. New
+   `serializeGame()` (`features/core/core.js`, after `serializePlayers`) returns the canonical
+   `{ruleset, manualMode, ownerSkipped, net, players, moveLog}`; `saveResume` adds `v/ts/current/round`,
+   `saveCurrentGame` (summary.js) adds `id/ts/ownerNamed/selectKeep`, and `archiveExpGame` (exp.js) adds
+   `id/ts` — all three stopped hand-building their own object. The **exp archive's bespoke player shape
+   is gone**: it used to omit `bet/bonus/selectKeep/diceBatch` and store a `pts` total, but `recTotal()`
+   always recomputes exp totals from `scores` (history.js) so `pts` was dead data — exp now archives via
+   the same `serializePlayers()` as standard. On the read side, `resumeExpGame` now rebuilds players via
+   the shared `reconstructPlayers()` (history.js) instead of its inline map — identical to standard
+   resume. Added a **resume round-trip to `scripts/smoke.js`** (play 3 turns → reload → `loadResume` →
+   `resume(Exp)Game` → assert restored, both rulesets) — the first coverage for the resume path.
+   (179 tests pass; smoke green: 4 play + 2 resume.)
+   *Remaining (5b+):* the **net wire codec** (`MP.pack*` in mp.js) and **replay** (`buildReplayActions`)
+   still have their own shapes; and **`netApplyRemote`/`netApplySnapshot` still mutate `pl.scores`
+   inline** — they don't emit a `COMMIT`/`NEXT_TURN` action like local play. (Also pre-existing, left
+   as-is: `resumeExpGame` hard-codes `game.manual = false`, ignoring `snap.manualMode`.)
 
 ## Target schema (sketch)
 ```

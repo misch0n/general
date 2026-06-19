@@ -64,10 +64,48 @@ const path = require('path');
     return true;
   }
 
+  // resume round-trip: play a few turns, reload, and continue from the resume snapshot — this is the
+  // real coverage for the unified serialize/deserialize (saveResume → loadResume → resume(Exp)Game).
+  async function resumeRoundTrip(ruleset) {
+    const before = errors.length;
+    await page.goto(url, { waitUntil: 'load' });
+    await page.evaluate((rs) => { settings.ruleset = rs; }, ruleset);
+    await page.evaluate(() => { startGame([G.createPlayer('Тест', '#d4a02e', false)], false); });
+    // play 3 turns so the snapshot carries scores + (standard) moveLog
+    await page.evaluate(async () => {
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const exp = gExp(), cats = exp ? G.CATEGORIES_EXP : G.CATEGORIES;
+      const scoreFn = exp ? G.scoreForExp : G.scoreFor, roll = exp ? expFirstRoll : firstRoll, commit = exp ? expCommit : commitScore;
+      for (let n = 0; n < 3; n++) {
+        const p = G.currentPlayer(game), cat = cats.find(c => !G.isCategoryFilled(p, c.key));
+        for (let w = 0; w < 40 && game.turn.locked; w++) await sleep(50);
+        if (game.turn.awaitingRoll) roll();
+        commit(cat.key, scoreFn(cat.key, game.turn.dice)); await sleep(60);
+      }
+    });
+    // reload (drops all in-memory state) then rebuild from the persisted snapshot
+    await page.goto(url, { waitUntil: 'load' });
+    const resumed = await page.evaluate(() => {
+      const snap = loadResume(); if (!snap) return { ok: false };
+      resumeGame(snap);
+      return { ok: !!(game && game.players && game.turn), filled: Object.keys(game.players[0].scores).length };
+    });
+    const tag = ruleset + '/resume';
+    const newErrs = errors.slice(before);
+    if (newErrs.length) { console.error('FAIL ' + tag + '\n  ' + newErrs.join('\n  ')); return false; }
+    // saveResume snapshots at each turn START (before that turn's commit), so a 3-commit game
+    // persists ≥2 filled cells — enough to prove scores + players round-tripped through the schema.
+    if (!resumed.ok || resumed.filled < 2) { console.error('FAIL ' + tag + ' — snapshot not restored (' + JSON.stringify(resumed) + ')'); return false; }
+    console.log('ok   ' + tag + ' (restored ' + resumed.filled + ' cells)');
+    return true;
+  }
+
   let ok = true;
   for (const rs of ['standard', 'experimental'])
     for (const manual of [false, true])
       ok = (await play(rs, manual)) && ok;
+  for (const rs of ['standard', 'experimental'])
+    ok = (await resumeRoundTrip(rs)) && ok;
 
   await browser.close();
   if (!ok) { console.error('SMOKE FAILED'); process.exit(1); }

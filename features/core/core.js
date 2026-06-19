@@ -427,15 +427,24 @@
                selectKeep: p.selectKeep, diceBatch: p.diceBatch };
     });
   }
+  // shared game-state envelope: the same {ruleset, manualMode, ownerSkipped, net, players, moveLog}
+  // shape backs BOTH the resume snapshot and the archive record (each caller adds id/ts/current/…).
+  // Single serializer ⇒ standard and experimental persist identically (was: exp built its own shape).
+  function serializeGame() {
+    return {
+      ruleset: (game && game.ruleset) || 'standard', manualMode: gManual(),
+      ownerSkipped: !!(game && game.ownerSkipped), net: !!netMode,
+      players: serializePlayers(), moveLog: moveLog,
+    };
+  }
   // ---- resume: snapshot the game at each turn boundary so a reload can continue ----
   function saveResume() {
     if (!game || !game.players || !game.players.length || viewingHistory || tut) return;   // tutorial games aren't resumable
     var over = gExp() ? X.isGameOver(game) : G.isGameOver(game);
     if (over) { clearResume(); return; }
-    lsSet(RESUME_KEY, JSON.stringify({
-      v: 1, ts: Date.now(), ruleset: game.ruleset || 'standard', manualMode: gManual(),
-      current: game.current, round: game.round, ownerSkipped: !!game.ownerSkipped, players: serializePlayers(), moveLog: moveLog,
-    }));
+    var snap = serializeGame();
+    snap.v = 1; snap.ts = Date.now(); snap.current = game.current; snap.round = game.round;
+    lsSet(RESUME_KEY, JSON.stringify(snap));
   }
   function loadResume() {
     var raw = lsGet(RESUME_KEY); if (!raw) return null;

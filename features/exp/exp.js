@@ -23,19 +23,12 @@
   }
   function resumeExpGame(snap) {
     netMode = false;
-    var players = snap.players.map(function (sp) {
-      var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
-      pl.gender = sp.gender || 'm'; pl.owner = !!sp.owner; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.scores = sp.scores || {};
-      if (!sp.isAI) { pl.selectKeep = (typeof sp.selectKeep === 'boolean') ? sp.selectKeep : !!settings.selectKeep; pl.diceBatch = (typeof sp.diceBatch === 'boolean') ? sp.diceBatch : !!settings.newDiceBatch; }
-      if (sp.isAI && sp.personaId) pl.persona = G.personaById(sp.personaId);
-      return pl;
-    });
-    game = X.createGame(players);
+    game = X.createGame(reconstructPlayers(snap));   // shared deserializer (same as standard resume)
     game.ruleset = 'experimental';
     game.manual = false;
     game.turn = freshTurn();
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
-    undoStack = []; viewingHistory = false; moveLog = snap.moveLog || players.map(function () { return []; });
+    undoStack = []; viewingHistory = false; moveLog = snap.moveLog || game.players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     $('hintBtn').classList.toggle('hidden', !exactReady || !settings.advice);
@@ -499,10 +492,10 @@
     showGameOver(X.ranking(game)[0].player);   // same end screen as standard, sourced from the exp ruleset
   }
   function archiveExpGame() {
-    var players = game.players.map(function (p) {
-      return { name: p.name, color: p.color, isAI: !!p.isAI, owner: !!p.owner, gender: p.gender || 'm',
-               personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], scores: p.scores, pts: G.playerTotalExp(p) };
-    });
-    archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
-      ruleset: 'experimental', manualMode: gManual(), ownerSkipped: !!game.ownerSkipped, net: !!netMode, players: players, moveLog: moveLog });
+    // shared envelope (was: a bespoke exp player shape). recTotal() recomputes exp totals from
+    // scores per the live ruleset, so the old stored `pts` was dead data — dropping it is safe.
+    var rec = serializeGame();
+    rec.id = 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4);
+    rec.ts = Date.now();
+    archiveGame(rec);
   }

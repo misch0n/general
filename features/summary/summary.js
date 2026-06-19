@@ -4,18 +4,12 @@
   // serialise a finished game so the archive can reproduce its summary exactly
   function saveCurrentGame() {
     if (!game || !game.players || !game.players.length) return;
-    archiveGame({
-      id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4),
-      ts: Date.now(),
-      ruleset: (game && game.ruleset) || 'standard',   // net minus games archive as experimental → correct history totals
-      manualMode: gManual(),
-      ownerSkipped: !!(game && game.ownerSkipped),
-      ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
-      selectKeep: !!settings.selectKeep,   // the dice-selection flavour this game was played in
-      net: !!netMode,                       // local vs network game (drives the history marker)
-      players: serializePlayers(),
-      moveLog: moveLog,
-    });
+    var rec = serializeGame();   // shared envelope (ruleset/manualMode/ownerSkipped/net/players/moveLog)
+    rec.id = 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4);
+    rec.ts = Date.now();
+    rec.ownerNamed = !!(settings.useOwnerName && settings.ownerName.trim());
+    rec.selectKeep = !!settings.selectKeep;   // the dice-selection flavour this game was played in
+    archiveGame(rec);
   }
   function endGame() {
     if (!viewingHistory) { saveCurrentGame(); clearResume(); trackGame('finish'); if (netMode) netActiveClear(); }   // archive + drop resume + clear rejoin
