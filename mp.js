@@ -545,6 +545,14 @@
   Session.prototype._resumeIfPaused = function () {
     if (this.isHost && this.state === 'IN_GAME' && !this.manual && this.activeId == null) this._advance();
   };
+  // re-sync everyone with the host's current authoritative state (idempotent). Used when the host's
+  // tab returns to the foreground after a background (iOS) so any missed updates are reconciled.
+  Session.prototype.rebroadcast = function () {
+    if (!this.isHost || this.state !== 'IN_GAME') return;
+    this._send(T.ROSTER, packRoster(this.roster));
+    this._send(T.STATE, packStateSnapshot(this.version, this.scores));
+    if (!this.manual && this.activeId != null) this._send(T.GRANT, packGrant(this.activeId, this.version));
+  };
   // ---------- host crash recovery: snapshot the authoritative state, rebuild it on a fresh host ----------
   // the host persists this; after a reload it re-hosts the SAME code, restore()s, and resumeHost()s.
   // Clients reconnect by eph (the normal mid-game rejoin path) and get caught up via START + STATE.

@@ -2410,10 +2410,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.51.2';
+  var APP_VERSION = '1.51.3';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.51.3', items: [
+      ['chg', 'Мрежова игра: при връщане към приложението (напр. след преглед на друг таб на iPhone) състоянието се синхронизира наново — старшината разпраща текущото състояние, гост моли да го наваксат, за да не се губят ходове.'] ] },
     { v: '1.51.2', items: [
       ['new', 'Меню на старшината: освен „AI“, отпаднал боец вече може да се сложи на „Пауза“ — прескача се и не бави края; ако се върне навреме, паузата се сваля и той наваксва пропуснатите ходове.'] ] },
     { v: '1.51.1', items: [
@@ -3850,6 +3852,16 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     var o = netActiveLoad(); if (o) { o.ts = Date.now(); try { lsSet(NET_ACTIVE_KEY, JSON.stringify(o)); } catch (e) {} }
   }
   function netActiveClear() { lsDel(NET_ACTIVE_KEY); }
+  // returning to the foreground after a background (esp. iOS, where the host may switch tabs while
+  // waiting for their turn): reconcile so no updates are lost. The host re-broadcasts its state;
+  // a client asks the host to catch it up. The transport reconnects separately if the link dropped.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible' || !netMode || !net) return;
+    try {
+      if (net.isHost) { if (net.rebroadcast) net.rebroadcast(); netActiveSave(); }
+      else if (net.rejoin) net.rejoin();
+    } catch (e) {}
+  });
   // ===================================================== WebRTC transport (PeerJS) ==============
   // A pluggable MP.Session transport over WebRTC data channels. PeerJS provides the public
   // signalling cloud (no account/server needed) just for the handshake; gameplay is P2P.
