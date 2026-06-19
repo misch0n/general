@@ -57,11 +57,11 @@
     });
   }
   function openHistoryGame(rec) {
-    histSnapshot = { game: game, moveLog: moveLog, manualMode: manualMode, summary: summary, undo: undoStack };
+    histSnapshot = { game: game, moveLog: moveLog, summary: summary, undo: undoStack };  // manual rides on game.manual
     viewingHistory = true;
     game = { players: reconstructPlayers(rec), current: 0, round: 1, ruleset: rec.ruleset };   // ruleset drives total()/summary
     moveLog = rec.moveLog || game.players.map(function () { return []; });
-    manualMode = !!rec.manualMode; undoStack = [];
+    game.manual = !!rec.manualMode; undoStack = [];
     var top = Math.max.apply(null, game.players.map(total));
     var winner = game.players.filter(function (p) { return total(p) === top; })[0];
     $('historyModal').classList.add('hidden'); $('calModal').classList.add('hidden');
@@ -76,7 +76,7 @@
   function exitHistoryGame(toArchive) {
     $('overModal').classList.add('hidden');
     $('playAgain').classList.remove('hidden');
-    if (histSnapshot) { game = histSnapshot.game; moveLog = histSnapshot.moveLog; manualMode = histSnapshot.manualMode; summary = histSnapshot.summary; undoStack = histSnapshot.undo; histSnapshot = null; }
+    if (histSnapshot) { game = histSnapshot.game; moveLog = histSnapshot.moveLog; summary = histSnapshot.summary; undoStack = histSnapshot.undo; histSnapshot = null; }
     viewingHistory = false; dossierCtx = null;
     if (toArchive) showHistory();   // back to the archive, keeping the tab + loaded games
   }

@@ -1007,7 +1007,7 @@
     var exp = netRuleset() === 'experimental';
     game = (exp ? X.createGame(players) : G.createGame(players)); game.ownerSkipped = false;
     game.ruleset = exp ? 'experimental' : 'standard';          // drives sumExp() → exp board/scoring over the net
-    manualMode = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
+    game.manual = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
     trackGame('start');
     // lobby size by HUMAN players (AI seats excluded), bucketed 1–5
     var humans = roster.filter(function (m) { return !m.isAI; }).length;
@@ -1017,9 +1017,9 @@
     $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     syncHintBtn();
-    setDockUI(manualMode);
+    setDockUI(gManual());
     netReconnecting = false; syncNetLink();   // show the connection indicator by the turn marker
-    if (manualMode) {
+    if (gManual()) {
       // FREE-FOR-ALL: I always fill MY OWN sheet at my own pace; others' boards update for peeking
       var mySeat = netOrder.indexOf(localPid); game.current = mySeat >= 0 ? mySeat : 0;
       netMyTurn = true; $('undoBottom').classList.add('hidden');   // no ОПА: entries are broadcast immediately

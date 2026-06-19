@@ -19,7 +19,7 @@
   var hintsOn = false;
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
   var ownerDetached = false; // owner deliberately removed from the roster (only while skipped): seat #1 shows a MUTED token but keeps its own identity until the token is re-activated
-  var manualMode = false;  // ОТЧЕТ mode: manual point entry, no app dice rolls
+  // ОТЧЕТ mode (manual point entry, no app dice rolls) now lives on `game.manual`; read via gManual().
   var netMode = false, net = null, localPid = null, netOrder = [], netMyTurn = false; // networked play (WebRTC)
   var netKind = 'acoustic', netBus = null, netManual = false;   // transport + regular/manual(ОТЧЕТ) game mode
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
@@ -50,7 +50,7 @@
     game.ruleset = 'standard';
     game.ownerSkipped = skipOwnerNext || ownerDetached; // record so this game is excluded from owner trends
     skipOwnerNext = false; ownerDetached = false;        // the skip/detach is a one-game decision
-    manualMode = !!manual;
+    game.manual = !!manual;
     trackGame('start');
     undoStack = [];
     moveLog = players.map(function () { return []; });
@@ -59,7 +59,7 @@
     $('overModal').classList.add('hidden');
     paintCamo($('game'));
     syncHintBtn();
-    setDockUI(manualMode);
+    setDockUI(gManual());
     beginTurn();
   }
 
@@ -70,12 +70,12 @@
     game = G.createGame(reconstructPlayers(snap));
     game.ruleset = 'standard';
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
-    manualMode = !!snap.manualMode; undoStack = []; viewingHistory = false;
+    game.manual = !!snap.manualMode; undoStack = []; viewingHistory = false;
     moveLog = snap.moveLog || game.players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
     syncHintBtn();
-    setDockUI(manualMode);
+    setDockUI(gManual());
     beginTurn();
   }
   function maybeOfferResume() {
@@ -155,7 +155,7 @@
       else { awaitingRoll = false; locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
       return;
     }
-    if (manualMode) {
+    if (gManual()) {
       manualCounts = [0,0,0,0,0,0,0];
       dice = []; throwsLeft = 0; curLog = null;
       renderAll();
@@ -220,7 +220,7 @@
     // tray, fire button and net spectating stay shared. Local exp uses expRenderAll, so it's untouched.
     if (sumExp()) { expRenderBoard(); $('expNumBar').classList.remove('hidden'); }
     else { renderBoard(); $('expNumBar').classList.add('hidden'); }
-    if (manualMode) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
+    if (gManual()) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
     renderDice(); renderFire(); (sumExp() ? expRenderHint : renderHint)(); syncBottomPad();
   }
 
@@ -319,7 +319,7 @@
   function filledCount(p) { return sumCats().filter(function (c) { return G.isCategoryFilled(p, c.key); }).length; }
   // manual net free-for-all: shame a player who races 2+ categories ahead of the SLOWEST one
   function isMamnik(i) {
-    if (!(netMode && manualMode) || !game) return false;
+    if (!(netMode && gManual()) || !game) return false;
     var others = game.players.filter(function (p, j) { return j !== i && !p.dropped; });
     if (!others.length) return false;
     var minOther = Math.min.apply(null, others.map(filledCount));
@@ -357,7 +357,7 @@
     // every open category shows its suggestion chip exactly like in normal play
     var pv = dice.length === G.DICE_COUNT ? computePreviews(p) : { prev: {}, cand: {}, best: null };
     var canScore = !locked && dice.length === G.DICE_COUNT && !fx.lock
-      && (manualMode || (!p.isAI && !awaitingRoll));
+      && (gManual() || (!p.isAI && !awaitingRoll));
     // spectators see the same combo previews for the watched dice (read-only — no commit handlers)
     var watchPrev = netWatching() && dice.length === G.DICE_COUNT;
     var showPrev = canScore || watchPrev;
@@ -380,7 +380,7 @@
       el.innerHTML = '<span class="face-n">' + c.label + '</span>'
         + '<span class="pts' + (showPrev && !done ? (zeroForfeit ? ' xchip' : ' upchip') : '') + '">' + pts + '</span>';
       if (canScore && !done) el.onclick = function () { val > 0 ? commitScore(key, val) : commitForfeit(key); };
-      attachTip(el.querySelector('.face-n'), key, p.isAI && !manualMode);
+      attachTip(el.querySelector('.face-n'), key, p.isAI && !gManual());
       $('boardUpper').appendChild(el);
     });
 
@@ -423,7 +423,7 @@
           }
         }
       }
-      attachTip(row.querySelector('.cname'), key, p.isAI && !manualMode);
+      attachTip(row.querySelector('.cname'), key, p.isAI && !gManual());
       $('boardLower').appendChild(row);
     });
   }
@@ -488,7 +488,7 @@
   $('overUndo').onclick = popUndo;
 
   function renderDice() {
-    if (manualMode) return;
+    if (gManual()) return;
     var p = G.currentPlayer(game);
     var box = $('dice'); box.innerHTML = '';
     if (awaitingRoll) {
@@ -534,7 +534,7 @@
   function renderFire() {
     $('fire').classList.remove('muted');   // clear any leftover spectator styling
     syncSpecReturn(); syncRollAll();
-    if (manualMode) { $('bottombar').classList.remove('preroll'); return; }
+    if (gManual()) { $('bottombar').classList.remove('preroll'); return; }
     // ---- network spectating: previewing my own board, or watching an opponent's turn ----
     if (netMode && specSelf) {
       $('bottombar').classList.remove('preroll');
@@ -587,7 +587,7 @@
     var box = $('dice'); if (!box) return;
     box.style.touchAction = 'none';
     var pid = null, startIdx = -1, paintVal = false, slid = false;
-    function selOk() { var p = game && game.players && game.players[game.current]; return !manualMode && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0 && p && !p.isAI && !(netMode && (!netMyTurn || specSelf)); }
+    function selOk() { var p = game && game.players && game.players[game.current]; return !gManual() && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0 && p && !p.isAI && !(netMode && (!netMyTurn || specSelf)); }
     function dieIdxAt(x, y) {
       var el = document.elementFromPoint(x, y); el = el && el.closest ? el.closest('.die') : null;
       if (!el || el.disabled || el.classList.contains('preroll')) return -1;
@@ -624,13 +624,13 @@
     var btn = $('rollAll'); if (!btn) return;
     var p = game && game.players && game.players[game.current];
     var watching = netMode && (!netMyTurn || specSelf);
-    var show = !manualMode && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0
+    var show = !gManual() && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0
       && p && !p.isAI && !watching && activeKeep() && dice.length === G.DICE_COUNT;
     btn.classList.toggle('hidden', !show);
   }
   $('rollAll').onclick = function () {
     var p = game && game.players && game.players[game.current];
-    if (manualMode || awaitingRoll || locked || aiBusy || throwsLeft <= 0 || !p || p.isAI) return;
+    if (gManual() || awaitingRoll || locked || aiBusy || throwsLeft <= 0 || !p || p.isAI) return;
     if (netMode && (!netMyTurn || specSelf)) return;
     selected = [false, false, false, false, false];   // hold nothing → the reroll mask covers all five
     humanFire();   // routes to expHumanFire when gExp()
@@ -742,14 +742,14 @@
   // ---------- commit / turn flow ----------
   function commitScore(key, value) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || (!manualMode && p.isAI) || G.isCategoryFilled(p, key)) return;
+    if (aiBusy || locked || (!gManual() && p.isAI) || G.isCategoryFilled(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     G.assignScore(p, key, dice, value);
     afterCommit(key, value);
   }
   function commitForfeit(key) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || (!manualMode && p.isAI) || G.isCategoryFilled(p, key)) return;
+    if (aiBusy || locked || (!gManual() && p.isAI) || G.isCategoryFilled(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     G.forfeitScore(p, key);
     afterCommit(key, 0);
@@ -759,7 +759,7 @@
     if (tut) tutEvent('commit');
     var log = curLog;
     if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
-    if (netMode && manualMode) {
+    if (netMode && gManual()) {
       // FREE-FOR-ALL: record + broadcast my entry, then reset for my next category (no turn handover)
       var ment = { mask: evReady ? (EV.maskOfScores(p.scores) & ~EV.catBit(key)) : 0, dice: dice.slice(), category: key };
       if (evReady) moveLog[game.current].push(ment);
@@ -781,7 +781,7 @@
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
       return;
     }
-    if (manualMode) {
+    if (gManual()) {
       // ОПА can rewind this commit (restoring the entered hand), and the turn is
       // logged for the category-only analytics (mask = the board BEFORE this pick)
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
@@ -792,8 +792,8 @@
     flashTile(key);
     $('fire').disabled = true;
     // after an AI turn, hold the board a beat so players can read it
-    var delay = !manualMode && p.isAI ? AI_VIEW_DELAY : END_DELAY;
-    if ((manualMode || !p.isAI) && G.isFloorFlop(key, value) && showRoast(key, value)) delay = ROAST_MS + 250;
+    var delay = !gManual() && p.isAI ? AI_VIEW_DELAY : END_DELAY;
+    if ((gManual() || !p.isAI) && G.isFloorFlop(key, value) && showRoast(key, value)) delay = ROAST_MS + 250;
     turnTimer = setTimeout(endTurn, delay);
   }
   var turnTimer = null;

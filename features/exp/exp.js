@@ -3,24 +3,25 @@
   // ============================================================ EXPERIMENTAL flow (single column)
   var EXP_CELLS = X ? X.KEYS.length : 15;
   function expStartGame(players, manual) {
-    netMode = false; manualMode = !!manual;
+    netMode = false;
     trackGame('start');
     clearAllPenalties();
     game = X.createGame(players);
     game.ruleset = 'experimental';
+    game.manual = !!manual;
     game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
     undoStack = []; moveLog = players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
-    $('hintBtn').classList.toggle('hidden', !exactReady || manualMode || !settings.advice);
+    $('hintBtn').classList.toggle('hidden', !exactReady || gManual() || !settings.advice);
     document.querySelector('.sheet').classList.remove('hidden');   // reuse the standard tile board
     $('expBoard').classList.add('hidden');
     $('expReserve').classList.add('hidden');
-    setDockUI(manualMode);
+    setDockUI(gManual());
     expBeginTurn();
   }
   function resumeExpGame(snap) {
-    netMode = false; manualMode = false;
+    netMode = false;
     var players = snap.players.map(function (sp) {
       var pl = G.createPlayer(sp.name, sp.color, sp.isAI);
       pl.gender = sp.gender || 'm'; pl.owner = !!sp.owner; pl.ribbons = sp.ribbons || RIBBON_COLORS; pl.scores = sp.scores || {};
@@ -30,6 +31,7 @@
     });
     game = X.createGame(players);
     game.ruleset = 'experimental';
+    game.manual = false;
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
     undoStack = []; viewingHistory = false; moveLog = snap.moveLog || players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
@@ -47,7 +49,7 @@
     if (!netMode) saveResume();
     document.documentElement.style.setProperty('--pc', p.color);
     selected = [false, false, false, false, false];
-    if (manualMode) {                          // ОТЧЕТ: tap the five dice in, then pick a row
+    if (gManual()) {                          // ОТЧЕТ: tap the five dice in, then pick a row
       manualCounts = [0, 0, 0, 0, 0, 0, 0]; awaitingRoll = false; throwsLeft = 0; dice = []; curLog = null;
       expRenderAll();
     } else if (p.isAI) {
@@ -92,20 +94,20 @@
     if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
-    if (manualMode && !netMode) {
+    if (gManual() && !netMode) {
       // local ОПА can rewind this
       undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
     }
     // build the turn-log entry BEFORE assigning the score (mask = filled categories before this pick),
     // and record it locally for net games too (it used to be skipped) so history is complete here as well
     var expEnt = null;
-    if (manualMode) { if (exactReady) expEnt = { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true }; }
+    if (gManual()) { if (exactReady) expEnt = { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true }; }
     else if (curLog) { curLog.category = key; expEnt = curLog; curLog = null; }
     if (expEnt) moveLog[game.current].push(expEnt);
     X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
     var committed = p.scores[key];
     // ---- net minus (manual / отчет): free-for-all — broadcast my entry, then reset for my next category ----
-    if (netMode && manualMode) {
+    if (netMode && gManual()) {
       flashTile(key);
       if (net) net.submitMove({ category: catIndexOf(key), score: committed, rolls: [dice.slice()], keeps: [], log: expEnt ? JSON.stringify(expEnt) : '' });
       locked = true; renderAll();
@@ -113,7 +115,7 @@
       return;
     }
     // ---- net minus (regular): broadcast my completed turn; the host's STATE + next GRANT drive the rest ----
-    if (netMode && !manualMode) {
+    if (netMode && !gManual()) {
       if (tut) tutEvent('commit');
       var log = expEnt;
       locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
@@ -127,7 +129,7 @@
     locked = true; expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
     var delay = END_DELAY;
-    if (!manualMode && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
+    if (!gManual() && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
     turnTimer = setTimeout(expEndTurn, delay);
   }
   function expEndTurn() {
@@ -372,7 +374,7 @@
   // ----- experimental rendering -----
   function expRenderAll() {
     expRenderHeader(); expRenderPills(); expRenderBoard();
-    if (manualMode) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
+    if (gManual()) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
     expRenderDice(); expRenderFire(); expRenderHint(); syncBottomPad();
   }
   function expRenderHeader() {
@@ -541,5 +543,5 @@
                personaId: p.persona ? p.persona.id : null, ribbons: p.ribbons || [], scores: p.scores, pts: G.playerTotalExp(p) };
     });
     archiveGame({ id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4), ts: Date.now(),
-      ruleset: 'experimental', manualMode: manualMode, ownerSkipped: !!game.ownerSkipped, net: !!netMode, players: players, moveLog: moveLog });
+      ruleset: 'experimental', manualMode: gManual(), ownerSkipped: !!game.ownerSkipped, net: !!netMode, players: players, moveLog: moveLog });
   }

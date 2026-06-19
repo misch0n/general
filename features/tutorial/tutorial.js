@@ -129,7 +129,7 @@
   function tutStart() {
     var exp = settings.ruleset === 'experimental';
     $('settingsModal').classList.add('hidden');
-    clearResume(); viewingHistory = false; netMode = false; manualMode = false;
+    clearResume(); viewingHistory = false; netMode = false;   // game.manual is set by startGame below
     var me = G.createPlayer('Ти', settings.ownerColor || '#d4a02e', false);
     me.owner = true; me.gender = settings.ownerGender || 'm'; me.selectKeep = !!settings.selectKeep;
     me.ribbons = RIBBON_COLORS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 6);

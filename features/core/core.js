@@ -80,7 +80,7 @@
   // one game lifecycle event ('start' | 'finish' | 'abort' | 'error'), tagged net/local + manual/regular;
   // a finished game also reports this device's dice-flavour (keep-vs-throw, order-vs-separate)
   function trackGame(kind) {
-    var p = (netMode ? 'net' : 'local') + '-' + (manualMode ? 'manual' : 'regular');
+    var p = (netMode ? 'net' : 'local') + '-' + (gManual() ? 'manual' : 'regular');
     track(p + '-' + kind);
     if (kind === 'finish') {
       track(settings.selectKeep ? 'finish-keep' : 'finish-throw');
@@ -361,6 +361,9 @@
   // single source of truth for the live ruleset: read off the game object (set at creation in every
   // path — local/net, standard/experimental). Replaces the old `gExp()` global.
   function gExp() { return !!(game && game.ruleset === 'experimental'); }
+  // single source of truth for manual (ОТЧЕТ) mode: read off the game object (set at creation in
+  // every path). Replaces the old `gManual()` global. Same null-guard pattern as gExp().
+  function gManual() { return !!(game && game.manual); }
   // dice-roll footer + fire bar vs the manual-entry footer
   function setDockUI(manual) { if (manual) $('bottombar').classList.remove('preroll'); $('firebar').classList.toggle('hidden', manual); $('diceFooter').classList.toggle('hidden', manual); $('manualDock').classList.toggle('hidden', !manual); }
   // reserve scroll space under the fixed overlay bar so nothing stays hidden behind it
@@ -430,7 +433,7 @@
     var over = gExp() ? X.isGameOver(game) : G.isGameOver(game);
     if (over) { clearResume(); return; }
     lsSet(RESUME_KEY, JSON.stringify({
-      v: 1, ts: Date.now(), ruleset: game.ruleset || 'standard', manualMode: manualMode,
+      v: 1, ts: Date.now(), ruleset: game.ruleset || 'standard', manualMode: gManual(),
       current: game.current, round: game.round, ownerSkipped: !!game.ownerSkipped, players: serializePlayers(), moveLog: moveLog,
     }));
   }

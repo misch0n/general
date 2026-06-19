@@ -172,7 +172,7 @@
     var filledK = allKeys.filter(function (k) { return G.isCategoryFilled(p, k) && !usedBlank[k]; });
     var hideK = allKeys.filter(function (k) { return !usedHide[k]; });
     var remaining = G.DICE_COUNT - removed;
-    var diceMode = !manualMode && dice.length === G.DICE_COUNT && !awaitingRoll;
+    var diceMode = !gManual() && dice.length === G.DICE_COUNT && !awaitingRoll;
     var freeIdx = []; for (var i = 0; i < remaining; i++) if (!usedIdx[i]) freeIdx.push(i);
 
     // the full prank set (penalties only fire in казарма mode, gated upstream).

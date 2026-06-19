@@ -104,7 +104,7 @@
   $('menuHowto').onclick = function () { $('menuModal').classList.add('hidden'); openHowto(); };
   // aborting a live battle to the muster screen — keeps the SAME roster so the lineup can be tweaked
   function abortToStart() {
-    if (game) trackGame('abort');   // before resetNet() clears netMode/manualMode
+    if (game) trackGame('abort');   // before resetNet() clears netMode (manual rode on game.manual)
     $('menuModal').classList.add('hidden'); $('abortModal').classList.add('hidden');
     $('overModal').classList.add('hidden');
     resetNet();
@@ -119,7 +119,7 @@
   $('abortModal').onclick = function (e) { if (e.target === $('abortModal')) { $('abortModal').classList.add('hidden'); $('menuModal').classList.remove('hidden'); } };
 
   // ---------- settings (with a secret developer mode) ----------
-  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || manualMode || !settings.advice); }
+  function syncHintBtn() { $('hintBtn').classList.toggle('hidden', !evReady || gManual() || !settings.advice); }
   var SETTINGS_ROWS = [
     // master switch for the goofy layer (off = core only; on enables
     // callouts, penalties, combo tooltips and bets). Rare-name titles are separate.

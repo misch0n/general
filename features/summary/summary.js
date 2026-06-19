@@ -8,7 +8,7 @@
       id: 'g' + Date.now() + '_' + Math.floor(Math.random() * 1e4),
       ts: Date.now(),
       ruleset: (game && game.ruleset) || 'standard',   // net minus games archive as experimental → correct history totals
-      manualMode: manualMode,
+      manualMode: gManual(),
       ownerSkipped: !!(game && game.ownerSkipped),
       ownerNamed: !!(settings.useOwnerName && settings.ownerName.trim()),
       selectKeep: !!settings.selectKeep,   // the dice-selection flavour this game was played in
@@ -90,8 +90,8 @@
       // but not for EV skill/luck analysis, so leave their analysis null
       var analysable = log && log.length && !log[0].remote;
       analysisByPlayer[idx] = (ready && analysable)
-        ? (sumExp() ? (manualMode ? analyzeManualGameExp(log) : analyzeGameExp(log))
-                    : (manualMode ? EV.analyzeManualGame(log) : EV.analyzeGame(log)))
+        ? (sumExp() ? (gManual() ? analyzeManualGameExp(log) : analyzeGameExp(log))
+                    : (gManual() ? EV.analyzeManualGame(log) : EV.analyzeGame(log)))
         : null;
     });
     var anyAnalysis = Object.keys(analysisByPlayer).some(function (k) { return analysisByPlayer[k]; });
@@ -101,12 +101,12 @@
     summary.meta = computeSummaryMeta();   // §1 winner/skill/luck leaders + category board
 
     // luck has meaning only for dice games; the category board needs only scores
-    var luckable = !manualMode && anyAnalysis;
+    var luckable = !gManual() && anyAnalysis;
     $('tabSkill').classList.toggle('hidden', !anyAnalysis);
     $('tabStand').classList.toggle('hidden', !anyAnalysis);
     $('tabLuck').classList.toggle('hidden', !luckable);
     $('tabCats').classList.toggle('hidden', false);
-    $('overUndo').classList.toggle('hidden', !manualMode || !undoStack.length);
+    $('overUndo').classList.toggle('hidden', !gManual() || !undoStack.length);
     renderWinHeadline();   // WD-01 + WD-03 + WD-05 verdict
     renderWinBadges();     // WD-04 badges
 
@@ -126,7 +126,7 @@
   function setOverTitle() {
     var rec = viewingHistory ? currentHistRec : null;
     var head = $('overHead'), title = $('overTitle'), sub = $('overSubdate');
-    var mode = (rec ? rec.manualMode : manualMode) ? 'отчет' : 'игра';   // manual vs regular
+    var mode = (rec ? rec.manualMode : gManual()) ? 'отчет' : 'игра';   // manual vs regular
     if (!rec) {
       head.classList.remove('editable');
       title.textContent = '🏆 Край на битката'; title.onclick = null;
