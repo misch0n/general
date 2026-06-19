@@ -133,6 +133,47 @@ test('host + 2 clients: lobby, roster, full game, consistent final state', funct
   });
 });
 
+// ---- Step 0 (Task A 5c-remainder): the loopback safety net for the net-payload rewrite.
+// The full-game test above proves the numeric SCOREBOARD converges; this proves the full
+// per-player TURN LOG (the canonical JSON the wire carries in mv.log) converges on every
+// device too — host included — propagating intact host→clients (STATE delta) AND
+// client→host (MOVE). That log is the part the payload rewrite must not regress. ----
+test('host + 2 clients: per-player turn LOGS converge across the wire', function () {
+  var bus = new Bus();
+  function mk(isHost, me) {
+    var logs = {};   // playerId -> [reconstructed turn-log entries], in arrival order
+    var s = new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, maxPlayers: 6,
+      setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onMove: function (mv) { (logs[mv.playerId] || (logs[mv.playerId] = [])).push(mv.log ? JSON.parse(mv.log) : null); } } });
+    s._logs = logs;
+    return s;
+  }
+  var host = mk(true, { name: 'Иван', color: '#ee0055', gender: 'm' });
+  var c1 = mk(false, { name: 'Боби', color: '#00aa55', gender: 'm' });
+  var c2 = mk(false, { name: 'Мими', color: '#5566ff', gender: 'f' });
+  var nodes = [host, c1, c2];
+
+  host.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  assert.ok(host.startGame()); bus.drain();
+
+  for (var guard = 0; guard < 5000 && host.state === 'IN_GAME'; guard++) {
+    var actId = host.activeId;
+    var active = nodes.filter(function (n) { return n.myId === actId; })[0];
+    var cat = nextCat(active, actId);
+    // a representative turn-log entry (the same JSON shape afterCommit ships in mv.log)
+    var entry = { category: CATS[cat], rolls: [[1, 2, 3, 4, 5]], keeps: [], mask: cat };
+    active.submitMove({ category: cat, score: 1 + cat, log: JSON.stringify(entry) });
+    bus.drain();
+  }
+
+  [c1, c2].forEach(function (n) {
+    assert.deepStrictEqual(n._logs, host._logs, 'per-player turn logs match the host');
+  });
+  // the logs carry the real turn detail, not a fill-order-only marker
+  assert.strictEqual(host._logs[host.myId].length, 14, 'host played a full board');
+  assert.deepStrictEqual(host._logs[c1.myId][0].rolls, [[1, 2, 3, 4, 5]], 'roll detail survived the wire');
+});
+
 // ---- idempotency: replaying a move must not double-apply ----
 test('applying the same move twice is a no-op (idempotent)', function () {
   var bus = new Bus();
