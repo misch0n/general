@@ -147,36 +147,29 @@
   function unpackStart(p) { var r = new Reader(p), version = r.u16(), firstId = r.u8(), n = r.u8(), a = []; for (var i = 0; i < n; i++) a.push(readMeta(r)); return { version: version, firstId: firstId, players: a }; }
   function packGrant(activeId, version) { return new Writer().u8(activeId).u16(version).out(); }
   function unpackGrant(p) { var r = new Reader(p); return { activeId: r.u8(), version: r.u16() }; }
-  // MOVE — the active player's completed turn (category + rolls/keeps + score)
-  function packMove(m) {
-    var w = new Writer().u8(m.playerId).u16(m.ackVersion).u8(m.category).i16(m.score);
-    var rolls = m.rolls || [], nr = rolls.length; w.u8(nr);
-    for (var i = 0; i < nr; i++) for (var j = 0; j < 5; j++) w.u8((rolls[i][j] || 0));
-    for (i = 0; i < nr - 1; i++) { var mask = 0, kp = (m.keeps && m.keeps[i]) || []; for (j = 0; j < 5; j++) if (kp[j]) mask |= (1 << j); w.u8(mask); }
-    w.str16(m.log || '');   // full turn-log entry (JSON) so every device gets complete per-player history
-    return w.out();
-  }
-  function unpackMove(p) {
-    var r = new Reader(p), m = { playerId: r.u8(), ackVersion: r.u16(), category: r.u8(), score: r.i16() };
-    var nr = r.u8(); m.rolls = []; m.keeps = [];
-    for (var i = 0; i < nr; i++) { var d = []; for (var j = 0; j < 5; j++) d.push(r.u8()); m.rolls.push(d); }
-    for (i = 0; i < nr - 1; i++) { var mask = r.u8(), k = []; for (j = 0; j < 5; j++) k.push(!!(mask & (1 << j))); m.keeps.push(k); }
-    m.log = r.left() > 0 ? r.str16() : '';   // tolerate older peers that don't send a log
-    return m;
-  }
-  // STATE — sub 0: delta (one applied move); sub 1: full snapshot (re-baseline on resync)
-  function packStateDelta(version, mv) { return new Writer().u8(0).u16(version).u8(mv.playerId).u8(mv.category).i16(mv.score).str16(mv.log || '').out(); }
-  function packStateSnapshot(version, scores) {
-    var w = new Writer().u8(1).u16(version), ids = Object.keys(scores); w.u8(ids.length);
-    ids.forEach(function (id) { var cells = scores[id], cs = Object.keys(cells); w.u8(+id).u8(cs.length); cs.forEach(function (c) { w.u8(+c).i16(cells[c]); }); });
-    return w.out();
-  }
+  // ---- [GAME-SPECIFIC] L3 payloads are the CANONICAL game shape, JSON-encoded
+  // (Task A 5c-remainder). Transport is a dumb pipe: a MOVE/STATE payload IS a serialized
+  // move action / scoreboard projection, not a hand-packed binary sidecar. The L1 frame
+  // (type/sender/seq/CRC) is unchanged — only these payload bytes became a UTF-8 JSON
+  // string, exactly as the `log` field already was. No wire back-compat is needed (everyone
+  // plays the single live version). JSON also natively carries negative (minus-ruleset)
+  // scores and removes the old ±32768 i16 clamp.
+  function packJSON(obj) { return utf8(JSON.stringify(obj)); }
+  function unpackJSON(p) { return JSON.parse(utf8d(p)); }
+
+  // MOVE — the active player's completed turn as a move action `{playerId, category, score, log}`.
+  // category is the numeric index (net.js bridges index↔key via catIndexOf/catKeyAt at the edge);
+  // the full per-player turn detail (rolls/keeps/…) rides inside the JSON `log`, so the old binary
+  // rolls/keeps sidecar (never read on receive) and the unused ackVersion are gone.
+  function packMove(m) { return packJSON({ playerId: m.playerId, category: m.category, score: m.score, log: m.log || '' }); }
+  function unpackMove(p) { var m = unpackJSON(p); return { playerId: m.playerId, category: m.category, score: m.score, log: m.log || '' }; }
+  // STATE — kind 'delta' (one applied move action) or 'snapshot' (full scoreboard projection, re-baseline on resync)
+  function packStateDelta(version, mv) { return packJSON({ kind: 'delta', version: version, playerId: mv.playerId, category: mv.category, score: mv.score, log: mv.log || '' }); }
+  function packStateSnapshot(version, scores) { return packJSON({ kind: 'snapshot', version: version, scores: scores }); }
   function unpackState(p) {
-    var r = new Reader(p), sub = r.u8(), version = r.u16();
-    if (sub === 0) { var d = { kind: 'delta', version: version, playerId: r.u8(), category: r.u8(), score: r.i16() }; d.log = r.left() > 0 ? r.str16() : ''; return d; }
-    var n = r.u8(), scores = {};
-    for (var i = 0; i < n; i++) { var id = r.u8(), m = r.u8(), cells = {}; for (var j = 0; j < m; j++) { var c = r.u8(); cells[c] = r.i16(); } scores[id] = cells; }
-    return { kind: 'snapshot', version: version, scores: scores };
+    var s = unpackJSON(p);
+    if (s.kind === 'snapshot') return { kind: 'snapshot', version: s.version, scores: s.scores || {} };
+    return { kind: 'delta', version: s.version, playerId: s.playerId, category: s.category, score: s.score, log: s.log || '' };
   }
 
   // ============================================================ L2/L3 Session
@@ -462,7 +455,7 @@
   };
   // the local active player submits their completed turn
   Session.prototype.submitMove = function (mv) {
-    mv.playerId = this.myId; mv.ackVersion = this.version;
+    mv.playerId = this.myId;
     if (this.isHost) {
       // manual = free-for-all: apply my own move and broadcast, no turn advance (just maybe end)
       if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); if (this.manual) this._maybeEnd(); else this._advance(); }
@@ -526,7 +519,7 @@
   };
   Session.prototype.submitMoveFor = function (playerId, mv) {
     if (!this.isHost || this.state !== 'IN_GAME' || playerId !== this.activeId) return false;
-    mv.playerId = playerId; mv.ackVersion = this.version;
+    mv.playerId = playerId;
     if (this._applyMove(mv)) { this._send(T.STATE, packStateDelta(this.version, mv)); this._advance(); return true; }
     return false;
   };
@@ -613,8 +606,14 @@
     var sig = bytes && bytes.join ? bytes.join(',') : String(bytes);
     if (sig === this._lastBytes) { this._linkTick(); return; }   // drop an immediate duplicate retransmit
     this._lastBytes = sig;
-    if (this.isHost) this._rxHost(pkt); else this._rxClient(pkt);
-    this._rxAdaptive(pkt);
+    // L3 payloads are JSON (5c-remainder), so unpack* can throw on a malformed payload — unlike the
+    // old binary readers. A CRC-valid frame from our own packers is always valid JSON, but treat a
+    // parse failure like a failed decode (same as unframe → null above) rather than letting it escape
+    // the transport callback. (Reliable WebRTC channels never deliver corrupt bytes; this is defensive.)
+    try {
+      if (this.isHost) this._rxHost(pkt); else this._rxClient(pkt);
+      this._rxAdaptive(pkt);
+    } catch (e) { this._linkTick(); return; }
     this._linkTick();
   };
   Session.prototype._rxHost = function (pkt) {

@@ -104,8 +104,23 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
      the pure round-trip test, and the stale README/CLAUDE.md references). `sanitizeRecord` stays — it
      still hardens the live JSON-paste import (`settings.js`).
 
-   *Deferred (the net wire **payload** rewrite — needs test coverage first):* see the dedicated
-   handoff section **"5c-remainder"** below. (Also still pre-existing, left as-is: `resumeExpGame`
+   **5c-remainder DONE** — the net wire **payload** is now the canonical game shape, JSON-encoded
+   (see the section below for the full plan this closed). **Step 0** first: added a loopback
+   **turn-log convergence** test (`test/mp.test.js`) — the existing 3-device full-game test only
+   asserted the numeric scoreboard converged; the new one asserts the full per-player `mv.log`
+   (the canonical JSON) converges on every device too (host included), proving it survives
+   host→clients (STATE delta) and client→host (MOVE). Then the rewrite: `packMove`/`unpackMove`,
+   `packStateDelta`, `packStateSnapshot`/`unpackState` (`mp.js`) dropped their hand-packed binary
+   fields and now emit/parse a UTF-8 **JSON** payload — a move action `{playerId, category, score,
+   log}` and a `{kind, version, scores}` projection. The L1 frame (type/sender/seq/CRC) is
+   untouched; only the payload bytes changed (the `log` field already did exactly this). The dead
+   binary `rolls`/`keeps` sidecar (never read on receive — the detail rides in `log`) and the
+   unused `ackVersion` are gone, including from the two app-side `mv` literals in `afterCommit`
+   (`features/game/game.js`). `category` stays a numeric **index** on the wire (net.js bridges
+   index↔key at the edge via `catIndexOf`/`catKeyAt`, as before). No wire back-compat needed
+   (single live version); JSON also natively carries minus-ruleset negatives and drops the old
+   ±32768 i16 clamp. (185 tests pass — the negative-score round-trip still green through JSON;
+   smoke green: 4 play + 2 resume + 1 replay.) (Still pre-existing, left as-is: `resumeExpGame`
    hard-codes `game.manual = false`, ignoring `snap.manualMode`.)
 
 ## Target schema (sketch)
@@ -145,8 +160,9 @@ reduce(state, action) -> nextState   // local play and net-apply both dispatch a
 - **Resume** — `saveResume`/`loadResume` (`features/core/core.js`), snapshot at each `beginTurn`.
 - **Archive** — `archiveGame` + the record shape (core.js; exp games archive via `exp.js` ~L543 — a
   separate path that Slice 4/5 should unify).
-- **Net wire** — `MP.packMove`/`packStateDelta`/`packStateSnapshot` (`mp.js`); net move =
-  `{category index, score, rolls, keeps, log}`. (`packRecord` was removed in 5c.)
+- **Net wire** — `MP.packMove`/`packStateDelta`/`packStateSnapshot` (`mp.js`); since 5c-remainder
+  these carry the **canonical shape as JSON**: net move = `{playerId, category index, score, log}`,
+  state = `{kind, version, scores}`. (`packRecord` was removed in 5c.)
 - **Replay** — reconstructs actions from `moveLog` (`features/history/history.js`).
 
 ## Verification each slice
@@ -166,12 +182,11 @@ reduce(state, action) -> nextState   // local play and net-apply both dispatch a
 
 ---
 
-## 5c-remainder — net wire **payload** → canonical schema (DEFERRED; read this first)
+## 5c-remainder — net wire **payload** → canonical schema (✅ DONE)
 
-**Status:** not started. Deliberately deferred from the 5c session because it touches **live
-multiplayer, which has ZERO app-level test coverage**, and the value is mostly architectural purity
-(the schema is already authoritative at the receive boundary — see below). **Do not start the payload
-rewrite until the test harness in step 0 exists.**
+**Status:** DONE (see the slice-5 "5c-remainder DONE" entry above for the as-built summary). Step 0
+(the loopback turn-log convergence harness in `test/mp.test.js`) landed first, then the three codecs
+in `mp.js` were rewritten to JSON. The original plan is kept below for context.
 
 ### The vision (from the repo owner)
 One **grand unified schema** (the Target schema above) + `reduce(state, action)` as the *only* mutator;

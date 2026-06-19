@@ -499,7 +499,7 @@ test('re-GRANT idempotency: the host re-granting a slow player does NOT re-fire 
 // upper-row cell was read back as 65534 → a multi-thousand bogus total on the receiving device) ----
 test('MOVE/STATE codecs round-trip negative (minus-ruleset) scores', function () {
   [-2, -17, -1, 0, 5, 42, -65, 70].forEach(function (sc) {
-    var mv = MP.unpackMove(MP.packMove({ playerId: 1, ackVersion: 3, category: 4, score: sc, rolls: [[1,2,3,4,5]], keeps: [], log: '' }));
+    var mv = MP.unpackMove(MP.packMove({ playerId: 1, category: 4, score: sc, log: '' }));
     assert.strictEqual(mv.score, sc, 'MOVE score ' + sc);
     var dl = MP.unpackState(MP.packStateDelta(7, { playerId: 1, category: 4, score: sc, log: '' }));
     assert.strictEqual(dl.score, sc, 'STATE delta score ' + sc);

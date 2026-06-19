@@ -62,20 +62,22 @@ test('player meta + roster pack/unpack preserve name/colour/gender', function ()
   assert.ok(/Капитан/.test(r[1].name));
 });
 
-test('move pack/unpack preserves category, score, rolls and keeps', function () {
-  var mv = { playerId: 2, ackVersion: 7, category: 13, score: 50, rolls: [[1, 2, 3, 4, 5], [5, 5, 3, 4, 5], [5, 5, 5, 4, 5]], keeps: [[false, false, true, true, true], [true, true, false, true, true]] };
+test('move pack/unpack preserves the canonical move action (playerId, category, score, log)', function () {
+  // the turn detail (rolls/keeps) rides inside the JSON `log`, not a binary sidecar
+  var log = JSON.stringify({ category: 'general', rolls: [[1, 2, 3, 4, 5], [5, 5, 3, 4, 5], [5, 5, 5, 4, 5]], keeps: [[false, false, true, true, true], [true, true, false, true, true]] });
+  var mv = { playerId: 2, category: 13, score: 50, log: log };
   var out = MP.unpackMove(MP.packMove(mv));
   assert.strictEqual(out.playerId, 2);
-  assert.strictEqual(out.ackVersion, 7);
   assert.strictEqual(out.category, 13);
   assert.strictEqual(out.score, 50);
-  assert.deepStrictEqual(out.rolls, mv.rolls);
-  assert.deepStrictEqual(out.keeps, mv.keeps);
+  assert.strictEqual(out.log, log);
+  assert.deepStrictEqual(JSON.parse(out.log).rolls, JSON.parse(log).rolls);
 });
 
 test('state delta + snapshot pack/unpack', function () {
-  var d = MP.unpackState(MP.packStateDelta(9, { playerId: 1, category: 4, score: 12 }));
+  var d = MP.unpackState(MP.packStateDelta(9, { playerId: 1, category: 4, score: 12, log: 'L' }));
   assert.strictEqual(d.kind, 'delta'); assert.strictEqual(d.version, 9); assert.strictEqual(d.score, 12);
+  assert.strictEqual(d.playerId, 1); assert.strictEqual(d.category, 4); assert.strictEqual(d.log, 'L');
   var snap = MP.unpackState(MP.packStateSnapshot(5, { 0: { 0: 3, 13: 50 }, 1: { 0: 2 } }));
   assert.strictEqual(snap.kind, 'snapshot'); assert.strictEqual(snap.version, 5);
   assert.strictEqual(snap.scores[0][13], 50); assert.strictEqual(snap.scores[1][0], 2);

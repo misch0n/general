@@ -740,7 +740,7 @@
       var ment = { mask: evReady ? (EV.maskOfScores(p.scores) & ~EV.catBit(key)) : 0, dice: game.turn.dice.slice(), category: key };
       if (evReady) moveLog[game.current].push(ment);
       flashTile(key);
-      if (net) net.submitMove({ category: catIndexOf(key), score: value, rolls: [game.turn.dice.slice()], keeps: [], log: JSON.stringify(ment) });
+      if (net) net.submitMove({ category: catIndexOf(key), score: value, log: JSON.stringify(ment) });
       game.turn.locked = true; renderAll();
       if (G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming, same as local
       setTimeout(beginManualEntry, END_DELAY);
@@ -751,7 +751,7 @@
       game.turn.locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
       netSendAct({ commit: true, category: catIndexOf(key), value: value });   // spectators see the category go in
       if (netAiActiveId == null && G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming on my own commit
-      var mv = { category: catIndexOf(key), score: value, rolls: log ? log.rolls : [game.turn.dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
+      var mv = { category: catIndexOf(key), score: value, log: log ? JSON.stringify(log) : '' };
       // hold the committed board a beat (comprehension) before the move propagates and the turn passes
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }  // host injects the AI seat's move
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
