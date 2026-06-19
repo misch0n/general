@@ -278,6 +278,8 @@ round-trips in `test/mp.test.js`/`test/webrtc.test.js` and single-process app sm
   `Session.rebroadcast()`→`_send(T.STATE, packStateSnapshot)`.
 
 ### Also still dormant (not part of 5c-remainder, separate cleanup if ever wanted)
-The broader acoustic **modem** layer is still present and unused: `PROFILES`, the adaptive link layer
-(`_rxAdaptive`, `AdaptiveController`, `LinkMeter`), and the `XOFFER`/`XWANT`/`XDATA`/`XACK`/`XDONE`
-type constants. Left in place intentionally — removing it is a large, orthogonal sweep.
+**✅ Done — removed in Task B** (`docs/completed/TASK-B-net-stack-slimming.md`). The broader acoustic
+**modem** layer was still present and unused: `PROFILES`, the adaptive link layer (`_rxAdaptive`,
+`AdaptiveController`, `LinkMeter`), and the `XOFFER`/`XWANT`/`XDATA`/`XACK`/`XDONE` type constants.
+That was the "large, orthogonal sweep" — Task B carried it out, leaving `mp.js` as framing + session
++ game codecs.

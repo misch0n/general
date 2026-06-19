@@ -96,15 +96,17 @@ nothing else in `_rx` depends on the meter.
      the element, its click wiring, `syncNetMode`, and the `.netmodeswitch` CSS were all dead. The live
      mode value is the `netManual` global (set on the start screen; a joiner adopts the host's at
      `onJoined`), so removal is behaviour-neutral.
-4. ⬜ **TODO — docs/README sync** (do as the code slices land, or as a final pass):
-   - `README.md` ~322–400: the "Acoustic multiplayer" + "Adaptive link" sections — replace with a short
-     "WebRTC-only" paragraph. ~622: the `mp.js` table row ("…audio FSK modem") — rewrite.
-   - `CLAUDE.md` ~41–43: the net note already says WebRTC-only but references the dormant layer's
-     presence — tighten once removed.
-   - `docs/completed/TASK-A-state-unification.md` §"Also still dormant" (~end): mark it done here
-     ("removed in Task B").
-   - Regenerate `docs/MAP.md` (`bash scripts/genmap.sh`) after the `mp.js` functions are gone.
-   - When everything lands, archive this doc to `docs/completed/` (as Task A was).
+4. ✅ **DONE — docs/README sync**:
+   - `README.md`: the "Acoustic multiplayer" + "Adaptive link" sections rewritten into one short
+     **"Network multiplayer — WebRTC-only"** section; the `mp.js` rows in the file-table and Project-
+     layout listings rewritten ("…audio FSK modem" → WebRTC protocol core); the stale **Акустика**
+     settings toggle dropped from the Settings paragraph (it's gone from `SETTINGS_ROWS`).
+   - `CLAUDE.md`: the `mp.js` engine-table row dropped "+ dormant link-adaptation layer"; the net note
+     now says the dormant layer was removed in Task B; the "Active task" pointer folded into
+     "Completed refactors" (Task A + Task B).
+   - `docs/completed/TASK-A-state-unification.md` §"Also still dormant": marked done ("removed in Task B").
+   - Regenerated `docs/MAP.md` (`bash scripts/genmap.sh`).
+   - This doc archived to `docs/completed/` — **Task B complete**.
 
 ## Inventory (key line refs — as of `56a30ef`; will drift as slices land — re-grep)
 | Symbol(s) | `mp.js` line(s) | Role |

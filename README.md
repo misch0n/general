@@ -23,7 +23,7 @@ node --test                      # run the dependency-free test suite
 | `game.js` | **Pure, DOM-free logic** (UMD): scoring, dice, turn/player/game state, the greedy AI, names, roasts, personas, ranks, rarity and the Bulgarian morphology engine. The single source of truth for the rules. |
 | `engine.js` | The **EV engine** (UMD): an MDP solver, `evaluate()`, the luck/skill decomposition and the calibrated bot policies. Consumes `game.js`'s scoring — never re-implements the rules. |
 | `ev-table.js` | The precomputed optimal value table (16384 floats), generated offline so the page needs no heavy compute at load. |
-| `mp.js` | **Acoustic multiplayer** (UMD): a layered, dependency-free data-over-sound stack — L1 framing, General-specific schemas, a host-authoritative `Session`, and a browser-only `AudioFSK` modem. Pure protocol logic is DOM-free and unit-tested. |
+| `mp.js` | **WebRTC multiplayer** (UMD): the dependency-free protocol core — L1 framing, General-specific schemas, a host-authoritative `Session`, and the wire codecs. Pure protocol logic is DOM-free and unit-tested. |
 | `tools/` | Offline `build-ev.js` (writes `ev-table.js`) and `calibrate-bots.js` (the τ ↔ strength curve). |
 | `test/` | `node:test` unit tests for `game.js` and `engine.js`. |
 
@@ -319,11 +319,12 @@ so it shows a ⊘ in the archive and is **excluded from your trends** rather tha
 polluting them with a result that wasn't yours. It's a one-game decision and
 resets when the game starts.
 
-## Acoustic multiplayer — „🔊 Мрежова игра“ (`mp.js`)
+## Network multiplayer — „Игра по мрежа“ (`mp.js` + `features/net/net.js`)
 
-Play across **several phones in the same room with no server and no network** —
-the speaker→microphone channel carries the game. The protocol is built in the
-spec's layers and is **dependency-free**:
+Play across **several phones with no game server of our own** — the transport is
+**WebRTC** (PeerJS handles signalling and NAT traversal). One device hosts; others
+**join by QR invite** (`features/net/net.js`: lobby, host/join, scan-to-join,
+spectating, sync). `mp.js` is the dependency-free protocol core both ends share:
 
 - **L1 framing** — `[TYPE][SENDER][SEQ][payload][CRC-8]`; schema-packed payloads
   carry only values (both ends run the same code).
@@ -331,21 +332,12 @@ spec's layers and is **dependency-free**:
   `GRANT`, `MOVE` (a turn's category + rolls/keeps + score), and `STATE`
   delta/snapshot.
 - **Host-authoritative `Session`** — one device is the host (single source of
-  truth, channel arbiter, referee). The **turn token is the transmit token**, so
-  contention only exists in the lobby (ALOHA-style join) and recovery. It runs the
-  whole lobby → `GRANT`/`MOVE`/`STATE` loop → `END`, with **idempotent** moves,
-  **version-gap resync** (snapshot re-baseline) and retransmit timeouts.
-- **L0 `AudioFSK`** — a browser-only Web-Audio FSK modem (sync preamble + length +
-  CRC-16; mic echo-cancel/noise-suppression/AGC disabled, since that DSP destroys
-  data-over-sound). Pluggable: swap it for ggwave without touching the layers above.
+  truth, referee). It runs the whole lobby → `GRANT`/`MOVE`/`STATE` loop → `END`,
+  with **idempotent** moves, **version-gap resync** (snapshot re-baseline), **AI
+  takeover** of a stalled/dropped seat, and **host-crash recovery** (a snapshot
+  rebuilds the authoritative state on a fresh host).
 
-Every sound workflow narrates itself: a **stage label + percentage** (so both
-devices see how much is left) and **rotating comic flavour** keyed to the protocol
-stage — *„Ехо, има ли някой?“* while a host hunts for players, *„А, видях те! ·
-Искам! · ГЕНЕРАЛ!“* as a client jumps in, *„Кога ще започваме?“* in the lobby,
-*„Ало, ще ти пратя една битка…“* while a transfer hand-shakes.
-
-In the app: tap **🔊 Мрежова игра**, then host or join. The roster broadcasts, and
+In the app: tap **Игра по мрежа**, then host or join. The roster broadcasts, and
 `START` builds the **same game on every phone**. In network mode the **active
 player drives input on their own device**; the host's `GRANT`/`STATE` advance
 everyone else's board (you watch the score land). Crucially, **each device owns its
@@ -362,42 +354,20 @@ so **every imported record is pure data** — it can never carry anything
 executable. The importer then picks which player is *them* (owner attribution)
 and files it.
 
-> Historical note: this used to also transfer over an **acoustic** (data-over-
-> sound) channel using a compact binary record codec (`packRecord`/`unpackRecord`,
-> `XOFFER`/`XWANT`/…). That transport was removed, and the binary record codec
-> with it (Task A slice 5c) — it was a third, competing serialization alongside
-> `serializeGame()` and the live WebRTC wire. Records now move only as the
-> canonical `serializeGame()` JSON envelope.
+> Historical note: earlier builds also carried the game over an **acoustic**
+> (data-over-sound) channel — a Web-Audio FSK modem with its own adaptive
+> band/profile machinery (`LinkMeter`/`AdaptiveController`, `RELAY`/`GOSSIP`) and a
+> compact binary record codec (`packRecord`/`unpackRecord`, `XOFFER`/`XWANT`/…) —
+> plus an optical QR-handshake transport. All of it was removed: Task A slice 5c
+> dropped the binary record codec, and Task B stripped the dormant adaptive-link
+> layer and the acoustic UI. The transport is now **WebRTC-only**, and records move
+> only as the canonical `serializeGame()` JSON envelope.
 
-**The `Акустика` switch.** Every data-over-sound feature — network play and the
-sound transfer — lives behind a single settings toggle, **off by default**; when
-off they're hidden entirely.
-
-**Adaptive link (companion spec).** The channel varies hugely with distance, room
-and noise, so the transport is **parameterised by profiles** (band / baud / ecc /
-volume) — an `anchor` floor plus `gameplay` (upper-audible, robust, long-range),
-`setup`, `transfer` and a near-ultrasonic `stealth` — and the phase that needs
-range (gameplay) carries the least data, so it spends the whole budget on
-robustness. The lobby runs a **calibration** step (probe the ladder → `pickProfile`
-the fastest comfortably-below-threshold profile → `switchProfile`). A **`LinkMeter`**
-turns decode outcomes into **signal bars + a GOOD/DEGRADING/CRITICAL state** (ECC
-correction load is the *early-warning* signal — bars drop before failures), shown
-live in the lobby, in-game (a corner badge) and during transfers, with **actionable
-warnings** tied to the levers (*приближи се · намали шума · усили звука*). An
-**`AdaptiveController`** with hysteresis steps the broadcast down to a robuster
-profile (or recalibrates) when the worst client degrades, announced via
-`PROFILE_SWITCH` on the anchor with client acks. Optional **safe peer roles** keep
-the host the only truth: a **`RELAY`** re-broadcasts the host's authoritative
-snapshot (stale versions ignored), **`GOSSIP`** only *detects* divergence so the
-behind device resyncs from the host — never peer-to-peer consensus.
-
-The pure protocol logic is covered by `test/mp.test.js` — framing/CRC, every
-schema, a full **3-device game converging to identical state**, idempotency,
-gap→snapshot resync, the record codec, the **sanitiser** (junk/`__proto__`
-stripping), a full chunked **blob transfer**, and the **adaptive layer** (profile
-selection, the meter's bars/state + ECC early-warning, controller hysteresis,
-`PROFILE_SWITCH`, calibration, and the relay/gossip guards). The acoustic L0 itself
-needs real two-device tuning (range, volume, room noise) and is best-effort.
+The pure protocol logic is covered by `test/mp.test.js` and `test/webrtc.test.js` —
+framing/CRC, every schema, lobby prep, a full **3-device game converging to
+identical state**, idempotency, gap→snapshot resync, AI takeover, drop/reconnect,
+host-crash recovery, the **sanitiser** (junk/`__proto__` stripping), and the star
+topology under PeerBus.
 
 ## Военен архив — history & replay
 
@@ -448,10 +418,9 @@ Settings (`SETTINGS_ROWS`, persisted to `general:settings:v1`) lead with the
 **default gender** and **default colour** for the старшина's seat — colours and
 names are kept **unique across the roster** (locally and over the network)), then
 positive toggles: **КАЗАРМА**, **Титли** (with its nested **Бонус точки**
-sub-toggle, shown only while Титли is on), **Съвети**, **Глупости**, and
-**Акустика** (off by default — reveals every data-over-sound feature, hidden
-otherwise). The two pre-game-only rows (Титли, Съвети) hide once a battle is on;
-you can also clear the archive here.
+sub-toggle, shown only while Титли is on), **Съвети** and **Глупости**. The two
+pre-game-only rows (Титли, Съвети) hide once a battle is on; you can also clear the
+archive here.
 
 - **Глупости toggle** (profanity) — **on by default** (this is an adult party
   game): rude, NSFW-flagged words are in play. Turn it **off** to censor to the
@@ -619,7 +588,7 @@ index.html   # single-page app: military UI, game loop, summary, history, replay
 game.js      # pure logic: scoring, heuristic AI, roasts, personas, ranks, rarity, BG engine
 engine.js    # EV engine: MDP solver, evaluate(), luck/skill decomposition, bot policies
 ev-table.js  # precomputed optimal value table (generated by tools/build-ev.js)
-mp.js        # acoustic multiplayer: framing, schemas, host Session, audio FSK modem
+mp.js        # WebRTC multiplayer protocol core: framing, schemas, host Session, wire codecs
 tools/       # offline build + calibration scripts
 test/        # node:test unit tests (game + engine + multiplayer protocol)
 .github/     # CI + Pages deploy workflow

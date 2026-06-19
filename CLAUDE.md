@@ -36,10 +36,11 @@ Two layers, loaded in this order (see `index.html`):
 | `exp.js` | `window.GeneralExp` (**X**) | experimental ruleset engine | `exp.test.js` |
 | `engine.js` | `window.GeneralEV` (**EV**) | optimal-value tables, skill/luck analysis | `engine.test.js` |
 | `ev-table*.js`, `ev-exp-exact-table.js` | — | precomputed EV data | — |
-| `mp.js` | `window.MP` | net **session/lobby state machine** (`MP.Session`) + wire codecs (`packMove`/`packStateDelta`/`unframe`…) + dormant link-adaptation layer | `mp.test.js`, `webrtc.test.js` |
+| `mp.js` | `window.MP` | net **session/lobby state machine** (`MP.Session`) + wire codecs (`packMove`/`packStateDelta`/`unframe`…) | `mp.test.js`, `webrtc.test.js` |
 
 > Net is **WebRTC-only** (PeerJS). The acoustic (data-over-sound) and optical (QR-handshake)
-> transports were removed; `mp.js` keeps `MP.Session` + codecs (the shared core WebRTC uses).
+> transports were removed, along with their dormant adaptive-link machinery (Task B);
+> `mp.js` is now just **framing + session + game codecs** — what WebRTC actually uses.
 
 **2. App (UI + game loop) — `features/<name>/*.js`, classic global scope:**
 Load order: `core → setup → net → game → exp → game/ai → modals → summary → history → tutorial → settings → core/boot` (**boot runs last**).
@@ -60,12 +61,14 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
 - CSS mirrors this under `features/<name>/<name>.css` (+ `features/base/base.css`).
 
 **Per-file function index:** `docs/MAP.md` (regenerate: `bash scripts/genmap.sh`).
-**Active task:** `docs/TASK-B-net-stack-slimming.md` — remove the dormant acoustic / adaptive-link
-layer from `mp.js` (profiles, `LinkMeter`/`AdaptiveController`, `RELAY`/`GOSSIP`, the `X*` constants,
-`crc16`), leaving framing + session + game codecs (what WebRTC actually uses).
-**Completed refactor (historic context):** `docs/completed/TASK-A-state-unification.md` — state
-unification: one `GameState` + `GReduce.reduce`, one serialize/deserialize across
-resume/archive/net/replay, canonical-JSON net wire, and std/exp merged into one parameterized flow.
+**Completed refactors (historic context):**
+- `docs/completed/TASK-A-state-unification.md` — state unification: one `GameState` +
+  `GReduce.reduce`, one serialize/deserialize across resume/archive/net/replay, canonical-JSON net
+  wire, and std/exp merged into one parameterized flow.
+- `docs/completed/TASK-B-net-stack-slimming.md` — removed the dormant acoustic / adaptive-link layer
+  from `mp.js` (profiles, `LinkMeter`/`AdaptiveController`, `RELAY`/`GOSSIP`, the `X*` constants,
+  `crc16`) plus the acoustic UI / `netKind` remnants in the app, leaving `mp.js` as framing + session
+  + game codecs (what WebRTC actually uses).
 
 ## Conventions
 - Big files use section banners — `// ===== MAJOR` and `// ---------- minor ----------`. **Grep these
