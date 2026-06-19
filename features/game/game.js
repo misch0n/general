@@ -212,7 +212,7 @@
   function renderAll() {
     var localExp = gExp() && !netMode;
     (localExp ? expRenderHeader : renderHeader)();
-    (localExp ? expRenderPills : renderPills)();
+    renderPills();   // shared: pills are identical; the peek modal (openPeek) picks the exp board by ruleset
     if (sumExp()) { expRenderBoard(); $('expNumBar').classList.remove('hidden'); }
     else { renderBoard(); $('expNumBar').classList.add('hidden'); }
     if (gManual()) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }

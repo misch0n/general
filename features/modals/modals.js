@@ -677,8 +677,8 @@
   function openPeek(i) {
     var p = game.players[i];
     $('peekTitle').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
-    $('peekBody').innerHTML = miniBoard(p);
-    $('peekTotal').textContent = total(p);
+    $('peekBody').innerHTML = sumExp() ? expMiniBoard(p) : miniBoard(p);   // ruleset-aware board (was the separate expPeek)
+    $('peekTotal').textContent = total(p);   // total() is ruleset-aware → X.total in exp
     $('peekModal').classList.remove('hidden');
     if (tut) tutEvent('peek');
   }

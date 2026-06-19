@@ -362,18 +362,8 @@
     var filled = X.filledCount(p.scores);
     $('curRound').innerHTML = Math.min(filled + 1, EXP_CELLS) + '<span class="rsub">/' + EXP_CELLS + '</span>';
   }
-  function expRenderPills() {
-    $('pillWrap').innerHTML = game.players.map(pillHTML).join('');   // total() is ruleset-aware → X.total in exp mode
-    $('pillWrap').querySelectorAll('.ppill').forEach(function (b) { b.onclick = function () { expPeek(+b.getAttribute('data-i')); }; });
-  }
-  function expPeek(i) {
-    var p = game.players[i];
-    $('peekTitle').innerHTML = (isOwnerP(p) ? ownerTokenHTML(true) : '') + esc(p.name) + (p.isAI && p.persona ? ' <span class="badge-ai">' + esc(p.persona.name) + '</span>' : '');
-    $('peekBody').innerHTML = expMiniBoard(p);
-    $('peekTotal').textContent = X.total(p);
-    $('peekModal').classList.remove('hidden');
-    if (tut) tutEvent('peek');
-  }
+  // expRenderPills/expPeek were folded into the shared renderPills + openPeek (which now picks
+  // expMiniBoard via sumExp()); local exp uses them directly now.
   // experimental mini cell-board (peek / summary recap) — same look as the standard miniBoard,
   // with the signed number part (colour by value), the number-part bar, and фул хаус spanning two.
   function expMiniBoard(p) {
