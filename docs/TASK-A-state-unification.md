@@ -16,12 +16,16 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
 1. ✅ **DONE** (commit `4f8cc92`) — *single source of truth for ruleset*. `game.ruleset` is now
    set in every creation path (local/net, std/exp, fresh/resume); the `expMode` global is deleted;
    ~19 read sites go through the new `gExp()` helper (in `features/core/core.js`).
-2. ⬜ **Fold turn state into `game.turn`** — move the scattered turn globals (`dice`, `selected`,
-   `diceNew`, `diceGen`, `throwsLeft`, `rollNo`, `awaitingRoll`, `locked`, `aiBusy`, `rerolledAll`,
-   `manualCounts`, `curLog`) onto a `game.turn` object. Also make **mode** a single source of truth:
-   add `game.manual` (replace the `manualMode` global via a `gManual()` helper, same pattern as `gExp()`).
-   Mechanical; verify each step. (~64 `manualMode` sites — but distinguish the **global** from the
-   serialized record fields `rec.manualMode` / `snap.manualMode`, which STAY.)
+2. ✅ **DONE** — *fold turn state + mode into the `game` object.* Two commits:
+   - **2a** (`9746349`): mode → `game.manual`, read via the new `gManual()` helper (core.js), same
+     null-guarded pattern as `gExp()`. Set at every creation path; serialized `rec.manualMode` /
+     `snap.manualMode` and the record key `manualMode:` are unchanged.
+   - **2b**: the 12 turn globals (`dice`, `selected`, `diceNew`, `diceGen`, `throwsLeft`, `rollNo`,
+     `awaitingRoll`, `locked`, `aiBusy`, `rerolledAll`, `manualCounts`, `curLog`) moved onto a single
+     `game.turn` object via `freshTurn()` (game.js), initialized in every creation path. `dice` needed
+     hand-care (local `dice` params/vars in exp.js EV-helpers + `$('dice')` strings + `dice:` keys must
+     NOT be rewritten); the rest were a guarded perl (`(?<!.)\bNAME\b(?!:)` → `game.turn.NAME`, valid
+     for reads AND writes). Also added `scripts/smoke.js` (commit `638ad1a`) as the app-loop safety net.
 3. ⬜ **Introduce `reduce(state, action)`** for the turn flow (`BEGIN_TURN`, `FIRST_ROLL`, `REROLL`,
    `COMMIT`, `TAP_MANUAL`, `UNDO`, `NEXT_TURN`, `END_GAME`). Route existing mutators through it.
    **Add `reduce()` unit tests** — this is the first real coverage for the app game-loop (today only

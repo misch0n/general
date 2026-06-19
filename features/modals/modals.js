@@ -364,8 +364,8 @@
     var p = (game && G.currentPlayer(game)) || {};
     var ctx = {
       name: ((p.name || '') + '').trim(), players: game ? game.players.length : 0, turn: game ? game.round : 0,
-      total: game ? total(p) : 0, dice: (dice || []).join(' '), same: maxSameCount(dice),
-      rerolls: (typeof throwsLeft === 'number') ? Math.max(0, (ROLLS - 1) - throwsLeft) : 0,
+      total: game ? total(p) : 0, dice: ((game && game.turn.dice) || []).join(' '), same: maxSameCount((game && game.turn.dice) || []),
+      rerolls: (game && typeof game.turn.throwsLeft === 'number') ? Math.max(0, (ROLLS - 1) - game.turn.throwsLeft) : 0,
     };
     if (extra) for (var k in extra) ctx[k] = extra[k];
     return ctx;

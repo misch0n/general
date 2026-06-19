@@ -33,6 +33,7 @@ const path = require('path');
       const scoreFn = exp ? G.scoreForExp : G.scoreFor;
       const roll = exp ? expFirstRoll : firstRoll;
       const commit = exp ? expCommit : commitScore;
+      let didReroll = false;   // exercise the reroll path (selected/diceNew/diceGen/applyReroll) once per game
       // one commit per turn: after a commit `locked` stays true until endTurn→beginTurn re-arms,
       // so wait for readiness each step instead of a fixed delay.
       for (let n = 0; n < cats.length * 3; n++) {
@@ -40,10 +41,16 @@ const path = require('path');
         const cat = cats.find(c => !G.isCategoryFilled(p, c.key));
         if (!cat) break;
         // wait until the turn is interactive again (not locked, hand entered/rolled)
-        for (let w = 0; w < 40 && locked; w++) await sleep(50);
-        if (manual) { while (dice.length < G.DICE_COUNT) tapManualDie(1); }   // tap the 5-die hand in
-        else if (awaitingRoll) roll();
-        commit(cat.key, scoreFn(cat.key, dice));
+        for (let w = 0; w < 40 && game.turn.locked; w++) await sleep(50);
+        if (manual) { while (game.turn.dice.length < G.DICE_COUNT) tapManualDie(1); }   // tap the 5-die hand in
+        else {
+          if (game.turn.awaitingRoll) roll();
+          if (!didReroll && game.turn.throwsLeft > 0) {   // mark one die and re-throw the rest
+            game.turn.selected = [true, false, false, false, false];
+            humanFire(); didReroll = true;
+          }
+        }
+        commit(cat.key, scoreFn(cat.key, game.turn.dice));
         await sleep(60);
       }
       // the final commit hands off to endTurn on a timer (END_DELAY, longer if a roast fires)

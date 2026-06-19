@@ -61,7 +61,7 @@
     viewingHistory = true;
     game = { players: reconstructPlayers(rec), current: 0, round: 1, ruleset: rec.ruleset };   // ruleset drives total()/summary
     moveLog = rec.moveLog || game.players.map(function () { return []; });
-    game.manual = !!rec.manualMode; undoStack = [];
+    game.manual = !!rec.manualMode; game.turn = freshTurn(); undoStack = [];
     var top = Math.max.apply(null, game.players.map(total));
     var winner = game.players.filter(function (p) { return total(p) === top; })[0];
     $('historyModal').classList.add('hidden'); $('calModal').classList.add('hidden');

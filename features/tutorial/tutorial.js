@@ -118,11 +118,11 @@
     if (!rr.some(Boolean)) return;
     var all = rr.every(Boolean);
     if (st.gate === 'rerollAll' && !all) { tutNudge(); return; }
-    dice = (tut.dice || dice).slice(); sortDice();
-    diceNew = [false, false, false, false, false]; diceGen = [];
-    if (curLog) { curLog.keeps.push(rr.map(function (x) { return !x; })); curLog.rolls.push(dice.slice()); }
-    selected = [false, false, false, false, false];
-    throwsLeft--;
+    game.turn.dice = (tut.dice || game.turn.dice).slice(); sortDice();
+    game.turn.diceNew = [false, false, false, false, false]; game.turn.diceGen = [];
+    if (game.turn.curLog) { game.turn.curLog.keeps.push(rr.map(function (x) { return !x; })); game.turn.curLog.rolls.push(game.turn.dice.slice()); }
+    game.turn.selected = [false, false, false, false, false];
+    game.turn.throwsLeft--;
     (gExp() ? expRenderAll : renderAll)(); shakeDice();
     tutEvent(all ? 'rerollAll' : 'reroll');
   }

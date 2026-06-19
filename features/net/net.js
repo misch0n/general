@@ -1007,7 +1007,7 @@
     var exp = netRuleset() === 'experimental';
     game = (exp ? X.createGame(players) : G.createGame(players)); game.ownerSkipped = false;
     game.ruleset = exp ? 'experimental' : 'standard';          // drives sumExp() → exp board/scoring over the net
-    game.manual = !!(net && net.manual); netMode = true; undoStack = []; viewingHistory = false;
+    game.manual = !!(net && net.manual); game.turn = freshTurn(); netMode = true; undoStack = []; viewingHistory = false;
     trackGame('start');
     // lobby size by HUMAN players (AI seats excluded), bucketed 1–5
     var humans = roster.filter(function (m) { return !m.isAI; }).length;
@@ -1033,8 +1033,8 @@
     var p = game.players[game.current], cats = sumCats();   // ruleset-aware (minus has 15 rows incl. два чифта)
     var filled = cats.filter(function (c) { return G.isCategoryFilled(p, c.key); }).length;
     game.round = Math.min(cats.length, filled + 1);
-    if (myManualDone()) { locked = true; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; renderAll(); netSay('✔ Готов! Чакам останалите да попълнят…'); return; }
-    locked = false; manualCounts = [0, 0, 0, 0, 0, 0, 0]; dice = []; throwsLeft = 0; curLog = null;
+    if (myManualDone()) { game.turn.locked = true; game.turn.manualCounts = [0, 0, 0, 0, 0, 0, 0]; game.turn.dice = []; renderAll(); netSay('✔ Готов! Чакам останалите да попълнят…'); return; }
+    game.turn.locked = false; game.turn.manualCounts = [0, 0, 0, 0, 0, 0, 0]; game.turn.dice = []; game.turn.throwsLeft = 0; game.turn.curLog = null;
     renderAll();
   }
   function myManualDone() { var p = game && game.players[game.current]; return p && sumCats().every(function (c) { return G.isCategoryFilled(p, c.key); }); }
@@ -1056,8 +1056,8 @@
     var pid = (netAiActiveId != null && net.isHost) ? netAiActiveId : (netMyTurn ? localPid : null);
     if (pid == null) return;
     var mask = 0;
-    for (var i = 0; i < 5; i++) if (diceNew[i]) mask |= (1 << i);   // which dice are freshly thrown (drives the watcher's reroll view)
-    var a = { playerId: pid, throwsLeft: throwsLeft, dice: dice.slice(), mask: mask };
+    for (var i = 0; i < 5; i++) if (game.turn.diceNew[i]) mask |= (1 << i);   // which dice are freshly thrown (drives the watcher's reroll view)
+    var a = { playerId: pid, throwsLeft: game.turn.throwsLeft, dice: game.turn.dice.slice(), mask: mask };
     if (extra) for (var k in extra) a[k] = extra[k];
     try { net.sendAction(a); } catch (e) {}
   }
@@ -1087,7 +1087,7 @@
   function playSpecAction(a, done) {
     var seat = netOrder.indexOf(a.playerId); if (seat < 0) { done(); return; }
     var ep = specEpoch;
-    game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
+    game.current = seat; netMyTurn = false; game.turn.aiBusy = false; game.turn.awaitingRoll = false; game.turn.locked = true;
     if (a.commit) {
       specSetDice(a); specThrow = null;
       var ck = a.category != null ? catKeyAt(a.category) : null;
@@ -1121,10 +1121,10 @@
     if (settings.newDiceBatch) pairs.sort(function (x, y) { return (x.g - y.g) || (x.v - y.v); });
     else pairs.sort(function (x, y) { return x.v - y.v; });
     specPairs = pairs;
-    dice = pairs.map(function (p) { return p.v; });
-    diceGen = pairs.map(function (p) { return p.g; });
-    diceNew = pairs.map(function (p) { return specRollNo > 1 && p.g === specRollNo; });   // accent the freshest batch (not the opening roll)
-    throwsLeft = a.throwsLeft || 0; selected = [false, false, false, false, false];
+    game.turn.dice = pairs.map(function (p) { return p.v; });
+    game.turn.diceGen = pairs.map(function (p) { return p.g; });
+    game.turn.diceNew = pairs.map(function (p) { return specRollNo > 1 && p.g === specRollNo; });   // accent the freshest batch (not the opening roll)
+    game.turn.throwsLeft = a.throwsLeft || 0; game.turn.selected = [false, false, false, false, false];
   }
   // tap your own board while spectating → see your usual during-turn screen (read-only preview).
   // the spectator queue is HELD while you're here, then resumes on RETURN.
@@ -1132,11 +1132,11 @@
     if (!netMode || localPid == null) return;
     var seat = netOrder.indexOf(localPid); if (seat < 0) return;
     // snapshot the watched view so RETURN restores it exactly (even if the active player hasn't rolled yet)
-    if (!specSelf) specSaved = { dice: dice.slice(), diceGen: diceGen.slice(), diceNew: diceNew.slice(), throwsLeft: throwsLeft,
-      selected: selected.slice(), specPairs: specPairs.slice(), specRollNo: specRollNo, specThrow: specThrow };
+    if (!specSelf) specSaved = { dice: game.turn.dice.slice(), diceGen: game.turn.diceGen.slice(), diceNew: game.turn.diceNew.slice(), throwsLeft: game.turn.throwsLeft,
+      selected: game.turn.selected.slice(), specPairs: specPairs.slice(), specRollNo: specRollNo, specThrow: specThrow };
     specSelf = true; specThrow = null;
-    game.current = seat; netMyTurn = false; aiBusy = false; awaitingRoll = false; locked = true;
-    dice = []; throwsLeft = 0; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false]; diceGen = [];
+    game.current = seat; netMyTurn = false; game.turn.aiBusy = false; game.turn.awaitingRoll = false; game.turn.locked = true;
+    game.turn.dice = []; game.turn.throwsLeft = 0; game.turn.selected = [false, false, false, false, false]; game.turn.diceNew = [false, false, false, false, false]; game.turn.diceGen = [];
     renderAll(); syncSpecReturn();
   }
   function returnToCurrent() {
@@ -1144,10 +1144,10 @@
     // always jump the board back to the current active player (don't require spectated dice to exist)
     var seat = netActiveId != null ? netOrder.indexOf(netActiveId) : -1;
     if (seat >= 0) {
-      game.current = seat; netMyTurn = (netActiveId === localPid); locked = !netMyTurn; awaitingRoll = false;
+      game.current = seat; netMyTurn = (netActiveId === localPid); game.turn.locked = !netMyTurn; game.turn.awaitingRoll = false;
       if (specSaved) {   // restore the exact watch-view we left
-        dice = specSaved.dice; diceGen = specSaved.diceGen; diceNew = specSaved.diceNew; throwsLeft = specSaved.throwsLeft;
-        selected = specSaved.selected; specPairs = specSaved.specPairs; specRollNo = specSaved.specRollNo; specThrow = specSaved.specThrow;
+        game.turn.dice = specSaved.dice; game.turn.diceGen = specSaved.diceGen; game.turn.diceNew = specSaved.diceNew; game.turn.throwsLeft = specSaved.throwsLeft;
+        game.turn.selected = specSaved.selected; specPairs = specSaved.specPairs; specRollNo = specSaved.specRollNo; specThrow = specSaved.specThrow;
       }
       renderAll();
     }
@@ -1198,11 +1198,11 @@
     var p = game.players[seat];
     p.persona = { name: 'AI', policy: netAiPolicy(seat) };     // synthetic persona feeding aiKeepMask/aiCategory
     netAiActiveId = activeId;
-    netMyTurn = false; awaitingRoll = false; locked = false;
-    throwsLeft = ROLLS - 1; selected = [false, false, false, false, false]; diceNew = [false, false, false, false, false];
-    dice = G.rollAll(); sortDice();
-    rollNo = 1; diceGen = dice.map(function () { return 1; });
-    curLog = startTurnLog(p);
+    netMyTurn = false; game.turn.awaitingRoll = false; game.turn.locked = false;
+    game.turn.throwsLeft = ROLLS - 1; game.turn.selected = [false, false, false, false, false]; game.turn.diceNew = [false, false, false, false, false];
+    game.turn.dice = G.rollAll(); sortDice();
+    game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
+    game.turn.curLog = startTurnLog(p);
     renderAll(); shakeDice(); showOrder(p);
     netSendAct();   // clients watch the host-driven AI seat roll
     runAiTurn();

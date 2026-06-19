@@ -9,6 +9,7 @@
     game = X.createGame(players);
     game.ruleset = 'experimental';
     game.manual = !!manual;
+    game.turn = freshTurn();
     game.ownerSkipped = skipOwnerNext; skipOwnerNext = false;
     undoStack = []; moveLog = players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
@@ -32,6 +33,7 @@
     game = X.createGame(players);
     game.ruleset = 'experimental';
     game.manual = false;
+    game.turn = freshTurn();
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
     undoStack = []; viewingHistory = false; moveLog = snap.moveLog || players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
@@ -42,75 +44,75 @@
     expBeginTurn();
   }
   function expBeginTurn() {
-    locked = false; rerolledAll = false; diceNew = [false, false, false, false, false]; diceGen = []; rollNo = 0;
+    game.turn.locked = false; game.turn.rerolledAll = false; game.turn.diceNew = [false, false, false, false, false]; game.turn.diceGen = []; game.turn.rollNo = 0;
     hintsOn = false; $('hintBtn').classList.remove('on'); $('hintBtn').classList.toggle('hidden', !exactReady || !settings.advice);  // hints need the exact table AND the advice toggle
     clearRoast();
     var p = G.currentPlayer(game);
     if (!netMode) saveResume();
     document.documentElement.style.setProperty('--pc', p.color);
-    selected = [false, false, false, false, false];
+    game.turn.selected = [false, false, false, false, false];
     if (gManual()) {                          // ОТЧЕТ: tap the five dice in, then pick a row
-      manualCounts = [0, 0, 0, 0, 0, 0, 0]; awaitingRoll = false; throwsLeft = 0; dice = []; curLog = null;
+      game.turn.manualCounts = [0, 0, 0, 0, 0, 0, 0]; game.turn.awaitingRoll = false; game.turn.throwsLeft = 0; game.turn.dice = []; game.turn.curLog = null;
       expRenderAll();
     } else if (p.isAI) {
-      awaitingRoll = false; throwsLeft = ROLLS - 1;
-      dice = G.rollAll(); sortDice();
-      rollNo = 1; diceGen = dice.map(function () { return 1; });
-      curLog = expStartLog(p);
+      game.turn.awaitingRoll = false; game.turn.throwsLeft = ROLLS - 1;
+      game.turn.dice = G.rollAll(); sortDice();
+      game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
+      game.turn.curLog = expStartLog(p);
       expRenderAll(); shakeDice();
       expRunAiTurn();
     } else {
-      awaitingRoll = true; throwsLeft = ROLLS - 1; dice = []; curLog = null;
+      game.turn.awaitingRoll = true; game.turn.throwsLeft = ROLLS - 1; game.turn.dice = []; game.turn.curLog = null;
       expRenderAll();
     }
   }
   // per-turn move log for skill/luck analysis (mask + upper-subtotal at turn start)
-  function expStartLog(p) { return exactReady ? { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, rolls: [dice.slice()], keeps: [] } : null; }
-  function expLogReroll(rr) { if (curLog) { curLog.keeps.push(rr.map(function (x) { return !x; })); curLog.rolls.push(dice.slice()); } }
+  function expStartLog(p) { return exactReady ? { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, rolls: [game.turn.dice.slice()], keeps: [] } : null; }
+  function expLogReroll(rr) { if (game.turn.curLog) { game.turn.curLog.keeps.push(rr.map(function (x) { return !x; })); game.turn.curLog.rolls.push(game.turn.dice.slice()); } }
   function expFirstRoll() {
-    if (!awaitingRoll || locked) return;
+    if (!game.turn.awaitingRoll || game.turn.locked) return;
     if (tut && !tutGate('roll')) return;
-    awaitingRoll = false; dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
-    rollNo = 1; diceGen = dice.map(function () { return 1; });
-    curLog = expStartLog(G.currentPlayer(game));
+    game.turn.awaitingRoll = false; game.turn.dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
+    game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
+    game.turn.curLog = expStartLog(G.currentPlayer(game));
     clearRoast(); expRenderAll(); shakeDice();
     if (tut) tutEvent('roll');
   }
   function expHumanFire() {
-    if (awaitingRoll) { expFirstRoll(); return; }   // first throw via the ХВЪРЛИ! button
-    if (aiBusy || locked || throwsLeft <= 0) return;
+    if (game.turn.awaitingRoll) { expFirstRoll(); return; }   // first throw via the ХВЪРЛИ! button
+    if (game.turn.aiBusy || game.turn.locked || game.turn.throwsLeft <= 0) return;
     if (tut) { tutReroll(); return; }               // tutorial: scripted reroll
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;
-    if (rr.every(Boolean)) rerolledAll = true;
+    if (rr.every(Boolean)) game.turn.rerolledAll = true;
     applyReroll(rr);
     expLogReroll(rr);
-    selected = [false, false, false, false, false];
-    throwsLeft--;
+    game.turn.selected = [false, false, false, false, false];
+    game.turn.throwsLeft--;
     expRenderAll(); shakeDice();
   }
   function expCommit(key, value) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || p.isAI || awaitingRoll || dice.length !== G.DICE_COUNT) return;
+    if (game.turn.aiBusy || game.turn.locked || p.isAI || game.turn.awaitingRoll || game.turn.dice.length !== G.DICE_COUNT) return;
     if (!X.canPlay(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     if (gManual() && !netMode) {
       // local ОПА can rewind this
-      undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
+      undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: game.turn.manualCounts.slice() });
     }
     // build the turn-log entry BEFORE assigning the score (mask = filled categories before this pick),
     // and record it locally for net games too (it used to be skipped) so history is complete here as well
     var expEnt = null;
-    if (gManual()) { if (exactReady) expEnt = { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: dice.slice(), category: key, manual: true }; }
-    else if (curLog) { curLog.category = key; expEnt = curLog; curLog = null; }
+    if (gManual()) { if (exactReady) expEnt = { mask: EVX.maskOfScores(p.scores), up: G.upperStateExp(p.scores).subtotal, dice: game.turn.dice.slice(), category: key, manual: true }; }
+    else if (game.turn.curLog) { game.turn.curLog.category = key; expEnt = game.turn.curLog; game.turn.curLog = null; }
     if (expEnt) moveLog[game.current].push(expEnt);
-    X.assignScore(p, key, dice, value);          // value omitted → the row's score for the dice
+    X.assignScore(p, key, game.turn.dice, value);          // value omitted → the row's score for the dice
     var committed = p.scores[key];
     // ---- net minus (manual / отчет): free-for-all — broadcast my entry, then reset for my next category ----
     if (netMode && gManual()) {
       flashTile(key);
-      if (net) net.submitMove({ category: catIndexOf(key), score: committed, rolls: [dice.slice()], keeps: [], log: expEnt ? JSON.stringify(expEnt) : '' });
-      locked = true; renderAll();
+      if (net) net.submitMove({ category: catIndexOf(key), score: committed, rolls: [game.turn.dice.slice()], keeps: [], log: expEnt ? JSON.stringify(expEnt) : '' });
+      game.turn.locked = true; renderAll();
       setTimeout(beginManualEntry, END_DELAY);
       return;
     }
@@ -118,15 +120,15 @@
     if (netMode && !gManual()) {
       if (tut) tutEvent('commit');
       var log = expEnt;
-      locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
+      game.turn.locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
       netSendAct({ commit: true, category: catIndexOf(key), value: committed });   // spectators see the category go in
-      var mv = { category: catIndexOf(key), score: committed, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
+      var mv = { category: catIndexOf(key), score: committed, rolls: log ? log.rolls : [game.turn.dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
       return;
     }
     if (tut) tutEvent('commit');
-    locked = true; expRenderAll(); $('fire').disabled = true;
+    game.turn.locked = true; expRenderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
     var delay = END_DELAY;
     if (!gManual() && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
@@ -138,7 +140,7 @@
     if (tut) { while (game.players[game.current].isAI) X.nextTurn(game); }   // tutorial: the opponent never plays
     expBeginTurn();
   }
-  function expRunAiTurn() { aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
+  function expRunAiTurn() { game.turn.aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
 
   // ----- EXACT penalty-aware evaluator (reuses the engine reroll DP, threading the upper subtotal) -----
   function expStageUp(prev) {
@@ -266,26 +268,26 @@
   }
   function expRenderHint() {
     var line = $('hintLine'), p = G.currentPlayer(game);
-    var show = hintsOn && exactReady && !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    var show = hintsOn && exactReady && !p.isAI && !game.turn.locked && !game.turn.awaitingRoll && game.turn.dice.length === G.DICE_COUNT;
     if (!show) { line.classList.add('hidden'); return; }
     var head, alts;
-    if (throwsLeft > 0) {
+    if (game.turn.throwsLeft > 0) {
       head = 'Щабът съветва:';
       var ranked = X.availableKeys(p).map(function (key) {
-        var keep = X.keepFor(key, dice);
-        return { key: key, keep: keep, ev: expKeepValue(p.scores, dice, throwsLeft, keep) };
+        var keep = X.keepFor(key, game.turn.dice);
+        return { key: key, keep: keep, ev: expKeepValue(p.scores, game.turn.dice, game.turn.throwsLeft, keep) };
       }).sort(function (a, b) { return b.ev - a.ev; });
       var sigSeen = {}, opts = [];
       ranked.forEach(function (o) { if (opts.length >= 3) return; var sig = o.keep.map(function (b) { return b ? 1 : 0; }).join(''); if (sigSeen[sig]) return; sigSeen[sig] = 1; opts.push(o); });
       alts = opts.map(function (o) {
-        var kept = dice.filter(function (v, j) { return o.keep[j]; }), tname = EXP_LABEL[o.key] || o.key;
+        var kept = game.turn.dice.filter(function (v, j) { return o.keep[j]; }), tname = EXP_LABEL[o.key] || o.key;
         if (kept.length === G.DICE_COUNT) return '<span class="kr">спри · отчети <b>' + esc(tname) + '</b></span>';
         var dd = kept.length ? '<span class="krd">' + kept.map(hintDie).join('') + '</span>' : '<span class="kr-none">нищо</span>';
         return '<span class="kr">дръж ' + dd + ' · търсиш <b>' + esc(tname) + '</b></span>';
       }).join('');
     } else {
       head = 'Щабът съветва да отчетеш:';
-      alts = expRankCategories(p.scores, dice).slice(0, 3).map(function (c) { return '<span class="kr"><b>' + esc(EXP_LABEL[c.key] || c.key) + '</b></span>'; }).join('');
+      alts = expRankCategories(p.scores, game.turn.dice).slice(0, 3).map(function (c) { return '<span class="kr"><b>' + esc(EXP_LABEL[c.key] || c.key) + '</b></span>'; }).join('');
     }
     line.innerHTML = '<div class="hh">' + esc(head) + '</div><div class="krs">' + alts + '</div>';
     line.classList.remove('hidden');
@@ -322,22 +324,22 @@
   }
 
   function expAiKeeps(p) {
-    if (exactReady && p.persona) return expBotKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
-    if (evxReady && p.persona) return EVX.botKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
-    return X.aiKeeps(p, dice);
+    if (exactReady && p.persona) return expBotKeep(p.scores, game.turn.dice, game.turn.throwsLeft, p.persona.policy, Math.random);
+    if (evxReady && p.persona) return EVX.botKeep(p.scores, game.turn.dice, game.turn.throwsLeft, p.persona.policy, Math.random);
+    return X.aiKeeps(p, game.turn.dice);
   }
   function expAiStep() {
     var p = G.currentPlayer(game);
-    if (throwsLeft > 0) {
+    if (game.turn.throwsLeft > 0) {
       var holds = expAiKeeps(p);
-      selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
+      game.turn.selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
       var rr = rerollMask();
       if (rr.some(Boolean)) {
         expRenderDice();
         setTimeout(function () {
-          applyReroll(rr); expLogReroll(rr); selected = [false, false, false, false, false]; throwsLeft--;
+          applyReroll(rr); expLogReroll(rr); game.turn.selected = [false, false, false, false, false]; game.turn.throwsLeft--;
           expRenderAll(); shakeDice();
-          setTimeout(throwsLeft > 0 ? expAiStep : expAiFinish, AI_DELAY);
+          setTimeout(game.turn.throwsLeft > 0 ? expAiStep : expAiFinish, AI_DELAY);
         }, AI_DELAY * 0.65);
         return;
       }
@@ -362,12 +364,12 @@
   }
   function expAiFinish() {
     var p = G.currentPlayer(game);
-    var key = (exactReady && p.persona) ? expBotCategory(p.scores, dice, p.persona.policy, Math.random)
-            : (evxReady && p.persona) ? expChooseKeyEV(p, dice) : X.aiChooseKey(p, dice);
-    aiBusy = false;
-    if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
-    X.assignScore(p, key, dice);
-    locked = true; expRenderAll(); $('fire').disabled = true;
+    var key = (exactReady && p.persona) ? expBotCategory(p.scores, game.turn.dice, p.persona.policy, Math.random)
+            : (evxReady && p.persona) ? expChooseKeyEV(p, game.turn.dice) : X.aiChooseKey(p, game.turn.dice);
+    game.turn.aiBusy = false;
+    if (game.turn.curLog) { game.turn.curLog.category = key; moveLog[game.current].push(game.turn.curLog); game.turn.curLog = null; }
+    X.assignScore(p, key, game.turn.dice);
+    game.turn.locked = true; expRenderAll(); $('fire').disabled = true;
     turnTimer = setTimeout(expEndTurn, AI_VIEW_DELAY);
   }
 
@@ -425,13 +427,13 @@
   // plus a number-part status bar (running Σ and the −50 risk).
   function expRenderBoard() {
     var p = G.currentPlayer(game), sc = p.scores;
-    var canScore = !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
-    var watchPrev = netWatching() && dice.length === G.DICE_COUNT, showPrev = canScore || watchPrev;   // spectators see read-only previews
+    var canScore = !p.isAI && !game.turn.locked && !game.turn.awaitingRoll && game.turn.dice.length === G.DICE_COUNT;
+    var watchPrev = netWatching() && game.turn.dice.length === G.DICE_COUNT, showPrev = canScore || watchPrev;   // spectators see read-only previews
     // ---- number part (deviation tiles) ----
     $('boardUpper').innerHTML = '';
     G.CATEGORIES_EXP.filter(function (c) { return c.group === 'upper'; }).forEach(function (c) {
       var key = c.key, done = typeof sc[key] === 'number', open = canScore && !done, prev = showPrev && !done;
-      var dev = done ? sc[key] : (showPrev ? G.scoreForExp(key, dice) : null);
+      var dev = done ? sc[key] : (showPrev ? G.scoreForExp(key, game.turn.dice) : null);
       var val = done ? sc[key] : (prev ? dev : null);
       var sign = val == null ? '' : (val > 0 ? ' pos' : val < 0 ? ' neg' : ' zero');   // colour the number by value
       var el = document.createElement('button');
@@ -453,7 +455,7 @@
         row.innerHTML = head + '<span class="acts"></span>';
         var acts = row.querySelector('.acts');
         if (showPrev) {
-          var v = G.scoreForExp(key, dice);
+          var v = G.scoreForExp(key, game.turn.dice);
           if (v > 0) { var chip = document.createElement('button'); chip.className = 'chip'; chip.textContent = v; if (canScore) chip.onclick = function (e) { e.stopPropagation(); expCommit(key, v); }; else chip.disabled = true; acts.appendChild(chip); }
           var x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'откажи се'); if (canScore) x.onclick = function (e) { e.stopPropagation(); expCommit(key, 0); }; else x.disabled = true; acts.appendChild(x);
           if (canScore) { row.style.cursor = 'pointer'; row.onclick = function () { v > 0 ? expCommit(key, v) : expCommit(key, 0); }; }
@@ -488,34 +490,34 @@
   function expRenderDice() {
     var p = G.currentPlayer(game);
     var box = $('dice'); box.innerHTML = '';
-    if (awaitingRoll) {
+    if (game.turn.awaitingRoll) {
       for (var k = 0; k < G.DICE_COUNT; k++) {
         var g = document.createElement('button'); g.className = 'die preroll'; g.disabled = true; g.setAttribute('aria-hidden', 'true'); box.appendChild(g);
       }
       var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>'; $('throws').innerHTML = td; return;
     }
-    var interactive = !p.isAI && !locked && throwsLeft > 0;
-    var batchMode = activeBatch() && diceGen.length === dice.length;   // group by roll instead of accenting
-    dice.forEach(function (v, i) {
-      if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {
+    var interactive = !p.isAI && !game.turn.locked && game.turn.throwsLeft > 0;
+    var batchMode = activeBatch() && game.turn.diceGen.length === game.turn.dice.length;   // group by roll instead of accenting
+    game.turn.dice.forEach(function (v, i) {
+      if (batchMode && i > 0 && game.turn.diceGen[i] !== game.turn.diceGen[i - 1]) {
         var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true'); box.appendChild(sep);
       }
       var b = document.createElement('button');
-      var sel = selected[i], keepMode = activeKeep(), fresh = !batchMode && diceNew[i];
+      var sel = game.turn.selected[i], keepMode = activeKeep(), fresh = !batchMode && game.turn.diceNew[i];
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
       b.disabled = !interactive; b.setAttribute('data-i', i);
       b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
       if (interactive) b.onclick = function () { toggleSelect(i); };
       box.appendChild(b);
     });
-    var t = ''; for (var r = 0; r < ROLLS - 1; r++) t += '<span class="tdot' + (r < throwsLeft ? ' on' : '') + '"></span>';
+    var t = ''; for (var r = 0; r < ROLLS - 1; r++) t += '<span class="tdot' + (r < game.turn.throwsLeft ? ' on' : '') + '"></span>';
     $('throws').innerHTML = t;
   }
   function expRenderFire() {
     $('fire').classList.remove('muted');   // clear leftover spectator styling (e.g. after a net minus game)
     syncRollAll();
     var p = G.currentPlayer(game);
-    if (awaitingRoll) {
+    if (game.turn.awaitingRoll) {
       $('bottombar').classList.add('preroll');
       $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
       var fa = $('fire'); fa.classList.remove('hidden'); fa.disabled = false; $('fireTxt').textContent = 'ХВЪРЛИ!'; return;
@@ -523,17 +525,17 @@
     $('bottombar').classList.remove('preroll');
     $('rollHint').classList.add('hidden');
     var fire = $('fire'), think = $('aiThinking');
-    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
+    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !game.turn.aiBusy); return; }
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
-    var keep = activeKeep(), someSel = selected.some(Boolean), txt;
-    if (locked) { txt = '…'; fire.disabled = true; }
-    else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
+    var keep = activeKeep(), someSel = game.turn.selected.some(Boolean), txt;
+    if (game.turn.locked) { txt = '…'; fire.disabled = true; }
+    else if (game.turn.throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
     else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
     $('fireTxt').textContent = txt;
   }
   function expEndGame() {
-    locked = true;
+    game.turn.locked = true;
     if (!viewingHistory) { archiveExpGame(); clearResume(); trackGame('finish'); if (netMode) netActiveClear(); }
     showGameOver(X.ranking(game)[0].player);   // same end screen as standard, sourced from the exp ruleset
   }

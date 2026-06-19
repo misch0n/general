@@ -4,36 +4,36 @@
   // engine-backed persona policy when the EV table is ready; else heuristic.
   function aiKeepMask(p) {
     if (evReady && p.persona) {
-      var keep = EV.botKeep(p.scores, dice, throwsLeft, p.persona.policy, Math.random);
+      var keep = EV.botKeep(p.scores, game.turn.dice, game.turn.throwsLeft, p.persona.policy, Math.random);
       return keep; // boolean[5], true = keep
     }
-    return G.aiChooseHolds(dice); // heuristic fallback (true = keep)
+    return G.aiChooseHolds(game.turn.dice); // heuristic fallback (true = keep)
   }
   function aiCategory(p) {
     if (evReady && p.persona) {
-      var key = EV.botCategory(p.scores, dice, p.persona.policy, Math.random);
-      return { category: key, value: G.scoreFor(key, dice) };
+      var key = EV.botCategory(p.scores, game.turn.dice, p.persona.policy, Math.random);
+      return { category: key, value: G.scoreFor(key, game.turn.dice) };
     }
-    return G.aiChooseCategory(p, dice);
+    return G.aiChooseCategory(p, game.turn.dice);
   }
-  function runAiTurn() { aiBusy = true; renderFire(); setTimeout(aiStep, AI_DELAY); }
+  function runAiTurn() { game.turn.aiBusy = true; renderFire(); setTimeout(aiStep, AI_DELAY); }
   function aiStep() {
     var p = G.currentPlayer(game);
-    if (throwsLeft > 0) {
+    if (game.turn.throwsLeft > 0) {
       var holds = aiKeepMask(p);                    // true = keep this die
       // mark the dice the same way a human would under the active setting (keep vs throw)
-      selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
+      game.turn.selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
       var rr = rerollMask();
       if (rr.some(Boolean)) {
         renderDice();
         setTimeout(function () {
           var kept = rr.map(function (x) { return !x; });
           applyReroll(rr);
-          if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
-          selected = [false,false,false,false,false]; throwsLeft--;
+          if (game.turn.curLog) { game.turn.curLog.keeps.push(kept); game.turn.curLog.rolls.push(game.turn.dice.slice()); }
+          game.turn.selected = [false,false,false,false,false]; game.turn.throwsLeft--;
           renderAll(); shakeDice();
           netSendAct();   // clients watch the AI seat's reroll
-          setTimeout(throwsLeft > 0 ? aiStep : aiFinish, AI_DELAY);
+          setTimeout(game.turn.throwsLeft > 0 ? aiStep : aiFinish, AI_DELAY);
         }, AI_DELAY * 0.65);
         return;
       }
@@ -43,8 +43,8 @@
   function aiFinish() {
     var p = G.currentPlayer(game);
     var choice = aiCategory(p);
-    aiBusy = false;
-    if (choice.value > 0) G.assignScore(p, choice.category, dice, choice.value);
+    game.turn.aiBusy = false;
+    if (choice.value > 0) G.assignScore(p, choice.category, game.turn.dice, choice.value);
     else G.forfeitScore(p, choice.category);
     afterCommit(choice.category, choice.value);
   }
@@ -97,7 +97,7 @@
   var penalties = [], tipHideTimer = null, refundTimer = null;
 
   function comboReminder(key, anchor) {
-    if (locked || !fun()) return;
+    if (game.turn.locked || !fun()) return;
     // measure the anchor BEFORE the penalty re-renders the board (which would
     // detach it and zero its rect, dumping the tooltip in the top-left corner)
     var r = anchor.getBoundingClientRect();
@@ -172,7 +172,7 @@
     var filledK = allKeys.filter(function (k) { return G.isCategoryFilled(p, k) && !usedBlank[k]; });
     var hideK = allKeys.filter(function (k) { return !usedHide[k]; });
     var remaining = G.DICE_COUNT - removed;
-    var diceMode = !gManual() && dice.length === G.DICE_COUNT && !awaitingRoll;
+    var diceMode = !gManual() && game.turn.dice.length === G.DICE_COUNT && !game.turn.awaitingRoll;
     var freeIdx = []; for (var i = 0; i < remaining; i++) if (!usedIdx[i]) freeIdx.push(i);
 
     // the full prank set (penalties only fire in казарма mode, gated upstream).
@@ -248,7 +248,7 @@
     if (pretend) f.pretendNext = true;
     if (lose) f.youlose = true;
     if (faces.length || removed > 0) {
-      var shown = dice.slice();
+      var shown = game.turn.dice.slice();
       faces.forEach(function (q) { if (q.index < shown.length) shown[q.index] = q.face; });
       if (faces.length) f.dice = shown;
       if (removed > 0) f.diceKeep = Math.max(0, G.DICE_COUNT - removed);

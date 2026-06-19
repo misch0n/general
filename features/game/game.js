@@ -2,19 +2,25 @@
 // Core game loop: state, board render, manual mode, dice interaction, commit / turn flow.
 
   // ===================================================== GAME STATE
-  var game = null, dice = [], selected = [false,false,false,false,false], diceNew = [false,false,false,false,false], throwsLeft = 0;
-  // „Нов набор зарове" (experimental): per-die generation = the roll it was last thrown in. Parallel to `dice`;
-  // used to group the tray (kept-longest left → newest right) instead of accenting. Empty = feature inactive this turn.
-  var diceGen = [], rollNo = 0;
-  var aiBusy = false, locked = false, rerolledAll = false, roastIx = 0, roastTimer = null;
+  // Per-turn state lives on `game.turn` (one object, reset each turn) — see freshTurn().
+  // turn.diceGen ("Нов набор зарове"): per-die generation = the roll a die was last thrown in. Parallel
+  // to turn.dice; groups the tray (kept-longest left → newest right) instead of accenting. Empty = off.
+  var game = null;
+  var roastIx = 0, roastTimer = null;
   var moveLog = [];   // per player index: array of completed turn logs
-  var curLog = null;  // the in-progress turn log
+  // the live per-turn fields, defaulted; beginTurn() overwrites them at each turn boundary
+  function freshTurn() {
+    return { dice: [], selected: [false, false, false, false, false],
+             diceNew: [false, false, false, false, false], diceGen: [], throwsLeft: 0, rollNo: 0,
+             awaitingRoll: false, locked: false, aiBusy: false, rerolledAll: false,
+             manualCounts: [0, 0, 0, 0, 0, 0, 0], curLog: null };
+  }
   // seed the turn's move-log for the active ruleset. Net minus games run the standard turn path
   // but score by EXP rules, so they need the EXP log shape — otherwise nothing is logged and the
   // end-game summary can't analyse (players unclickable, only the category board shows).
   function startTurnLog(p) {
     return sumExp() ? expStartLog(p)
-      : (evReady ? { mask: EV.maskOfScores(p.scores), rolls: [dice.slice()], keeps: [] } : null);
+      : (evReady ? { mask: EV.maskOfScores(p.scores), rolls: [game.turn.dice.slice()], keeps: [] } : null);
   }
   var hintsOn = false;
   var skipOwnerNext = false; // when set, the next game is NOT attributed to the owner (someone else is playing)
@@ -25,7 +31,7 @@
   var netPhase = 'choose', netMe = null, netMyReady = false, netAiActiveId = null, netMetaTimer = null; // lobby preparation + host AI takeover
   var netActiveId = null, specSelf = false, specAct = null, specSaved = null;   // spectating: who's playing, am I previewing my own board, last action, saved watch-view
   // true while we're rendering a watched opponent's read-only frame (not my turn, not my own-board preview)
-  function netWatching() { return netMode && locked && !netMyTurn && !specSelf && netActiveId != null && netActiveId !== localPid; }
+  function netWatching() { return netMode && game.turn.locked && !netMyTurn && !specSelf && netActiveId != null && netActiveId !== localPid; }
   var CAT_INDEX = {}, CAT_KEYS = G.CATEGORIES.map(function (c) { return c.key; }); G.CATEGORIES.forEach(function (c, i) { CAT_INDEX[c.key] = i; });
   // experimental category space (for net minus games — the move protocol indexes into THIS list)
   var CAT_INDEX_EXP = {}, CAT_KEYS_EXP = G.CATEGORIES_EXP.map(function (c) { return c.key; }); G.CATEGORIES_EXP.forEach(function (c, i) { CAT_INDEX_EXP[c.key] = i; });
@@ -34,8 +40,6 @@
   function catKeyAt(i) { return (sumExp() ? CAT_KEYS_EXP : CAT_KEYS)[i]; }
   var undoStack = [];      // manual-mode action log for ОПА (taps + commits)
   var summary = null;      // end-game summary state (tab, selected player)
-  var manualCounts = [0,0,0,0,0,0,0]; // manual: tapped dice per face (the 5-dice entry)
-  var awaitingRoll = false; // dice mode: first roll happens on a tap of the dice
   var tut = null;          // active tutorial controller (scripted dice + coach bubbles), null otherwise
   var fx = {};             // combo-reminder penalties folded into one override (see rebuildFx)
 
@@ -51,6 +55,7 @@
     game.ownerSkipped = skipOwnerNext || ownerDetached; // record so this game is excluded from owner trends
     skipOwnerNext = false; ownerDetached = false;        // the skip/detach is a one-game decision
     game.manual = !!manual;
+    game.turn = freshTurn();
     trackGame('start');
     undoStack = [];
     moveLog = players.map(function () { return []; });
@@ -70,7 +75,7 @@
     game = G.createGame(reconstructPlayers(snap));
     game.ruleset = 'standard';
     game.current = snap.current || 0; game.round = snap.round || 1; game.ownerSkipped = !!snap.ownerSkipped;
-    game.manual = !!snap.manualMode; undoStack = []; viewingHistory = false;
+    game.manual = !!snap.manualMode; game.turn = freshTurn(); undoStack = []; viewingHistory = false;
     moveLog = snap.moveLog || game.players.map(function () { return []; });
     $('setup').classList.add('hidden'); $('game').classList.remove('hidden'); $('overModal').classList.add('hidden');
     paintCamo($('game'));
@@ -138,10 +143,10 @@
   };
 
   function beginTurn() {
-    locked = false;
-    rerolledAll = false;
-    diceNew = [false, false, false, false, false];   // no "fresh" accent on a turn's first roll
-    diceGen = []; rollNo = 0;                          // generations are seeded by the turn's first roll
+    game.turn.locked = false;
+    game.turn.rerolledAll = false;
+    game.turn.diceNew = [false, false, false, false, false];   // no "fresh" accent on a turn's first roll
+    game.turn.diceGen = []; game.turn.rollNo = 0;                          // generations are seeded by the turn's first roll
     hintsOn = false; $('hintBtn').classList.remove('on');   // advice is per-turn: re-click each turn
     clearRoast();
     var p = G.currentPlayer(game);
@@ -149,36 +154,36 @@
     document.documentElement.style.setProperty('--pc', p.color);
     if (netMode) {
       // the active player drives input on their own device; everyone else watches
-      selected = [false, false, false, false, false];
-      dice = []; throwsLeft = 0; curLog = null;
-      if (netMyTurn) { awaitingRoll = true; locked = false; throwsLeft = ROLLS - 1; renderAll(); showOrder(p); }   // my turn: a first roll + (ROLLS-1) rerolls
-      else { awaitingRoll = false; locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
+      game.turn.selected = [false, false, false, false, false];
+      game.turn.dice = []; game.turn.throwsLeft = 0; game.turn.curLog = null;
+      if (netMyTurn) { game.turn.awaitingRoll = true; game.turn.locked = false; game.turn.throwsLeft = ROLLS - 1; renderAll(); showOrder(p); }   // my turn: a first roll + (ROLLS-1) rerolls
+      else { game.turn.awaitingRoll = false; game.turn.locked = true; renderAll(); netSay('Ход на ' + esc(p.name) + '…'); }
       return;
     }
     if (gManual()) {
-      manualCounts = [0,0,0,0,0,0,0];
-      dice = []; throwsLeft = 0; curLog = null;
+      game.turn.manualCounts = [0,0,0,0,0,0,0];
+      game.turn.dice = []; game.turn.throwsLeft = 0; game.turn.curLog = null;
       renderAll();
       showOrder(p);
       return;
     }
-    selected = [false,false,false,false,false];
+    game.turn.selected = [false,false,false,false,false];
     if (p.isAI) {
       // AI rolls immediately
-      awaitingRoll = false;
-      throwsLeft = ROLLS - 1;
-      dice = G.rollAll(); sortDice();
-      rollNo = 1; diceGen = dice.map(function () { return 1; });
-      curLog = startTurnLog(p);
+      game.turn.awaitingRoll = false;
+      game.turn.throwsLeft = ROLLS - 1;
+      game.turn.dice = G.rollAll(); sortDice();
+      game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });
+      game.turn.curLog = startTurnLog(p);
       renderAll(); shakeDice(); showOrder(p);
       runAiTurn();
     } else {
       // human: the first roll waits for a tap of the dice — adds anticipation
       // after the general's order
-      awaitingRoll = true;
-      throwsLeft = ROLLS - 1;
-      dice = [];
-      curLog = null;
+      game.turn.awaitingRoll = true;
+      game.turn.throwsLeft = ROLLS - 1;
+      game.turn.dice = [];
+      game.turn.curLog = null;
       renderAll();
       showOrder(p);
     }
@@ -186,13 +191,13 @@
 
   // the human's first throw of the turn, triggered by tapping the dice tray
   function firstRoll() {
-    if (!awaitingRoll || locked) return;
+    if (!game.turn.awaitingRoll || game.turn.locked) return;
     if (tut && !tutGate('roll')) return;          // tutorial: only roll on a roll step
     var p = G.currentPlayer(game);
-    awaitingRoll = false;
-    dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
-    rollNo = 1; diceGen = dice.map(function () { return 1; });   // first throw: every die is generation 1
-    curLog = startTurnLog(p);
+    game.turn.awaitingRoll = false;
+    game.turn.dice = (tut && tut.dice) ? tut.dice.slice() : G.rollAll(); sortDice();
+    game.turn.rollNo = 1; game.turn.diceGen = game.turn.dice.map(function () { return 1; });   // first throw: every die is generation 1
+    game.turn.curLog = startTurnLog(p);
     clearRoast();
     renderAll();
     shakeDice();
@@ -205,7 +210,7 @@
     var prev = {}, cand = {}, best = null, bestVal = 0;
     G.CATEGORIES.forEach(function (c) {
       if (G.isCategoryFilled(player, c.key)) return;
-      var cs = G.candidates(c.key, dice);
+      var cs = G.candidates(c.key, game.turn.dice);
       cand[c.key] = cs;
       prev[c.key] = Math.max.apply(null, cs);
       if (prev[c.key] > bestVal) { bestVal = prev[c.key]; best = c.key; }
@@ -252,17 +257,17 @@
   function renderHint() {
     var line = $('hintLine');
     var p = G.currentPlayer(game);
-    var show = hintsOn && evReady && !p.isAI && !locked && !awaitingRoll && dice.length === G.DICE_COUNT;
+    var show = hintsOn && evReady && !p.isAI && !game.turn.locked && !game.turn.awaitingRoll && game.turn.dice.length === G.DICE_COUNT;
     if (!show) { line.classList.add('hidden'); return; }
     var head, alts;
-    if (throwsLeft > 0) {
+    if (game.turn.throwsLeft > 0) {
       head = 'Щабът съветва:';
       // for each open category use its NATURAL keep, rank by EV, then dedupe by the
       // kept-dice signature so the three lines are genuinely different directions
       var mask = EV.maskOfScores(p.scores);
       var ranked = G.CATEGORIES.filter(function (c) { return !G.isCategoryFilled(p, c.key); }).map(function (c) {
-        var keep = keepForTarget(dice, c.key);
-        return { key: c.key, keep: keep, ev: EV.keepValue(mask, dice, throwsLeft, keep) };
+        var keep = keepForTarget(game.turn.dice, c.key);
+        return { key: c.key, keep: keep, ev: EV.keepValue(mask, game.turn.dice, game.turn.throwsLeft, keep) };
       }).sort(function (a, b) { return b.ev - a.ev; });
       var sigSeen = {}, opts = [];
       ranked.forEach(function (o) {
@@ -272,7 +277,7 @@
         sigSeen[sig] = 1; opts.push(o);
       });
       alts = opts.map(function (o) {
-        var kept = dice.filter(function (v, j) { return o.keep[j]; });
+        var kept = game.turn.dice.filter(function (v, j) { return o.keep[j]; });
         var tname = G.ORDER_NAMES[o.key] || o.key;
         if (kept.length === G.DICE_COUNT) return '<span class="kr">спри · отчети <b>' + esc(tname) + '</b></span>';
         var d = kept.length ? '<span class="krd">' + kept.map(hintDie).join('') + '</span>' : '<span class="kr-none">нищо</span>';
@@ -280,7 +285,7 @@
       }).join('');
     } else {
       head = 'Щабът съветва да отчетеш:';
-      var ev = EV.evaluate(p.scores, dice, throwsLeft);
+      var ev = EV.evaluate(p.scores, game.turn.dice, game.turn.throwsLeft);
       alts = ev.category_ranked.slice(0, 3).map(function (c) {
         return '<span class="kr"><b>' + esc(G.ORDER_NAMES[c.key] || c.key) + '</b></span>';
       }).join('');
@@ -355,11 +360,11 @@
     var p = G.currentPlayer(game);
     // manual mode reuses the regular board: once all 5 table dice are tapped in,
     // every open category shows its suggestion chip exactly like in normal play
-    var pv = dice.length === G.DICE_COUNT ? computePreviews(p) : { prev: {}, cand: {}, best: null };
-    var canScore = !locked && dice.length === G.DICE_COUNT && !fx.lock
-      && (gManual() || (!p.isAI && !awaitingRoll));
+    var pv = game.turn.dice.length === G.DICE_COUNT ? computePreviews(p) : { prev: {}, cand: {}, best: null };
+    var canScore = !game.turn.locked && game.turn.dice.length === G.DICE_COUNT && !fx.lock
+      && (gManual() || (!p.isAI && !game.turn.awaitingRoll));
     // spectators see the same combo previews for the watched dice (read-only — no commit handlers)
-    var watchPrev = netWatching() && dice.length === G.DICE_COUNT;
+    var watchPrev = netWatching() && game.turn.dice.length === G.DICE_COUNT;
     var showPrev = canScore || watchPrev;
     var hidden = fx.hide || [], blanked = fx.blank || [];
 
@@ -434,30 +439,30 @@
 
   function manualDiceArray() {
     var d = [];
-    for (var f = 1; f <= 6; f++) for (var k = 0; k < manualCounts[f]; k++) d.push(f);
+    for (var f = 1; f <= 6; f++) for (var k = 0; k < game.turn.manualCounts[f]; k++) d.push(f);
     return d;
   }
 
   function renderManualDock() {
     var sel = $('manualSel'), diceBox = $('manualDice');
-    var n = dice.length;
+    var n = game.turn.dice.length;
     sel.innerHTML = n < G.DICE_COUNT
       ? 'Удари заровете от масата · <b class="livescore">' + n + '/' + G.DICE_COUNT + '</b>'
       : 'Избери категория от таблото ↑';
     diceBox.innerHTML = '';
     for (var f = 1; f <= 6; f++) (function (face) {
       var b = document.createElement('button');
-      b.className = 'die mdie' + (manualCounts[face] ? ' counted' : '');
-      b.innerHTML = pipFace(face) + (manualCounts[face] ? '<span class="mcount">' + manualCounts[face] + '</span>' : '');
+      b.className = 'die mdie' + (game.turn.manualCounts[face] ? ' counted' : '');
+      b.innerHTML = pipFace(face) + (game.turn.manualCounts[face] ? '<span class="mcount">' + game.turn.manualCounts[face] + '</span>' : '');
       b.onclick = function () { tapManualDie(face); };  // tap to count; ОПА removes the last tap
       diceBox.appendChild(b);
     })(f);
   }
   function tapManualDie(face) {
-    if (locked) return;
-    if (dice.length >= G.DICE_COUNT) return; // a roll is 5 dice
-    manualCounts[face]++;
-    dice = manualDiceArray();
+    if (game.turn.locked) return;
+    if (game.turn.dice.length >= G.DICE_COUNT) return; // a roll is 5 dice
+    game.turn.manualCounts[face]++;
+    game.turn.dice = manualDiceArray();
     undoStack.push({ t: 'tap', face: face });
     gExp() ? expRenderAll() : renderAll();
   }
@@ -470,17 +475,17 @@
     $('overModal').classList.add('hidden');     // in case we're undoing the final entry
     var a = undoStack.pop();
     if (a.t === 'tap') {
-      if (manualCounts[a.face] > 0) manualCounts[a.face]--;
-      dice = manualDiceArray();
+      if (game.turn.manualCounts[a.face] > 0) game.turn.manualCounts[a.face]--;
+      game.turn.dice = manualDiceArray();
     } else { // commit
       delete game.players[a.playerIdx].scores[a.key];
       game.current = a.playerIdx;
       game.round = a.prevRound;
       if (moveLog[a.playerIdx] && moveLog[a.playerIdx].length) moveLog[a.playerIdx].pop();
-      manualCounts = a.counts.slice();
-      dice = manualDiceArray();
+      game.turn.manualCounts = a.counts.slice();
+      game.turn.dice = manualDiceArray();
     }
-    locked = false;
+    game.turn.locked = false;
     clearRoast();
     gExp() ? expRenderAll() : renderAll();
   }
@@ -491,7 +496,7 @@
     if (gManual()) return;
     var p = G.currentPlayer(game);
     var box = $('dice'); box.innerHTML = '';
-    if (awaitingRoll) {
+    if (game.turn.awaitingRoll) {
       // before the first throw: dimmed placeholder dice (no ?), the throw happens via the ХВЪРЛИ! button
       for (var k = 0; k < G.DICE_COUNT; k++) {
         var g = document.createElement('button'); g.className = 'die preroll'; g.disabled = true; g.setAttribute('aria-hidden', 'true');
@@ -501,24 +506,24 @@
       $('throws').innerHTML = td;
       return;
     }
-    var interactive = !p.isAI && !locked && throwsLeft > 0 && !fx.lock;
+    var interactive = !p.isAI && !game.turn.locked && game.turn.throwsLeft > 0 && !fx.lock;
     var watching = netWatching();   // rendering a watched opponent's frame (read-only)
     // penalty overrides: swap the dice, or hide some (centred remainder)
-    var shown = fx.dice ? fx.dice : dice;
+    var shown = fx.dice ? fx.dice : game.turn.dice;
     if (fx.diceKeep != null) shown = shown.slice(0, fx.diceKeep);
     // „Нови зарове": group the tray by generation (separators) instead of accenting. While watching,
     // it follows THE WATCHER's own setting (not the active player's), for easy scanning of new dice.
-    var batchMode = (watching ? settings.newDiceBatch : activeBatch()) && !fx.dice && fx.diceKeep == null && diceGen.length === shown.length;
+    var batchMode = (watching ? settings.newDiceBatch : activeBatch()) && !fx.dice && fx.diceKeep == null && game.turn.diceGen.length === shown.length;
     shown.forEach(function (v, i) {
-      if (batchMode && i > 0 && diceGen[i] !== diceGen[i - 1]) {   // a generation boundary → divider between groups
+      if (batchMode && i > 0 && game.turn.diceGen[i] !== game.turn.diceGen[i - 1]) {   // a generation boundary → divider between groups
         var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true');
         $('dice').appendChild(sep);
       }
       var b = document.createElement('button');
-      var sel = !watching && !fx.dice && fx.diceKeep == null && selected[i];
-      var fresh = !batchMode && !fx.dice && fx.diceKeep == null && diceNew[i];   // freshly thrown — gold accent (off in batch mode)
+      var sel = !watching && !fx.dice && fx.diceKeep == null && game.turn.selected[i];
+      var fresh = !batchMode && !fx.dice && fx.diceKeep == null && game.turn.diceNew[i];   // freshly thrown — gold accent (off in batch mode)
       var throwing = watching && specThrow && specThrow[i];                       // watcher: dice about to be re-thrown
-      var specNew = specPulseOn && diceGen.length === shown.length && diceGen[i] === specRollNo;   // watcher: pulse the just-thrown dice
+      var specNew = specPulseOn && game.turn.diceGen.length === shown.length && game.turn.diceGen[i] === specRollNo;   // watcher: pulse the just-thrown dice
       var keepMode = activeKeep();
       b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '') + (throwing ? ' throwing' : '') + (specNew ? ' spec-pulse' : '');
       b.disabled = !interactive; b.setAttribute('data-i', i);
@@ -527,7 +532,7 @@
       if (interactive) b.onclick = function () { toggleSelect(i); };
       $('dice').appendChild(b);
     });
-    var t = ''; for (var k = 0; k < ROLLS - 1; k++) t += '<span class="tdot' + (k < throwsLeft ? ' on' : '') + '"></span>';
+    var t = ''; for (var k = 0; k < ROLLS - 1; k++) t += '<span class="tdot' + (k < game.turn.throwsLeft ? ' on' : '') + '"></span>';
     $('throws').innerHTML = t;
   }
 
@@ -541,13 +546,13 @@
       $('fire').classList.add('hidden'); $('fireQ').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('rollHint').classList.add('hidden');
       return;   // the RETURN-to-current button is shown separately
     }
-    if (netMode && !netMyTurn && netAiActiveId == null && !aiBusy) {
+    if (netMode && !netMyTurn && netAiActiveId == null && !game.turn.aiBusy) {
       $('bottombar').classList.remove('preroll');
       $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
       var fo = $('fire'); fo.classList.remove('hidden'); fo.disabled = true; fo.classList.add('muted'); $('fireTxt').textContent = 'ХОД НА ОПОНЕНТА';
       return;
     }
-    if (awaitingRoll) {
+    if (game.turn.awaitingRoll) {
       // before the first throw: only the centred ХВЪРЛИ! button (no dice, no ? chooser yet)
       $('bottombar').classList.add('preroll');
       $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
@@ -558,13 +563,13 @@
     $('rollHint').classList.add('hidden');
     var p = G.currentPlayer(game);
     var fire = $('fire'), think = $('aiThinking');
-    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !aiBusy); return; }
+    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !game.turn.aiBusy); return; }
     think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
     // the button keys off whether the player has MARKED any dice (same in both modes):
     // nothing marked → prompt to choose; once marked → throw/keep the selection
-    var keep = activeKeep(), someSel = selected.some(Boolean), txt;
-    if (locked) { txt = '…'; fire.disabled = true; }
-    else if (throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
+    var keep = activeKeep(), someSel = game.turn.selected.some(Boolean), txt;
+    if (game.turn.locked) { txt = '…'; fire.disabled = true; }
+    else if (game.turn.throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
     else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
     else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
     $('fireTxt').textContent = txt;
@@ -574,8 +579,8 @@
   var diceSlideSuppress = false;
   function toggleSelect(i) {
     if (diceSlideSuppress) return;   // a slide gesture handled selection; swallow the trailing tap
-    if (aiBusy || locked || throwsLeft <= 0) return;
-    selected[i] = !selected[i];
+    if (game.turn.aiBusy || game.turn.locked || game.turn.throwsLeft <= 0) return;
+    game.turn.selected[i] = !game.turn.selected[i];
     if (gExp()) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
     // (no live broadcast of selections — watchers see the throw highlighted at reroll time instead)
@@ -587,21 +592,21 @@
     var box = $('dice'); if (!box) return;
     box.style.touchAction = 'none';
     var pid = null, startIdx = -1, paintVal = false, slid = false;
-    function selOk() { var p = game && game.players && game.players[game.current]; return !gManual() && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0 && p && !p.isAI && !(netMode && (!netMyTurn || specSelf)); }
+    function selOk() { var p = game && game.players && game.players[game.current]; return !gManual() && !game.turn.awaitingRoll && !game.turn.locked && !game.turn.aiBusy && game.turn.throwsLeft > 0 && p && !p.isAI && !(netMode && (!netMyTurn || specSelf)); }
     function dieIdxAt(x, y) {
       var el = document.elementFromPoint(x, y); el = el && el.closest ? el.closest('.die') : null;
       if (!el || el.disabled || el.classList.contains('preroll')) return -1;
       var i = el.getAttribute('data-i'); return i == null ? -1 : +i;
     }
     function setSel(i, val) {
-      if (i < 0 || i >= selected.length || selected[i] === val) return;
-      selected[i] = val;
+      if (i < 0 || i >= game.turn.selected.length || game.turn.selected[i] === val) return;
+      game.turn.selected[i] = val;
       if (gExp()) { expRenderDice(); expRenderFire(); } else { renderDice(); renderFire(); }
     }
     box.addEventListener('pointerdown', function (e) {
       if (!selOk()) return;
       var i = dieIdxAt(e.clientX, e.clientY); if (i < 0) return;
-      pid = e.pointerId; startIdx = i; paintVal = !selected[i]; slid = false;
+      pid = e.pointerId; startIdx = i; paintVal = !game.turn.selected[i]; slid = false;
       // NB: don't capture here — a plain tap must still deliver its click to the die button
     });
     box.addEventListener('pointermove', function (e) {
@@ -624,15 +629,15 @@
     var btn = $('rollAll'); if (!btn) return;
     var p = game && game.players && game.players[game.current];
     var watching = netMode && (!netMyTurn || specSelf);
-    var show = !gManual() && !awaitingRoll && !locked && !aiBusy && throwsLeft > 0
-      && p && !p.isAI && !watching && activeKeep() && dice.length === G.DICE_COUNT;
+    var show = !gManual() && !game.turn.awaitingRoll && !game.turn.locked && !game.turn.aiBusy && game.turn.throwsLeft > 0
+      && p && !p.isAI && !watching && activeKeep() && game.turn.dice.length === G.DICE_COUNT;
     btn.classList.toggle('hidden', !show);
   }
   $('rollAll').onclick = function () {
     var p = game && game.players && game.players[game.current];
-    if (gManual() || awaitingRoll || locked || aiBusy || throwsLeft <= 0 || !p || p.isAI) return;
+    if (gManual() || game.turn.awaitingRoll || game.turn.locked || game.turn.aiBusy || game.turn.throwsLeft <= 0 || !p || p.isAI) return;
     if (netMode && (!netMyTurn || specSelf)) return;
-    selected = [false, false, false, false, false];   // hold nothing → the reroll mask covers all five
+    game.turn.selected = [false, false, false, false, false];   // hold nothing → the reroll mask covers all five
     humanFire();   // routes to expHumanFire when gExp()
   };
   $('specReturn').onclick = function () { returnToCurrent(); };
@@ -701,37 +706,37 @@
   });
 
   // which dice get RE-THROWN this fire — interprets the tap marks per the player's keep/throw flavour
-  function rerollMask() { return activeKeep() ? selected.map(function (s) { return !s; }) : selected.slice(); }
+  function rerollMask() { return activeKeep() ? game.turn.selected.map(function (s) { return !s; }) : game.turn.selected.slice(); }
   // re-roll the masked dice. Default: keep the tray sorted ascending, mark the new ones (accent).
   // „Нов набор зарове": stamp each die with its generation (the roll it was last thrown in) and
   // sort by (generation, value) so kept dice group on the left and the fresh batch lands ordered on the right.
   function applyReroll(rr) {
-    rollNo++;
-    var paired = dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i], g: rr[i] ? rollNo : (diceGen[i] || 1) }; });
+    game.turn.rollNo++;
+    var paired = game.turn.dice.map(function (v, i) { return { v: rr[i] ? G.rollDie() : v, nw: !!rr[i], g: rr[i] ? game.turn.rollNo : (game.turn.diceGen[i] || 1) }; });
     if (activeBatch()) paired.sort(function (a, b) { return (a.g - b.g) || (a.v - b.v); });
     else paired.sort(function (a, b) { return a.v - b.v; });
-    dice = paired.map(function (x) { return x.v; });
-    diceNew = paired.map(function (x) { return x.nw; });
-    diceGen = paired.map(function (x) { return x.g; });
+    game.turn.dice = paired.map(function (x) { return x.v; });
+    game.turn.diceNew = paired.map(function (x) { return x.nw; });
+    game.turn.diceGen = paired.map(function (x) { return x.g; });
   }
   function humanFire() {
     if (gExp()) { expHumanFire(); return; }
-    if (awaitingRoll) { firstRoll(); return; }   // first throw via the ХВЪРЛИ! button
-    if (aiBusy || locked || throwsLeft <= 0) return;
+    if (game.turn.awaitingRoll) { firstRoll(); return; }   // first throw via the ХВЪРЛИ! button
+    if (game.turn.aiBusy || game.turn.locked || game.turn.throwsLeft <= 0) return;
     if (tut) { tutReroll(); return; }            // tutorial: scripted reroll
     var rr = rerollMask();
     if (!rr.some(Boolean)) return;                    // nothing to throw
-    if (rr.every(Boolean)) rerolledAll = true;        // re-rolled the whole hand
+    if (rr.every(Boolean)) game.turn.rerolledAll = true;        // re-rolled the whole hand
     var kept = rr.map(function (x) { return !x; });
     applyReroll(rr);
-    if (curLog) { curLog.keeps.push(kept); curLog.rolls.push(dice.slice()); }
-    selected = [false,false,false,false,false];
-    throwsLeft--;
+    if (game.turn.curLog) { game.turn.curLog.keeps.push(kept); game.turn.curLog.rolls.push(game.turn.dice.slice()); }
+    game.turn.selected = [false,false,false,false,false];
+    game.turn.throwsLeft--;
     renderAll(); shakeDice();
     netSendAct();   // spectators see my reroll (newly-thrown dice accented)
   }
 
-  function sortDice() { dice.sort(function (a, b) { return a - b; }); }
+  function sortDice() { game.turn.dice.sort(function (a, b) { return a - b; }); }
   // dice are re-sorted after every throw, so the whole tray resettles
   function shakeDice() {
     $('dice').querySelectorAll('.die').forEach(function (el) {
@@ -742,14 +747,14 @@
   // ---------- commit / turn flow ----------
   function commitScore(key, value) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || (!gManual() && p.isAI) || G.isCategoryFilled(p, key)) return;
+    if (game.turn.aiBusy || game.turn.locked || (!gManual() && p.isAI) || G.isCategoryFilled(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
-    G.assignScore(p, key, dice, value);
+    G.assignScore(p, key, game.turn.dice, value);
     afterCommit(key, value);
   }
   function commitForfeit(key) {
     var p = G.currentPlayer(game);
-    if (aiBusy || locked || (!gManual() && p.isAI) || G.isCategoryFilled(p, key)) return;
+    if (game.turn.aiBusy || game.turn.locked || (!gManual() && p.isAI) || G.isCategoryFilled(p, key)) return;
     if (tut && !tutCommitOk(key)) { tutNudge(); return; }
     G.forfeitScore(p, key);
     afterCommit(key, 0);
@@ -757,25 +762,25 @@
   function afterCommit(key, value) {
     var p = G.currentPlayer(game);  // still the player who just committed
     if (tut) tutEvent('commit');
-    var log = curLog;
-    if (curLog) { curLog.category = key; moveLog[game.current].push(curLog); curLog = null; }
+    var log = game.turn.curLog;
+    if (game.turn.curLog) { game.turn.curLog.category = key; moveLog[game.current].push(game.turn.curLog); game.turn.curLog = null; }
     if (netMode && gManual()) {
       // FREE-FOR-ALL: record + broadcast my entry, then reset for my next category (no turn handover)
-      var ment = { mask: evReady ? (EV.maskOfScores(p.scores) & ~EV.catBit(key)) : 0, dice: dice.slice(), category: key };
+      var ment = { mask: evReady ? (EV.maskOfScores(p.scores) & ~EV.catBit(key)) : 0, dice: game.turn.dice.slice(), category: key };
       if (evReady) moveLog[game.current].push(ment);
       flashTile(key);
-      if (net) net.submitMove({ category: catIndexOf(key), score: value, rolls: [dice.slice()], keeps: [], log: JSON.stringify(ment) });
-      locked = true; renderAll();
+      if (net) net.submitMove({ category: catIndexOf(key), score: value, rolls: [game.turn.dice.slice()], keeps: [], log: JSON.stringify(ment) });
+      game.turn.locked = true; renderAll();
       if (G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming, same as local
       setTimeout(beginManualEntry, END_DELAY);
       return;
     }
     if (netMode) {
       // broadcast my completed turn; the host's STATE + next GRANT drive the rest
-      locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
+      game.turn.locked = true; renderAll(); flashTile(key); $('fire').disabled = true;
       netSendAct({ commit: true, category: catIndexOf(key), value: value });   // spectators see the category go in
       if (netAiActiveId == null && G.isFloorFlop(key, value)) showRoast(key, value);   // казарма shaming on my own commit
-      var mv = { category: catIndexOf(key), score: value, rolls: log ? log.rolls : [dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
+      var mv = { category: catIndexOf(key), score: value, rolls: log ? log.rolls : [game.turn.dice.slice()], keeps: log ? log.keeps : [], log: log ? JSON.stringify(log) : '' };
       // hold the committed board a beat (comprehension) before the move propagates and the turn passes
       if (netAiActiveId != null) { var aid = netAiActiveId; netAiActiveId = null; setTimeout(function () { if (net) net.submitMoveFor(aid, mv); }, NET_HANDOVER_DELAY); }  // host injects the AI seat's move
       else { netSay('🔊 Изпращам хода…'); setTimeout(function () { if (net) net.submitMove(mv); }, NET_HANDOVER_DELAY); }
@@ -784,10 +789,10 @@
     if (gManual()) {
       // ОПА can rewind this commit (restoring the entered hand), and the turn is
       // logged for the category-only analytics (mask = the board BEFORE this pick)
-      undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: manualCounts.slice() });
-      if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: dice.slice(), category: key });
+      undoStack.push({ t: 'commit', playerIdx: game.current, key: key, prevRound: game.round, counts: game.turn.manualCounts.slice() });
+      if (evReady) moveLog[game.current].push({ mask: EV.maskOfScores(p.scores) & ~EV.catBit(key), dice: game.turn.dice.slice(), category: key });
     }
-    locked = true;
+    game.turn.locked = true;
     renderAll();
     flashTile(key);
     $('fire').disabled = true;
