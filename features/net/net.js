@@ -930,7 +930,7 @@
     if (bus) { if (disbanding) setTimeout(function () { try { bus.stop(); } catch (e) {} }, 250); else bus.stop(); }
     net = null; netBus = null; netMode = false; localPid = null;
     netPhase = 'choose'; netMe = null; netMyReady = false; netAiActiveId = null; netSettCtx = false;
-    $('netBars').innerHTML = ''; $('netLink').classList.add('hidden');
+    $('netLink').classList.add('hidden');
     if ($('netCodeJoin')) $('netCodeJoin').disabled = false;
     if ($('netOptical')) $('netOptical').classList.add('hidden');
   }

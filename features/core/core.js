@@ -88,10 +88,12 @@
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.51.3';
+  var APP_VERSION = '1.51.4';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.51.4', items: [
+      ['rem', 'Почистени са последните остатъци от старата акустична мрежа: неизползваните индикатори за сила на сигнала в лобито (играта е само по интернет).'] ] },
     { v: '1.51.3', items: [
       ['chg', 'Мрежова игра: при връщане към приложението (напр. след преглед на друг таб на iPhone) състоянието се синхронизира наново — старшината разпраща текущото състояние, гост моли да го наваксат, за да не се губят ходове.'] ] },
     { v: '1.51.2', items: [
