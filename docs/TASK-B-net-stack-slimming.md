@@ -65,14 +65,14 @@ nothing else in `_rx` depends on the meter.
    - **Verify:** `node --test` (expect the count to drop by ~9 from removed tests — that's intended,
      note it in the commit) + `node scripts/smoke.js` green. Also run the two existing loopback
      full-game tests in `mp.test.js` — they must still converge (they don't touch the adaptive layer).
-2. ⬜ **TODO — drop the orphaned acoustic remnants** (`mp.js`). Small, independent of slice 1:
-   - `T` constants `XOFFER`/`XWANT`/`XDATA`/`XACK`/`XDONE` (20–24) — acoustic record-transfer
-     handshake; `packRecord`/`unpackRecord` were already removed in Task A 5c, these are orphans.
+2. ✅ **DONE (commit `ddd0624`)** — drop the orphaned acoustic remnants (`mp.js`). Removed:
+   - `T` constants `XOFFER`/`XWANT`/`XDATA`/`XACK`/`XDONE` (the acoustic record-transfer
+     handshake; `packRecord`/`unpackRecord` were already removed in Task A 5c, these were orphans).
    - `crc16` (its def + the `api` export) — acoustic-era L0 utility, zero callers.
-   - The stale comment in the `Session` constructor (~193–196) that justifies the long timer
-     intervals by *"each acoustic frame takes ~1–3 s and the link is half-duplex"* — the interval
-     defaults stay (fine for WebRTC), but reword the rationale.
-   - **Verify:** `node --test` + smoke.
+   - Reworded the stale `Session`-constructor comment that justified the long timer intervals by
+     *"each acoustic frame takes ~1–3 s and the link is half-duplex"*; the interval defaults stay
+     (fine for WebRTC), only the rationale changed.
+   - **Verified:** `node --test` (176 pass, no test changes this slice) + `node scripts/smoke.js` green.
 3. ⬜ **TODO (optional / can defer) — acoustic UI + `netKind` simplification** (app layer):
    - `index.html`: the `ac-only` nodes (the "phones in same room / speaker→mic" copy + the
      "Без слушалки!" warning, ~449/451/475) and the stale `<!-- network (acoustic) … -->` comment
