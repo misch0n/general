@@ -21,8 +21,6 @@
     JOIN_NAK: 19,                                           // host rejects a join (e.g. game-mode mismatch)
     BYE: 25,                                                // host disbands the lobby — clients return to host/join
     XOFFER: 20, XWANT: 21, XDATA: 22, XACK: 23, XDONE: 24,   // acoustic record transfer
-    // adaptive link & resilience (reserved 30-39)
-    CAL_PROBE: 30, CAL_REPORT: 31, CAL_SELECT: 32, CAL_CONFIRM: 33, PROFILE_SWITCH: 34, QUALITY: 35, RELAY: 36, GOSSIP: 37,
   };
   var HOST_ID = 0, UNASSIGNED = 15;          // SENDER nibble: host is 0, pre-join client is 15
   var GENDERS = ['m', 'n', 'f'];
@@ -213,82 +211,13 @@
     this._timers = {};
     this._wantJoin = false;
     this._acked = false;
-    // adaptive link state (§4-6)
-    this.meter = new LinkMeter();
-    // EVERYONE stays on the robust ANCHOR band — host AND clients. Putting the host on
-    // a different (faster) band than the clients meant each device transmitted in a band
-    // the other wasn't listening on, so they never heard each other. No mid-session band
-    // hops either (they desync the modem); the messages are tiny and human-paced anyway.
-    this.profile = ANCHOR;
-    this.ctrl = this.isHost ? new AdaptiveController() : null;
-    this.clientQ = {};                 // host: client id → its reported link quality
-    this._linkN = 0;
     var self = this;
     this.tp.onReceive(function (bytes) { self._rx(bytes); });
-    if (this.tp.onMeter) this.tp.onMeter(function (ev) { self.meter.record(ev); self._linkTick(); });  // richer events from L0 (ecc/snr/fail)
-    if (this.tp.setProfile) this.tp.setProfile(this.profile);
-    if (this.tp.setRole) this.tp.setRole(this.isHost ? 'host' : 'client');   // carrier-sense priority for the orchestrator
     this.settingsBits = 0;             // host's enabled pre-game settings (summary shown to clients)
     this.takeover = {};                // host: id → true when that seat is AI-driven mid-game
     this.paused = {};                  // host: id → true when a dropped seat is paused (skipped; doesn't block the finish)
     if (this.isHost) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender, ready: true, isAI: false });
   }
-  Session.prototype._applyProfile = function (p) { this.profile = p; if (this.tp.setProfile) this.tp.setProfile(p); if (this.cb.onProfile) this.cb.onProfile(p); };
-  // §5 host announces a profile change on the ANCHOR (so a degraded client still
-  // hears it), then adopts it; clients ack with CAL_CONFIRM.
-  Session.prototype.switchProfile = function (id) {
-    if (!this.isHost) return;
-    if (this.tp.setProfile) this.tp.setProfile(ANCHOR);
-    this._send(T.PROFILE_SWITCH, packProfileSwitch(id, this.version));
-    this._applyProfile(getProfile(id));
-  };
-  Session.prototype._worstState = function () {
-    var worst = this.meter.state(), rank = { GOOD: 0, DEGRADING: 1, CRITICAL: 2 };
-    for (var k in this.clientQ) { var q = this.clientQ[k], s = q.bars <= 1 ? 'CRITICAL' : q.bars <= 2 ? 'DEGRADING' : 'GOOD'; if (rank[s] > rank[worst]) worst = s; }
-    return worst;
-  };
-  Session.prototype._stepDown = function () {                 // move broadcast toward a robuster profile
-    var to = this.profile.id === ANCHOR.id ? ANCHOR.id : (this.profile.id === getProfile(1).id ? ANCHOR.id : getProfile(1).id);
-    if (to !== this.profile.id) this.switchProfile(to);
-  };
-  Session.prototype._linkTick = function () {
-    var bars = this.meter.bars(), state = this.meter.state();
-    if (this.cb.onLink) this.cb.onLink({ bars: bars, state: state, worst: this.isHost ? this._worstState() : state, clientQ: this.clientQ });
-    if (this.isHost && this.ctrl && this.state === 'IN_GAME') {
-      var act = this.ctrl.sample(this._worstState());
-      if (act === 'down' || act === 'recal') this._stepDown();
-    }
-    if (!this.isHost && this.state === 'IN_GAME' && (++this._linkN % 10 === 0)) {
-      this._send(T.QUALITY, packQuality(bars, Math.min(100, Math.round(this.meter.errorRate() * 100)), Math.min(100, Math.round(this.meter.eccLoad() * 100))));
-    }
-  };
-  // host-coordinated calibration: probe candidates, pick the fastest comfortable one,
-  // and switch everyone to it. Uses the transport's measureProbe when available.
-  Session.prototype.calibrate = function (done) {
-    var self = this;
-    if (!this.isHost) { if (done) done(this.profile); return; }
-    if (!this.tp.measureProbe) { if (done) done(this.profile); return; }   // no probe → just stay on ANCHOR
-    var ladder = CAL_LADDER, reports = {}, i = 0;
-    (function step() {
-      if (i >= ladder.length) { var chosen = pickProfile(reports, { threshold: 0.05, margin: 0.5 }); self.switchProfile(chosen.id); if (done) done(chosen); return; }
-      var p = ladder[i++];
-      self.tp.measureProbe(p, function (er) { reports[p.id] = er; step(); });
-    })();
-  };
-  // adaptive message types handled for both roles
-  Session.prototype._rxAdaptive = function (pkt) {
-    if (pkt.type === T.PROFILE_SWITCH && !this.isHost) {
-      var ps = unpackProfileSwitch(pkt.payload); this._applyProfile(getProfile(ps.profileId)); this._send(T.CAL_CONFIRM, new Writer().u8(ps.profileId).out());
-    } else if (pkt.type === T.QUALITY && this.isHost) {
-      this.clientQ[pkt.sender] = unpackQuality(pkt.payload);
-    } else if (pkt.type === T.GOSSIP) {
-      var g = unpackGossip(pkt.payload);
-      if (!this.isHost && isBehind(this.version, g.version)) this._send(T.RESYNC_REQ, new Writer().u16(this.version).out());  // detect → resync from host
-    } else if (pkt.type === T.RELAY && !this.isHost) {
-      var rl = unpackRelay(pkt.payload);
-      if (acceptRelayVersion(rl.version, this.version)) { var s = unpackState(rl.snapshot); if (s.kind === 'snapshot') this._rxState(s); }  // host stays the only truth
-    }
-  };
   Session.prototype._status = function (s) { if (this.cb.onStatus) this.cb.onStatus(s); };
   Session.prototype._send = function (type, payload) {
     var sender = this.myId == null ? UNASSIGNED : this.myId;
@@ -601,10 +530,9 @@
   // ---------- receive / dispatch ----------
   Session.prototype._rx = function (bytes) {
     var pkt = unframe(bytes);
-    this.meter.record({ ok: !!pkt });          // §4 meter every decode attempt (clean vs failed)
-    if (!pkt) { this._linkTick(); return; }
+    if (!pkt) return;
     var sig = bytes && bytes.join ? bytes.join(',') : String(bytes);
-    if (sig === this._lastBytes) { this._linkTick(); return; }   // drop an immediate duplicate retransmit
+    if (sig === this._lastBytes) return;   // drop an immediate duplicate retransmit
     this._lastBytes = sig;
     // L3 payloads are JSON (5c-remainder), so unpack* can throw on a malformed payload — unlike the
     // old binary readers. A CRC-valid frame from our own packers is always valid JSON, but treat a
@@ -612,9 +540,7 @@
     // the transport callback. (Reliable WebRTC channels never deliver corrupt bytes; this is defensive.)
     try {
       if (this.isHost) this._rxHost(pkt); else this._rxClient(pkt);
-      this._rxAdaptive(pkt);
-    } catch (e) { this._linkTick(); return; }
-    this._linkTick();
+    } catch (e) { return; }
   };
   Session.prototype._rxHost = function (pkt) {
     if (pkt.type === T.JOIN_REQ && this.state === 'LOBBY') {
@@ -817,111 +743,9 @@
     return rec;
   }
 
-  // ============================================================ adaptive link layer
-  // Profiles parameterise L0 (band / baud / ecc / volume). The ladder runs
-  // fastest→safest; ANCHOR is the ultra-robust always-on floor used for calibration
-  // and control. Per-phase defaults: handshake/transfer are fast & close-range,
-  // gameplay is slow/robust/long-range (tiny human-paced messages hide the slowness).
-  var PROFILES = [
-    { id: 0, name: 'anchor',   f0: 1700, f1: 2100, baud: 24, volume: 0.5,  ecc: 3 },  // floor: loud, mid-band; ~1 s short frames so half-duplex talk/listen can alternate
-    { id: 1, name: 'gameplay', f0: 5200, f1: 6200, baud: 40, volume: 0.46, ecc: 2 },  // upper-audible, robust, long range
-    { id: 2, name: 'setup',    f0: 6000, f1: 7000, baud: 70, volume: 0.42, ecc: 1 },  // faster, close range
-    { id: 3, name: 'transfer', f0: 6200, f1: 7200, baud: 96, volume: 0.42, ecc: 0 },  // fast, one-time, close
-    { id: 4, name: 'stealth',  f0: 15000, f1: 16000, baud: 70, volume: 0.5, ecc: 1 }, // near-ultrasonic ~1m
-  ];
-  var ANCHOR = PROFILES[0];
-  function getProfile(id) { for (var i = 0; i < PROFILES.length; i++) if (PROFILES[i].id === id) return PROFILES[i]; return ANCHOR; }
-  function phaseProfile(phase) { return getProfile({ handshake: 2, setup: 2, gameplay: 1, transfer: 3 }[phase] != null ? { handshake: 2, setup: 2, gameplay: 1, transfer: 3 }[phase] : 1); }
-  // calibration ladder for a phase: candidate profiles fastest→safest
-  var CAL_LADDER = [getProfile(3), getProfile(2), getProfile(1), ANCHOR];
-
-  // §3.3 pick the FASTEST profile whose measured error sits comfortably below the
-  // threshold (with margin) — not the one that barely scraped through.
-  function pickProfile(reports, opts) {
-    opts = opts || {}; var thr = opts.threshold != null ? opts.threshold : 0.05, margin = opts.margin != null ? opts.margin : 0.5;
-    var ladder = opts.ladder || CAL_LADDER, comfortable = thr * margin, best = null, bestEr = 2;
-    for (var i = 0; i < ladder.length; i++) {
-      var p = ladder[i], er = reports[p.id];
-      if (er == null) continue;
-      if (er <= comfortable) return p;                 // fastest comfortable wins
-      if (er <= thr && er < bestEr) { best = p; bestEr = er; }
-    }
-    return best || ANCHOR;                              // none comfortable → safest that passed, else the floor
-  }
-
-  // §4 rolling link-quality meter → bars (0-4) + state. ECC correction load is the
-  // early-warning signal: high load means you're near the cliff before failures show.
-  function LinkMeter(opts) {
-    opts = opts || {};
-    this.win = opts.window || 16; this.events = [];
-    this.thr = opts.thresholds || { degrading: 0.12, critical: 0.35, eccWarn: 0.6 };
-  }
-  LinkMeter.prototype.record = function (ev) { this.events.push(ev || {}); if (this.events.length > this.win) this.events.shift(); };
-  LinkMeter.prototype._avg = function (f) { var n = 0, s = 0; this.events.forEach(function (e) { var v = f(e); if (typeof v === 'number') { s += v; n++; } }); return n ? s / n : 0; };
-  LinkMeter.prototype.errorRate = function () { var n = this.events.length; if (!n) return 0; var bad = 0; this.events.forEach(function (e) { if (e.ok === false) bad++; }); return bad / n; };
-  LinkMeter.prototype.eccLoad = function () { return this._avg(function (e) { return e.ecc; }); };
-  LinkMeter.prototype.retxRate = function () { var n = this.events.length; if (!n) return 0; var r = 0; this.events.forEach(function (e) { if (e.retx || e.resync) r++; }); return r / n; };
-  LinkMeter.prototype.bars = function () {
-    if (!this.events.length) return 4;                 // assume fine until proven otherwise
-    var q = 1 - Math.max(this.errorRate(), this.eccLoad() * 0.7, this.retxRate() * 0.5);
-    var b = q >= 0.85 ? 4 : q >= 0.65 ? 3 : q >= 0.4 ? 2 : q >= 0.15 ? 1 : 0, st = this.state();
-    if (st === 'CRITICAL') b = Math.min(b, 1);         // tie bars to the link state
-    else if (st === 'DEGRADING') b = Math.min(b, 2);
-    return b;
-  };
-  LinkMeter.prototype.state = function () {
-    var er = this.errorRate(), ecc = this.eccLoad();
-    if (er >= this.thr.critical) return 'CRITICAL';
-    if (er >= this.thr.degrading || ecc >= this.thr.eccWarn) return 'DEGRADING';
-    return 'GOOD';
-  };
-
-  // §5 adaptive controller: meter state → step/recal decision, with hysteresis
-  // (N consecutive samples + a cooldown) so the link doesn't flap between profiles.
-  function AdaptiveController(opts) {
-    opts = opts || {};
-    this.need = opts.consecutive || 3; this.cooldown = opts.cooldown || 5; this.upFactor = opts.upFactor || 2;
-    this._streak = { GOOD: 0, DEGRADING: 0, CRITICAL: 0 }; this._cool = 0;
-  }
-  AdaptiveController.prototype.sample = function (state) {
-    if (this._cool > 0) { this._cool--; this._reset(); return null; }
-    for (var k in this._streak) this._streak[k] = (k === state) ? this._streak[k] + 1 : 0;
-    if (this._streak.CRITICAL >= this.need) { this._fire(); return 'recal'; }   // severe/persistent → recalibrate
-    if (this._streak.DEGRADING >= this.need) { this._fire(); return 'down'; }   // minor → step to a robuster profile
-    if (this._streak.GOOD >= this.need * this.upFactor) { this._fire(); return 'up'; }  // sustained good → conservative step up
-    return null;
-  };
-  AdaptiveController.prototype._reset = function () { this._streak = { GOOD: 0, DEGRADING: 0, CRITICAL: 0 }; };
-  AdaptiveController.prototype._fire = function () { this._cool = this.cooldown; this._reset(); };
-
-  // §6.1 RELAY/GOSSIP guards — peers relay/detect, the host stays the only truth.
-  function acceptRelayVersion(incoming, local) { return incoming > local; } // ignore stale re-broadcasts
-  function isBehind(localVersion, peerVersion) { return peerVersion > localVersion; }
-
-  // ---- adaptive message schemas (§8) ----
-  function packProfileSwitch(profileId, effVersion) { return new Writer().u8(profileId).u16(effVersion).out(); }
-  function unpackProfileSwitch(p) { var r = new Reader(p); return { profileId: r.u8(), effVersion: r.u16() }; }
-  function packQuality(bars, errorPct, eccPct) { return new Writer().u8(bars).u8(errorPct).u8(eccPct).out(); }
-  function unpackQuality(p) { var r = new Reader(p); return { bars: r.u8(), errorPct: r.u8(), eccPct: r.u8() }; }
-  function packGossip(version, hash) { return new Writer().u16(version).u16(hash).out(); }
-  function unpackGossip(p) { var r = new Reader(p); return { version: r.u16(), hash: r.u16() }; }
-  function packRelay(version, snapshot) { return new Writer().u16(version).bytes(snapshot).out(); }
-  function unpackRelay(p) { var r = new Reader(p), v = r.u16(); return { version: v, snapshot: p.slice(2) }; }
-  function packCalReport(rows) { var w = new Writer().u8(rows.length); rows.forEach(function (x) { w.u8(x.profileId).u8(Math.max(0, Math.min(255, Math.round(x.errorRate * 255)))).u8((x.snr | 0) & 0xff); }); return w.out(); }
-  function unpackCalReport(p) { var r = new Reader(p), n = r.u8(), a = []; for (var i = 0; i < n; i++) { var pid = r.u8(), er = r.u8(), snr = r.u8(); a.push({ profileId: pid, errorRate: er / 255, snr: (snr << 24) >> 24 }); } return a; }
-  function stateHash(scores) {                          // cheap state fingerprint for GOSSIP
-    var h = 0x1234; Object.keys(scores).sort().forEach(function (id) { var c = scores[id]; Object.keys(c).sort().forEach(function (k) { h = (h * 31 + (+id) * 7 + (+k) * 13 + (c[k] | 0)) & 0xffff; }); }); return h;
-  }
-
   var api = {
     T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, crc16: crc16, utf8: utf8, utf8d: utf8d,
     sanitizeRecord: sanitizeRecord,
-    PROFILES: PROFILES, ANCHOR: ANCHOR, getProfile: getProfile, phaseProfile: phaseProfile, CAL_LADDER: CAL_LADDER,
-    pickProfile: pickProfile, LinkMeter: LinkMeter, AdaptiveController: AdaptiveController,
-    acceptRelayVersion: acceptRelayVersion, isBehind: isBehind, stateHash: stateHash,
-    packProfileSwitch: packProfileSwitch, unpackProfileSwitch: unpackProfileSwitch, packQuality: packQuality, unpackQuality: unpackQuality,
-    packGossip: packGossip, unpackGossip: unpackGossip, packRelay: packRelay, unpackRelay: unpackRelay,
-    packCalReport: packCalReport, unpackCalReport: unpackCalReport,
     Writer: Writer, Reader: Reader, frame: frame, unframe: unframe,
     hexRGB: hexRGB, rgbHex: rgbHex,
     packBeacon: packBeacon, unpackBeacon: unpackBeacon, packJoinReq: packJoinReq, unpackJoinReq: unpackJoinReq,
