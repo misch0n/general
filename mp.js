@@ -776,54 +776,12 @@
 
   function crc16(bytes) { var c = 0xffff; for (var i = 0; i < bytes.length; i++) { c ^= bytes[i] << 8; for (var k = 0; k < 8; k++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; } return c; }
 
-  // ---- [GAME-SPECIFIC] compact game-record codec (for acoustic transfer) ----
-  // Sends per turn only the FINAL dice + category (manual-style), so a transferred
-  // game stays small; the board mask is reconstructed from the category order on
-  // the receiving end. The wire is a fixed schema of primitives — no structure,
-  // names, or anything executable can ride along.
-  function packRecord(rec, catKeys) {
-    var idx = {}; catKeys.forEach(function (k, i) { idx[k] = i; });
-    var w = new Writer().u8(1);
-    var secs = Math.floor((rec.ts || Date.now()) / 1000);
-    w.u16((secs >>> 16) & 0xffff).u16(secs & 0xffff);
-    w.u8((rec.manualMode ? 1 : 0) | (rec.ownerSkipped ? 2 : 0) | (rec.selectKeep ? 4 : 0));
-    w.u8(rec.players.length);
-    rec.players.forEach(function (p, pi) {
-      w.u8((p.owner ? 1 : 0) | (p.isAI ? 2 : 0));
-      w.bytes(hexRGB(p.color)); w.u8(genIx(p.gender)); w.str(p.name, 28); w.u16(Math.max(0, Math.min(65535, (p.bonus | 0))));
-      var mask = 0; catKeys.forEach(function (k, i) { if (typeof (p.scores || {})[k] === 'number') mask |= (1 << i); });
-      w.u16(mask);
-      catKeys.forEach(function (k, i) { if (mask & (1 << i)) w.i16(p.scores[k] | 0); });   // signed: minus-ruleset cells go negative
-      var log = (rec.moveLog && rec.moveLog[pi]) || [];
-      log = log.slice(0, catKeys.length); w.u8(log.length);
-      log.forEach(function (t) {
-        var fd = t.dice || (t.rolls && t.rolls[t.rolls.length - 1]) || [0, 0, 0, 0, 0];
-        for (var j = 0; j < 5; j++) w.u8(Math.max(0, Math.min(6, fd[j] | 0)));
-        w.u8(idx[t.category] == null ? 0 : idx[t.category]);
-      });
-    });
-    return w.out();
-  }
-  function unpackRecord(bytes, catKeys) {
-    var r = new Reader(bytes); r.u8();                       // version
-    var secs = (r.u16() << 16) | r.u16(), flags = r.u8(), n = r.u8(), players = [], moveLog = [];
-    for (var pi = 0; pi < n; pi++) {
-      var pf = r.u8(), rgb = r.bytes(3), g = r.u8(), name = r.str(), bonus = r.u16();
-      var mask = r.u16(), scores = {};
-      for (var i = 0; i < catKeys.length; i++) if (mask & (1 << i)) scores[catKeys[i]] = r.i16();
-      players.push({ owner: !!(pf & 1), isAI: !!(pf & 2), color: rgbHex(rgb), gender: GENDERS[g] || 'm', name: name, bonus: bonus, scores: scores });
-      var nt = r.u8(), turns = [], built = 0;
-      for (var ti = 0; ti < nt; ti++) {
-        var dice = []; for (var j = 0; j < 5; j++) dice.push(r.u8());
-        var ci = r.u8(), key = catKeys[ci] || catKeys[0];
-        turns.push({ mask: built, dice: dice, category: key });   // mask = board before this turn
-        built |= (1 << ci);
-      }
-      moveLog.push(turns);
-    }
-    // transferred games analyse manual-style (final dice + pick); fits unpacked moveLog
-    return { ts: secs * 1000, manualMode: true, ownerSkipped: !!(flags & 2), selectKeep: !!(flags & 4), acoustic: true, players: players, moveLog: moveLog };
-  }
+  // NOTE: the compact binary game-record codec (packRecord/unpackRecord) was
+  // removed with the acoustic transport (Task A slice 5c) — it was a third,
+  // competing serialization of a game alongside serializeGame() and the live
+  // wire, with no remaining caller. Records now move only as the canonical
+  // serializeGame() JSON envelope; the JSON-paste import path below still
+  // hardens any inbound record through sanitizeRecord.
 
   // ---- SANITISE: turn any received/parsed record into a clean, whitelisted,
   // clamped plain object (or null). Received bytes are DATA only — this guarantees
@@ -958,7 +916,7 @@
 
   var api = {
     T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, crc16: crc16, utf8: utf8, utf8d: utf8d,
-    packRecord: packRecord, unpackRecord: unpackRecord, sanitizeRecord: sanitizeRecord,
+    sanitizeRecord: sanitizeRecord,
     PROFILES: PROFILES, ANCHOR: ANCHOR, getProfile: getProfile, phaseProfile: phaseProfile, CAL_LADDER: CAL_LADDER,
     pickProfile: pickProfile, LinkMeter: LinkMeter, AdaptiveController: AdaptiveController,
     acceptRelayVersion: acceptRelayVersion, isBehind: isBehind, stateHash: stateHash,

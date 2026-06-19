@@ -353,19 +353,21 @@ own player** — that seat is flagged the owner locally (the ★ on your own nam
 the archived game and your dossier attribute *your* performance. The local player
 keeps a full move log; remote players are mirrored score-only.
 
-**Acoustic export / import.** The same channel also transfers a single game
-between devices. Export offers **📡 Изпрати по звук**, the archive offers
-**🔊 Приеми по звук**: the sender advertises (`XOFFER`), the receiver wants
-(`XWANT`), they handshake on a tag and ping-pong a stop-and-wait, CRC-16'd
-chunked transfer of a **compact record** (`packRecord` — final dice + category
-per turn, the board mask reconstructed on the far end), shown with a progress
-bar. The received blob is decoded and run through **`sanitizeRecord`** before it
-touches anything — a hard whitelist that **clamps every value and drops unknown
-fields, non-primitives, functions and `__proto__` keys** (the key set is
-null-proto, so a `__proto__` category can't bypass it). The JSON paste import
-sanitises through the same gate, so **every imported record is pure data** — it
-can never carry anything executable. The receiver then picks which player is
-*them* (owner attribution) and files it.
+**Record import.** A single game can be shared between devices by exporting it
+as JSON and pasting it back in. Every imported record is run through
+**`sanitizeRecord`** before it touches anything — a hard whitelist that **clamps
+every value and drops unknown fields, non-primitives, functions and `__proto__`
+keys** (the key set is null-proto, so a `__proto__` category can't bypass it),
+so **every imported record is pure data** — it can never carry anything
+executable. The importer then picks which player is *them* (owner attribution)
+and files it.
+
+> Historical note: this used to also transfer over an **acoustic** (data-over-
+> sound) channel using a compact binary record codec (`packRecord`/`unpackRecord`,
+> `XOFFER`/`XWANT`/…). That transport was removed, and the binary record codec
+> with it (Task A slice 5c) — it was a third, competing serialization alongside
+> `serializeGame()` and the live WebRTC wire. Records now move only as the
+> canonical `serializeGame()` JSON envelope.
 
 **The `Акустика` switch.** Every data-over-sound feature — network play and the
 sound transfer — lives behind a single settings toggle, **off by default**; when

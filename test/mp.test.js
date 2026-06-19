@@ -165,43 +165,13 @@ test('client detects a version gap and resyncs from a snapshot', function () {
   assert.strictEqual(c.scores[0][1], 4, 're-baselined from snapshot');
 });
 
-// ---- compact record codec (acoustic transfer) ----
-test('packRecord/unpackRecord round-trips scores, meta, ts and final dice', function () {
-  var rec = {
-    ts: 1700000000000, manualMode: false, ownerSkipped: false,
-    players: [
-      { name: 'Иван', color: '#ee0055', gender: 'm', owner: true, bonus: 5, scores: { ones: 3, general: 50 } },
-      { name: 'Боби', color: '#00aa55', gender: 'f', owner: false, bonus: 0, scores: { ones: 2, twos: 6 } },
-    ],
-    moveLog: [
-      [{ rolls: [[1, 2, 3, 4, 5], [1, 1, 3, 4, 5]], keeps: [[true, false, false, false, false]], category: 'ones' },
-       { dice: [5, 5, 5, 5, 5], category: 'general' }],
-      [{ dice: [2, 2, 4, 5, 6], category: 'twos' }],
-    ],
-  };
-  var out = MP.unpackRecord(MP.packRecord(rec, CATS), CATS);
-  assert.strictEqual(out.ts, 1700000000000);
-  assert.strictEqual(out.players[0].name, 'Иван');
-  assert.strictEqual(out.players[0].color, '#ee0055');
-  assert.strictEqual(out.players[0].owner, true);
-  assert.strictEqual(out.players[0].bonus, 5);
-  assert.strictEqual(out.players[0].scores.general, 50);
-  assert.strictEqual(out.players[1].gender, 'f');
-  // final dice survive; mask is reconstructed from category order (0 then 'ones' bit)
-  assert.deepStrictEqual(out.moveLog[0][0].dice, [1, 1, 3, 4, 5]); // last roll
-  assert.strictEqual(out.moveLog[0][0].category, 'ones');
-  assert.strictEqual(out.moveLog[0][0].mask, 0);
-  assert.strictEqual(out.moveLog[0][1].category, 'general');
-  assert.strictEqual(out.moveLog[0][1].mask, 1 << CATS.indexOf('ones'));
-  assert.strictEqual(out.manualMode, true);  // transferred games analyse manual-style
-});
-
-test('selectKeep (dice-selection flavour) survives packRecord + sanitizeRecord', function () {
+// ---- record sanitisation (JSON-paste import gate; the acoustic packRecord/
+//      unpackRecord codec was removed in Task A slice 5c) ----
+test('selectKeep (dice-selection flavour) survives sanitizeRecord', function () {
   var rec = { ts: 1700000000000, manualMode: false, ownerSkipped: false, selectKeep: true,
     players: [{ name: 'A', color: '#ee0055', gender: 'm', owner: true, bonus: 0, scores: { ones: 3 } },
               { name: 'B', color: '#00aa55', gender: 'f', owner: false, bonus: 0, scores: { ones: 2 } }],
     moveLog: [[{ dice: [1, 1, 1, 4, 5], category: 'ones' }], [{ dice: [2, 2, 4, 5, 6], category: 'ones' }]] };
-  assert.strictEqual(MP.unpackRecord(MP.packRecord(rec, CATS), CATS).selectKeep, true, 'acoustic round-trip');
   assert.strictEqual(MP.sanitizeRecord(rec, CATS).selectKeep, true, 'import sanitise keeps it');
   assert.strictEqual(MP.sanitizeRecord({ players: rec.players, moveLog: rec.moveLog }, CATS).selectKeep, false, 'defaults off when absent');
 });
@@ -235,12 +205,12 @@ test('sanitizeRecord whitelists, clamps, and drops junk', function () {
   assert.strictEqual(MP.sanitizeRecord({ players: [] }, CATS), null);
 });
 
-test('a packed record survives transfer-then-sanitise into a usable game', function () {
+test('a clean record sanitises into a usable game (scores + categories preserved)', function () {
   var rec = { ts: 1700000000000, manualMode: false, players: [
     { name: 'Иван', color: '#ee0055', gender: 'm', owner: true, bonus: 0, scores: { ones: 3 } },
     { name: 'Боби', color: '#00aa55', gender: 'm', owner: false, bonus: 0, scores: { twos: 6 } } ],
     moveLog: [[{ dice: [1, 1, 1, 4, 5], category: 'ones' }], [{ dice: [2, 2, 4, 5, 6], category: 'twos' }]] };
-  var clean = MP.sanitizeRecord(MP.unpackRecord(MP.packRecord(rec, CATS), CATS), CATS);
+  var clean = MP.sanitizeRecord(rec, CATS);
   assert.strictEqual(clean.players.length, 2);
   assert.strictEqual(clean.players[0].scores.ones, 3);
   assert.strictEqual(clean.moveLog[1][0].category, 'twos');

@@ -36,7 +36,7 @@ Two layers, loaded in this order (see `index.html`):
 | `exp.js` | `window.GeneralExp` (**X**) | experimental ruleset engine | `exp.test.js` |
 | `engine.js` | `window.GeneralEV` (**EV**) | optimal-value tables, skill/luck analysis | `engine.test.js` |
 | `ev-table*.js`, `ev-exp-exact-table.js` | — | precomputed EV data | — |
-| `mp.js` | `window.MP` | net **session/lobby state machine** (`MP.Session`) + wire codecs (`packMove`/`packRecord`/`unframe`…) + dormant link-adaptation layer | `mp.test.js`, `webrtc.test.js` |
+| `mp.js` | `window.MP` | net **session/lobby state machine** (`MP.Session`) + wire codecs (`packMove`/`packStateDelta`/`unframe`…) + dormant link-adaptation layer | `mp.test.js`, `webrtc.test.js` |
 
 > Net is **WebRTC-only** (PeerJS). The acoustic (data-over-sound) and optical (QR-handshake)
 > transports were removed; `mp.js` keeps `MP.Session` + codecs (the shared core WebRTC uses).
