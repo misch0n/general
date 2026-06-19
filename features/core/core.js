@@ -520,25 +520,30 @@
     return '<span class="face">' + s + '</span>';
   }
 
-  // camouflage + scrim, injected into a board element
+  // camouflage + scrim, injected into a board element.
+  // Each instance gets UNIQUE filter ids: multiple camo layers coexist (setup + game),
+  // and shared ids collide — a later camo would reference the earlier (often display:none)
+  // filter, which some engines render as raw turbulence (the "rainbow" background bug).
+  var _camoSeq = 0;
   function paintCamo(el) {
     if (el.querySelector('.camo')) return;
+    var u = 'cam' + (++_camoSeq) + '_';
     var svg = '<svg class="camo" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'
       + '<defs>'
-      + '<filter id="cam1"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="11" result="n"/>'
+      + '<filter id="' + u + '1"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="11" result="n"/>'
       + '<feComponentTransfer in="n" result="m"><feFuncA type="discrete" tableValues="0 0 0 1 1"/></feComponentTransfer>'
       + '<feFlood flood-color="#39401a" result="f"/><feComposite in="f" in2="m" operator="in"/></filter>'
-      + '<filter id="cam2"><feTurbulence type="fractalNoise" baseFrequency="0.026" numOctaves="3" seed="29" result="n"/>'
+      + '<filter id="' + u + '2"><feTurbulence type="fractalNoise" baseFrequency="0.026" numOctaves="3" seed="29" result="n"/>'
       + '<feComponentTransfer in="n" result="m"><feFuncA type="discrete" tableValues="0 0 1 1"/></feComponentTransfer>'
       + '<feFlood flood-color="#717449" result="f"/><feComposite in="f" in2="m" operator="in"/></filter>'
-      + '<filter id="cam3"><feTurbulence type="fractalNoise" baseFrequency="0.034" numOctaves="2" seed="47" result="n"/>'
+      + '<filter id="' + u + '3"><feTurbulence type="fractalNoise" baseFrequency="0.034" numOctaves="2" seed="47" result="n"/>'
       + '<feComponentTransfer in="n" result="m"><feFuncA type="discrete" tableValues="0 0 0 0 1"/></feComponentTransfer>'
       + '<feFlood flood-color="#26261a" result="f"/><feComposite in="f" in2="m" operator="in"/></filter>'
       + '</defs>'
       + '<rect width="100%" height="100%" fill="#4a5223"/>'
-      + '<rect width="100%" height="100%" filter="url(#cam1)"/>'
-      + '<rect width="100%" height="100%" filter="url(#cam2)"/>'
-      + '<rect width="100%" height="100%" filter="url(#cam3)"/></svg>'
+      + '<rect width="100%" height="100%" filter="url(#' + u + '1)"/>'
+      + '<rect width="100%" height="100%" filter="url(#' + u + '2)"/>'
+      + '<rect width="100%" height="100%" filter="url(#' + u + '3)"/></svg>'
       + '<div class="scrim"></div>';
     el.insertAdjacentHTML('afterbegin', svg);
   }
