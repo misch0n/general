@@ -197,6 +197,40 @@ test('APPLY_SCORE is pure: input state and its players are untouched', function 
   assert.strictEqual(n.players[0], s.players[0]);       // untouched seat shares identity
 });
 
+// The replay viewer (features/history/history.js) reconstructs the board at any
+// step by folding each committed cell through APPLY_SCORE — the same reducer the
+// live/net paths use (Task A slice 5c). This locks that round-robin fold: scores
+// land on the right seats, forfeits (0) count as filled, and the result is a
+// per-seat scores map — exactly what rpStateAt returns.
+test('APPLY_SCORE fold reconstructs a replay board (round-robin commits incl. a forfeit)', function () {
+  // 3 seats, commits interleaved in true play order (round-robin), one forfeit.
+  var commits = [
+    { p: 0, key: 'ones', score: 3 }, { p: 1, key: 'ones', score: 2 }, { p: 2, key: 'ones', score: 1 },
+    { p: 0, key: 'general', score: 0 },                                  // a sacrificed cell
+    { p: 1, key: 'twos', score: 6 },
+  ];
+  var stt = { players: [{ scores: {} }, { scores: {} }, { scores: {} }] };
+  commits.forEach(function (c) { stt = R.reduce(stt, { type: 'APPLY_SCORE', seat: c.p, key: c.key, score: c.score }); });
+  var grid = stt.players.map(function (p) { return p.scores; });
+  assert.deepStrictEqual(grid[0], { ones: 3, general: 0 });   // forfeit recorded as 0
+  assert.deepStrictEqual(grid[1], { ones: 2, twos: 6 });
+  assert.deepStrictEqual(grid[2], { ones: 1 });
+});
+
+// Stepping a replay backward means folding a PREFIX of the commits — the score
+// grid at step k must match recomputing from scratch up to k (no leftover state).
+test('APPLY_SCORE fold up to a prefix matches a partial replay (scrubbing)', function () {
+  var commits = [{ p: 0, key: 'ones', score: 3 }, { p: 1, key: 'ones', score: 2 }, { p: 0, key: 'twos', score: 4 }];
+  function gridAt(idx) {
+    var s = { players: [{ scores: {} }, { scores: {} }] };
+    for (var k = 0; k <= idx; k++) s = R.reduce(s, { type: 'APPLY_SCORE', seat: commits[k].p, key: commits[k].key, score: commits[k].score });
+    return s.players.map(function (p) { return p.scores; });
+  }
+  assert.deepStrictEqual(gridAt(0), [{ ones: 3 }, {}]);
+  assert.deepStrictEqual(gridAt(1), [{ ones: 3 }, { ones: 2 }]);
+  assert.deepStrictEqual(gridAt(2), [{ ones: 3, twos: 4 }, { ones: 2 }]);
+});
+
 // ---------------------------------------------------------------------- UNDO
 
 test('UNDO of a tap un-counts one die and unlocks', function () {

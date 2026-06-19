@@ -100,12 +100,52 @@ const path = require('path');
     return true;
   }
 
+  // replay round-trip: play a standard game to the end, then open its archived record in the
+  // replay viewer and step through every action. This is the real coverage for slice 5c — the
+  // viewer reconstructs each board via the shared reducer (rpStateAt → GReduce APPLY_SCORE), a
+  // path no unit test drives end-to-end. Asserts no pageerror AND that the final reconstructed
+  // board matches the record's own scores.
+  async function replayRoundTrip() {
+    const before = errors.length;
+    await page.goto(url, { waitUntil: 'load' });
+    await page.evaluate(() => { settings.ruleset = 'standard'; startGame([G.createPlayer('Тест', '#d4a02e', false)], false); });
+    await page.evaluate(async () => {
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      for (let n = 0; n < G.CATEGORIES.length * 2; n++) {
+        const p = G.currentPlayer(game), cat = G.CATEGORIES.find(c => !G.isCategoryFilled(p, c.key));
+        if (!cat) break;
+        for (let w = 0; w < 40 && game.turn.locked; w++) await sleep(50);
+        if (game.turn.awaitingRoll) firstRoll();
+        commitScore(cat.key, G.scoreFor(cat.key, game.turn.dice)); await sleep(60);
+      }
+      for (let w = 0; w < 60 && $('overModal').classList.contains('hidden'); w++) await sleep(100);
+    });
+    const res = await page.evaluate(() => {
+      const recs = loadHistory(); if (!recs.length) return { ok: false, why: 'no archived game' };
+      openReplay(recs[recs.length - 1]); rpPause();        // open the latest game, stop the auto-play timer
+      if (!replay || !replay.actions.length) return { ok: false, why: 'replay did not open' };
+      for (let i = 0; i < replay.actions.length; i++) { replay.idx = i; renderReplay(); }   // step every frame (drives rpStateAt)
+      // the final reconstructed board must equal the record's stored scores
+      const grid = rpStateAt(replay.actions.length - 1);
+      const want = replay.rec.players.map(p => p.scores);
+      let match = true;
+      for (let s = 0; s < want.length; s++) for (const k in want[s]) if (grid[s][k] !== want[s][k]) match = false;
+      return { ok: match, frames: replay.actions.length };
+    });
+    const newErrs = errors.slice(before);
+    if (newErrs.length) { console.error('FAIL standard/replay\n  ' + newErrs.join('\n  ')); return false; }
+    if (!res.ok) { console.error('FAIL standard/replay — ' + (res.why || 'reconstructed board mismatch')); return false; }
+    console.log('ok   standard/replay (stepped ' + res.frames + ' frames, board matches)');
+    return true;
+  }
+
   let ok = true;
   for (const rs of ['standard', 'experimental'])
     for (const manual of [false, true])
       ok = (await play(rs, manual)) && ok;
   for (const rs of ['standard', 'experimental'])
     ok = (await resumeRoundTrip(rs)) && ok;
+  ok = (await replayRoundTrip()) && ok;
 
   await browser.close();
   if (!ok) { console.error('SMOKE FAILED'); process.exit(1); }

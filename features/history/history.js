@@ -134,10 +134,18 @@
     }
     return actions;
   }
+  // Reconstruct the board at step `idx` through the SAME reducer the live and
+  // net paths use (Task A slice 5c): fold each committed cell as an APPLY_SCORE
+  // action instead of writing a private scores map. Replay now *extracts from
+  // state* — the one state machine owns "a committed score lands on a seat",
+  // including its filled-cell guard — so there is no second copy of that rule.
   function rpStateAt(idx) {
-    var sc = replay.rec.players.map(function () { return {}; });
-    for (var k = 0; k <= idx; k++) { var a = replay.actions[k]; if (a.type === 'commit') sc[a.p][a.category] = a.score; }
-    return sc;
+    var st = { players: replay.rec.players.map(function () { return { scores: {} }; }) };
+    for (var k = 0; k <= idx; k++) {
+      var a = replay.actions[k];
+      if (a.type === 'commit') st = GReduce.reduce(st, { type: 'APPLY_SCORE', seat: a.p, key: a.category, score: a.score });
+    }
+    return st.players.map(function (p) { return p.scores; });
   }
   function replayBoardHTML(scores, hlKey, opts) {
     var recKeys = (opts && opts.recordKeys) || null, myCol = opts && opts.color;
