@@ -53,7 +53,7 @@
     document.documentElement.style.setProperty('--pc', p.color);
     if (gManual()) {                          // ОТЧЕТ: tap the five dice in, then pick a row
       game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'manual' }).turn;
-      expRenderAll();
+      renderAll();
       return;
     }
     game.turn = GReduce.reduce(game, { type: 'BEGIN_TURN', mode: 'dice' }).turn;
@@ -61,10 +61,10 @@
       // AI rolls immediately — replay the human first-roll transition, then drive the bot
       game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: G.rollAll() }).turn;
       game.turn.curLog = expStartLog(p);
-      expRenderAll(); shakeDice();
+      renderAll(); shakeDice();
       expRunAiTurn();
     } else {
-      expRenderAll();
+      renderAll();
     }
   }
   // per-turn move log for skill/luck analysis (mask + upper-subtotal at turn start)
@@ -76,7 +76,7 @@
     var faces = (tut && tut.dice) ? tut.dice.slice() : G.rollAll();
     game.turn = GReduce.reduce(game, { type: 'FIRST_ROLL', dice: faces }).turn;
     game.turn.curLog = expStartLog(G.currentPlayer(game));   // log seeds from game.turn.dice, so build it after the roll lands
-    clearRoast(); expRenderAll(); shakeDice();
+    clearRoast(); renderAll(); shakeDice();
     if (tut) tutEvent('roll');
   }
   function expHumanFire() {
@@ -90,7 +90,7 @@
     expLogReroll(rr);
     game.turn.selected = [false, false, false, false, false];
     game.turn.throwsLeft--;
-    expRenderAll(); shakeDice();
+    renderAll(); shakeDice();
   }
   function expCommit(key, value) {
     var p = G.currentPlayer(game);
@@ -130,7 +130,7 @@
     }
     if (tut) tutEvent('commit');
     game.turn = GReduce.reduce(game, { type: 'COMMIT' }).turn;   // lock the turn
-    expRenderAll(); $('fire').disabled = true;
+    renderAll(); $('fire').disabled = true;
     // floor-flop shame for a forfeited combo (number rows use signed deviations — no roast there)
     var delay = END_DELAY;
     if (!gManual() && G.UPPER_KEYS.indexOf(key) < 0 && G.isFloorFlop(key, committed) && showRoast(key, committed)) delay = ROAST_MS + 250;
@@ -148,7 +148,7 @@
     if (tut) { while (game.players[game.current].isAI) advance(); }   // tutorial: the opponent never plays
     expBeginTurn();
   }
-  function expRunAiTurn() { game.turn.aiBusy = true; expRenderFire(); setTimeout(expAiStep, AI_DELAY); }
+  function expRunAiTurn() { game.turn.aiBusy = true; renderFire(); setTimeout(expAiStep, AI_DELAY); }
 
   // ----- EXACT penalty-aware evaluator (reuses the engine reroll DP, threading the upper subtotal) -----
   function expStageUp(prev) {
@@ -343,10 +343,10 @@
       game.turn.selected = activeKeep() ? holds.slice() : holds.map(function (h) { return !h; });
       var rr = rerollMask();
       if (rr.some(Boolean)) {
-        expRenderDice();
+        renderDice();
         setTimeout(function () {
           applyReroll(rr); expLogReroll(rr); game.turn.selected = [false, false, false, false, false]; game.turn.throwsLeft--;
-          expRenderAll(); shakeDice();
+          renderAll(); shakeDice();
           setTimeout(game.turn.throwsLeft > 0 ? expAiStep : expAiFinish, AI_DELAY);
         }, AI_DELAY * 0.65);
         return;
@@ -377,16 +377,14 @@
     game.turn.aiBusy = false;
     if (game.turn.curLog) { game.turn.curLog.category = key; moveLog[game.current].push(game.turn.curLog); game.turn.curLog = null; }
     X.assignScore(p, key, game.turn.dice);
-    game.turn.locked = true; expRenderAll(); $('fire').disabled = true;
+    game.turn.locked = true; renderAll(); $('fire').disabled = true;
     turnTimer = setTimeout(expEndTurn, AI_VIEW_DELAY);
   }
 
   // ----- experimental rendering -----
-  function expRenderAll() {
-    expRenderHeader(); expRenderPills(); expRenderBoard();
-    if (gManual()) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
-    expRenderDice(); expRenderFire(); expRenderHint(); syncBottomPad();
-  }
+  // The standard renderAll() (features/game/game.js) is the single render entry; it dispatches to
+  // these exp-specific pieces (header, pills, board, hint). The dice tray + fire button are shared
+  // (the standard renderDice/renderFire already cover the local-exp case — no net/penalty extras).
   function expRenderHeader() {
     var p = G.currentPlayer(game);
     // constant 2-line name: first two words on line 1, the rest + persona on line 2
@@ -495,53 +493,6 @@
     var b = $('numPartTip');
     if (b && !b.classList.contains('hidden') && !b.contains(e.target) && !(e.target.classList && e.target.classList.contains('np-tap'))) b.classList.add('hidden');
   });
-  function expRenderDice() {
-    var p = G.currentPlayer(game);
-    var box = $('dice'); box.innerHTML = '';
-    if (game.turn.awaitingRoll) {
-      for (var k = 0; k < G.DICE_COUNT; k++) {
-        var g = document.createElement('button'); g.className = 'die preroll'; g.disabled = true; g.setAttribute('aria-hidden', 'true'); box.appendChild(g);
-      }
-      var td = ''; for (var q = 0; q < ROLLS - 1; q++) td += '<span class="tdot on"></span>'; $('throws').innerHTML = td; return;
-    }
-    var interactive = !p.isAI && !game.turn.locked && game.turn.throwsLeft > 0;
-    var batchMode = activeBatch() && game.turn.diceGen.length === game.turn.dice.length;   // group by roll instead of accenting
-    game.turn.dice.forEach(function (v, i) {
-      if (batchMode && i > 0 && game.turn.diceGen[i] !== game.turn.diceGen[i - 1]) {
-        var sep = document.createElement('span'); sep.className = 'die-sep'; sep.setAttribute('aria-hidden', 'true'); box.appendChild(sep);
-      }
-      var b = document.createElement('button');
-      var sel = game.turn.selected[i], keepMode = activeKeep(), fresh = !batchMode && game.turn.diceNew[i];
-      b.className = 'die' + (sel ? ' sel' + (keepMode ? ' keep' : '') : '') + (fresh ? ' fresh' : '');
-      b.disabled = !interactive; b.setAttribute('data-i', i);
-      b.innerHTML = pipFace(v) + (sel ? '<span class="reticle">' + (keepMode ? '✓' : '✕') + '</span>' : '');
-      if (interactive) b.onclick = function () { toggleSelect(i); };
-      box.appendChild(b);
-    });
-    var t = ''; for (var r = 0; r < ROLLS - 1; r++) t += '<span class="tdot' + (r < game.turn.throwsLeft ? ' on' : '') + '"></span>';
-    $('throws').innerHTML = t;
-  }
-  function expRenderFire() {
-    $('fire').classList.remove('muted');   // clear leftover spectator styling (e.g. after a net minus game)
-    syncRollAll();
-    var p = G.currentPlayer(game);
-    if (game.turn.awaitingRoll) {
-      $('bottombar').classList.add('preroll');
-      $('rollHint').classList.add('hidden'); $('aiThinking').classList.add('hidden'); $('fireQ').classList.add('hidden');
-      var fa = $('fire'); fa.classList.remove('hidden'); fa.disabled = false; $('fireTxt').textContent = 'ХВЪРЛИ!'; return;
-    }
-    $('bottombar').classList.remove('preroll');
-    $('rollHint').classList.add('hidden');
-    var fire = $('fire'), think = $('aiThinking');
-    if (p.isAI) { fire.classList.add('hidden'); $('fireQ').classList.add('hidden'); think.classList.toggle('hidden', !game.turn.aiBusy); return; }
-    think.classList.add('hidden'); fire.classList.remove('hidden'); $('fireQ').classList.remove('hidden');
-    var keep = activeKeep(), someSel = game.turn.selected.some(Boolean), txt;
-    if (game.turn.locked) { txt = '…'; fire.disabled = true; }
-    else if (game.turn.throwsLeft <= 0) { txt = 'ИЗБЕРИ КОМБИНАЦИЯ!'; fire.disabled = true; }
-    else if (!someSel) { txt = 'ИЗБЕРИ ЗАРОВЕ'; fire.disabled = true; }
-    else { txt = keep ? 'ДРЪЖ!' : 'ХВЪРЛИ!'; fire.disabled = false; }
-    $('fireTxt').textContent = txt;
-  }
   function expEndGame() {
     game.turn.locked = true;
     if (!viewingHistory) { archiveExpGame(); clearResume(); trackGame('finish'); if (netMode) netActiveClear(); }

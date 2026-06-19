@@ -123,7 +123,7 @@
     if (game.turn.curLog) { game.turn.curLog.keeps.push(rr.map(function (x) { return !x; })); game.turn.curLog.rolls.push(game.turn.dice.slice()); }
     game.turn.selected = [false, false, false, false, false];
     game.turn.throwsLeft--;
-    (gExp() ? expRenderAll : renderAll)(); shakeDice();
+    renderAll(); shakeDice();
     tutEvent(all ? 'rerollAll' : 'reroll');
   }
   function tutStart() {

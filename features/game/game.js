@@ -201,10 +201,15 @@
   }
 
   // ---------- render ----------
+  // single render entry for BOTH rulesets and BOTH sources (local + net). The genuinely
+  // ruleset-specific pieces (header, board, hint) dispatch internally; the dice tray, fire button
+  // and net spectating are shared. The exp board (signed deviation rows + два чифта + number bar)
+  // is also what net-minus games render. Header/pills only switch to the exp layout for LOCAL exp —
+  // net-exp keeps the shared net-aware header/pills (same as before this merge).
   function renderAll() {
-    renderHeader(); renderPills();
-    // net minus games run the EXPERIMENTAL sheet (deviation rows + два чифта + number bar); the dice
-    // tray, fire button and net spectating stay shared. Local exp uses expRenderAll, so it's untouched.
+    var localExp = gExp() && !netMode;
+    (localExp ? expRenderHeader : renderHeader)();
+    (localExp ? expRenderPills : renderPills)();
     if (sumExp()) { expRenderBoard(); $('expNumBar').classList.remove('hidden'); }
     else { renderBoard(); $('expNumBar').classList.add('hidden'); }
     if (gManual()) { renderManualDock(); $('undoBottom').disabled = undoStack.length === 0; syncBottomPad(); return; }
@@ -441,7 +446,7 @@
     if (next === game) return;   // reduce no-ops when locked or the hand is already full
     game.turn = next.turn;
     undoStack.push({ t: 'tap', face: face });
-    gExp() ? expRenderAll() : renderAll();
+    renderAll();
   }
 
   // ОПА — undoes action by action across the whole game: dice taps first, then
@@ -458,7 +463,7 @@
     var next = GReduce.reduce(game, { type: 'UNDO', entry: a });   // rewinds the hand + cursor
     game.turn = next.turn; game.current = next.current; game.round = next.round;
     clearRoast();
-    gExp() ? expRenderAll() : renderAll();
+    renderAll();
   }
   $('undoBottom').onclick = popUndo;
   $('overUndo').onclick = popUndo;
@@ -552,7 +557,6 @@
     if (diceSlideSuppress) return;   // a slide gesture handled selection; swallow the trailing tap
     if (game.turn.aiBusy || game.turn.locked || game.turn.throwsLeft <= 0) return;
     game.turn.selected[i] = !game.turn.selected[i];
-    if (gExp()) { expRenderDice(); expRenderFire(); return; }
     renderDice(); renderFire();
     // (no live broadcast of selections — watchers see the throw highlighted at reroll time instead)
   }
@@ -572,7 +576,7 @@
     function setSel(i, val) {
       if (i < 0 || i >= game.turn.selected.length || game.turn.selected[i] === val) return;
       game.turn.selected[i] = val;
-      if (gExp()) { expRenderDice(); expRenderFire(); } else { renderDice(); renderFire(); }
+      renderDice(); renderFire();
     }
     box.addEventListener('pointerdown', function (e) {
       if (!selOk()) return;
@@ -656,7 +660,7 @@
         var p = game && game.players[game.current];
         if (p && !p.isAI) p.selectKeep = newKeep;               // the change sticks to THIS player
         if (!p || p.owner || p.isAI) { settings.selectKeep = newKeep; saveSettings(); }  // owner's choice is also the persistent default
-        if (game) (gExp() ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
+        if (game) renderAll();
       }
       renderKeepThrowTip();
     };
@@ -670,7 +674,7 @@
         var p = game && game.players[game.current];
         if (p && !p.isAI) p.diceBatch = nb;
         if (!p || p.owner || p.isAI) { settings.newDiceBatch = nb; saveSettings(); }
-        if (game) (gExp() ? expRenderAll : renderAll)();   // exp board has its own layout (keeps the „два чифта" tile)
+        if (game) renderAll();
       }
       renderKeepThrowTip();
     };

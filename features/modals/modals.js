@@ -124,7 +124,7 @@
     // master switch for the goofy layer (off = core only; on enables
     // callouts, penalties, combo tooltips and bets). Rare-name titles are separate.
     { key: 'barracks', label: 'Сол и хранилки', onChange: function () {
-        if (game) (gExp() ? expRenderAll : renderAll)();
+        if (game) renderAll();
         if (!$('setup').classList.contains('hidden')) renderSetup();
       } },
     // Облози — the wager flavour; its own switch now (used to ride on КАЗАРМА). Pre-game only:
@@ -138,7 +138,7 @@
     { key: 'titles', label: 'Титли', preGameOnly: true, gameShared: true,
       sub: { key: 'titlePoints', label: 'Бонус точки', onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
       onChange: function () { if (!$('setup').classList.contains('hidden')) renderSetup(); } },
-    { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); (gExp() ? expRenderAll : renderAll)(); } } },
+    { key: 'advice', label: 'Съвети', preGameOnly: true, onChange: function () { if (game) { syncHintBtn(); renderAll(); } } },
     // (the tap-to-throw / tap-to-keep flavour moved to the ? on the in-game fire button)
     // Глупости — ON = profanity (NSFW words allowed); OFF = censored to the SFW set
     { key: 'glupost', label: 'Глупости', onChange: function () {

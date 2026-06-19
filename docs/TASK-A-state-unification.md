@@ -49,12 +49,19 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    same as standard `afterCommit`). **Added 2 `NEXT_TURN` skip tests** (179 pass; smoke green both
    rulesets × dice/manual). *Score assignment stays shell-side* (`G.assignScore` vs `X.assignScore`)
    by design — `reduce()` COMMIT only locks; it does not pick engine fns.
-   **4b REMAINING (riskiest):** collapse the rendering duplication — `expRenderAll` /
-   `expRenderHeader` / `expRenderPills` / `expRenderDice` / `expRenderFire` and the ~10
-   `gExp() ? expRenderAll : renderAll` dispatch sites (game.js, modals.js, tutorial.js). The exp
-   board (15 signed rows + number bar) genuinely differs, so this is a render-layer merge, deferred
-   from 4a to keep that slice safe. `expStartGame`/`resumeExpGame` also still duplicate the
-   start/resume scaffolding (could fold into `startGame`/`resumeGame` once rendering unifies).
+   **4b DONE** — `renderAll` (`features/game/game.js`) is now the **single render entry** for both
+   rulesets × both sources. It dispatches the genuinely-different pieces internally: header/pills →
+   `expRenderHeader`/`expRenderPills` only for **local exp** (`gExp() && !netMode`, preserving the
+   prior net-exp behavior of standard header/pills); board/hint → `expRenderBoard`/`expRenderHint`
+   for any exp (`sumExp()`). `expRenderAll`/`expRenderDice`/`expRenderFire` were **deleted** — the
+   standard `renderDice`/`renderFire` are exact supersets (the exp variants were just the no-`fx`,
+   no-net-spectating case), so local exp now shares them. All ~10 `gExp() ? expRenderAll : renderAll`
+   dispatch sites (game.js, modals.js, tutorial.js) and the inline `expRenderDice/Fire` branches
+   collapsed to plain `renderAll()`/`renderDice(); renderFire()`. (179 tests pass; smoke green for
+   both rulesets × dice/manual.) *Still duplicated (out of 4b scope):* `expStartGame`/`resumeExpGame`
+   start/resume scaffolding (fold into `startGame`/`resumeGame`) and the header/pills exp variants
+   themselves (`expRenderHeader`/`expRenderPills` — a 2-line name layout + `expPeek`); these could
+   merge later but were left to keep the diff behavior-preserving.
 5. ⬜ **Unify serialization** — resume / archive / net wire codec / replay all read **one** schema via
    shared serialize/deserialize. Make the net-apply path **emit the same actions** as local play.
 
