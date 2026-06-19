@@ -72,7 +72,7 @@
         // what I SELECTED on the start screen, before adopting the host's actual game
         var selM = netManual, selE = selExp();
         var hostM = (typeof manual === 'boolean') ? manual : selM, hostE = !!exp;
-        if (typeof manual === 'boolean') { netManual = hostM; syncNetMode(); }   // adopt the host's mode (host rules win)
+        if (typeof manual === 'boolean') netManual = hostM;   // adopt the host's mode (host rules win)
         if (net) net.rounds = hostE ? (X ? X.KEYS.length : 15) : G.CATEGORIES.length;
         netJoinMismatch(selM, selE, hostM, hostE);   // warn (don't block) if it differs from my selection
         renderNetRoster(); setFlavour($('netStatus'), 'lobbyWait');
@@ -562,8 +562,6 @@
     $('netMeName').textContent = localMeta().name;
     netShow('choose');
     $('netPickRole').classList.remove('hidden');                       // back to the role picker
-    // webrtc mode is preset on the start screen
-    $('netModeSwitch').classList.add('hidden');
     renderNetPickInfo();
     $('netJoinCode').classList.add('hidden'); $('netCodeInput').value = '';
     $('netHostCode').classList.add('hidden'); $('netHostCode').innerHTML = '';
@@ -572,17 +570,9 @@
     $('netJoin').textContent = 'ПРИСЪЕДИНИ СЕ';
     $('netHost').textContent = 'ПОКАНИ';
     wrCapReset('', '');   // start a fresh capture session (records the environment)
-    syncNetMode();
     $('netModal').classList.remove('hidden');
     syncWrCapVis();
   }
-  // regular (dice) vs manual (ОТЧЕТ) network game
-  function syncNetMode() {
-    $('netModeSwitch').querySelectorAll('.nms-opt').forEach(function (b) { b.classList.toggle('on', (b.getAttribute('data-manual') === '1') === netManual); });
-  }
-  $('netModeSwitch').querySelectorAll('.nms-opt').forEach(function (b) {
-    b.onclick = function () { netManual = (b.getAttribute('data-manual') === '1'); syncNetMode(); renderNetPickInfo(); };
-  });
   // human-readable labels for the chosen ruleset / game type (reused in the mismatch warning)
   function rsLabel(rs) { return rs === 'experimental' ? 'с минуси' : 'без минуси'; }
   function modeLabel(manual) { return manual ? 'на отчет (ръчно)' : 'със зарове'; }
@@ -606,8 +596,7 @@
   };
   $('netJoin').onclick = function () {
     // switch to the join sub-view; deliberately DON'T focus the field (no keyboard until tapped).
-    // the mode selector is the host's choice — joiners adopt it, so hide it here.
-    $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
+    $('netPickRole').classList.add('hidden');
     $('netJoinCode').classList.remove('hidden'); netChooseMsg('');
   };
   // guest: scan the host's QR to fill the code field (no typing). reuses the optical scan view.
@@ -661,8 +650,6 @@
   // leave the join sub-view, back to the host/join picker
   $('netJoinCancel').onclick = function () {
     $('netJoinCode').classList.add('hidden'); $('netPickRole').classList.remove('hidden');
-    // over the net the mode comes from the start screen
-    $('netModeSwitch').classList.add('hidden');
     $('netCodeInput').value = ''; netChooseMsg('');
     if (netBus) { netBus.stop(); netBus = null; }
     if (net) { net.dispose(); net = null; }

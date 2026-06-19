@@ -106,7 +106,7 @@
     try { history.replaceState(null, '', location.pathname); } catch (e) {}   // don't re-trigger on reload
     netManual = false;
     openNetModal(false);
-    $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
+    $('netPickRole').classList.add('hidden');
     $('netJoinCode').classList.remove('hidden');
     $('netCodeInput').value = code; lastCodeSource = 'qr';
     $('netCodeJoin').onclick();
@@ -134,7 +134,7 @@
       else webrtcHost(o.code);                          // re-host the same code so a waiting peer can reconnect
     }
     else {                                            // dial back in; the host re-seats us via our saved eph
-      $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
+      $('netPickRole').classList.add('hidden');
       $('netJoinCode').classList.remove('hidden');
       $('netCodeInput').value = o.code; lastCodeSource = 'manual';
       $('netCodeJoin').onclick();

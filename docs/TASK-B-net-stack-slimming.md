@@ -90,8 +90,12 @@ nothing else in `_rx` depends on the meter.
    - **Verified:** `node --test` (176 pass, unchanged — app layer has no unit tests) + `node scripts/smoke.js`
      green, plus a headless `file://` check that `openNetModal()` opens the modal cleanly with the
      formerly-`wr-only` nodes visible and zero `ac-only`/`wr-only` nodes left.
-   - **Left in place (out of this slice's scope):** `#netModeSwitch` (the dice/manual lobby switch) is
-     always-hidden dead UI but isn't `netKind`/acoustic-tied — leave for a separate cleanup if wanted.
+   - Also removed `#netModeSwitch` (the in-lobby dice/manual picker) and its `syncNetMode` helper: it
+     was the **acoustic-era** in-lobby mode selector, made redundant once the mode moved to the
+     start-screen play button (WebRTC presets it). It was force-hidden everywhere and never re-shown, so
+     the element, its click wiring, `syncNetMode`, and the `.netmodeswitch` CSS were all dead. The live
+     mode value is the `netManual` global (set on the start screen; a joiner adopts the host's at
+     `onJoined`), so removal is behaviour-neutral.
 4. ⬜ **TODO — docs/README sync** (do as the code slices land, or as a final pass):
    - `README.md` ~322–400: the "Acoustic multiplayer" + "Adaptive link" sections — replace with a short
      "WebRTC-only" paragraph. ~622: the `mp.js` table row ("…audio FSK modem") — rewrite.

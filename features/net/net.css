@@ -59,11 +59,6 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   border-radius:6px; padding:3px 7px; transition:color .12s, background .12s; }
 #qrShareUrl.copied{ color:#8fe0ac; background:rgba(46,158,91,.16); }
 .netjoinview{ margin:6px 0; }
-/* regular vs manual network-game switcher */
-.netmodeswitch{ display:flex; gap:0; margin:4px 0 12px; border:1px solid var(--gen-pill-line); border-radius:9px; overflow:hidden; background:rgba(0,0,0,.25); }
-.netmodeswitch .nms-opt{ flex:1; padding:9px 6px; font-family:var(--gen-font-display); font-weight:700; font-size:12.5px; letter-spacing:.4px; text-transform:uppercase;
-  background:transparent; color:var(--gen-muted); border:none; cursor:pointer; }
-.netmodeswitch .nms-opt.on{ background:var(--gen-brass); color:var(--gen-ink); }
 /* optical (QR) handshake view */
 .netoptical{ margin:6px 0; }
 .optqr{ width:100%; max-width:280px; margin:10px auto; background:#fff; padding:10px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
