@@ -2405,10 +2405,12 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     }
   }
   // app version (major.minor.micro) — bump on every change; shown as vX.Y.Z in settings
-  var APP_VERSION = '1.51.0';
+  var APP_VERSION = '1.51.1';
   // changelog (newest first) — surfaced by tapping the version marker on the start-screen settings.
   // tags: new (ново) · chg (промяна) · fix (поправка) · rem (премахнато)
   var CHANGELOG = [
+    { v: '1.51.1', items: [
+      ['chg', 'QR кодът за покана вече е връзка — сканира се и с камерата на телефона (извън приложението) и отваря играта направо в режим за присъединяване с готов код.'] ] },
     { v: '1.51.0', items: [
       ['chg', 'Мрежова игра: разпаднал се боец вече не се прескача безвъзвратно — играта изчаква да се върне (или го поеми с AI от менюто), вместо да приключи и да го остави недовършен.'],
       ['new', 'Възстановяване при срив на старшината: ако старшината презареди/затвори, при влизане се предлага „възстанови играта“ — възстановява последното състояние, а гостите се връщат по същия код.'] ] },
@@ -4138,7 +4140,10 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   // pull a 4–6 char game code out of whatever the QR carried (plain code, or with stray chars)
   function extractGameCode(data) {
     if (!data) return null;
-    var s = String(data).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var s = String(data);
+    var m = s.match(/[?&#]join=([A-Za-z0-9]{4,8})/i);   // a deep-link invite URL
+    if (m) return m[1].toUpperCase().slice(0, 6);
+    s = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
     return (s.length >= 4) ? s.slice(0, 6) : null;
   }
   // brief green flash on the code box (paste/scan feedback); optionally flash a button too
@@ -4203,6 +4208,9 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   }
   // the exact message the host shares (kept in one place so paste-parsing can match it)
   function shareCodeText(code) { return 'Влез в играта ми на ГЕНЕРАЛ с код: ' + code; }
+  // a deep-link invite: scanning this QR with the phone camera (outside the app) opens the page
+  // straight into the join flow for that code (handled by maybeJoinFromURL on load)
+  function joinURL(code) { return pageShareURL() + '?join=' + code; }
   // accept only the two formats we hand out: a bare 6-char code, or the host share message
   function parsePastedCode(raw) {
     var s = String(raw == null ? '' : raw).trim();
@@ -4245,7 +4253,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     box.innerHTML = '<div class="netcode-lbl">Код за играта</div><div class="netcodeqr"></div>' + codeCopyLine(code);
     box.classList.remove('hidden');
     wireCodeCopy(box, code);
-    renderCodeQRInto(box.querySelector('.netcodeqr'), code);
+    renderCodeQRInto(box.querySelector('.netcodeqr'), joinURL(code));   // deep-link so an external camera can join
   }
   // robust clipboard copy: a synchronous execCommand path (works inside the tap gesture on iOS
   // Safari, where navigator.clipboard often rejects), with the async Clipboard API as a backup.
@@ -4893,7 +4901,7 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
     box.classList.remove('hidden');
     box.innerHTML = '<div class="netcode-lbl">Код за връщане в играта</div><div class="netcodeqr"></div>' + codeCopyLine(wrCode) + '<div class="mnc-hint">Разпаднал се боец може да влезе пак с този код — или да сканира QR-а.</div>';
     wireCodeCopy(box, wrCode);
-    renderCodeQRInto(box.querySelector('.netcodeqr'), wrCode);
+    renderCodeQRInto(box.querySelector('.netcodeqr'), joinURL(wrCode));
   }
   // in-game WebRTC log export: same payload as wrCapCopy, but reachable mid-game from the Щаб menu
   // (shown only with the debug toggle on) so a connection hiccup can be captured the moment it happens.
@@ -4912,7 +4920,8 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   loadSettings();   // restore censor + owner name/toggle before the first muster
   paintCamo($('setup'));
   addSetupPlayer(false); addSetupPlayer(false);
-  if (!maybeOfferNetRejoin()) maybeOfferResume();   // a recent network game takes precedence over a local resume
+  // a scanned invite (?join=CODE) jumps straight into the join flow; else offer a recent net rejoin / local resume
+  if (!maybeJoinFromURL() && !maybeOfferNetRejoin()) maybeOfferResume();
   syncAcousticUI();     // hide every data-over-sound feature unless Акустика is on
   syncWebrtcUI();       // hide the WebRTC entry unless the experimental toggle is on
   syncStartRuleSel(); syncStartWhereSel();   // start-screen ruleset + local/network selectors
@@ -5008,6 +5017,21 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
   $('resumeGo').onclick = function () { var snap = loadResume(); $('resumeModal').classList.add('hidden'); if (snap) resumeGame(snap); };
   $('resumeAbort').onclick = function () { clearResume(); $('resumeModal').classList.add('hidden'); };
 
+  // on load: a deep-link invite (?join=CODE, e.g. from scanning the host QR with the phone camera)
+  // opens the page straight into the join flow for that game.
+  function maybeJoinFromURL() {
+    var m = (location.search + location.hash).match(/[?&#]join=([A-Za-z0-9]{4,8})/i);
+    if (!m || !settings.webrtc) return false;
+    var code = m[1].toUpperCase().slice(0, 6);
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}   // don't re-trigger on reload
+    netManual = false; netKind = 'webrtc';
+    openNetModal('webrtc', false);
+    $('netPickRole').classList.add('hidden'); $('netModeSwitch').classList.add('hidden');
+    $('netJoinCode').classList.remove('hidden');
+    $('netCodeInput').value = code; lastCodeSource = 'qr';
+    $('netCodeJoin').onclick();
+    return true;
+  }
   // on load: if a WebRTC game was active within the last 15 min, offer to rejoin it (else clean up)
   function maybeOfferNetRejoin() {
     var o = netActiveLoad(); if (!o) return false;
