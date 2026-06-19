@@ -73,17 +73,25 @@ nothing else in `_rx` depends on the meter.
      *"each acoustic frame takes ~1–3 s and the link is half-duplex"*; the interval defaults stay
      (fine for WebRTC), only the rationale changed.
    - **Verified:** `node --test` (176 pass, no test changes this slice) + `node scripts/smoke.js` green.
-3. ⬜ **TODO (optional / can defer) — acoustic UI + `netKind` simplification** (app layer):
-   - `index.html`: the `ac-only` nodes (the "phones in same room / speaker→mic" copy + the
-     "Без слушалки!" warning, ~449/451/475) and the stale `<!-- network (acoustic) … -->` comment
-     (~444).
-   - `features/game/game.js`: `var netKind = 'acoustic'` default (~26) → `'webrtc'`.
-   - `features/net/net.js`: the ~14 `netKind` reads / `netKind !== 'webrtc'` guards. **Care:** check
-     the rejoin / `netActiveSave`/`netActiveLoad` saved-state payload and the QR/join-code flow before
-     collapsing — a persisted `netKind` may be read on resume. Decide whether to keep `netKind` as a
-     vestigial always-`'webrtc'` field or excise it entirely.
-   - **Verify:** `node --test` + smoke + a manual WebRTC host/join sanity pass if feasible (net has no
-     automated app-level coverage beyond the `mp.js` loopback).
+3. ✅ **DONE (commit `db3296a`)** — acoustic UI + `netKind` excision (app layer). Verified first
+   (explorer + targeted reads) that `netKind` is **never persisted** (the `netActiveSave` payload is
+   `{ code, role, manual, exp, ts, snap? }` — no `netKind`) and **never encoded** in invite/join codes,
+   so it could be excised entirely rather than kept as a vestigial `'webrtc'` field. Removed:
+   - `index.html`: the three `ac-only` nodes (the "phones in same room / speaker→mic" copy + the
+     "Без слушалки!" warning), the `🔊 Акустична игра` title → `Игра по мрежа`, and the stale
+     `<!-- network (acoustic) … -->` comment. The five `wr-only hidden` nodes lost both classes and
+     became plain always-visible (the `wr-only` toggle was the only thing un-hiding them; nothing else
+     re-hides them).
+   - `features/game/game.js`: the `netKind` declaration (`= 'acoustic'`) and its deep-link/rejoin writes.
+   - `features/net/net.js`: ~10 `netKind === 'webrtc'` / `!== 'webrtc'` guards (all no-ops on the live
+     path) collapsed; `openNetModal` lost its `kind` param and the `ac-only`/`wr-only` visibility toggles;
+     the two acoustic-era comments reworded. `features/setup/setup.js`: the `openNetModal('webrtc', …)`
+     call updated.
+   - **Verified:** `node --test` (176 pass, unchanged — app layer has no unit tests) + `node scripts/smoke.js`
+     green, plus a headless `file://` check that `openNetModal()` opens the modal cleanly with the
+     formerly-`wr-only` nodes visible and zero `ac-only`/`wr-only` nodes left.
+   - **Left in place (out of this slice's scope):** `#netModeSwitch` (the dice/manual lobby switch) is
+     always-hidden dead UI but isn't `netKind`/acoustic-tied — leave for a separate cleanup if wanted.
 4. ⬜ **TODO — docs/README sync** (do as the code slices land, or as a final pass):
    - `README.md` ~322–400: the "Acoustic multiplayer" + "Adaptive link" sections — replace with a short
      "WebRTC-only" paragraph. ~622: the `mp.js` table row ("…audio FSK modem") — rewrite.
