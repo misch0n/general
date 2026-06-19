@@ -1199,13 +1199,17 @@
     var pl = game.players[seat], key = catKeyAt(mv.category);
     if (key && !G.isCategoryFilled(pl, key)) {
       game.players = GReduce.reduce(game, { type: 'APPLY_SCORE', seat: seat, key: key, score: mv.score }).players;   // mirror the remote score
-      // store this player's FULL turn log (relayed as JSON) so history is complete on every device.
-      // If no log came through (older peer), fall back to a fill-order-only marker.
-      if (moveLog[seat]) {
-        var entry = null;
-        if (mv.log) { try { entry = JSON.parse(mv.log); } catch (e) {} }
-        moveLog[seat].push(entry || { category: key, remote: true });
-      }
+    }
+    // store this player's FULL turn log (relayed as JSON) so history + skill/luck analysis is complete
+    // on every device. This is DECOUPLED from the score-apply above: live spectating pre-fills the
+    // category via the TACT commit action (playSpecAction), which arrives BEFORE this authoritative
+    // STATE delta — so by now the category is already filled and the old guard skipped the log push,
+    // leaving the opponent unanalysable. Dedup by category key so a double-delivery never double-logs.
+    // If no log came through (older peer), fall back to a fill-order-only marker.
+    if (key && moveLog[seat] && !moveLog[seat].some(function (e) { return e && e.category === key; })) {
+      var entry = null;
+      if (mv.log) { try { entry = JSON.parse(mv.log); } catch (e) {} }
+      moveLog[seat].push(entry || { category: key, remote: true });
     }
     renderAll();
   }
