@@ -13,6 +13,8 @@
  * REROLL, COMMIT, TAP_MANUAL, UNDO, NEXT_TURN, END_GAME. Random dice are NOT
  * rolled here (that would make it non-deterministic); the shell rolls and hands
  * the faces in via the action, which also makes every transition unit-testable.
+ * Slice 5 adds APPLY_SCORE so the net-apply path mirrors a committed score onto
+ * a seat through the reducer instead of writing pl.scores inline.
  * Merging the experimental path (slice 4) and net/serialization (slice 5) build
  * on this.
  *
@@ -129,6 +131,23 @@
       case 'COMMIT': {
         var t = clone(turn); t.locked = true;
         return withTurn(state, t);
+      }
+
+      // Mirror a committed score onto a seat's card — the net-apply analogue of
+      // the local engine's assignScore (slice 5). The local path validates the
+      // dice via G/X.assignScore; the net path trusts the already-validated
+      // remote/host score, so this does no dice check — but it keeps the same
+      // "never overwrite a filled cell" guard, so a stale or duplicate STATE
+      // can't clobber a committed value. Pure: clones only the touched player
+      // (and its scores map) so the input state is untouched.
+      case 'APPLY_SCORE': {
+        var seat = action.seat, key = action.key, pl = state.players[seat];
+        if (!pl || key == null || G.isCategoryFilled(pl, key)) return state;
+        var players = state.players.map(function (p, i) {
+          if (i !== seat) return p;
+          var np = clone(p); np.scores = clone(p.scores); np.scores[key] = action.score; return np;
+        });
+        return Object.assign({}, state, { players: players });
       }
 
       // ОПА — rewind one logged action. A 'tap' un-counts one die; a 'commit'

@@ -128,8 +128,12 @@
     if (!netMode || !game) return;
     Object.keys(scores).forEach(function (idStr) {
       var seat = netOrder.indexOf(+idStr); if (seat < 0) return;
-      var pl = game.players[seat], cells = scores[idStr];
-      Object.keys(cells).forEach(function (cIx) { var key = catKeyAt(+cIx); if (key && !G.isCategoryFilled(pl, key)) pl.scores[key] = cells[cIx]; });
+      var cells = scores[idStr];
+      Object.keys(cells).forEach(function (cIx) {
+        var key = catKeyAt(+cIx);   // re-read the seat each cell: APPLY_SCORE replaces the players array
+        if (key && !G.isCategoryFilled(game.players[seat], key))
+          game.players = GReduce.reduce(game, { type: 'APPLY_SCORE', seat: seat, key: key, score: cells[cIx] }).players;
+      });
     });
     syncNetDropped(); renderAll();
   }
@@ -1092,7 +1096,8 @@
       specSetDice(a); specThrow = null;
       var ck = a.category != null ? catKeyAt(a.category) : null;
       // mark the category as submitted right away (the authoritative STATE confirms the same value)
-      if (ck && game.players[seat] && !G.isCategoryFilled(game.players[seat], ck)) game.players[seat].scores[ck] = a.value;
+      if (ck && game.players[seat] && !G.isCategoryFilled(game.players[seat], ck))
+        game.players = GReduce.reduce(game, { type: 'APPLY_SCORE', seat: seat, key: ck, score: a.value }).players;
       renderAll(); if (ck) flashTile(ck); done(); return;
     }
     if (!specPairs.length || a.mask === 0) { specThrow = null; specSetDice(a); specPulseOn = true; renderAll(); specPulseOn = false; shakeDice(); done(); return; }   // turn's first roll
@@ -1214,7 +1219,7 @@
     var seat = netOrder.indexOf(mv.playerId); if (seat < 0) return;
     var pl = game.players[seat], key = catKeyAt(mv.category);
     if (key && !G.isCategoryFilled(pl, key)) {
-      pl.scores[key] = mv.score;                                 // mirror the remote score
+      game.players = GReduce.reduce(game, { type: 'APPLY_SCORE', seat: seat, key: key, score: mv.score }).players;   // mirror the remote score
       // store this player's FULL turn log (relayed as JSON) so history is complete on every device.
       // If no log came through (older peer / acoustic), fall back to a fill-order-only marker.
       if (moveLog[seat]) {

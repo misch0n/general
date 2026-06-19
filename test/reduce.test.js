@@ -165,6 +165,38 @@ test('COMMIT locks the turn', function () {
   assert.deepStrictEqual(t.dice, [1, 1, 1, 1, 1]);   // hand untouched
 });
 
+// --------------------------------------------------------------- APPLY_SCORE
+
+test('APPLY_SCORE mirrors a committed score onto the named seat', function () {
+  var s = st();
+  var n = R.reduce(s, { type: 'APPLY_SCORE', seat: 1, key: 'ones', score: 4 });
+  assert.strictEqual(n.players[1].scores.ones, 4);
+  assert.deepStrictEqual(n.players[0].scores, {});      // other seats untouched
+});
+
+test('APPLY_SCORE writes a forfeit 0 (a numeric score, so the cell counts as filled)', function () {
+  var s = st();
+  var n = R.reduce(s, { type: 'APPLY_SCORE', seat: 0, key: 'general', score: 0 });
+  assert.strictEqual(n.players[0].scores.general, 0);
+});
+
+test('APPLY_SCORE never overwrites an already-filled cell (stale/duplicate STATE)', function () {
+  var s = st({ players: [{ scores: { ones: 3 } }, { scores: {} }] });
+  var n = R.reduce(s, { type: 'APPLY_SCORE', seat: 0, key: 'ones', score: 9 });
+  assert.strictEqual(n.players[0].scores.ones, 3);      // kept
+  assert.strictEqual(n, s);                              // same reference (no-op)
+});
+
+test('APPLY_SCORE is pure: input state and its players are untouched', function () {
+  var s = st();
+  var before = JSON.stringify(s);
+  var n = R.reduce(s, { type: 'APPLY_SCORE', seat: 1, key: 'fives', score: 15 });
+  assert.strictEqual(JSON.stringify(s), before);        // input unchanged
+  assert.notStrictEqual(n.players, s.players);          // new array
+  assert.notStrictEqual(n.players[1], s.players[1]);    // touched seat cloned
+  assert.strictEqual(n.players[0], s.players[0]);       // untouched seat shares identity
+});
+
 // ---------------------------------------------------------------------- UNDO
 
 test('UNDO of a tap un-counts one die and unlocks', function () {

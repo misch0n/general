@@ -77,10 +77,21 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    resume. Added a **resume round-trip to `scripts/smoke.js`** (play 3 turns → reload → `loadResume` →
    `resume(Exp)Game` → assert restored, both rulesets) — the first coverage for the resume path.
    (179 tests pass; smoke green: 4 play + 2 resume.)
-   *Remaining (5b+):* the **net wire codec** (`MP.pack*` in mp.js) and **replay** (`buildReplayActions`)
-   still have their own shapes; and **`netApplyRemote`/`netApplySnapshot` still mutate `pl.scores`
-   inline** — they don't emit a `COMMIT`/`NEXT_TURN` action like local play. (Also pre-existing, left
-   as-is: `resumeExpGame` hard-codes `game.manual = false`, ignoring `snap.manualMode`.)
+   **5b DONE** — the net-apply score write now goes **through the reducer** instead of mutating
+   player state inline. New pure `APPLY_SCORE` action (`reduce.js`) mirrors a committed score onto a
+   seat — the net-apply analogue of the local engine's `assignScore` (it trusts the already-validated
+   remote/host score, so no dice check, but keeps the same "never overwrite a filled cell" guard). It
+   clones only the touched seat (untouched seats keep identity) and returns a new `players` array; the
+   shell reassigns `game.players = reduce(…).players`. All three inline `pl.scores[key] = …` writes on
+   the net path now route through it: `netApplyRemote`, `netApplySnapshot` (re-reads the seat per cell,
+   since the array is replaced each apply — fixing a latent stale-`pl` read), and the spectator preview
+   in `playSpecAction`. **Added 4 `APPLY_SCORE` unit tests** (183 pass; local smoke green for both
+   rulesets × dice/manual — the net path has no smoke, but the change is a mechanical guard-preserving
+   reroute covered by the new pure tests).
+   *Remaining (5c+):* the **net wire codec** (`MP.pack*` in mp.js) and **replay** (`buildReplayActions`)
+   still have their own shapes (the binary protocol + replay reconstruction — larger, not behavior-
+   preserving to fold in casually). (Also pre-existing, left as-is: `resumeExpGame` hard-codes
+   `game.manual = false`, ignoring `snap.manualMode`.)
 
 ## Target schema (sketch)
 ```
