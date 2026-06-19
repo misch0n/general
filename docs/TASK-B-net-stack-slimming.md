@@ -41,7 +41,7 @@ also calls `_linkTick`). Removing `meter`/`_linkTick` means editing `_rx` — a 
 nothing else in `_rx` depends on the meter.
 
 ## Slice plan & status
-1. ⬜ **TODO — strip the adaptive link layer** (`mp.js` + `test/mp.test.js`). Remove:
+1. ✅ **DONE (commit `40536d5`)** — strip the adaptive link layer (`mp.js` + `test/mp.test.js`). Removed:
    - **Profiles:** `PROFILES`, `ANCHOR`, `getProfile`, `phaseProfile`, `CAL_LADDER`, `pickProfile`.
    - **Classes/methods:** `LinkMeter`, `AdaptiveController`, and `Session.prototype.`
      `_rxAdaptive` / `switchProfile` / `calibrate` / `_worstState` / `_stepDown` / `_linkTick` /
