@@ -49,7 +49,9 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
 - `features/net/net.js` — WebRTC multiplayer: lobby, host/join, QR invite + scan-to-join, spectating, sync.
 - `features/game/game.js` — **the core game loop**: state, board render, manual mode, dice interaction, commit/turn flow.
 - `features/game/ai.js` — bots, speech bubbles, combo tooltip.
-- `features/exp/exp.js` — experimental ruleset flow (currently a **parallel path** to game.js — see Task A).
+- `features/exp/exp.js` — experimental ruleset engine glue: the exp turn flow (`expBeginTurn`/`expCommit`/…),
+  exp board/hint rendering, and the exp evaluator hooks. Start/resume, header, pills and the dice tray are
+  **shared** with `game.js` (exp is a parameterization of the one flow, not a parallel path — Task A is done).
 - `features/modals/modals.js` — how-to-play, combo reference, settings panel, dev string editor.
 - `features/summary/summary.js` — end game, tie-break, awards.
 - `features/history/history.js` — archive, replay viewer, career charts, calendar.
@@ -58,7 +60,9 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
 - CSS mirrors this under `features/<name>/<name>.css` (+ `features/base/base.css`).
 
 **Per-file function index:** `docs/MAP.md` (regenerate: `bash scripts/genmap.sh`).
-**In-flight refactor:** `docs/TASK-A-state-unification.md`.
+**Completed refactor (historic context):** `docs/completed/TASK-A-state-unification.md` — state
+unification: one `GameState` + `GReduce.reduce`, one serialize/deserialize across
+resume/archive/net/replay, canonical-JSON net wire, and std/exp merged into one parameterized flow.
 
 ## Conventions
 - Big files use section banners — `// ===== MAJOR` and `// ---------- minor ----------`. **Grep these
@@ -66,7 +70,8 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
 - Engine globals: `G` (General), `EV`, `X` (exp), `MP`; `$ = document.getElementById`.
 - Live game state currently lives on a global `game` object **plus scattered globals**
   (`dice`, `selected`, `throwsLeft`, `manualMode`, `netMode`, …). Single source of truth for the
-  ruleset is `game.ruleset`, read via `gExp()`. (Broader unification is in progress — Task A.)
+  ruleset is `game.ruleset`, read via `gExp()`. (The turn flow now runs through `GReduce.reduce`
+  and std/exp share one flow — Task A, complete; see `docs/completed/`.)
 - Don't bump `APP_VERSION`/CHANGELOG for pure structural refactors; **do** for user-visible behavior changes.
 
 ## Token hygiene (keep sessions cheap)

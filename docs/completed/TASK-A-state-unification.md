@@ -1,4 +1,18 @@
-# Task A — State extraction & unification (handoff)
+# Task A — State extraction & unification (✅ COMPLETE — archived)
+
+> **STATUS: DONE.** All slices (1–5 incl. 5c-remainder) landed; the standard and experimental
+> code paths are merged — exp is now a *parameterization* of the one flow (engine factory + a
+> couple of internal `gExp()`/`sumExp()` branches), not a parallel set of functions. The turn flow
+> runs through `GReduce.reduce`; resume/archive/net-wire/replay all read one schema; the net wire
+> payload is canonical JSON. This file is kept in `docs/completed/` for historic context only — it
+> is **not** an active worklist. The single remaining item below ("Also still dormant" — the
+> acoustic modem/adaptive-link layer) is **orthogonal to Task A** and was never in its scope.
+>
+> *As-built notes on the final slice-4 merge (start/resume scaffolding, pills+peek, header):* see
+> the slice-4 entry below; the exp functions `expStartGame`/`resumeExpGame`/`expRenderHeader`/
+> `expRenderPills`/`expPeek` were deleted and folded into `startGame`/`resumeGame`/`renderHeader`/
+> `renderPills`/`openPeek`. Two latent exp bugs were fixed in passing (ownerDetached at start;
+> `resumeExpGame` ignoring `snap.manualMode`).
 
 **Purpose:** resume this refactor cleanly in a fresh session. Read CLAUDE.md first, then this.
 
@@ -39,7 +53,7 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    coverage for the app game-loop (177 tests pass; smoke green for both rulesets × dice/manual).
    *Not yet routed (by design):* the exp first-roll/commit path (slice 4) and the net commit/snapshot
    mutations (slice 5); `BEGIN_TURN mode:'net'` is wired but the rest of the net turn flow is slice 5.
-4. 🟡 **IN PROGRESS** — *merge the exp parallel path.* **4a DONE** — the exp **turn-flow state
+4. ✅ **DONE** — *merge the exp parallel path.* **4a DONE** — the exp **turn-flow state
    machine** now routes through `GReduce.reduce`, exactly like the standard path: `expBeginTurn`
    (BEGIN_TURN `manual`/`dice` + AI FIRST_ROLL), `expFirstRoll` (FIRST_ROLL), `expCommit`'s local
    lock (COMMIT), and `expEndTurn` (END_GAME + NEXT_TURN) no longer mutate `game.turn` inline.
@@ -62,7 +76,17 @@ ruleset-parameterized flow. Done **incrementally, one committed+verified slice a
    start/resume scaffolding (fold into `startGame`/`resumeGame`) and the header/pills exp variants
    themselves (`expRenderHeader`/`expRenderPills` — a 2-line name layout + `expPeek`); these could
    merge later but were left to keep the diff behavior-preserving.
-5. 🟡 **IN PROGRESS** — *unify serialization* — resume / archive / net wire codec / replay all read
+   **4c DONE (final)** — those leftovers are now folded in. `expStartGame`/`resumeExpGame` →
+   `startGame`/`resumeGame` (branch only on the engine factory + ruleset tag + begin-turn fn);
+   `expRenderHeader` → an internal local-exp branch in `renderHeader`; `expRenderPills`/`expPeek` →
+   the shared `renderPills` + a ruleset-aware `openPeek` (picks `expMiniBoard` via `sumExp()`).
+   `renderAll` calls plain `renderHeader()`/`renderPills()` now — no ruleset dispatch. Fixed two
+   latent exp bugs in passing: start ignored `ownerDetached`; `resumeExpGame` hard-coded
+   `game.manual = false` (now honors `snap.manualMode`). `syncHintBtn` became ruleset-aware
+   (`exactReady` vs `evReady`). The exp **board + hint** stay as `sumExp()`-dispatched helpers
+   (`expRenderBoard`/`expRenderHint`) — genuinely different, by design (4b). (185 tests pass; smoke
+   green: 4 play + 2 resume + 1 replay.)
+5. ✅ **DONE** — *unify serialization* — resume / archive / net wire codec / replay all read
    **one** schema via shared serialize/deserialize; make the net-apply path **emit the same actions**
    as local play.
    **5a DONE** — one shared **JSON envelope** for resume + archive, both rulesets. New
