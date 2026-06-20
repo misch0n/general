@@ -78,7 +78,11 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
   (`dice`, `selected`, `throwsLeft`, `manualMode`, `netMode`, …). Single source of truth for the
   ruleset is `game.ruleset`, read via `gExp()`. (The turn flow now runs through `GReduce.reduce`
   and std/exp share one flow — Task A, complete; see `docs/completed/`.)
-- Don't bump `APP_VERSION`/CHANGELOG for pure structural refactors; **do** for user-visible behavior changes.
+- **Bump `APP_VERSION` + add a CHANGELOG entry** (both in `features/core/core.js`) for **every bug
+  fix, new feature, or user-visible behaviour change** — newest first, Bulgarian, tagged
+  `new`/`chg`/`fix`/`rem`. This is part of the definition of done for such a change, not an
+  afterthought. Skip the bump **only** for pure structural refactors, docs, or test-only changes
+  (no behaviour change).
 
 ## Token hygiene (keep sessions cheap)
 - Prefer `grep`/section-banners and **ranged reads** over whole-file reads.
