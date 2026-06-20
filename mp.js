@@ -522,6 +522,12 @@
   // catches us up. Works mid-game (same eph identifies us); the host answers ACK+ROSTER+STATE.
   Session.prototype.rejoin = function () {
     if (this.isHost) return;
+    // a transient reconnect leaves this client's session (and its activeId) intact. The host
+    // answers with START/GRANT carrying the SAME activeId, so _applyActive's "changed" guard would
+    // suppress onTurn and the returning active player's board would never be re-enabled. Arm a
+    // one-shot so the next active-seat broadcast forces a fresh onTurn for US (only). This does NOT
+    // affect the host's move-timeout re-GRANT to an ordinary slow player (they aren't rejoining).
+    this._rejoining = true;
     this._send(T.JOIN_REQ, packJoinReq(this.eph, this.me, this.manual));
   };
 
@@ -675,8 +681,13 @@
     // player on its move-timeout; without this guard a re-GRANT would re-run the client's beginTurn
     // and reset their dice/throws mid-turn. A reloaded client has activeId=null, so it still fires.
     var changed = this.activeId !== id;
+    // ...but a transient reconnect (this.rejoin()) keeps our activeId, so "changed" stays false even
+    // though our board needs re-initialising. Force a single re-fire when WE are the returning active
+    // seat. Scoped to id===myId so a rebroadcast START to other clients still honours the guard.
+    var rejoinSelf = this._rejoining && id === this.myId;
+    this._rejoining = false;   // one-shot: consumed (or cleared because the token moved on without us)
     this.activeId = id;
-    if (changed && this.cb.onTurn) this.cb.onTurn(id, id === this.myId);
+    if ((changed || rejoinSelf) && this.cb.onTurn) this.cb.onTurn(id, id === this.myId);
   };
   Session.prototype._rxState = function (s) {
     if (s.kind === 'snapshot') {
