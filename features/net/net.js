@@ -1058,6 +1058,14 @@
     if (netOrder.indexOf(a.playerId) < 0) return;
     netActiveId = a.playerId; specAct = a;               // remember so RETURN can jump back here
     if (a.playerId !== specPid) { specQueue = []; specPid = a.playerId; specRollNo = 0; specPairs = []; }   // new player → fresh
+    // a COMMIT is the climactic moment: highlight the chosen category LIVE, the instant it arrives.
+    // Otherwise it waits its turn behind the paced roll replay (SPEC_GAP apart) and only pulses long
+    // after the authoritative STATE delta has already filled the tile — i.e. no live highlight at all.
+    // The queued replay below still re-plays the commit for continuity (idempotent flash).
+    if (a.commit && a.category != null && !specSelf) {
+      var lck = catKeyAt(a.category);   // flashTile locates the tile positionally, no game.current needed
+      if (lck) flashTile(lck);
+    }
     specQueue.push(a);
     if (specQueue.length > 6) specQueue.splice(0, specQueue.length - 6);   // never lag more than a few actions behind
     specPump();
