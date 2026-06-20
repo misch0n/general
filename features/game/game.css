@@ -37,6 +37,7 @@
 .ppill .mamnik::before{ content:''; position:absolute; bottom:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-bottom-color:#c0392b; }
 @keyframes mamnikpop{ from{ opacity:0; transform:translateX(-50%) translateY(-4px) scale(.7); } to{ opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
 .ppill.on{ transform:scale(1.22); font-weight:800; box-shadow:0 0 0 2px var(--gen-brass), 0 3px 9px rgba(0,0,0,.45); z-index:2; }   /* current player: bigger, not recoloured */
+.ppill.host{ margin-right:10px; }   /* net: the host is seat #1 — a touch of extra right spacing sets the special player apart */
 /* a disconnected player (turns skipped): desaturated, with a fashionable pulsing amber ring */
 .ppill.mine{ text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:2px; }   /* your own board */
 .ppill.dropped{ filter:grayscale(.7); opacity:.7; animation:droppulse 1.6s ease-in-out infinite; }

@@ -341,6 +341,7 @@
     var col = p.color || 'var(--gen-pill)';
     var mamnik = isMamnik(i) ? '<span class="mamnik">МАМНИК!</span>' : '';
     return '<button class="ppill' + (i === game.current ? ' on' : '') + (p.dropped ? ' dropped' : '') + (isMyNetPlayer(p) ? ' mine' : '')
+      + (netMode && i === 0 ? ' host' : '')   // the host is always seat #1 — set them apart with a touch of right spacing
       + '" data-i="' + i + '" style="background:' + col + ';color:' + pillInk(p.color) + ';border-color:rgba(0,0,0,.4)" title="' + (p.dropped ? 'разпадна се' : '') + '">' + (p.dropped ? '📵' : total(p)) + mamnik + '</button>';
   }
   function renderPills() {
@@ -348,8 +349,16 @@
     $('pillWrap').querySelectorAll('.ppill').forEach(function (b) {
       b.onclick = function () {
         var i = +b.getAttribute('data-i');
-        // network spectating: tapping MY OWN board shows my full during-turn screen (with a RETURN button)
-        if (netMode && !netMyTurn && isMyNetPlayer(game.players[i])) { previewSelf(); return; }
+        // Network spectating: the pills are a "where am I looking" switch.
+        if (netMode && !netMyTurn) {
+          if (isMyNetPlayer(game.players[i])) {        // own marker → full during-turn board; re-tap jumps back
+            if (specSelf) returnToCurrent(); else previewSelf();
+            return;
+          }
+          var activeSeat = netActiveId != null ? netOrder.indexOf(netActiveId) : -1;
+          if (i === activeSeat) { returnToCurrent(); return; }   // current player → switch to their live turn
+          openPeek(i); return;                                   // any other player → read-only peek
+        }
         openPeek(i);
       };
     });

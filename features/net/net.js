@@ -23,14 +23,16 @@
   var netReconnecting = false;
   function syncNetLink() {
     var nl = $('netLink'); if (!nl) return;
-    if (!netMode) return;
+    if (!netMode) { nl.innerHTML = ''; nl.classList.add('hidden'); return; }
     var up = !!(netBus && netBus.conns && netBus.conns.length > 0);
-    var cls, lbl;
-    if (net && net.isHost) { cls = 'up'; lbl = 'хост'; }
-    else if (netReconnecting || !up) { cls = 'warn'; lbl = 'връзка…'; }
-    else { cls = 'up'; lbl = 'свързан'; }
-    nl.innerHTML = '<span class="condot ' + cls + '"></span><span class="conlbl">' + lbl + '</span>';
-    nl.classList.remove('hidden');
+    // The steady host/„свързан" identity badge is gone — it carried little signal. Keep only a
+    // connection-trouble indicator (client side) so a dropped link stays visible by the turn marker.
+    if (!(net && net.isHost) && (netReconnecting || !up)) {
+      nl.innerHTML = '<span class="condot warn"></span><span class="conlbl">връзка…</span>';
+      nl.classList.remove('hidden');
+    } else {
+      nl.innerHTML = ''; nl.classList.add('hidden');
+    }
   }
 
   // host rejected our join (e.g. we picked the wrong game mode) → explain + back to the chooser
