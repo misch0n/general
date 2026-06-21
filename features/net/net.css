@@ -155,10 +155,8 @@ h2 .ic-book, h2 .ic-archive, h2 .cog-ic{ display:inline-block; vertical-align:mi
 .netlink{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px;
   background:rgba(0,0,0,.35); border:1px solid var(--gen-pill-line); font-size:10px; }
 .netlink .condot{ width:8px; height:8px; border-radius:50%; flex:none; }
-.netlink .condot.up{ background:#2e9e5b; box-shadow:0 0 6px rgba(46,158,91,.7); }
 .netlink .condot.warn{ background:#e0a92e; box-shadow:0 0 6px rgba(224,169,46,.7); animation:condotpulse .9s ease-in-out infinite; }
 @keyframes condotpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
-.netlink .condot.down{ background:#c0392b; }
 .netlink .conlbl{ font-family:var(--gen-font-display); text-transform:uppercase; letter-spacing:.4px; color:var(--gen-muted); }
 .netflavour{ font-style:italic; color:var(--gen-label); min-height:18px; }
 .reorder{ display:flex; flex-direction:column; gap:2px; }

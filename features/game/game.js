@@ -211,6 +211,7 @@
   // number bar) is also what net-minus games render.
   function renderAll() {
     renderHeader();   // shared: branches to the exp 2-line layout internally for local exp
+    syncNetLink();    // keep the connection-trouble marker in sync (esp. host: a seat drops/returns → re-render here)
     renderPills();    // shared: pills are identical; the peek modal (openPeek) picks the exp board by ruleset
     if (sumExp()) { expRenderBoard(); $('expNumBar').classList.remove('hidden'); }
     else { renderBoard(); $('expNumBar').classList.add('hidden'); }

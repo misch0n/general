@@ -23,16 +23,24 @@
   var netReconnecting = false;
   function syncNetLink() {
     var nl = $('netLink'); if (!nl) return;
-    if (!netMode) { nl.innerHTML = ''; nl.classList.add('hidden'); return; }
-    var up = !!(netBus && netBus.conns && netBus.conns.length > 0);
     // The steady host/„свързан" identity badge is gone — it carried little signal. Keep only a
-    // connection-trouble indicator (client side) so a dropped link stays visible by the turn marker.
-    if (!(net && net.isHost) && (netReconnecting || !up)) {
-      nl.innerHTML = '<span class="condot warn"></span><span class="conlbl">връзка…</span>';
-      nl.classList.remove('hidden');
-    } else {
-      nl.innerHTML = ''; nl.classList.add('hidden');
+    // connection-trouble indicator by the turn marker. For a client that's „I can't reach the host";
+    // for the host it's „a seat dropped and I'm still awaiting it" (an AI-taken-over or paused seat
+    // is a deliberate state, not a lost link, so it doesn't light up).
+    var down = false;
+    if (netMode) {
+      if (net && net.isHost) {
+        down = !!(net.roster && net.roster.some(function (m) {
+          return m.id !== MP.HOST_ID && m.dropped && !net.isAIControlled(m.id) && !((net.paused || {})[m.id]);
+        }));
+      } else {
+        down = netReconnecting || !(netBus && netBus.conns && netBus.conns.length > 0);
+      }
     }
+    var shown = !nl.classList.contains('hidden');
+    if (down === shown) return;   // idempotent: don't rewrite (which would restart the pulse) when unchanged
+    if (down) { nl.innerHTML = '<span class="condot warn"></span><span class="conlbl">връзка…</span>'; nl.classList.remove('hidden'); }
+    else { nl.innerHTML = ''; nl.classList.add('hidden'); }
   }
 
   // host rejected our join (e.g. we picked the wrong game mode) → explain + back to the chooser

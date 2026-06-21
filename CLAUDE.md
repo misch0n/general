@@ -83,6 +83,10 @@ Load order: `core → setup → net → game → exp → game/ai → modals → 
   `new`/`chg`/`fix`/`rem`. This is part of the definition of done for such a change, not an
   afterthought. Skip the bump **only** for pure structural refactors, docs, or test-only changes
   (no behaviour change).
+- **Leave no dead code.** After any change, remove what it orphans — unused functions, variables,
+  CSS rules/classes, HTML elements, dependencies, now-unreachable branches. If a change makes
+  something unused, deleting it is part of that change, not a follow-up. Grep for remaining
+  references before deleting, and double-check nothing else still uses it.
 
 ## Token hygiene (keep sessions cheap)
 - Prefer `grep`/section-banners and **ranged reads** over whole-file reads.
