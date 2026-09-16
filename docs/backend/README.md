@@ -1,0 +1,171 @@
+# Backend server — orientation & how to use this plan
+
+This directory holds the **plan and progress tracker** for giving Генерал a real
+**authoritative multiplayer server**, replacing the current browser-only,
+peer-to-peer (PeerJS/WebRTC) host model with a dedicated server that is the single
+source of truth for every game.
+
+- **[`PLAN.md`](./PLAN.md)** — the master plan **and the live work tracker**. It is
+  the source of truth for *what we are building*, *why*, and *how far we've gotten*.
+- **This file** — orientation: the architecture facts you need before touching
+  anything, and the workflow for picking up and continuing the work.
+
+> **New session? Start here.** Read this file top-to-bottom, then read `PLAN.md`,
+> then run `git log --oneline main..HEAD` on this branch. That is enough to know
+> exactly where we are and what to do next — you should not need to re-explore the
+> codebase to resume.
+
+---
+
+## 1. The goal
+
+Today, network play works with **no server of our own**: one phone is the "host"
+(referee), others join over WebRTC via PeerJS's public broker (`features/net/net.js`
++ `mp.js`). The host is authoritative *in principle*, but the device holding the
+turn rolls its own dice and **declares its own score**, which the host trusts.
+
+We want a **true authoritative server**:
+
+- The **server** owns every room, the turn order, the dice (RNG), and score
+  computation. Clients send **intents** ("roll", "reroll these", "commit category
+  X"); the server rolls, validates, scores, and broadcasts the authoritative result.
+- A client can never fabricate a roll or a score. Reconnects, drops, and AI
+  takeover are handled by the server.
+
+## 2. Guiding constraints (do not violate)
+
+1. **The frontend must keep working over `file://`.** The whole game already opens
+   by double-clicking `index.html` with no server. Server play is **additive and
+   opt-in** — the page still opens and plays locally offline. No bundler, no ES
+   modules, no `fetch()` of local files in the browser (see root `CLAUDE.md`).
+   - WebSocket is **allowed** from a `file://` page (unlike ES modules / `fetch` of
+     local files), so a `wss://` client transport is fine.
+2. **Reuse the pure engine — one source of truth for the rules.** The server runs
+   the *exact same rules code* as the browser by `require()`-ing the pure modules.
+   Do **not** re-implement scoring, the reducer, or the wire codecs on the server.
+3. **The server runs `MP.Session`, it does not replace it.** `mp.js`'s `Session` is
+   already a transport-pluggable, host-authoritative state machine. The server hosts
+   an instance per room over a WebSocket transport. We *extend* the protocol for
+   server-owned dice; we don't rewrite it.
+4. **`mp.js` stays pure and UMD.** It is shared by browser and server and unit-tested
+   in Node. Any protocol change lands there with round-trip tests, DOM-free.
+5. **Incremental & always-green.** Every phase is independently verifiable. Run
+   `node --test` before every commit; the frontend puppeteer smoke (per `CLAUDE.md`)
+   before any commit that touches browser files.
+
+## 3. Architecture at a glance (so you don't have to re-explore)
+
+**Pure, Node-usable modules the server reuses (all UMD, DOM-free):**
+
+| Module | Global | What the server uses it for |
+|---|---|---|
+| `game.js` | `window.General` (**G**) | scoring (`scoreFor`, `assignScore`), categories, **RNG** (`rollDie(rng)`, `rollAll(rng)` — already pluggable!), AI (`aiChoose`…), player/game factories |
+| `exp.js` | `window.GeneralExp` (**X**) | experimental-ruleset flow + scoring |
+| `reduce.js` | `window.GReduce` | **pure turn reducer** — `reduce(state, action)`; the shell rolls dice and feeds faces in via the action (server becomes that shell) |
+| `mp.js` | `window.MP` | L1 framing (`frame`/`unframe`, CRC-8), all wire codecs, and **`MP.Session`** — the host-authoritative lobby→turn→end state machine |
+
+> ⚠️ `features/exp/exp.js` (the *app glue*) is DOM-coupled — **not** server-usable.
+> Only the four root modules above are pure. `features/**` is browser-only.
+
+**How the transport seam works (this is where the server plugs in):**
+
+- `MP.Session` takes `opts.transport` with just `send(bytes)` + `onReceive(cb)`.
+- In the browser, `PeerBus` (`features/net/net.js:460+`) implements that over WebRTC:
+  host relays to all clients (star topology), client sends only to host.
+- **Server plan:** a `SocketBus` implements the same two-method contract over `ws`.
+  The server constructs `new MP.Session({ transport: socketBus, isHost: true, … })`
+  per room. The browser gets a matching `SocketBus` (WebSocket to the server) as an
+  alternative transport to `PeerBus`.
+
+**Wire protocol (in `mp.js`):**
+
+- Framing: `[TYPE][SENDER][SEQ][PAYLOAD…][CRC8]` (binary `Uint8Array`; WebSocket
+  carries binary frames natively).
+- Message types `T`: `BEACON, JOIN_REQ, JOIN_ACK, ROSTER, START, GRANT, MOVE, STATE,
+  RESYNC_REQ, PING, PONG, END, META, READY, PREP, AICTRL, TACT, SPUR, JOIN_NAK, BYE`.
+- Lobby/roster/turn codecs are compact binary; **game payloads are JSON**
+  (`packMove` → `{playerId, category, score, log}`, `packStateDelta/Snapshot`).
+- `MOVE` today = *client declares the final score*; `log` is an opaque per-turn
+  detail string (rolls/keeps) that the host never re-parses or validates. **This is
+  the contract Phase 3 changes.**
+
+**Identity today:** none. `Session.myId` is a numeric seat id assigned by the host on
+`JOIN_ACK`; `eph` is a random per-device token that survives reconnects (host maps
+`eph → seat`). No authentication; names/colours are free text, deduped for display.
+
+**The authority gap (the heart of the project):** `game.js:143-145` states rolls
+happen on the turn-holder's device and only the *result* is shared — "no shared-RNG
+path to desync." The host checks only `playerId === activeId` and "category not
+already filled" (`mp.js` `_rxHost`), **not** the dice or score. Phase 3 moves RNG +
+scoring to the server.
+
+## 4. How to use `PLAN.md` (it's the tracker)
+
+The plan is organized into **phases**, each a list of **tasks** with a status marker:
+
+| Marker | Meaning |
+|---|---|
+| `[ ]` | not started |
+| `[~]` | in progress (leave a one-line note of where it stands) |
+| `[x]` | done **and verified** (tests green, committed) |
+| `[!]` | blocked / needs a decision (see the note; often an entry in *Open decisions*) |
+
+At the top of `PLAN.md`, **`## Current status`** always points at the phase/task in
+flight and the immediate next step. Keep it accurate — it is the first thing the
+next session reads.
+
+### The resume loop (for any session, human or agent)
+
+1. Read this README, then `PLAN.md`'s `## Current status`, then `git log`.
+2. Pick the first `[ ]`/`[~]` task in phase order (unless *Current status* says
+   otherwise). Re-read that task's *why*, *files*, and *Definition of Done*.
+3. Do the work in a scoped way. Prefer the repo's subagents
+   (`docs/SUBAGENT-WORKFLOW.md`): `explorer` for reads, `implementer` for the change,
+   `reviewer` for a diff check.
+4. **Verify** per the task's DoD: `node --test`; add/extend tests; puppeteer smoke if
+   browser files changed.
+5. **Commit** (see conventions below), then **update `PLAN.md`**: tick the box, move
+   `## Current status`, and add a line to the *Decision log* if you made a
+   non-obvious call.
+6. Push to the working branch.
+
+### Commit conventions (commits are our memory)
+
+Per the user's direction and root `CLAUDE.md`:
+
+- Each commit is **one logical slice**. The message says **what** changed and
+  **why**, with reasoning for any tricky decision — enough that the commit history
+  reconstructs *why we did it this way*, without being bloated. A future session
+  (or reviewer) should be able to read the log and understand the design intent
+  per file / per decision.
+- Reference the phase/task, e.g. `backend(P1): SocketBus WebSocket transport …`.
+- Keep the plan and the code in sync **in the same commit** when practical (tick the
+  box in the commit that finishes the task).
+- End messages with the `Co-Authored-By` / `Claude-Session` trailers (per session
+  attribution rules).
+- If a change is **user-visible in the browser**, bump `APP_VERSION` + add a
+  CHANGELOG entry in `features/core/core.js` (root `CLAUDE.md` rule). Pure server or
+  docs/tests changes skip the bump.
+
+## 5. Running & verifying the server (once it exists)
+
+The server does not exist yet — Phase 0/1 create it. The intended shape (subject to
+Phase 0 finalizing layout):
+
+```
+# from repo root, once Phase 0 lands:
+node server/index.js            # starts the WS server (PORT env, default TBD in P0)
+node --test                     # engine + protocol + server unit/integration tests
+```
+
+The frontend keeps its zero-tooling workflow untouched: open `index.html` over
+`file://`, `node --test`, puppeteer smoke — exactly as documented in root `CLAUDE.md`.
+
+## 6. Open decisions
+
+Product/architecture questions that need an owner call are tracked in
+**`PLAN.md` → `## Open decisions`** with a recommended default each. They are
+flagged `[!]` on the tasks that depend on them. Don't silently assume — either use
+the recorded default or raise it.
+</content>
+</invoke>
