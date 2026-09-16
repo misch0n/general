@@ -178,9 +178,19 @@ node --test                     # engine + protocol + server suites (225 tests)
 **Config** is all env, defaults in `server/config.js` (`config.describe()` lists the
 operator-facing set): `PORT` (8787; `0` = any free port), `HOST`, `LOG_LEVEL`,
 `LOG_FORMAT` (defaults to text on a TTY, json otherwise), `MAX_PLAYERS_PER_ROOM`
-(6), `MAX_ROOMS` (100), `ROOM_IDLE_MS`, `MAX_FRAME_BYTES`, `ALLOWED_ORIGINS`
-(empty = any; a `file://` page sends `Origin: null`, so name `null` explicitly if
-you set an allowlist), `SHUTDOWN_GRACE_MS`.
+(6), `MAX_ROOMS` (100), `ROOM_IDLE_MS`, `HEARTBEAT_MS` (30000; `0` disables),
+`MAX_FRAME_BYTES`, `ALLOWED_ORIGINS` (empty = any; a `file://` page sends
+`Origin: null`, so name `null` explicitly if you set an allowlist),
+`SHUTDOWN_GRACE_MS`.
+
+**The invariant `listener.js` exists to keep: one bad connection must never take
+the process down.** A server refereeing many rooms cannot let a single rude or
+broken client kill every other game on the box, so every boundary where foreign
+code or foreign bytes enter is wrapped — the accept callback, the receive
+callback, the health handler — and `send()` **never rejects** (`MP.Session` calls
+it without a `.catch()`, so a rejection would be an unhandled rejection, which
+Node turns into an exit). Keep that property when adding to this file; the tests
+under "one bad connection must never take the process down" are the guard.
 
 **Server tests** need no separate lane: they live in `test/server/` and Node's
 default test glob (`**/test/**/*.js`) already finds them. Two things to know:

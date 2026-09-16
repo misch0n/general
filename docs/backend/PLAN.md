@@ -92,6 +92,19 @@ test lane, changing nothing about the `file://` frontend.*
     deregistration pause in that gap.
   - `Origin: null` is what a `file://` page sends — the allowlist must be able to
     name it, or the game's primary client is locked out (5.2 owns the rest).
+  - **The invariant to preserve: one bad connection must never take the process
+    down.** An independent review of the first cut found three ways it could —
+    a rejected `send()` becoming an unhandled rejection, a throwing
+    `onConnection`, and a throwing `stats()` inside the health handler — each of
+    which exited the process, i.e. killed *every* room on the box. All three are
+    fixed and have named regression tests. `send()` now **never rejects** by
+    contract, because `MP.Session` calls it without a `.catch()`.
+  - Drain closes the WS server and the HTTP port **in parallel**, and terminates
+    peers that don't answer a close frame: `ws` waits up to 30 s for that answer,
+    so nesting the two closes let one frozen client burn the whole
+    `SHUTDOWN_GRACE_MS` and turn a clean SIGTERM into `exit(1)`.
+  - A `HEARTBEAT_MS` ping/pong reaps half-open sockets (vanished peer, no FIN).
+    From Phase 1 those hold a **seat**, so this stops being cosmetic.
 - [x] **0.4 Server test lane.** Extend `node --test` with a `test/server/` area;
   document how server tests run (see Decision D1 on packaging). *DoD:* `node --test`
   discovers and runs server tests alongside the existing 176.
@@ -258,9 +271,10 @@ archive / leaderboards are out of scope (future, with accounts).*
   `@roamhq/wrtc` nor `jsdom` is required by any file in the repo — both are
   devDependencies nothing uses (Task B's net slimming appears to have orphaned
   wrtc; `webrtc.test.js` drives `mp.js` with a mock bus, no real WebRTC). Drop both
-  here, and update `.claude/hooks/session-start.sh`, whose comment still names them. *DoD:* server is the only network transport; grep confirms no
-  PeerJS/WebRTC/TURN remnants; `node --test` + puppeteer smoke green; **`APP_VERSION`
-  + CHANGELOG** bumped (`rem` tag).
+  here, and update `.claude/hooks/session-start.sh`, whose comment still names them.
+  *DoD:* server is the only network transport; grep confirms no PeerJS/WebRTC/TURN
+  remnants; `node --test` + puppeteer smoke green; **`APP_VERSION` + CHANGELOG**
+  bumped (`rem` tag).
 
 ## Phase 8 — Testing, hardening & docs
 

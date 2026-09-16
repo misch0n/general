@@ -77,6 +77,12 @@ var SPEC = {
   // Rooms are in-memory only (Decision D6), so an abandoned one is pure leak
   // until it expires. Consumed by Phase 2.3's GC.
   roomIdleMs: { env: 'ROOM_IDLE_MS', def: 15 * 60 * 1000, parse: int(1000, 24 * 60 * 60 * 1000) },
+  // WebSocket ping interval. A peer that vanishes without a FIN (closed laptop,
+  // NAT timeout, mobile handoff) never fires 'close', so its connection — and
+  // from Phase 1 its SEAT — would be held forever. A socket that misses one
+  // round is terminated. 0 disables the heartbeat (tests that want a frozen
+  // connection to stay frozen).
+  heartbeatMs: { env: 'HEARTBEAT_MS', def: 30000, parse: int(0, 10 * 60 * 1000) },
 
   // --- hardening (Phase 5.2; enforced there, configured here) ---
   // A frame is a few hundred bytes; a state snapshot is the big one. 64 KiB is
