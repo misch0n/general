@@ -566,6 +566,15 @@
         this.roster.push(p);
         if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
         existing = p;
+      } else if (existing.dropped) {
+        // A known боец coming BACK to the lobby: clear the flag their vanished
+        // connection set, exactly as the mid-game rejoin branch below does.
+        // Without this they are re-admitted but stay greyed out as "dropped" in
+        // everyone's roster for the rest of the lobby — they can ready up and
+        // start the game still marked gone.
+        existing.dropped = false;
+        if (this.cb.onDrop) this.cb.onDrop(existing.id, false);
+        if (this.cb.onRoster) this.cb.onRoster(this.roster.slice());
       }
       this._send(T.JOIN_ACK, packJoinAck(jr.eph, existing.id, this.manual, this.exp));
       this._send(T.ROSTER, packRoster(this.roster));

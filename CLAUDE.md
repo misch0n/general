@@ -19,7 +19,7 @@ protocol)** — there is no server, bundler, or transpile step.
 
 ## Run & verify
 - **Open:** just open `index.html` in a browser, or `file://<abs-path>/index.html`.
-- **Unit tests:** `node --test` (engine + net/session logic; currently **156 tests**).
+- **Unit tests:** `node --test` (engine + net/session logic + `test/server/`; currently **268 tests**).
 - **UI smoke (headless, over file://):** the app game-loop has **no unit tests** — puppeteer is the
   app-level safety net. Write a short script (puppeteer is in `node_modules`) that loads
   `file://$PWD/index.html`, drives `#playBtn` (dispatch real `pointerdown`+`pointerup`+`click`),

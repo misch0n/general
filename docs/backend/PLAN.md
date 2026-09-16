@@ -32,7 +32,7 @@ process. `test/server/room.test.js`'s protocol-level `client()` rig (raw `ws` +
 `expect(type)`) is the model for a scripted end-to-end check.
 
 **Progress:** Phase 0 complete (4 / 4); Phase 1 at 2 / 4.
-`node --test` → **267** tests; `node scripts/smoke.js` → SMOKE PASS.
+`node --test` → **268** tests; `node scripts/smoke.js` → SMOKE PASS.
 Run the server: `node server/index.js` (see README §5).
 
 ---

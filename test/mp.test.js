@@ -330,6 +330,34 @@ test('lobby prep: host adds and removes AI seats (AI is auto-ready, names/colour
   assert.strictEqual(c1.roster.length, 2, 'client saw the removal');
 });
 
+test('lobby: a боец who drops and comes back is no longer shown as dropped', function () {
+  var bus = new Bus();
+  var drops = [];
+  function mk(isHost, me, cb) {
+    return new MP.Session({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2,
+      setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: cb || {} });
+  }
+  var host = mk(true, { name: 'Хост', color: '#d4a02e', gender: 'm' },
+    { onDrop: function (id, on) { drops.push({ id: id, on: on }); } });
+  var c1 = mk(false, { name: 'Боян', color: '#e07a2e', gender: 'm' });
+  host.openLobby(); c1.requestJoin(); bus.drain();
+
+  // The connection vanishes while still in the lobby, then the same боец (same
+  // eph) comes back. The mid-game branch has always cleared this; the lobby one
+  // did not, so they stayed greyed out as "dropped" for the rest of the lobby —
+  // able to ready up and start the game still marked gone.
+  host.markDropped(c1.myId, true); bus.drain();
+  assert.strictEqual(host._byId(c1.myId).dropped, true);
+
+  c1.rejoin(); bus.drain();
+  assert.strictEqual(host._byId(c1.myId).dropped, false, 'the host cleared the flag');
+  assert.strictEqual(c1.roster.filter(function (p) { return p.id === c1.myId; })[0].dropped, false,
+    'and said so in the roster everyone sees');
+  assert.deepStrictEqual(drops, [{ id: c1.myId, on: true }, { id: c1.myId, on: false }],
+    'the host UI was told both times');
+  assert.strictEqual(host.roster.length, 2, 'they came back to their seat, not a new one');
+});
+
 // ---- a host that referees instead of playing (the server's shape) ----
 // The browser's host is a player at the table and takes seat 0 in its own
 // roster. The server's host is not: it must hold no seat, or seat 0 would join

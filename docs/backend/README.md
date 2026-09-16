@@ -179,7 +179,7 @@ Phase 0 has landed, so this is real now:
 ```
 npm install                     # one manifest at the repo root (Decision D1)
 node server/index.js            # listener + one open room; Ctrl-C / SIGTERM drains and exits 0
-node --test                     # engine + protocol + server suites (267 tests)
+node --test                     # engine + protocol + server suites (268 tests)
 node scripts/smoke.js           # the frontend's file:// smoke — required if you touched mp.js
 ```
 

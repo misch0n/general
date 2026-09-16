@@ -134,8 +134,9 @@ function create(opts) {
    * given seat, and it detaches this one BEFORE reporting the loss. The residual
    * wrinkle is the other way round — while a half-open socket still holds the
    * claim, its owner's NEW socket cannot be tagged, so reaping the stale one
-   * drops a seat somebody is sitting in. Only the returning client's own
-   * JOIN_REQ clears that, by `eph`; 2.2 is what removes the window.
+   * drops a seat somebody is sitting in. What rescues that today is the
+   * returning client's own JOIN_REQ, which clears the flag by `eph` in every
+   * state; 2.2 is what removes the window.
    */
   function seatLost(conn) {
     if (conn.pid == null) { log.debug('room: an unseated socket went away', { conn: conn.id }); return; }
