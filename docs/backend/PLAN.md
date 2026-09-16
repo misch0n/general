@@ -12,18 +12,23 @@ Status markers: `[ ]` todo · `[~]` in progress · `[x]` done+verified · `[!]` 
 
 **Phase 0 — COMPLETE.** `server/` exists, boots, provably runs the browser's own
 rules modules, serves `/healthz`+`/readyz`, upgrades `/ws`, round-trips `mp.js`
-frames over a real WebSocket, and drains cleanly on SIGTERM. Still no rooms and no
-game logic — that is Phase 1's job.
+frames over a real WebSocket, and drains cleanly on SIGTERM.
 
-**Next step:** **Phase 1, Task 1.1** (server `SocketBus`). The seam is already
-built: `listener.create({ onConnection })` hands each socket out as a
-`{ send, onReceive, close }` object, which is precisely `MP.Session`'s
-`opts.transport` contract — so 1.1 is a *grouping* layer (fan a room's sockets into
-one bus, star-topology like `PeerBus`), not new transport code. Mirror
-`test/webrtc.test.js`'s star expectations.
+**Phase 1 — in progress.** `server/socket-bus.js` (1.1) groups a room's sockets into
+the one transport `MP.Session` wants, and real sessions already run a full game over
+it in tests. Still no rooms and no server-side session instance — 1.2 constructs one.
 
-**Progress:** Phase 0 of 9 complete (4 / 4 tasks).
-`node --test` → **225** tests (was 176 before the server landed).
+**Next step:** **Phase 1, Task 1.2** (host a `Session` per connection group).
+`new MP.Session({ transport: bus, isHost: true, … })` on top of the bus, its
+callbacks pumped, wired into `listener.create({ onConnection })` — one bus for now
+(Phase 2 turns that into a room registry). Dice stay client-declared until Phase 3.
+`test/server/socket-bus.test.js`'s `starHarness` is the mock-socket rig to reuse;
+the new integration test should drive a **real** `ws` client through `JOIN_REQ` →
+`JOIN_ACK` + `ROSTER`.
+
+**Progress:** Phase 0 complete (4 / 4); Phase 1 at 1 / 4.
+`node --test` → **248** tests. (The "225" recorded here after Phase 0 had drifted:
+the tree was at 232 before this task, so 1.1 added 16.)
 Run the server: `node server/index.js` (see README §5).
 
 ---
@@ -121,11 +126,32 @@ test lane, changing nothing about the `file://` frontend.*
 *Goal: a browser client connects to the server, the server hosts a real `MP.Session`
 over WebSocket, and the existing lobby handshake works end-to-end unchanged.*
 
-- [ ] **1.1 Server `SocketBus`.** Implement the `MP.Session` transport contract
+- [x] **1.1 Server `SocketBus`.** Implement the `MP.Session` transport contract
   (`send(bytes)`, `onReceive(cb)`) over a room's WebSocket connections, mirroring
   `PeerBus`'s star topology (server relays to all clients; a client's frame goes to
   the server). *Files:* `server/socket-bus.js` (+ tests). *DoD:* unit test drives a
   mock `ws` and asserts framing relay matches `webrtc.test.js`'s star expectations.
+  → **Done.** `server/socket-bus.js`: `create({log,onPeers,onLost})` returns the bus,
+  which *is* the transport (`send`/`onReceive` on it directly, like `PeerBus`), plus
+  `add/remove/has/size/peers/stop`. 14 tests in `test/server/socket-bus.test.js`, the
+  last two driving **real `MP.Session`s** over the bus (lobby convergence + a client
+  move reaching the other client only via the host). Notes for later phases:
+  - **`conn.onClose(fn)` is new on the listener's socket wrapper** — the bus has no
+    access to the raw `ws`, and from now on a socket holds a *seat*, so a vanished
+    peer must be announced or the seat is never released. The listener's own
+    bookkeeping runs first, and a throwing handler is caught (same invariant as the
+    receive path; both are tested).
+  - **`onLost` fires only for a socket that went away on its own.** An explicit
+    `remove()`/`stop()` is *our* doing — Phase 2 must not report a player drop when
+    it is the one tearing the room down.
+  - **The `conn.pid` seat tag is a hint, not a registry.** A `JOIN_REQ` carries the
+    `UNASSIGNED` (15) sender nibble, so a socket is untagged until its *seated*
+    client speaks. That is the right shape (an untagged socket holds no seat), but
+    2.2's reconnect path must bind seats by `eph` at `JOIN_ACK` time, not by this.
+  - `send()` fans the **same** `Uint8Array` to every socket (the listener's `send`
+    makes a zero-copy view and `ws` may still hold it queued), so frames are
+    **read-only** once sent; it iterates a snapshot, because a write can
+    synchronously close a socket. It never rejects, and resolves the delivered count.
 - [ ] **1.2 Host a `Session` per connection group.** Server constructs
   `new MP.Session({ transport, isHost: true, … })` and pumps its callbacks. Reuse the
   existing `LOBBY→PREP→IN_GAME→GAME_OVER` machine as-is for now (dice still
@@ -386,3 +412,13 @@ the durable "why" that complements the commit history.
     today. Server-side storage/archive/leaderboards are out of scope (future, with
     accounts). Phase 6 accordingly drops the room-persistence and server-archive tasks,
     keeping only telemetry + ops.
+- **2026-09-16 — Phase 1.1: the bus is the transport, and socket↔seat is a hint.**
+  `SocketBus` carries `send`/`onReceive` on the bus object itself rather than behind a
+  `.transport` property, so it drops into `new MP.Session({ transport: bus })` exactly
+  where the browser passes a `PeerBus`. *Why it matters later:* the socket→seat tag it
+  keeps (`conn.pid`, copied from the frame's sender nibble, as `PeerBus` does on the
+  host side) is only populated once a **seated** client sends something — a `JOIN_REQ`
+  says `UNASSIGNED`. It is therefore fine for "who just dropped?" but must not be used
+  as the seat registry for reconnects (2.2 binds by `eph` at `JOIN_ACK`).
+  Consequence: `server/listener.js`'s socket wrapper grew a **`conn.onClose(fn)`**
+  registration, because the bus cannot see the raw `ws` yet must release seats.

@@ -300,6 +300,36 @@ test('onConnection receives a transport-shaped object (what Phase 1 plugs into)'
   });
 });
 
+test('onClose tells the layer above that a socket vanished', function () {
+  // SocketBus has no access to the raw `ws`, but from Phase 1 a socket holds a
+  // SEAT — and a seat nobody releases stalls the room for everyone else.
+  var gone = null;
+  return withServer(null, {
+    onConnection: function (conn) { conn.onClose(function (c, code) { gone = { id: c.id, code: code }; }); },
+  }, function (s) {
+    return connect(s.wsUrl).then(function (ws) {
+      ws.close(4001, 'bye');
+      return until(function () { return gone !== null; }, 'the close handler to fire').then(function () {
+        assert.strictEqual(gone.code, 4001, 'the close code is passed through');
+        assert.ok(gone.id, 'the connection is identified');
+      });
+    });
+  });
+});
+
+test('a throwing close handler does not take the server down', function () {
+  return withServer(null, {
+    onConnection: function (conn) { conn.onClose(function () { throw new Error('bus blew up on close'); }); },
+  }, function (s) {
+    return connect(s.wsUrl).then(function (ws) {
+      ws.close();
+      return until(function () { return s.app.listener.connectionCount === 0; }, 'the connection to be released')
+        .then(function () { return get(s.base + '/healthz'); })
+        .then(function (r) { assert.strictEqual(r.status, 200, 'the server is still serving'); });
+    });
+  });
+});
+
 test('a throwing receive handler closes that connection, not the server', function () {
   return withServer(null, {
     onConnection: function (conn) { conn.onReceive(function () { throw new Error('boom'); }); },

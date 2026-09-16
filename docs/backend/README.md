@@ -77,9 +77,15 @@ We want a **true authoritative server**:
   per room. The browser gets a matching `SocketBus` (WebSocket to the server) as an
   alternative transport to `PeerBus`.
 - **Already built (Phase 0.3):** `server/listener.js` hands each accepted socket to
-  `onConnection(conn)` as a `{ send, onReceive, close }` object — the same two
-  methods, per socket. `SocketBus` (1.1) is therefore only the *grouping* step: fan
-  one room's connections into one bus with `PeerBus`'s star topology.
+  `onConnection(conn)` as a `{ send, onReceive, onClose, close }` object — the same
+  two transport methods, per socket.
+- **Already built (Phase 1.1):** `server/socket-bus.js` is that grouping step — fan
+  one room's connections into one bus with `PeerBus`'s star topology. The bus **is**
+  the transport (`send`/`onReceive` live on it), so it goes straight into
+  `new MP.Session({ transport: bus, isHost: true, … })`. Star means: the session's
+  frame reaches every socket; a socket's frame reaches the session and **nobody
+  else**. That last part is the authority model — relaying a client's bytes to its
+  peers would let a client speak with the host's voice.
 
 **Wire protocol (in `mp.js`):**
 
@@ -158,7 +164,7 @@ Phase 0 has landed, so this is real now:
 ```
 npm install                     # one manifest at the repo root (Decision D1)
 node server/index.js            # HTTP + WS listener; Ctrl-C / SIGTERM drains and exits 0
-node --test                     # engine + protocol + server suites (225 tests)
+node --test                     # engine + protocol + server suites (248 tests)
 ```
 
 **Layout (`server/`, plain Node CommonJS — never runs in a browser):**
@@ -170,6 +176,7 @@ node --test                     # engine + protocol + server suites (225 tests)
 | `log.js` | structured `{ts, level, msg, ...fields}` records, json/text, child loggers |
 | `lifecycle.js` | reverse-order drain hooks under a grace deadline |
 | `listener.js` | HTTP health endpoints + `/ws` upgrade; hands out transport-shaped sockets |
+| `socket-bus.js` | one room's sockets fanned into the single `MP.Session` transport (star) |
 | `index.js` | `boot()` wires it all; `main()` installs signal handlers and listens |
 
 **Endpoints:** `GET /healthz` (liveness — is the process up?), `GET /readyz`

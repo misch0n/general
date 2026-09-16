@@ -57,6 +57,7 @@ function originAllowed(allowed, origin) {
 function wrapSocket(ws, opts) {
   var log = opts.log;
   var cb = null;
+  var closeCb = null;
   var closed = false;
 
   var conn = {
@@ -102,6 +103,12 @@ function wrapSocket(ws, opts) {
 
     onReceive: function (fn) { cb = fn; },
 
+    // Registration for the layer above (Phase 1's SocketBus), which has no
+    // access to the raw `ws` yet must learn when a socket vanishes — from
+    // Phase 1 that socket holds a SEAT, and a seat nobody releases stalls the
+    // game for everyone else in the room.
+    onClose: function (fn) { closeCb = fn; },
+
     close: function (code, reason) {
       if (closed) return;
       closed = true;
@@ -139,7 +146,14 @@ function wrapSocket(ws, opts) {
   ws.on('close', function (code) {
     closed = true;
     log.debug('socket closed', { conn: conn.id, code: code });
+    // Our own bookkeeping first, so the handler above sees a consistent view.
     if (opts.onClose) opts.onClose(conn, code);
+    // Same invariant as the receive path: a throw from foreign code on the way
+    // out closes one connection's story, not the process.
+    if (closeCb) {
+      try { closeCb(conn, code); }
+      catch (e) { log.error('close handler threw', { conn: conn.id, err: e }); }
+    }
   });
 
   // 'error' fires for protocol violations and resets. Without this listener ws
