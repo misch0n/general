@@ -32,8 +32,10 @@ Build a Node.js **authoritative multiplayer server** for Генерал that:
   protocol only where server-owned dice require it;
 - leaves the **`file://` frontend intact** — server play is opt-in and additive.
 
-**Out of scope (unless a later decision pulls it in):** accounts/social features,
-ranked matchmaking/ELO, payments, native mobile clients, voice/chat.
+**Out of scope (unless a later decision pulls it in):** accounts/sign-in (the game is
+open-and-play, no accounts — D5), **server-side game storage/archive/leaderboards**
+(persistence stays on-device — D6), ranked matchmaking/ELO, payments, native mobile
+clients, voice/chat.
 
 ---
 
@@ -160,33 +162,37 @@ and broadcasts authoritative results. This is the project's reason to exist.*
 
 *Goal: a minimal, honest identity + input-hardening layer. Scope gated by Decision D5.*
 
-- [ ] **5.1 Connection identity.** At minimum, a per-connection token (opaque, server
-  issued) binding a socket to its `eph`/seat, so seat ownership can't be spoofed by a
-  reconnecting stranger. *Decision:* D5 (anonymous tokens now vs accounts later).
+- [ ] **5.1 Connection identity (anonymous).** Per D5 there are **no accounts** — just
+  an opaque, server-issued per-connection token binding a socket to its `eph`/seat, so
+  seat ownership can't be spoofed by a reconnecting stranger. No sign-in, no PII.
   *DoD:* a second socket cannot claim another player's seat.
 - [ ] **5.2 Transport security & origin.** `wss://` (TLS, typically via reverse proxy),
   WebSocket origin/allowlist checks, per-connection rate limiting and message-size
   caps. *DoD:* rate-limit + oversize-frame tests reject abusive input; documented
   TLS/proxy setup.
-- [ ] **5.3 Secrets & config hygiene.** No credentials in repo. Note: `net.js` today
-  ships **hardcoded Metered.ca TURN credentials** (net.js:380-387) — decide their fate
-  once server play exists (Decision D3). *DoD:* all server secrets come from env/config;
-  a check flags committed credentials.
+- [ ] **5.3 Secrets & config hygiene.** No credentials in repo; all server secrets come
+  from env/config. Note the hardcoded Metered.ca TURN credentials in `net.js:380-387`
+  are **removed with PeerJS in 7.4** (D3) — no server-side equivalent is needed. *DoD:*
+  a check flags any committed credentials; env-driven config verified.
 
-## Phase 6 — Persistence & operations
+## Phase 6 — Operations & telemetry
 
-*Goal: survive restarts (to the extent decided) and run in production. Gated by D6.*
+*Goal: run the server in production. Per D6, the server keeps **no durable game
+storage** — rooms are in-memory, a restart drops in-flight games, and finished games
+are archived on-device by the client (as today). Server-side persistence /
+archive / leaderboards are out of scope (future, with accounts).*
 
-- [ ] **6.1 Room state persistence (optional).** Persist in-flight rooms via
-  `Session.snapshot()`/`restore()` so a server restart can rebuild live games.
-  *Decision:* D6 (in-memory only vs durable store). *DoD (if pursued):* kill+restart
-  the server mid-game; rooms rebuild from the store.
-- [ ] **6.2 Server-side archive (optional).** Persist finished games as the canonical
-  `serializeGame()` JSON envelope for a server-hosted history/leaderboard. *DoD:* a
-  finished game is retrievable from the store.
-- [ ] **6.3 Ops surface.** Health/readiness endpoints, metrics (rooms, players,
-  errors), structured logs, deploy notes (process manager, env, graceful drain).
-  *DoD:* health endpoint reflects real state; runbook in `docs/backend/`.
+- ~~6.x Room state persistence~~ — **out of scope (D6).** In-memory only; a restart
+  drops live rooms. (Revisit only if accounts + server storage are ever added.)
+- ~~6.x Server-side archive~~ — **out of scope (D6).** Finished games stay in the
+  client's `localStorage` archive; the server stores nothing durable.
+- [ ] **6.1 Telemetry & analytics.** Server-side metrics/analytics (rooms, players,
+  game outcomes, errors) — this is what replaces the third-party relay's role and
+  removes any need for Metered.ca (D3). Privacy-respecting, no PII (no accounts).
+  *DoD:* documented metrics surface; basic dashboards/log-based analytics.
+- [ ] **6.2 Ops surface.** Health/readiness endpoints, structured logs, deploy notes
+  (process manager, env, graceful drain), TLS/`wss://` termination (D7). *DoD:* health
+  endpoint reflects real state; runbook in `docs/backend/`.
 
 ## Phase 7 — Frontend integration & migration
 
@@ -202,9 +208,15 @@ and broadcasts authoritative results. This is the project's reason to exist.*
   from the browser; puppeteer smoke covers both rulesets in server mode.
 - [ ] **7.3 Reconnect & error UX.** Surface disconnect/resync/room-closed states in the
   net UI. *DoD:* dropping and restoring the socket mid-game recovers cleanly in the UI.
-- [ ] **7.4 PeerJS deprecation path.** Per Decision D3: keep P2P as fallback, or remove
-  it and delete the dormant WebRTC/TURN code (root `CLAUDE.md`: leave no dead code).
-  *DoD:* decision executed; if removed, grep confirms no orphaned net code/CSS/deps.
+- [ ] **7.4 Remove PeerJS/WebRTC entirely.** Per Decision D3, once server play is the
+  proven path, **delete** the WebRTC/PeerJS transport, the PeerJS CDN load, and the
+  hardcoded Metered.ca TURN credentials/ICE config (`net.js:375-398`, `PeerBus`, the
+  `settings.iceServers` override) — server telemetry replaces what the relay gave us.
+  Leave no dead code (root `CLAUDE.md`): grep for orphaned net code/CSS/HTML/deps
+  (`peerjs` in `package*.json`, `@roamhq/wrtc` if now unused, `webrtc.test.js` scope)
+  and remove them. *DoD:* server is the only network transport; grep confirms no
+  PeerJS/WebRTC/TURN remnants; `node --test` + puppeteer smoke green; **`APP_VERSION`
+  + CHANGELOG** bumped (`rem` tag).
 
 ## Phase 8 — Testing, hardening & docs
 
@@ -238,23 +250,31 @@ When you resolve one, record the outcome here and in the *Decision log*.
   `REROLL_REQ`, `COMMIT_REQ`) **vs** overloading `TACT`/`MOVE`. *Default:* **new
   explicit types** — clearer authority boundary, keeps `MOVE` meaning "authoritative
   result," easier to test.
-- **D3 — P2P/PeerJS coexistence.** Keep WebRTC P2P as a fallback **vs** replace it with
-  server-only. *Default:* **keep P2P as fallback through Phase 7**, revisit removal in
-  7.4 once server play is proven. Affects the hardcoded TURN credentials (5.3).
+- **D3 — P2P/PeerJS coexistence.** ✅ **RESOLVED (2026-09-16): scrap PeerJS entirely
+  once the server is complete.** P2P may stay wired during development as a working
+  fallback, but Phase 7.4 **removes** WebRTC/PeerJS and its dead code. The hardcoded
+  Metered.ca **TURN credentials go too** — the server gives us our own telemetry and
+  analytics, so we no longer depend on a third-party relay.
 - **D4 — Room/player caps.** *Default:* **6 players/room** (matches `maxPlayers`), a
   conservative global room cap (e.g. 100) tunable via config; revisit under load (8.2).
-- **D5 — Identity scope.** Anonymous per-connection tokens **vs** real accounts.
-  *Default:* **anonymous tokens now** (enough to stop seat-spoofing); accounts are a
-  separate, later effort if the product wants persistence/social.
-- **D6 — Persistence backend.** In-memory only **vs** durable store (file/SQLite/Redis).
-  *Default:* **in-memory first** (Phases 0–5); add persistence in Phase 6 only if the
-  product wants restart-survival or server-side history. Pick the store then.
+- **D5 — Identity scope.** ✅ **RESOLVED (2026-09-16): no accounts — anonymous
+  open-and-play only.** The game is meant to be simple: open and play, no sign-in.
+  Identity is just an **anonymous per-connection token** bound to the `eph`/seat to
+  stop seat-spoofing. Accounts are explicitly **out of scope** (a possible future
+  expansion, not now).
+- **D6 — Persistence backend.** ✅ **RESOLVED (2026-09-16): persistence stays
+  on-device only — the server keeps no durable game storage.** Server rooms are
+  **in-memory**; a server restart drops in-flight games (acceptable for open-and-play).
+  Finished games are archived **on the client** (`localStorage`, as today) — in server
+  mode the client archives the authoritative final state it receives. Server-side
+  archive/leaderboards and restart-survival are **out of scope** (future, with accounts).
 - **D7 — Deployment target/env.** Where the server runs (self-host, PaaS, container) and
   the public `wss://` URL the client uses. *Default:* **defer to Phase 6**; keep the
   client's server URL configurable (env/settings), not hardcoded.
 
-> Several of these are product calls. Use the default to keep moving, but flag D3, D5,
-> and D6 to the owner before the phase that commits to them (7.4, 5.1, 6.1).
+> D3/D5/D6 are **resolved** (see above). D1/D2/D4 are implementation defaults — proceed.
+> D7 (deployment target + public `wss://` URL) is still open but only bites in Phase 6;
+> flag it to the owner before then.
 
 ---
 
@@ -272,4 +292,16 @@ the durable "why" that complements the commit history.
   client-declared score) as the core thing Phase 3 fixes by moving RNG + scoring
   server-side. Recorded open product decisions D1–D7 with defaults so work can proceed
   without blocking.
-</content>
+- **2026-09-16 — D3, D5, D6 resolved by owner.**
+  - **D3:** scrap PeerJS entirely once the server is complete (P2P may remain a
+    dev-time fallback, removed in Phase 7.4). Drop the Metered.ca TURN relay too — the
+    server provides our own telemetry/analytics (Phase 6.1), so no third-party relay
+    dependency remains.
+  - **D5:** no accounts — the game stays simple open-and-play. Identity is only an
+    anonymous per-connection token to stop seat-spoofing. Accounts are a possible
+    future expansion, out of scope now.
+  - **D6:** persistence is on-device only. Server rooms are in-memory (a restart drops
+    in-flight games); finished games are archived in the client's `localStorage` as
+    today. Server-side storage/archive/leaderboards are out of scope (future, with
+    accounts). Phase 6 accordingly drops the room-persistence and server-archive tasks,
+    keeping only telemetry + ops.

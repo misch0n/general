@@ -167,5 +167,3 @@ Product/architecture questions that need an owner call are tracked in
 **`PLAN.md` → `## Open decisions`** with a recommended default each. They are
 flagged `[!]` on the tasks that depend on them. Don't silently assume — either use
 the recorded default or raise it.
-</content>
-</invoke>
