@@ -330,6 +330,55 @@ test('lobby prep: host adds and removes AI seats (AI is auto-ready, names/colour
   assert.strictEqual(c1.roster.length, 2, 'client saw the removal');
 });
 
+// ---- a host that referees instead of playing (the server's shape) ----
+// The browser's host is a player at the table and takes seat 0 in its own
+// roster. The server's host is not: it must hold no seat, or seat 0 would join
+// the turn order and be granted a turn nobody was ever going to play.
+test('hostPlays: false — the host holds no seat and stays out of the rotation', function () {
+  var bus = new Bus();
+  var ended = {};
+  function mk(isHost, me, extra) {
+    return new MP.Session(Object.assign({ transport: bus.transport(), isHost: isHost, me: me, minPlayers: 2, rounds: 2,
+      setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout,
+      callbacks: { onEnd: function () { ended[me.name] = true; } } }, extra || {}));
+  }
+  var ref = mk(true, { name: 'Съдия', color: '#d4a02e', gender: 'm' }, { hostPlays: false });
+  var c1 = mk(false, { name: 'Ана', color: '#e07a2e', gender: 'f' });
+  var c2 = mk(false, { name: 'Боян', color: '#2f86c8', gender: 'm' });
+
+  assert.strictEqual(ref.roster.length, 0, 'nobody is seated before anyone joins');
+  assert.strictEqual(ref.myId, MP.HOST_ID, 'the referee still SPEAKS as the host');
+
+  ref.openLobby(); c1.requestJoin(); c2.requestJoin(); bus.drain();
+  assert.deepStrictEqual(ref.roster.map(function (p) { return p.id; }), [1, 2], 'seats start at 1; seat 0 is nobody');
+  assert.deepStrictEqual(c1.roster.map(function (p) { return p.name; }), ['Ана', 'Боян'], 'clients see only players');
+
+  assert.ok(ref.startGame(), 'two players are a quorum without counting the referee');
+  bus.drain();
+  assert.deepStrictEqual(ref.order, [1, 2], 'the referee is not in the rotation');
+  assert.strictEqual(ref.activeId, 1, 'the first grant went to a player, not to an empty chair');
+
+  // The game must actually finish: with seat 0 in the order it would stall on a
+  // seat that never submits, and END would never come.
+  var nodes = [c1, c2];
+  for (var guard = 0; guard < 500 && ref.state === 'IN_GAME'; guard++) {
+    var active = nodes.filter(function (n) { return n.myId === ref.activeId; })[0];
+    active.submitMove({ category: nextCat(active, active.myId), score: 5, rolls: [[1, 2, 3, 4, 5]], keeps: [] });
+    bus.drain();
+  }
+  assert.strictEqual(ref.state, 'GAME_OVER');
+  assert.ok(ended['Ана'] && ended['Боян'], 'both players saw the end');
+  assert.strictEqual(ref.version, 2 * 2, 'four moves, no phantom sixth seat');
+  assert.strictEqual(ref.scores[MP.HOST_ID], undefined, 'the referee scored nothing');
+});
+
+test('hostPlays defaults to true — a browser host still sits at its own table', function () {
+  var bus = new Bus();
+  var host = new MP.Session({ transport: bus.transport(), isHost: true, me: { name: 'Хост', color: '#d4a02e', gender: 'm' },
+    setTimeout: noTimers.setTimeout, clearTimeout: noTimers.clearTimeout, callbacks: {} });
+  assert.deepStrictEqual(host.roster.map(function (p) { return p.id; }), [MP.HOST_ID]);
+});
+
 // ---- AI takeover of a dropped player ----
 test('takeover: host plays a stalled seat authoritatively and advances the turn', function () {
   var bus = new Bus();

@@ -20,9 +20,9 @@
  * client's bytes to its peers would let a client speak with the host's voice.
  * `test/webrtc.test.js` pins the same expectations for the WebRTC side.
  *
- * WHAT THIS FILE IS NOT: it does not construct the Session (Phase 1.2), does
- * not know about rooms or join codes (Phase 2), and does not validate moves
- * (Phase 3). It only knows which sockets belong together.
+ * WHAT THIS FILE IS NOT: it does not construct the Session (`room.js` does),
+ * does not know about rooms or join codes (Phase 2), and does not validate
+ * moves (Phase 3). It only knows which sockets belong together.
  */
 
 var MP = require('../mp.js');

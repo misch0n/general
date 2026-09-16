@@ -8,14 +8,15 @@
  *     frame size) before a connection ever reaches game code;
  *   - hand each accepted socket to `onConnection` as a `{ send, onReceive,
  *     close }` object — which is deliberately the SAME contract MP.Session's
- *     transport wants (mp.js `opts.transport`), so Phase 1's SocketBus is a
- *     thin grouping layer over these rather than a rewrite;
+ *     transport wants (mp.js `opts.transport`), so `socket-bus.js` is a thin
+ *     grouping layer over these rather than a rewrite;
  *   - keep dead peers from accumulating (heartbeat) and register its own drain
  *     hook so shutdown closes sockets before the port.
  *
- * NO game logic lives here. The default handler (when the caller supplies no
- * onConnection) is a framed PING→PONG echo: enough to prove mp.js framing
- * survives a real WebSocket round-trip, which is the whole point of Phase 0.3.
+ * NO game logic lives here, and no default handler either: a listener with no
+ * `onConnection` accepts sockets and drops whatever they say on the floor. In
+ * the running server `index.js` always supplies one (the room), so that state
+ * only exists for a test that wants the socket without a game behind it.
  *
  * THE INVARIANT THIS FILE EXISTS TO KEEP: one bad connection must never take
  * the process down. A server refereeing many rooms cannot let a single rude or
@@ -32,8 +33,6 @@
 var http = require('node:http');
 var crypto = require('node:crypto');
 var WebSocket = require('ws');
-
-var MP = require('../mp.js');
 
 var WS_PATH = '/ws';
 
@@ -103,10 +102,10 @@ function wrapSocket(ws, opts) {
 
     onReceive: function (fn) { cb = fn; },
 
-    // Registration for the layer above (Phase 1's SocketBus), which has no
-    // access to the raw `ws` yet must learn when a socket vanishes — from
-    // Phase 1 that socket holds a SEAT, and a seat nobody releases stalls the
-    // game for everyone else in the room.
+    // Registration for the layer above (`socket-bus.js`), which has no access
+    // to the raw `ws` yet must learn when a socket vanishes — that socket holds
+    // a SEAT, and a seat nobody releases stalls the game for everyone else in
+    // the room.
     //
     // SINGLE SLOT, like onReceive: registering again REPLACES the previous
     // handler. That is what lets a room hand a connection over (the new owner
@@ -179,24 +178,11 @@ function wrapSocket(ws, opts) {
   return conn;
 }
 
-// The Phase 0.3 stand-in for game logic: unframe, and answer a PING with a
-// PONG carrying the same payload. Proves the framing survives a real socket.
-function echoPingPong(conn, log) {
-  var seq = 0;
-  conn.onReceive(function (bytes) {
-    var f = MP.unframe(bytes);
-    // unframe() returns null on a CRC mismatch — "not received" by design.
-    if (!f) { log.debug('dropped a corrupt frame', { conn: conn.id, bytes: bytes.length }); return; }
-    if (f.type !== MP.T.PING) { log.debug('ignored a frame (no session yet)', { conn: conn.id, type: f.type }); return; }
-    conn.send(MP.frame(MP.T.PONG, MP.HOST_ID, seq++ & 0xff, f.payload));
-  });
-}
-
 // ===== listener
 
 /*
  * opts: { cfg, log, life, onConnection, stats }
- *   onConnection(conn) — Phase 1 plugs SocketBus in here; omitted = ping/pong echo.
+ *   onConnection(conn) — the room takes the socket here; omitted = frames go nowhere.
  *   stats()            — extra fields for /healthz (Phase 2 reports room counts).
  */
 function create(opts) {
@@ -293,11 +279,10 @@ function create(opts) {
     conns.add(conn);
     log.debug('socket accepted', { conn: id, connections: conns.size });
     // Same invariant as the receive path: a throw from the handler above us
-    // (Phase 1's SocketBus, Phase 2's room router) closes THIS connection, not
+    // (the room, and from Phase 2 the room router) closes THIS connection, not
     // the process.
     try {
       if (onConnection) onConnection(conn, req);
-      else echoPingPong(conn, log);
     } catch (e) {
       log.error('connection handler threw', { conn: id, err: e });
       conn.close(1011, 'accept error');
@@ -306,7 +291,7 @@ function create(opts) {
 
   // Ping every socket; terminate the ones that did not answer the last round.
   // Without this, half-open connections (vanished peer, no FIN) accumulate
-  // forever: they inflate /healthz and, from Phase 1, hold a seat in a room.
+  // forever: they inflate /healthz and hold a seat in a room.
   function startHeartbeat() {
     if (beat || !cfg.heartbeatMs) return;
     beat = setInterval(function () {

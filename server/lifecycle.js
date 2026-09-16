@@ -4,12 +4,16 @@
  *
  * Why it exists this early: rooms are in-memory only (Decision D6), so a
  * restart already drops in-flight games. The least we can do is tell the people
- * in them — Phase 2.3 registers a hook that sends BYE and closes sockets, rather
- * than yanking the TCP connection and leaving six phones showing a frozen board.
+ * in them — index.js registers a hook that sends BYE and closes the room's
+ * sockets, rather than yanking the TCP connection and leaving six phones
+ * showing a frozen board.
  *
  * Shape: hooks run in REVERSE registration order (last registered = first
- * drained), the way you'd unwind a stack — the listener stops accepting before
- * the rooms it feeds are torn down. Each hook gets its own slice of the grace
+ * drained), the way you'd unwind a stack. That is why index.js registers the
+ * rooms hook AFTER the listener's: the rooms drain first (stop accepting, say
+ * goodbye, close their sockets) and the listener releases the port last, rather
+ * than yanking the connections before the goodbye can reach them. Each hook
+ * gets its own slice of the grace
  * budget; a hook that hangs cannot hold the process hostage, because the
  * deadline forces the exit regardless.
  */

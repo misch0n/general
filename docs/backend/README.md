@@ -89,6 +89,18 @@ We want a **true authoritative server**:
   frame reaches every socket; a socket's frame reaches the session and **nobody
   else**. That last part is the authority model — relaying a client's bytes to its
   peers would let a client speak with the host's voice.
+- **Already built (Phase 1.2):** `server/room.js` is the session on top of that bus,
+  and `index.js` opens exactly one room at boot and routes every accepted socket to
+  it. Two things a browser-hosted session never has to think about, and which any
+  code added here must keep doing:
+  - **The server referees, it does not play.** The room builds its session with
+    `hostPlays: false` (`mp.js`), so the host holds **no roster seat** — seats start
+    at 1. A browser host is a player at its own table and takes seat 0; a server host
+    that did the same would put an empty chair in the turn order and grant it a turn
+    nobody was ever going to play.
+  - **`Session` timers are unref'd** (`room.unrefTimeout`). The lobby beacon re-arms
+    every few seconds for as long as the room is open; under Node that keeps the
+    event loop alive, so the process would outlive its own listener.
 
 **Wire protocol (in `mp.js`):**
 
@@ -166,8 +178,9 @@ Phase 0 has landed, so this is real now:
 
 ```
 npm install                     # one manifest at the repo root (Decision D1)
-node server/index.js            # HTTP + WS listener; Ctrl-C / SIGTERM drains and exits 0
-node --test                     # engine + protocol + server suites (253 tests)
+node server/index.js            # listener + one open room; Ctrl-C / SIGTERM drains and exits 0
+node --test                     # engine + protocol + server suites (267 tests)
+node scripts/smoke.js           # the frontend's file:// smoke — required if you touched mp.js
 ```
 
 **Layout (`server/`, plain Node CommonJS — never runs in a browser):**
@@ -180,6 +193,7 @@ node --test                     # engine + protocol + server suites (253 tests)
 | `lifecycle.js` | reverse-order drain hooks under a grace deadline |
 | `listener.js` | HTTP health endpoints + `/ws` upgrade; hands out transport-shaped sockets |
 | `socket-bus.js` | one room's sockets fanned into the single `MP.Session` transport (star) |
+| `room.js` | one bus + one host-side `MP.Session` — the server as referee |
 | `index.js` | `boot()` wires it all; `main()` installs signal handlers and listens |
 
 **Endpoints:** `GET /healthz` (liveness — is the process up?), `GET /readyz`

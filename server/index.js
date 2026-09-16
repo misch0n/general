@@ -7,10 +7,10 @@
  * a WebSocket transport, and — from Phase 3 — own the dice and the scoring, so a
  * client can no longer declare its own result.
  *
- * Current scope (Phase 0.3): boot, config, structured logging, graceful
- * shutdown, and an HTTP/WS listener that answers health checks and round-trips
- * mp.js frames. No rooms and no game logic yet — Phase 1 hosts an MP.Session
- * per connection group on top of this.
+ * Current scope (Phase 1.2): boot, config, structured logging, graceful
+ * shutdown, an HTTP/WS listener, and ONE room hosting a real MP.Session that
+ * every accepted socket joins. Rooms are still singular and codeless (Phase 2
+ * makes a registry of them), and the dice are still client-declared (Phase 3).
  *
  * Run: `node server/index.js`   (Ctrl-C / SIGTERM drains and exits 0)
  */
@@ -20,6 +20,7 @@ var config = require('./config.js');
 var logging = require('./log.js');
 var lifecycle = require('./lifecycle.js');
 var listener = require('./listener.js');
+var room = require('./room.js');
 
 // The boot banner, as fields rather than prose: it is the first thing an
 // operator reads and the first thing Phase 6.1's telemetry ingests.
@@ -58,16 +59,39 @@ function boot(opts) {
     log.warn('Web Crypto unavailable — dice would fall back to Math.random', { diceRng: 'math.random' });
   }
 
+  // ONE room for now, open from boot. Phase 2.1 replaces this with a registry
+  // that mints a join code per room and routes each socket to the right one.
+  var only = room.create({ cfg: cfg, log: log });
+
   // The listener registers its own drain hook with `life`, so shutdown closes
   // sockets and the port without index.js orchestrating it.
   var lis = listener.create({
     cfg: cfg, log: log, life: life,
-    onConnection: opts.onConnection, stats: opts.stats,
+    // Every accepted socket joins the room. A refusal means the room is closing
+    // (or the socket already died), and the listener hands us no ownership of a
+    // socket it was refused — so we close it rather than leave it hanging on a
+    // server that will never answer it.
+    onConnection: opts.onConnection || function (conn) {
+      if (!only.join(conn)) conn.close(1013, 'room unavailable');
+    },
+    stats: opts.stats || function () { return { rooms: 1, room: only.stats() }; },
   });
 
-  log.info('Генерал server booted (Phase 0 — listener only, no rooms yet)', bootFields(cfg, report));
+  /*
+   * Registered AFTER the listener, and hooks unwind in REVERSE order, so this
+   * one drains FIRST: stop accepting new players, tell the ones in the room
+   * (BYE) and close their sockets with a reason — and only then does the
+   * listener take the port away. The other order would yank the connections
+   * before the goodbye could reach them.
+   */
+  life.onShutdown('rooms', function () {
+    lis.beginDrain();
+    only.close('server shutting down');
+  });
 
-  return { cfg: cfg, log: log, life: life, listener: lis, engine: engine, report: report };
+  log.info('Генерал server booted (Phase 1.2 — one room, client-declared dice)', bootFields(cfg, report));
+
+  return { cfg: cfg, log: log, life: life, listener: lis, room: only, engine: engine, report: report };
 }
 
 function main() {

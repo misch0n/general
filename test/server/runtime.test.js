@@ -257,6 +257,9 @@ test('boot() wires config + logger + lifecycle and logs a banner', function () {
   assert.strictEqual(rec.maxRooms, 3);
   assert.strictEqual(rec.diceRng, 'webcrypto');
   assert.match(rec.engine, /GReduce←reduce\.js/);
+  // boot() opens a room whether or not this test uses it, and its session
+  // re-arms a beacon for as long as it is open.
+  app.room.close('test over');
 });
 
 test('boot() refuses to start on bad config', function () {

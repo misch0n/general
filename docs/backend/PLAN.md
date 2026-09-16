@@ -15,20 +15,24 @@ rules modules, serves `/healthz`+`/readyz`, upgrades `/ws`, round-trips `mp.js`
 frames over a real WebSocket, and drains cleanly on SIGTERM.
 
 **Phase 1 — in progress.** `server/socket-bus.js` (1.1) groups a room's sockets into
-the one transport `MP.Session` wants, and real sessions already run a full game over
-it in tests. Still no rooms and no server-side session instance — 1.2 constructs one.
+the one transport `MP.Session` wants, and `server/room.js` (1.2) puts a real
+host-side session on top: the server now answers a `JOIN_REQ` from a real WebSocket
+client with `JOIN_ACK` + `ROSTER`, keeps the roster, and runs the turn rotation —
+all in the browser's own `mp.js` code. **The server referees but does not play**
+(`hostPlays: false`, new in `mp.js`). There is still exactly ONE room, with no join
+code (Phase 2), and the dice are still client-declared (Phase 3).
 
-**Next step:** **Phase 1, Task 1.2** (host a `Session` per connection group).
-`new MP.Session({ transport: bus, isHost: true, … })` on top of the bus, its
-callbacks pumped, wired into `listener.create({ onConnection })` — one bus for now
-(Phase 2 turns that into a room registry). Dice stay client-declared until Phase 3.
-`test/server/socket-bus.test.js`'s `starHarness` is the mock-socket rig to reuse;
-the new integration test should drive a **real** `ws` client through `JOIN_REQ` →
-`JOIN_ACK` + `ROSTER`.
+**Next step:** **Phase 1, Task 1.3** (browser `SocketBus`). A WebSocket transport in
+`features/net/` with the same `send`/`onReceive` contract as `PeerBus`, pointed at
+the server URL, **not wired into the UI** (that is Phase 7) — constructible and
+smoke-testable only. It is a browser file, so: no ES modules, no `fetch` of local
+files, and the puppeteer `file://` smoke must stay green (root `CLAUDE.md`).
+Then 1.4 drives a full lobby handshake from that transport against a real server
+process. `test/server/room.test.js`'s protocol-level `client()` rig (raw `ws` +
+`expect(type)`) is the model for a scripted end-to-end check.
 
-**Progress:** Phase 0 complete (4 / 4); Phase 1 at 1 / 4.
-`node --test` → **253** tests. (The "225" recorded here after Phase 0 had drifted:
-the tree was at 232 before this task, so 1.1 added 21.)
+**Progress:** Phase 0 complete (4 / 4); Phase 1 at 2 / 4.
+`node --test` → **267** tests; `node scripts/smoke.js` → SMOKE PASS.
 Run the server: `node server/index.js` (see README §5).
 
 ---
@@ -164,11 +168,57 @@ over WebSocket, and the existing lobby handshake works end-to-end unchanged.*
     and resolves the delivered count.
   - `mp.js` now exports **`UNASSIGNED`** alongside `HOST_ID`: which sender values name
     a seat is protocol, and a transport that maps sockets to seats needs it.
-- [ ] **1.2 Host a `Session` per connection group.** Server constructs
+- [x] **1.2 Host a `Session` per connection group.** Server constructs
   `new MP.Session({ transport, isHost: true, … })` and pumps its callbacks. Reuse the
   existing `LOBBY→PREP→IN_GAME→GAME_OVER` machine as-is for now (dice still
   client-declared — Phase 3 fixes that). *DoD:* integration test: a mock client sends
   `JOIN_REQ`, receives `JOIN_ACK` + `ROSTER` from the server-hosted session.
+  → **Done.** `server/room.js`: `create({cfg,log,id,exp,manual,minPlayers})` returns
+  `{id, bus, session, join, close, stats, size, state, closed}` — bus + host session +
+  the plumbing between them, `openLobby()`'d at birth. `index.js` `boot()` opens ONE
+  room, routes every accepted socket to it, and puts the room's `stats()` on `/healthz`.
+  14 new tests (12 in `test/server/room.test.js`, driving **real `ws` clients** through
+  the handshake; 2 in `test/mp.test.js`). Notes for later phases:
+  - **The server referees, it does not play — `mp.js` gained `hostPlays` (default
+    `true`).** A browser host is a player at the table and takes seat 0 in its own
+    roster; a server host must hold no seat, or seat 0 lands in `order` and is granted
+    a turn nobody is ever going to play. The default keeps every browser path
+    byte-identical (asserted by a test); the server passes `hostPlays: false`.
+    Consequence for Phase 7: a browser **client** of a server room sees a roster with
+    no host entry — the UI's host pill/accent (`features/net/net.js`) has to cope.
+  - **`Session` timers must be unref'd under Node** (`room.unrefTimeout`). The lobby
+    beacon re-arms every 3.5s and the move timeout every turn; an un-unref'd timer is
+    a reason for the event loop to stay alive, so an open room would keep the process
+    up after the listener closed — turning a clean SIGTERM into a hang that the grace
+    deadline converts to `exit(1)`, which an orchestrator reads as a crash.
+  - **The shutdown hook order is deliberate.** `index.js` registers the room hook
+    *after* `listener.create()`, and hooks unwind in reverse, so the room drains
+    first: `beginDrain()` (stop accepting) → `BYE` + close the room's sockets with a
+    reason → the listener takes the port away. The other order yanks the connections
+    before the goodbye can reach them.
+  - **A seat-less host shrinks the seat budget by one.** `PROTOCOL_MAX_SEATS` is 15
+    because the sender nibble holds 0..15 — but it counts the host in, and this one
+    holds no seat, so an unclamped `MAX_PLAYERS_PER_ROOM: 15` would seat a player at
+    **15 = `UNASSIGNED`**: their frames read as "not seated yet" and `SocketBus` would
+    never tag their socket, so their disconnect would drop nobody. The room clamps to
+    `MP.UNASSIGNED - 1`. Phase 2.1's registry must keep that clamp.
+  - **A lobby dropout still leaves its seat behind.** `onLost` can only name a seat the
+    bus has tagged, and the tag appears only once a *seated* client speaks — a client
+    says nothing between its `JOIN_REQ` (sent `UNASSIGNED`) and its `READY`, so a
+    lobby drop is usually untagged and `markDropped` is never called. **2.2 is what
+    fixes this** (bind seats by `eph` at `JOIN_ACK`). An untagged socket dropping
+    nobody is the safe way to be wrong. The mirror-image wrinkle, also 2.2's: while a
+    half-open socket still claims a seat, its owner's *new* socket cannot be tagged
+    (the bus's first-claimant-wins), so reaping the stale one drops a seat somebody is
+    sitting in until the returning client's `JOIN_REQ` clears it. No
+    overlapping-reconnect guard is needed in `room.js` for the *other* direction —
+    unlike the browser's host, the bus already guarantees at most one live socket per
+    seat and detaches before it reports the loss.
+  - **`listener.js`'s `echoPingPong` stand-in is gone** — the room is the real handler,
+    so a default one in the listener was dead code. A listener with no `onConnection`
+    now accepts sockets and drops their frames; the PING→PONG echo moved into
+    `test/server/listener.test.js`, which is the only thing that still wants it (what
+    it proves is about the socket, not the game).
 - [ ] **1.3 Browser `SocketBus`.** Add a WebSocket transport in the app
   (`features/net/`) implementing the same contract as `PeerBus`, targeting the
   server URL. Do **not** wire it into the UI yet (Phase 7) — just make it
@@ -434,3 +484,27 @@ the durable "why" that complements the commit history.
   as the seat registry for reconnects (2.2 binds by `eph` at `JOIN_ACK`).
   Consequence: `server/listener.js`'s socket wrapper grew a **`conn.onClose(fn)`**
   registration, because the bus cannot see the raw `ws` yet must release seats.
+- **2026-09-16 — Phase 1.2: the server referees, it does not play (`hostPlays`).**
+  `mp.js`'s `Session` gained an opt-out (`hostPlays`, default `true`) for the host's
+  own roster seat, and `server/room.js` passes `false`. *Why:* the constructor seats
+  the host at id 0 because a browser host **is** a player at the table; a server host
+  is not, and seat 0 would otherwise land in `order` and be granted a turn nobody was
+  ever going to play — the rotation stalling on an empty chair. This was the one place
+  where "reuse the browser's host state machine as-is" did not survive contact, and it
+  is a one-line opt-out rather than a fork: the default keeps every browser path
+  byte-identical (pinned by a test). *Consequences:* seats now start at 1 in server
+  rooms; a browser client of a server room will see a roster with **no host entry**,
+  so Phase 7's UI (host pill/accent in `features/net/net.js`) must cope.
+- **2026-09-16 — Phase 1.2: Node timers and drain order are room concerns.** Two
+  things a browser-hosted session never has to think about. (1) `Session` re-arms the
+  lobby beacon and the move timeout forever; under Node an un-unref'd timer keeps the
+  event loop alive, so an open room would outlive the listener and turn a clean
+  SIGTERM into a hang that the grace deadline converts into `exit(1)` — i.e. a
+  "crash" to an orchestrator. `room.unrefTimeout` is injected as the session's
+  `setTimeout` for that reason. (2) `index.js` registers the room's drain hook
+  **after** the listener's so it runs **first** (hooks unwind in reverse): stop
+  accepting → `BYE` + close the room's sockets with a reason → release the port. The
+  other order yanks the connection before the goodbye can reach the player.
+  Also retired `listener.js`'s `echoPingPong` default handler: the room is the real
+  one now, so the stand-in was dead code in production and moved to the listener's
+  own tests, which are the only thing that still wants it.

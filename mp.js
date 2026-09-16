@@ -176,6 +176,12 @@
   function Session(opts) {
     this.tp = opts.transport;
     this.isHost = !!opts.isHost;
+    // A host normally PLAYS the game it hosts — in the browser the host IS a
+    // player at the table, so it takes seat 0 in its own roster (below). A
+    // server-hosted session is the exception: it referees and never takes a
+    // turn, so it must hold no seat. Seat 0 would otherwise land in `order` and
+    // be granted a turn nobody is ever going to play, stalling the rotation.
+    this.hostPlays = opts.hostPlays !== false;
     this.me = opts.me || { name: 'Боец', color: '#cccccc', gender: 'm' };
     this.maxPlayers = opts.maxPlayers || 6;
     this.minPlayers = opts.minPlayers || 2;
@@ -214,7 +220,7 @@
     this.settingsBits = 0;             // host's enabled pre-game settings (summary shown to clients)
     this.takeover = {};                // host: id → true when that seat is AI-driven mid-game
     this.paused = {};                  // host: id → true when a dropped seat is paused (skipped; doesn't block the finish)
-    if (this.isHost) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender, ready: true, isAI: false });
+    if (this.isHost && this.hostPlays) this.roster.push({ id: HOST_ID, name: this.me.name, color: this.me.color, gender: this.me.gender, ready: true, isAI: false });
   }
   Session.prototype._status = function (s) { if (this.cb.onStatus) this.cb.onStatus(s); };
   Session.prototype._send = function (type, payload) {

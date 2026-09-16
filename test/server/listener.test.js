@@ -19,6 +19,23 @@ var index = require('../../server/index.js');
 var listener = require('../../server/listener.js');
 
 // ===== harness
+
+// Unframe, and answer a PING with a PONG carrying the same payload. This lived
+// in listener.js until Phase 1.2 gave the server a real room to hand sockets
+// to; it belongs to the tests now, because what it proves is about the SOCKET —
+// that mp.js's frames, designed for a WebRTC data channel, cross a WebSocket
+// unharmed in both directions — and the listener has no business owning a
+// stand-in for game logic once the game logic exists.
+function echoPingPong(conn) {
+  var seq = 0;
+  conn.onReceive(function (bytes) {
+    var f = MP.unframe(bytes);
+    // unframe() returns null on a CRC mismatch — "not received" by design.
+    if (!f || f.type !== MP.T.PING) return;
+    conn.send(MP.frame(MP.T.PONG, MP.HOST_ID, seq++ & 0xff, f.payload));
+  });
+}
+
 // Port 0 = "any free port", so the suite never collides with a dev server or
 // with itself when tests run in parallel.
 function withServer(env, opts, run) {
@@ -26,6 +43,11 @@ function withServer(env, opts, run) {
     env: Object.assign({ PORT: '0', HOST: '127.0.0.1', LOG_LEVEL: 'silent' }, env || {}),
     write: function () {},
     exit: function () {},
+    // These tests are about the listener, not the game, so by default they take
+    // the connection instead of boot()'s room — the echo above answers frames
+    // without a session's state machine deciding what is worth answering. The
+    // room's own end-to-end path is test/server/room.test.js.
+    onConnection: function (conn) { echoPingPong(conn); },
   }, opts || {}));
 
   return app.listener.start().then(function (addr) {
@@ -36,9 +58,13 @@ function withServer(env, opts, run) {
     // bare .finally() on the result it would escape before the chain exists,
     // leaving a listening handle that keeps the test process alive after an
     // already-failing assertion.
+    // boot() opens a room whether or not this test uses it, and its session
+    // holds timers — unref'd, so they cannot hang the suite, but a room left
+    // open is still a live object per test.
+    function teardown() { app.room.close('test over'); return app.listener.stop(); }
     try { out = Promise.resolve(run({ app: app, base: base, wsUrl: wsUrl, port: addr.port })); }
-    catch (e) { return app.listener.stop().then(function () { throw e; }); }
-    return out.finally(function () { return app.listener.stop(); });
+    catch (e) { return teardown().then(function () { throw e; }); }
+    return out.finally(teardown);
   });
 }
 
