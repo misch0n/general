@@ -10,13 +10,18 @@ Status markers: `[ ]` todo · `[~]` in progress · `[x]` done+verified · `[!]` 
 
 ## Current status
 
-**Phase 0 — not started.** This is the first commit on the branch: the plan and its
-usage docs only. No server code exists yet.
+**Phase 0 — in progress.** 0.1 (scaffold + shared-module reuse) and 0.2 (config,
+logging, graceful shutdown) are **done and verified**. `server/` exists, boots, and
+provably runs the browser's own rules modules. There is no listener yet.
 
-**Next step:** begin **Phase 0, Task 0.1** (server scaffolding & shared-module
-smoke). Nothing depends on an open decision to start Phase 0.
+**Next step:** **Phase 0, Task 0.3** (HTTP + WS listener skeleton).
+⚠️ **Read 0.3's CI note before starting** — it needs the `ws` dependency, and
+`.github/workflows/deploy.yml` currently runs `node --test` with *no* `npm install`
+(every test to date is dependency-free). That commit must add an install step or CI
+breaks on the first server socket test.
 
-**Progress:** 0 / 9 phases complete.
+**Progress:** 0 / 9 phases complete (Phase 0: 2 / 4 tasks).
+`node --test` → **207** tests (was 176 before the server landed).
 
 ---
 
@@ -44,25 +49,47 @@ clients, voice/chat.
 *Goal: a running Node server process that shares the game's pure modules, with a
 test lane, changing nothing about the `file://` frontend.*
 
-- [ ] **0.1 Server scaffold + shared-module smoke.** Create `server/` at repo root
+- [x] **0.1 Server scaffold + shared-module smoke.** Create `server/` at repo root
   (plain Node, no bundler). Add a tiny entrypoint that `require()`s the four pure
   modules and asserts they load under Node (`G.rollAll`, `X`, `GReduce.reduce`,
   `MP.frame`). *Why:* prove the single-source-of-truth reuse works before building on
   it. *Files:* `server/index.js`, `server/package.json` (or root dep additions — see
   Decision D1). *DoD:* `node server/index.js` prints a health line; a unit test
   `require`s each module server-side and passes under `node --test`.
-- [ ] **0.2 Config & runtime plumbing.** Env-based config (`PORT`, log level, room
+  → **Done.** `server/engine.js` binds the four modules behind a `CONTRACT` +
+  `selfTest()`/`assertReady()`; `server/index.js` boots and prints the banner;
+  `test/server/engine-reuse.test.js` (10 tests) holds the reuse claim — including
+  module *identity* (`===`), `MP.Session` constructing under Node, and game.js's
+  rng-less `rollDie()` finding Web Crypto (not Math.random) server-side.
+- [x] **0.2 Config & runtime plumbing.** Env-based config (`PORT`, log level, room
   limits), structured logging, graceful shutdown (SIGTERM drains rooms). *Why:*
   every later phase needs config + clean lifecycle. *DoD:* config module unit-tested;
   server starts/stops cleanly.
+  → **Done.** `server/config.js` (env table → frozen object; bad values throw
+  naming the variable), `server/log.js` (level-filtered JSON/text records, child
+  loggers, crash-proof), `server/lifecycle.js` (reverse-order drain hooks under a
+  grace deadline). 21 tests in `test/server/runtime.test.js`. Caps default to D4
+  (6 players / 100 rooms) and are clamped to the 15 seats the wire format can
+  address. Note: with no listener yet the process prints its banner and exits —
+  SIGTERM draining is covered by tests until Phase 0.3 gives it something to hold.
 - [ ] **0.3 HTTP + WS listener skeleton.** Minimal HTTP server (health/readiness
   endpoint) upgrading to WebSocket via `ws`. No game logic yet — just accept a
   connection, echo a framed ping/pong through `mp.js` framing. *Why:* establishes the
   transport substrate Phase 1 builds `SocketBus` on. *DoD:* an integration test opens
   a `ws` client, round-trips a `PING`/`PONG` frame decoded by `mp.js`.
-- [ ] **0.4 Server test lane.** Extend `node --test` with a `test/server/` area;
+  ⚠️ **CI:** this is the first test needing a real dependency. `.github/workflows/`
+  `deploy.yml` runs `node --test` with **no `npm install`** — add one in the same
+  commit, or the test job fails on `require('ws')`. (`ws` is already present in
+  `node_modules` transitively via puppeteer, so it passes locally and would only
+  break in CI — an easy trap.)
+- [~] **0.4 Server test lane.** Extend `node --test` with a `test/server/` area;
   document how server tests run (see Decision D1 on packaging). *DoD:* `node --test`
   discovers and runs server tests alongside the existing 176.
+  → **Half done.** `test/server/` exists and needs no new lane: Node's default test
+  glob includes `**/test/**/*.js`, so root `node --test` already discovers it (176 →
+  207). Careful: that glob means **every** `.js` under `test/` is executed as a test
+  file, so shared helpers must live outside it (put them in `server/`). Remaining:
+  the dependency/CI half, folded into 0.3.
 
 ## Phase 1 — Transport bridge: `SocketBus` + server-hosted `Session`
 

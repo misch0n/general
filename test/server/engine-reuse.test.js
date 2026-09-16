@@ -115,8 +115,9 @@ test('MP.Session constructs and disposes under Node with a stub transport', func
   assert.strictEqual(session.state, 'DEAD');
 });
 
-test('the entrypoint reports a READY health line', function () {
-  var lines = index.healthLines(engine.selfTest());
-  assert.match(lines.join('\n'), /status\s+READY/);
-  assert.match(lines.join('\n'), /G ← game\.js/);
+test('the boot banner names the bound modules and the dice rng', function () {
+  var f = index.bootFields({ port: 1, host: 'h', maxRooms: 2, maxPlayersPerRoom: 3 }, engine.selfTest());
+  assert.match(f.engine, /G←game\.js/);
+  assert.match(f.engine, /MP←mp\.js/);
+  assert.strictEqual(f.diceRng, 'webcrypto');
 });
