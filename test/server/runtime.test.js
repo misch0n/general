@@ -51,8 +51,8 @@ test('config reads every knob from the environment', function () {
 
 test('bad config throws at boot, naming the variable', function () {
   assert.throws(function () { config.load({ PORT: 'abc' }); }, /config: PORT/);
-  assert.throws(function () { config.load({ PORT: '0' }); }, /config: PORT/);
-  assert.throws(function () { config.load({ PORT: '70000' }); }, /1\.\.65535/);
+  assert.throws(function () { config.load({ PORT: '70000' }); }, /0\.\.65535/);
+  assert.throws(function () { config.load({ PORT: '-1' }); }, /config: PORT/);
   assert.throws(function () { config.load({ LOG_LEVEL: 'chatty' }); }, /config: LOG_LEVEL.*debug\|info/s);
   assert.throws(function () { config.load({ MAX_ROOMS: '1.5' }); }, /config: MAX_ROOMS/);
   assert.throws(function () { config.load({ HOST: '   ' }); }, /config: HOST/);
@@ -65,6 +65,10 @@ test('room size cannot exceed what the wire format can address', function () {
   assert.doesNotThrow(function () { config.load({ MAX_PLAYERS_PER_ROOM: '15' }); });
   assert.throws(function () { config.load({ MAX_PLAYERS_PER_ROOM: '16' }); }, /2\.\.15/);
   assert.throws(function () { config.load({ MAX_PLAYERS_PER_ROOM: '1' }); }, /2\.\.15/);
+});
+
+test('PORT=0 is valid — "bind any free port", which the test suite relies on', function () {
+  assert.strictEqual(config.load({ PORT: '0' }).port, 0);
 });
 
 test('an empty env var means "unset", except where empty is meaningful', function () {

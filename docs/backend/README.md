@@ -76,6 +76,10 @@ We want a **true authoritative server**:
   The server constructs `new MP.Session({ transport: socketBus, isHost: true, … })`
   per room. The browser gets a matching `SocketBus` (WebSocket to the server) as an
   alternative transport to `PeerBus`.
+- **Already built (Phase 0.3):** `server/listener.js` hands each accepted socket to
+  `onConnection(conn)` as a `{ send, onReceive, close }` object — the same two
+  methods, per socket. `SocketBus` (1.1) is therefore only the *grouping* step: fan
+  one room's connections into one bus with `PeerBus`'s star topology.
 
 **Wire protocol (in `mp.js`):**
 
@@ -147,16 +151,45 @@ Per the user's direction and root `CLAUDE.md`:
   CHANGELOG entry in `features/core/core.js` (root `CLAUDE.md` rule). Pure server or
   docs/tests changes skip the bump.
 
-## 5. Running & verifying the server (once it exists)
+## 5. Running & verifying the server
 
-The server does not exist yet — Phase 0/1 create it. The intended shape (subject to
-Phase 0 finalizing layout):
+Phase 0 has landed, so this is real now:
 
 ```
-# from repo root, once Phase 0 lands:
-node server/index.js            # starts the WS server (PORT env, default TBD in P0)
-node --test                     # engine + protocol + server unit/integration tests
+npm install                     # one manifest at the repo root (Decision D1)
+node server/index.js            # HTTP + WS listener; Ctrl-C / SIGTERM drains and exits 0
+node --test                     # engine + protocol + server suites (225 tests)
 ```
+
+**Layout (`server/`, plain Node CommonJS — never runs in a browser):**
+
+| File | Role |
+|---|---|
+| `engine.js` | binds the four pure modules; `CONTRACT` + `selfTest()`/`assertReady()` |
+| `config.js` | env → frozen config; bad values throw at boot naming the variable |
+| `log.js` | structured `{ts, level, msg, ...fields}` records, json/text, child loggers |
+| `lifecycle.js` | reverse-order drain hooks under a grace deadline |
+| `listener.js` | HTTP health endpoints + `/ws` upgrade; hands out transport-shaped sockets |
+| `index.js` | `boot()` wires it all; `main()` installs signal handlers and listens |
+
+**Endpoints:** `GET /healthz` (liveness — is the process up?), `GET /readyz`
+(readiness — should a balancer route to it? 503 while draining), `WS /ws`.
+
+**Config** is all env, defaults in `server/config.js` (`config.describe()` lists the
+operator-facing set): `PORT` (8787; `0` = any free port), `HOST`, `LOG_LEVEL`,
+`LOG_FORMAT` (defaults to text on a TTY, json otherwise), `MAX_PLAYERS_PER_ROOM`
+(6), `MAX_ROOMS` (100), `ROOM_IDLE_MS`, `MAX_FRAME_BYTES`, `ALLOWED_ORIGINS`
+(empty = any; a `file://` page sends `Origin: null`, so name `null` explicitly if
+you set an allowlist), `SHUTDOWN_GRACE_MS`.
+
+**Server tests** need no separate lane: they live in `test/server/` and Node's
+default test glob (`**/test/**/*.js`) already finds them. Two things to know:
+
+- That glob **executes every `.js` under `test/`** as a test file, so shared test
+  helpers must live in `server/`, not `test/`.
+- `ws` is also pulled in transitively by puppeteer, so a genuinely missing
+  dependency would still pass locally. CI installs explicitly
+  (`npm ci --omit=dev`) to catch that.
 
 The frontend keeps its zero-tooling workflow untouched: open `index.html` over
 `file://`, `node --test`, puppeteer smoke — exactly as documented in root `CLAUDE.md`.

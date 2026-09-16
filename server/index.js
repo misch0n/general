@@ -7,9 +7,10 @@
  * a WebSocket transport, and — from Phase 3 — own the dice and the scoring, so a
  * client can no longer declare its own result.
  *
- * Current scope (Phase 0.2): boot, config, structured logging, graceful
- * shutdown. There is still no listener — Phase 0.3 adds HTTP/WS. An entrypoint
- * honest about what exists beats a stub that pretends to serve.
+ * Current scope (Phase 0.3): boot, config, structured logging, graceful
+ * shutdown, and an HTTP/WS listener that answers health checks and round-trips
+ * mp.js frames. No rooms and no game logic yet — Phase 1 hosts an MP.Session
+ * per connection group on top of this.
  *
  * Run: `node server/index.js`   (Ctrl-C / SIGTERM drains and exits 0)
  */
@@ -18,6 +19,7 @@ var engine = require('./engine.js');
 var config = require('./config.js');
 var logging = require('./log.js');
 var lifecycle = require('./lifecycle.js');
+var listener = require('./listener.js');
 
 // The boot banner, as fields rather than prose: it is the first thing an
 // operator reads and the first thing Phase 6.1's telemetry ingests.
@@ -37,9 +39,10 @@ function bootFields(cfg, report) {
 }
 
 /*
- * Wire everything up without listening. Returned so tests can boot the server's
- * runtime (config + log + lifecycle) and drain it without a process or a port.
- * opts: { env, write, now, exit } — all injectable.
+ * Wire everything up WITHOUT binding the port — `app.listener.start()` does
+ * that. Splitting the two lets tests boot the whole runtime, or start a
+ * listener on port 0, without a process and without a fixed port.
+ * opts: { env, write, now, exit, onConnection, stats } — all injectable.
  */
 function boot(opts) {
   opts = opts || {};
@@ -54,9 +57,17 @@ function boot(opts) {
   if (!report.cryptoRng) {
     log.warn('Web Crypto unavailable — dice would fall back to Math.random', { diceRng: 'math.random' });
   }
-  log.info('Генерал server booted (Phase 0 scaffold — no listener yet)', bootFields(cfg, report));
 
-  return { cfg: cfg, log: log, life: life, engine: engine, report: report };
+  // The listener registers its own drain hook with `life`, so shutdown closes
+  // sockets and the port without index.js orchestrating it.
+  var lis = listener.create({
+    cfg: cfg, log: log, life: life,
+    onConnection: opts.onConnection, stats: opts.stats,
+  });
+
+  log.info('Генерал server booted (Phase 0 — listener only, no rooms yet)', bootFields(cfg, report));
+
+  return { cfg: cfg, log: log, life: life, listener: lis, engine: engine, report: report };
 }
 
 function main() {
@@ -71,6 +82,10 @@ function main() {
     return null;
   }
   app.life.installSignalHandlers();
+  app.listener.start().catch(function (e) {
+    app.log.error('could not listen', { port: app.cfg.port, host: app.cfg.host, err: e });
+    process.exitCode = 1;
+  });
   return app;
 }
 

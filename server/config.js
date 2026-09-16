@@ -57,7 +57,9 @@ function csv(raw) {
 
 var SPEC = {
   // --- listener (Phase 0.3) ---
-  port: { env: 'PORT', def: 8787, parse: int(1, 65535) },
+  // 0 is allowed and meaningful: "bind any free port". The test suite relies on
+  // it so runs never collide with a dev server or with each other.
+  port: { env: 'PORT', def: 8787, parse: int(0, 65535) },
   host: { env: 'HOST', def: '0.0.0.0', parse: nonEmpty },
 
   // --- logging (below) ---

@@ -10,18 +10,21 @@ Status markers: `[ ]` todo · `[~]` in progress · `[x]` done+verified · `[!]` 
 
 ## Current status
 
-**Phase 0 — in progress.** 0.1 (scaffold + shared-module reuse) and 0.2 (config,
-logging, graceful shutdown) are **done and verified**. `server/` exists, boots, and
-provably runs the browser's own rules modules. There is no listener yet.
+**Phase 0 — COMPLETE.** `server/` exists, boots, provably runs the browser's own
+rules modules, serves `/healthz`+`/readyz`, upgrades `/ws`, round-trips `mp.js`
+frames over a real WebSocket, and drains cleanly on SIGTERM. Still no rooms and no
+game logic — that is Phase 1's job.
 
-**Next step:** **Phase 0, Task 0.3** (HTTP + WS listener skeleton).
-⚠️ **Read 0.3's CI note before starting** — it needs the `ws` dependency, and
-`.github/workflows/deploy.yml` currently runs `node --test` with *no* `npm install`
-(every test to date is dependency-free). That commit must add an install step or CI
-breaks on the first server socket test.
+**Next step:** **Phase 1, Task 1.1** (server `SocketBus`). The seam is already
+built: `listener.create({ onConnection })` hands each socket out as a
+`{ send, onReceive, close }` object, which is precisely `MP.Session`'s
+`opts.transport` contract — so 1.1 is a *grouping* layer (fan a room's sockets into
+one bus, star-topology like `PeerBus`), not new transport code. Mirror
+`test/webrtc.test.js`'s star expectations.
 
-**Progress:** 0 / 9 phases complete (Phase 0: 2 / 4 tasks).
-`node --test` → **207** tests (was 176 before the server landed).
+**Progress:** Phase 0 of 9 complete (4 / 4 tasks).
+`node --test` → **225** tests (was 176 before the server landed).
+Run the server: `node server/index.js` (see README §5).
 
 ---
 
@@ -72,24 +75,33 @@ test lane, changing nothing about the `file://` frontend.*
   (6 players / 100 rooms) and are clamped to the 15 seats the wire format can
   address. Note: with no listener yet the process prints its banner and exits —
   SIGTERM draining is covered by tests until Phase 0.3 gives it something to hold.
-- [ ] **0.3 HTTP + WS listener skeleton.** Minimal HTTP server (health/readiness
+- [x] **0.3 HTTP + WS listener skeleton.** Minimal HTTP server (health/readiness
   endpoint) upgrading to WebSocket via `ws`. No game logic yet — just accept a
   connection, echo a framed ping/pong through `mp.js` framing. *Why:* establishes the
   transport substrate Phase 1 builds `SocketBus` on. *DoD:* an integration test opens
   a `ws` client, round-trips a `PING`/`PONG` frame decoded by `mp.js`.
-  ⚠️ **CI:** this is the first test needing a real dependency. `.github/workflows/`
-  `deploy.yml` runs `node --test` with **no `npm install`** — add one in the same
-  commit, or the test job fails on `require('ws')`. (`ws` is already present in
-  `node_modules` transitively via puppeteer, so it passes locally and would only
-  break in CI — an easy trap.)
-- [~] **0.4 Server test lane.** Extend `node --test` with a `test/server/` area;
+  → **Done.** `server/listener.js`: `/healthz` + `/readyz`, `/ws` upgrade with
+  path/Origin/frame-size door checks, per-socket wrapper, self-registered drain
+  hook. 17 tests in `test/server/listener.test.js` run against a **real** server on
+  an ephemeral port with a real `ws` client. Notes for later phases:
+  - **`onConnection(conn)` hands out a `{send, onReceive, close}` object — exactly
+    `MP.Session`'s `opts.transport` contract**, so 1.1's `SocketBus` is a grouping
+    layer over these, not a rewrite.
+  - `beginDrain()` is deliberately separate from `stop()`: `/readyz` must fail
+    *before* the port closes or a balancer never sees the 503. Phase 6.2 adds the
+    deregistration pause in that gap.
+  - `Origin: null` is what a `file://` page sends — the allowlist must be able to
+    name it, or the game's primary client is locked out (5.2 owns the rest).
+- [x] **0.4 Server test lane.** Extend `node --test` with a `test/server/` area;
   document how server tests run (see Decision D1 on packaging). *DoD:* `node --test`
   discovers and runs server tests alongside the existing 176.
-  → **Half done.** `test/server/` exists and needs no new lane: Node's default test
-  glob includes `**/test/**/*.js`, so root `node --test` already discovers it (176 →
-  207). Careful: that glob means **every** `.js` under `test/` is executed as a test
-  file, so shared helpers must live outside it (put them in `server/`). Remaining:
-  the dependency/CI half, folded into 0.3.
+  → **Done.** No new lane needed: Node's default test glob includes
+  `**/test/**/*.js`, so root `node --test` discovers `test/server/` (176 → 225).
+  Two traps recorded: (a) that glob **executes every `.js` under `test/`** as a test
+  file, so shared helpers must live in `server/`, not `test/`; (b) CI ran
+  `node --test` with no install — fixed in `.github/workflows/deploy.yml`
+  (`npm ci --omit=dev`, Node 22). `ws` is present transitively via puppeteer, so a
+  missing-dependency bug would pass locally and fail only in CI.
 
 ## Phase 1 — Transport bridge: `SocketBus` + server-hosted `Session`
 
@@ -241,7 +253,12 @@ archive / leaderboards are out of scope (future, with accounts).*
   `settings.iceServers` override) — server telemetry replaces what the relay gave us.
   Leave no dead code (root `CLAUDE.md`): grep for orphaned net code/CSS/HTML/deps
   (`peerjs` in `package*.json`, `@roamhq/wrtc` if now unused, `webrtc.test.js` scope)
-  and remove them. *DoD:* server is the only network transport; grep confirms no
+  and remove them.
+  📌 **Already confirmed dead (found in Phase 0.3, left for this task):** neither
+  `@roamhq/wrtc` nor `jsdom` is required by any file in the repo — both are
+  devDependencies nothing uses (Task B's net slimming appears to have orphaned
+  wrtc; `webrtc.test.js` drives `mp.js` with a mock bus, no real WebRTC). Drop both
+  here, and update `.claude/hooks/session-start.sh`, whose comment still names them. *DoD:* server is the only network transport; grep confirms no
   PeerJS/WebRTC/TURN remnants; `node --test` + puppeteer smoke green; **`APP_VERSION`
   + CHANGELOG** bumped (`rem` tag).
 
@@ -268,11 +285,19 @@ archive / leaderboards are out of scope (future, with accounts).*
 Recommended defaults are in **bold**; a task blocked on one is marked `[!]` above.
 When you resolve one, record the outcome here and in the *Decision log*.
 
-- **D1 — Server packaging.** Own `server/package.json` (separate deps) **vs** add
-  server deps to root `package.json`. *Default:* **own `server/package.json`** to keep
-  the zero-dependency `file://` frontend uncluttered, sharing root modules via
-  relative `require('../../game.js')`. (Confirm the relative-require path once
-  `server/` layout is fixed in 0.1.)
+- **D1 — Server packaging.** ✅ **RESOLVED (2026-09-16, Phase 0.3): ONE root
+  `package.json`** — server deps (`ws`) sit in root `dependencies`, `server/` has no
+  manifest of its own, and modules are shared via `require('../game.js')`. This is
+  the *opposite* of the recorded default; the reason the default doesn't survive
+  contact is that server tests live in `test/server/` (root), so `require('ws')`
+  there resolves against **root** `node_modules` — a `server/node_modules` would not
+  be on that path, and splitting tests to sit next to the server just to satisfy the
+  manifest is the tail wagging the dog. The default's motive ("keep the
+  zero-dependency `file://` frontend uncluttered") also turns out to be moot: the
+  frontend ships no dependencies at any point, because nothing is bundled —
+  `package.json` is already a dev-tooling manifest (puppeteer, jsdom), not something
+  the browser ever sees. One manifest also means one `npm install` for CI and for
+  `.claude/hooks/session-start.sh`.
 - **D2 — Intent protocol shape.** New explicit intent message types (`ROLL_REQ`,
   `REROLL_REQ`, `COMMIT_REQ`) **vs** overloading `TACT`/`MOVE`. *Default:* **new
   explicit types** — clearer authority boundary, keeps `MOVE` meaning "authoritative
@@ -319,6 +344,21 @@ the durable "why" that complements the commit history.
   client-declared score) as the core thing Phase 3 fixes by moving RNG + scoring
   server-side. Recorded open product decisions D1–D7 with defaults so work can proceed
   without blocking.
+- **2026-09-16 — Phase 0 built; D1 resolved against its own default.** Server deps
+  live in the **root** `package.json`, not a `server/` one. *Why:* server tests sit
+  in `test/server/` (root), so `require('ws')` resolves against root
+  `node_modules`; a `server/node_modules` would be off that path. The default's
+  motive — "keep the zero-dependency frontend uncluttered" — is moot, since nothing
+  is bundled and the browser never sees `package.json`. Consequences: one
+  `npm install` everywhere, and CI (`deploy.yml`) gained `npm ci --omit=dev` + Node
+  22, because it previously ran `node --test` with no install at all and every test
+  to date happened to be dependency-free.
+- **2026-09-16 — the transport seam landed earlier than planned.**
+  `listener.create({ onConnection })` hands each accepted socket out as
+  `{ send, onReceive, close }` — deliberately the exact shape `MP.Session` wants for
+  `opts.transport`. Phase 1.1 therefore only has to *group* sockets into a room bus
+  (star topology, like `PeerBus`), not write transport code. Recorded because it
+  changes what 1.1 is: a small fan-out layer, not a port of `PeerBus`.
 - **2026-09-16 — D3, D5, D6 resolved by owner.**
   - **D3:** scrap PeerJS entirely once the server is complete (P2P may remain a
     dev-time fallback, removed in Phase 7.4). Drop the Metered.ca TURN relay too — the
