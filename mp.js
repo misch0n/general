@@ -751,7 +751,10 @@
   }
 
   var api = {
-    T: T, HOST_ID: HOST_ID, GENDERS: GENDERS, crc8: crc8, utf8: utf8, utf8d: utf8d,
+    // UNASSIGNED is exported because the SENDER nibble's bounds are protocol,
+    // not trivia: a transport that maps a socket to the seat it speaks for has
+    // to know which sender values name a seat at all.
+    T: T, HOST_ID: HOST_ID, UNASSIGNED: UNASSIGNED, GENDERS: GENDERS, crc8: crc8, utf8: utf8, utf8d: utf8d,
     sanitizeRecord: sanitizeRecord,
     Writer: Writer, Reader: Reader, frame: frame, unframe: unframe,
     hexRGB: hexRGB, rgbHex: rgbHex,

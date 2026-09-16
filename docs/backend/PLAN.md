@@ -27,8 +27,8 @@ the new integration test should drive a **real** `ws` client through `JOIN_REQ` 
 `JOIN_ACK` + `ROSTER`.
 
 **Progress:** Phase 0 complete (4 / 4); Phase 1 at 1 / 4.
-`node --test` → **248** tests. (The "225" recorded here after Phase 0 had drifted:
-the tree was at 232 before this task, so 1.1 added 16.)
+`node --test` → **253** tests. (The "225" recorded here after Phase 0 had drifted:
+the tree was at 232 before this task, so 1.1 added 21.)
 Run the server: `node server/index.js` (see README §5).
 
 ---
@@ -133,25 +133,37 @@ over WebSocket, and the existing lobby handshake works end-to-end unchanged.*
   mock `ws` and asserts framing relay matches `webrtc.test.js`'s star expectations.
   → **Done.** `server/socket-bus.js`: `create({log,onPeers,onLost})` returns the bus,
   which *is* the transport (`send`/`onReceive` on it directly, like `PeerBus`), plus
-  `add/remove/has/size/peers/stop`. 14 tests in `test/server/socket-bus.test.js`, the
+  `add/remove/has/size/peers/stop`. 18 tests in `test/server/socket-bus.test.js`, the
   last two driving **real `MP.Session`s** over the bus (lobby convergence + a client
   move reaching the other client only via the host). Notes for later phases:
-  - **`conn.onClose(fn)` is new on the listener's socket wrapper** — the bus has no
-    access to the raw `ws`, and from now on a socket holds a *seat*, so a vanished
-    peer must be announced or the seat is never released. The listener's own
-    bookkeeping runs first, and a throwing handler is caught (same invariant as the
-    receive path; both are tested).
+  - **`conn.onClose(fn)` and `conn.isOpen()` are new on the listener's socket
+    wrapper.** The bus has no access to the raw `ws`, yet from now on a socket holds
+    a *seat*: it must be told when a peer vanished (or the seat is never released),
+    and it must be able to refuse an already-dead socket — `'close'` is **one-shot**,
+    so adopting a closed conn installs a handler that can never fire and leaves a
+    ghost member. `onClose` is a **single slot** like `onReceive` (re-registering
+    replaces, which is what makes a room hand-off possible — so only one layer may
+    own it). Both close handlers are now wrapped: a throw there would escape ws's
+    emit *and* skip the release, i.e. both failures the file exists to prevent.
   - **`onLost` fires only for a socket that went away on its own.** An explicit
     `remove()`/`stop()` is *our* doing — Phase 2 must not report a player drop when
     it is the one tearing the room down.
-  - **The `conn.pid` seat tag is a hint, not a registry.** A `JOIN_REQ` carries the
-    `UNASSIGNED` (15) sender nibble, so a socket is untagged until its *seated*
-    client speaks. That is the right shape (an untagged socket holds no seat), but
-    2.2's reconnect path must bind seats by `eph` at `JOIN_ACK` time, not by this.
+  - **The `conn.pid` seat tag is advisory, not a registry.** A `JOIN_REQ` carries the
+    `UNASSIGNED` sender nibble, so a socket is untagged until its *seated* client
+    speaks. That is the right shape (an untagged socket holds no seat), but 2.2's
+    reconnect path must bind seats by `eph` at `JOIN_ACK` time, not by this. The
+    nibble is also a byte the *client* chose, seen before the session has accepted
+    anything, so the bus refuses a seat another live socket already claims —
+    otherwise a peer could claim seat 3 and disconnect to strand the real player 3.
+    A socket joining a bus starts untagged, so a tag from another room cannot make
+    the new room release a seat it never gave out.
   - `send()` fans the **same** `Uint8Array` to every socket (the listener's `send`
     makes a zero-copy view and `ws` may still hold it queued), so frames are
-    **read-only** once sent; it iterates a snapshot, because a write can
-    synchronously close a socket. It never rejects, and resolves the delivered count.
+    **read-only** once sent; it iterates a snapshot *and* re-checks membership per
+    socket, because a write can synchronously remove a later one. It never rejects,
+    and resolves the delivered count.
+  - `mp.js` now exports **`UNASSIGNED`** alongside `HOST_ID`: which sender values name
+    a seat is protocol, and a transport that maps sockets to seats needs it.
 - [ ] **1.2 Host a `Session` per connection group.** Server constructs
   `new MP.Session({ transport, isHost: true, … })` and pumps its callbacks. Reuse the
   existing `LOBBY→PREP→IN_GAME→GAME_OVER` machine as-is for now (dice still

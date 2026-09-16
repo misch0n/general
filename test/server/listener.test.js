@@ -289,6 +289,9 @@ test('onConnection receives a transport-shaped object (what Phase 1 plugs into)'
       assert.strictEqual(typeof seen.send, 'function');
       assert.strictEqual(typeof seen.onReceive, 'function');
       assert.strictEqual(typeof seen.close, 'function');
+      // the two the grouping layer above needs on top of the bare contract
+      assert.strictEqual(typeof seen.onClose, 'function');
+      assert.strictEqual(typeof seen.isOpen, 'function');
       ws.send(Buffer.from(MP.frame(MP.T.PING, MP.HOST_ID, 0, new Uint8Array([42]))), { binary: true });
       return nextMessage(ws).then(function (bytes) {
         var f = MP.unframe(bytes);
@@ -318,14 +321,41 @@ test('onClose tells the layer above that a socket vanished', function () {
 });
 
 test('a throwing close handler does not take the server down', function () {
+  var threw = false;
   return withServer(null, {
-    onConnection: function (conn) { conn.onClose(function () { throw new Error('bus blew up on close'); }); },
+    onConnection: function (conn) {
+      conn.onReceive(function (bytes) { conn.send(bytes); });
+      conn.onClose(function () { threw = true; throw new Error('bus blew up on close'); });
+    },
   }, function (s) {
     return connect(s.wsUrl).then(function (ws) {
       ws.close();
-      return until(function () { return s.app.listener.connectionCount === 0; }, 'the connection to be released')
-        .then(function () { return get(s.base + '/healthz'); })
-        .then(function (r) { assert.strictEqual(r.status, 200, 'the server is still serving'); });
+      return until(function () { return threw; }, 'the throwing close handler to run')
+        // The real proof is that the LISTENER still works afterwards — a new
+        // client can connect and round-trip a frame. (Both /healthz and the
+        // connection count are settled by the handler BEFORE the throwing one,
+        // so on their own they would pass without exercising this at all.)
+        .then(function () { return connect(s.wsUrl); })
+        .then(function (ws2) {
+          ws2.send(Buffer.from(MP.frame(MP.T.PING, MP.HOST_ID, 0, new Uint8Array([7]))), { binary: true });
+          return nextMessage(ws2).then(function (bytes) {
+            assert.deepStrictEqual(Array.from(MP.unframe(bytes).payload), [7], 'the listener still serves new players');
+            ws2.close();
+          });
+        });
+    });
+  });
+});
+
+test('isOpen() tells the layer above whether a socket can still carry bytes', function () {
+  // SocketBus refuses a dead socket with this: 'close' is one-shot, so a conn
+  // adopted after it died would register a handler that can never fire.
+  var conn = null;
+  return withServer(null, { onConnection: function (c) { conn = c; } }, function (s) {
+    return connect(s.wsUrl).then(function (ws) {
+      assert.strictEqual(conn.isOpen(), true);
+      ws.close();
+      return until(function () { return !conn.isOpen(); }, 'the socket to report itself closed');
     });
   });
 });

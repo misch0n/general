@@ -25,7 +25,7 @@ var socketBus = require('../../server/socket-bus.js');
 // ===== harness
 
 // Stands in for listener.js's socket wrapper: same { id, send, onReceive,
-// onClose, close } surface, plus test hooks (`sent`, `deliver`).
+// onClose, isOpen, close } surface, plus test hooks (`sent`, `deliver`).
 function mockConn(id) {
   var rx = null, closeCb = null;
   var c = {
@@ -40,7 +40,10 @@ function mockConn(id) {
       return Promise.resolve(true);
     },
     onReceive: function (fn) { rx = fn; },
+    // Single slot, like the real wrapper: a second registration replaces the
+    // first, which is what lets a room hand a connection over.
     onClose: function (fn) { closeCb = fn; },
+    isOpen: function () { return !c.closed; },
     close: function () {
       if (c.closed) return;
       c.closed = true;
@@ -135,6 +138,54 @@ test('an inbound frame tags its socket with the seat it speaks for', function ()
   assert.strictEqual(a.pid, 4, 'a host-sender frame does not re-tag the socket');
 });
 
+test('a socket cannot claim a seat another live socket already speaks for', function () {
+  // The sender nibble is a byte the CLIENT chose, and the bus sees it before
+  // the session has accepted anything. Without this, a peer could claim seat 2
+  // and then disconnect, stranding the real player 2.
+  var bus = socketBus.create({});
+  var honest = mockConn('honest'), impostor = mockConn('impostor');
+  bus.add(honest); bus.add(impostor);
+  bus.onReceive(function () {});
+
+  honest.deliver(frameFrom(2));
+  impostor.deliver(frameFrom(2));
+  assert.strictEqual(honest.pid, 2);
+  assert.strictEqual(impostor.pid, undefined, 'the impostor stays untagged — and so releases no seat');
+
+  // once the real seat-2 socket is gone, the seat is claimable again (this is
+  // also what a genuine reconnect looks like from the bus's side)
+  honest.close();
+  impostor.deliver(frameFrom(2));
+  assert.strictEqual(impostor.pid, 2);
+});
+
+test('a socket joining carries no seat tag from the room it came from', function () {
+  var lost = [];
+  var bus1 = socketBus.create({});
+  var bus2 = socketBus.create({ onLost: function (c) { lost.push(c.pid); } });
+  var a = mockConn('a');
+  bus1.add(a); bus1.onReceive(function () {});
+  a.deliver(frameFrom(3));
+  assert.strictEqual(a.pid, 3);
+
+  bus1.remove(a);
+  bus2.add(a);                                     // seat 3 there is not seat 3 here
+  assert.strictEqual(a.pid, undefined);
+  a.close();
+  assert.deepStrictEqual(lost, [undefined], 'the new room is not told to release a seat it never gave out');
+});
+
+test('add() refuses a socket that is already dead', function () {
+  // 'close' is one-shot: adopting a closed socket would install a handler that
+  // can never fire, leaving a ghost member that is counted and written to but
+  // never reported lost.
+  var bus = socketBus.create({});
+  var a = mockConn('a');
+  a.close();
+  assert.strictEqual(bus.add(a), false);
+  assert.strictEqual(bus.size(), 0);
+});
+
 // ===== membership
 
 test('add() is idempotent and counts peers; remove() detaches silently', function () {
@@ -187,6 +238,11 @@ test('a departed socket is no longer written to', function () {
   var a = mockConn('a'), b = mockConn('b');
   bus.add(a); bus.add(b);
   a.close();
+  // Assert on the BUS, not just on the write: a mock socket refuses a write
+  // once closed, so `a.sent` alone would stay empty even if the bus had kept
+  // it as a member.
+  assert.strictEqual(bus.size(), 1);
+  assert.strictEqual(bus.has(a), false);
   return bus.send(frameFrom(MP.HOST_ID)).then(function (n) {
     assert.strictEqual(n, 1);
     assert.strictEqual(a.sent.length, 0);
@@ -222,6 +278,20 @@ test('a socket that closes during the fan-out does not corrupt the iteration', f
   return bus.send(frameFrom(MP.HOST_ID)).then(function () {
     assert.strictEqual(c.sent.length, 1, 'the socket after the closed one still got the frame');
     assert.strictEqual(bus.size(), 2);
+  });
+});
+
+test('a socket taken off the bus mid-fan-out does not get that frame', function () {
+  // The room-hand-off case: `b` has already joined somewhere else by the time
+  // the loop reaches it, so this frame would be a stray from its old game.
+  var bus = socketBus.create({});
+  var a = mockConn('a'), b = mockConn('b');
+  bus.add(a); bus.add(b);
+  a.onSend = function () { bus.remove(b); };
+
+  return bus.send(frameFrom(MP.HOST_ID)).then(function (n) {
+    assert.strictEqual(b.sent.length, 0, 'the departed socket was skipped, though the snapshot still listed it');
+    assert.strictEqual(n, 1);
   });
 });
 

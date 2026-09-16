@@ -77,8 +77,11 @@ We want a **true authoritative server**:
   per room. The browser gets a matching `SocketBus` (WebSocket to the server) as an
   alternative transport to `PeerBus`.
 - **Already built (Phase 0.3):** `server/listener.js` hands each accepted socket to
-  `onConnection(conn)` as a `{ send, onReceive, onClose, close }` object — the same
-  two transport methods, per socket.
+  `onConnection(conn)` as a `{ send, onReceive, onClose, isOpen, close }` object —
+  the same two transport methods, per socket, plus what a grouping layer needs to
+  know when a socket vanished (`onClose`, single-slot) and whether it is still
+  alive at all (`isOpen` — `'close'` is one-shot, so a conn adopted after it died
+  would leave a ghost member).
 - **Already built (Phase 1.1):** `server/socket-bus.js` is that grouping step — fan
   one room's connections into one bus with `PeerBus`'s star topology. The bus **is**
   the transport (`send`/`onReceive` live on it), so it goes straight into
@@ -164,7 +167,7 @@ Phase 0 has landed, so this is real now:
 ```
 npm install                     # one manifest at the repo root (Decision D1)
 node server/index.js            # HTTP + WS listener; Ctrl-C / SIGTERM drains and exits 0
-node --test                     # engine + protocol + server suites (248 tests)
+node --test                     # engine + protocol + server suites (253 tests)
 ```
 
 **Layout (`server/`, plain Node CommonJS — never runs in a browser):**

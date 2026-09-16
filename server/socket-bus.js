@@ -28,12 +28,12 @@
 var MP = require('../mp.js');
 
 // SENDER nibble (mp.js): 0 is the host, 15 ("UNASSIGNED") is a client that has
-// not been seated yet. Only 1..14 name an actual seat.
+// not been seated yet. Only what lies between names an actual seat.
 var SEAT_MIN = MP.HOST_ID + 1;
-var SEAT_MAX = 14;
+var SEAT_MAX = MP.UNASSIGNED - 1;
 
 var NOOP = function () {};
-var NULL_LOG = { debug: NOOP, info: NOOP, warn: NOOP, error: NOOP };
+var NULL_LOG = { debug: NOOP, warn: NOOP };
 
 /*
  * opts: { log, onPeers(n), onLost(conn) }
@@ -66,6 +66,11 @@ function create(opts) {
     return true;
   }
 
+  function claimedBy(seat, notThis) {
+    for (var i = 0; i < conns.length; i++) if (conns[i] !== notThis && conns[i].pid === seat) return true;
+    return false;
+  }
+
   function receive(conn, bytes) {
     // A frame already in flight when we dropped the socket (or tore the room
     // down) must not reach the session — it would be a ghost of a player that
@@ -81,7 +86,22 @@ function create(opts) {
     // layer above knows WHICH player vanished. The host side of `PeerBus` does
     // exactly this; it costs one extra unframe per inbound frame (the session
     // unframes again), which is nothing next to a socket read.
-    if (f.sender >= SEAT_MIN && f.sender <= SEAT_MAX) conn.pid = f.sender;
+    //
+    // ADVISORY ONLY. The sender nibble is a byte the client chose, and the bus
+    // sees it BEFORE the session has accepted anything, so it cannot be the
+    // seat registry (Phase 2.2 binds seats by `eph` at JOIN_ACK, which is
+    // authoritative). What it must not do is let one client speak FOR another:
+    // a seat already claimed by a different live socket is never re-assigned,
+    // so a peer cannot claim seat 3 and then disconnect to strand the real
+    // player 3. First claimant wins, and the impostor simply stays untagged —
+    // an untagged socket releases no seat, which is the safe way to be wrong.
+    if (f.sender >= SEAT_MIN && f.sender <= SEAT_MAX && conn.pid !== f.sender) {
+      if (claimedBy(f.sender, conn)) {
+        log.warn('bus: refused a seat already claimed by another socket', { conn: conn.id, seat: f.sender });
+      } else {
+        conn.pid = f.sender;
+      }
+    }
 
     // Pass the ORIGINAL bytes on, not the decoded frame: the session owns the
     // protocol, this layer only routes.
@@ -112,6 +132,11 @@ function create(opts) {
       // Iterate a snapshot: a send can synchronously close a socket (a dead
       // peer), which mutates `conns` underneath us.
       conns.slice().forEach(function (c) {
+        // The snapshot protects the iteration; this protects the socket. A
+        // write earlier in the loop can have removed a later one (a room
+        // hand-off, a close), and a frame from the room it just left would be
+        // a stray from someone else's game.
+        if (conns.indexOf(c) < 0) return;
         try {
           pending.push(Promise.resolve(c.send(bytes)).then(
             function (ok) { if (ok !== false) wrote++; },
@@ -128,10 +153,22 @@ function create(opts) {
 
     // ---------- membership ----------
 
-    // Join a socket to this room's bus. Returns false if it is already a
-    // member, or the bus has been stopped.
+    /*
+     * Join a socket to this room's bus. Returns false — and takes no
+     * ownership, so the CALLER decides what becomes of the socket — when it is
+     * already a member, when the bus has been stopped, or when the socket is
+     * already dead. That last check is not belt-and-braces: 'close' is a
+     * one-shot event, so a conn that died before being adopted would register
+     * a close handler that can never fire and then sit here forever — counted,
+     * written to, never reported lost.
+     */
     add: function (conn) {
-      if (stopped || !conn || conns.indexOf(conn) >= 0) return false;
+      if (!conn || conns.indexOf(conn) >= 0) return false;
+      if (stopped) { log.debug('bus: refused a socket, bus stopped', { conn: conn.id }); return false; }
+      if (conn.isOpen && !conn.isOpen()) { log.debug('bus: refused a socket that is already closed', { conn: conn.id }); return false; }
+      // A socket arriving from another room carries that room's seat tag, and
+      // seat 3 there is not seat 3 here. It starts this room untagged.
+      conn.pid = undefined;
       conns.push(conn);
       conn.onReceive(function (bytes) { receive(conn, bytes); });
       // The socket wrapper lets a layer above register for the close, because

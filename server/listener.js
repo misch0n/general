@@ -107,7 +107,18 @@ function wrapSocket(ws, opts) {
     // access to the raw `ws` yet must learn when a socket vanishes — from
     // Phase 1 that socket holds a SEAT, and a seat nobody releases stalls the
     // game for everyone else in the room.
+    //
+    // SINGLE SLOT, like onReceive: registering again REPLACES the previous
+    // handler. That is what lets a room hand a connection over (the new owner
+    // takes the slot), and it is why two layers must not both register — the
+    // second silently evicts the first. One owner at a time, by contract.
     onClose: function (fn) { closeCb = fn; },
+
+    // Whether this socket can still carry bytes. The layer above needs it
+    // because 'close' is a ONE-SHOT event: a conn that died before it was
+    // adopted would register a close handler that can never fire, and sit in
+    // its new owner's list forever as a ghost member.
+    isOpen: function () { return !closed && ws.readyState === WebSocket.OPEN; },
 
     close: function (code, reason) {
       if (closed) return;
@@ -146,10 +157,15 @@ function wrapSocket(ws, opts) {
   ws.on('close', function (code) {
     closed = true;
     log.debug('socket closed', { conn: conn.id, code: code });
-    // Our own bookkeeping first, so the handler above sees a consistent view.
-    if (opts.onClose) opts.onClose(conn, code);
-    // Same invariant as the receive path: a throw from foreign code on the way
-    // out closes one connection's story, not the process.
+    // Our own bookkeeping first, so the handler above sees a consistent view —
+    // and wrapped like everything else, because a throw here would escape ws's
+    // 'close' emit uncaught (killing the process) AND skip the handler below,
+    // so the room would never release the seat. Both failures this file exists
+    // to prevent, from one throw.
+    if (opts.onClose) {
+      try { opts.onClose(conn, code); }
+      catch (e) { log.error('internal close handler threw', { conn: conn.id, err: e }); }
+    }
     if (closeCb) {
       try { closeCb(conn, code); }
       catch (e) { log.error('close handler threw', { conn: conn.id, err: e }); }
