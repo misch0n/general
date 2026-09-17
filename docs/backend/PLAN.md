@@ -19,20 +19,24 @@ the one transport `MP.Session` wants, and `server/room.js` (1.2) puts a real
 host-side session on top: the server now answers a `JOIN_REQ` from a real WebSocket
 client with `JOIN_ACK` + `ROSTER`, keeps the roster, and runs the turn rotation —
 all in the browser's own `mp.js` code. **The server referees but does not play**
-(`hostPlays: false`, new in `mp.js`). There is still exactly ONE room, with no join
-code (Phase 2), and the dice are still client-declared (Phase 3).
+(`hostPlays: false`, new in `mp.js`). `features/net/socket-bus.js` (1.3) is the
+other end: the browser's WebSocket transport, loaded by `index.html` but **wired to
+nothing** (Phase 7 does that). There is still exactly ONE room, with no join code
+(Phase 2), and the dice are still client-declared (Phase 3).
 
-**Next step:** **Phase 1, Task 1.3** (browser `SocketBus`). A WebSocket transport in
-`features/net/` with the same `send`/`onReceive` contract as `PeerBus`, pointed at
-the server URL, **not wired into the UI** (that is Phase 7) — constructible and
-smoke-testable only. It is a browser file, so: no ES modules, no `fetch` of local
-files, and the puppeteer `file://` smoke must stay green (root `CLAUDE.md`).
-Then 1.4 drives a full lobby handshake from that transport against a real server
-process. `test/server/room.test.js`'s protocol-level `client()` rig (raw `ws` +
-`expect(type)`) is the model for a scripted end-to-end check.
+**Next step:** **Phase 1, Task 1.4** (end-to-end lobby over WS). Put a real
+`MP.Session` (client side) on top of the browser `SocketBus` and drive the full
+handshake — beacon → join → roster → ready → `IN_PREP` — against a real
+`server/index.js` process. Both halves now exist and are tested separately; 1.4 is
+what proves they agree. `test/server/socket-bus-client.test.js` has the bus-level
+harness (real file + injected `ws` + real server) and
+`test/server/room.test.js`'s protocol-level `client()` rig is the model for asserting
+on frames; the new thing 1.4 adds is a *session* at the client end instead of hand-rolled
+frames. Watch for: a client `Session`'s own timers under Node (1.2's `unrefTimeout`
+lesson) and the fact that a server room's roster has **no host entry**.
 
-**Progress:** Phase 0 complete (4 / 4); Phase 1 at 2 / 4.
-`node --test` → **268** tests; `node scripts/smoke.js` → SMOKE PASS.
+**Progress:** Phase 0 complete (4 / 4); Phase 1 at 3 / 4.
+`node --test` → **283** tests; `node scripts/smoke.js` → SMOKE PASS.
 Run the server: `node server/index.js` (see README §5).
 
 ---
@@ -219,12 +223,68 @@ over WebSocket, and the existing lobby handshake works end-to-end unchanged.*
     now accepts sockets and drops their frames; the PING→PONG echo moved into
     `test/server/listener.test.js`, which is the only thing that still wants it (what
     it proves is about the socket, not the game).
-- [ ] **1.3 Browser `SocketBus`.** Add a WebSocket transport in the app
+- [x] **1.3 Browser `SocketBus`.** Add a WebSocket transport in the app
   (`features/net/`) implementing the same contract as `PeerBus`, targeting the
   server URL. Do **not** wire it into the UI yet (Phase 7) — just make it
   constructible and unit-/smoke-testable. *Why:* keep frontend changes isolated and
   `file://`-safe. *DoD:* puppeteer smoke still passes (no regression); the transport
   connects to a locally-run server in a scripted check.
+  → **Done.** `features/net/socket-bus.js`: `new SocketBus({url, WebSocket?, onPeers,
+  onLost, onReup, onLog?})` with `send`/`onReceive` (the `MP.Session` contract) plus
+  `start()`/`stop()` — PeerBus's lifecycle, nothing else added. Loaded from
+  `index.html` before `net.js`; **nothing calls it yet**. 15 tests in
+  `test/server/socket-bus-client.test.js` (268 → 283 tests) drive the **real file** against a
+  **real server process**, and `scripts/smoke.js` gained a `net/socket-bus` case that
+  loads + constructs it over `file://`. Notes for later phases:
+  - **It is UMD, like `mp.js` — a deliberate exception to "`features/**` is
+    browser-only".** The file is DOM-free, so Node can `require()` it and inject `ws`
+    where the browser hands it the global `WebSocket`. That is the only way the DoD's
+    "connects to a locally-run server" can be *tested* rather than asserted: a
+    transport checked against a mock socket only proves the mock agrees with it.
+  - **It is the client half of `PeerBus` and nothing else.** The star's centre is the
+    server, so there is no host branch, no peer acceptance, no `conn._pid` seat
+    tagging, no re-broadcast — `onPeers(n)` is only ever 0 or 1. Phase 7 can hand
+    either bus to `newSessionWith()` without the UI knowing which it has.
+  - **`onLost` fires only for a link that dropped on its own**, the same rule
+    `server/socket-bus.js` follows: `stop()` neutralizes the handlers *before* `close()`,
+    so our own teardown is never reported to the app as a player dropping (and cannot
+    restart the redial loop it just cancelled). It **mutes them with no-ops rather than
+    nulling them**, because `close()` on a still-connecting socket raises an error, and
+    under `ws` an `'error'` with no listener is an uncaught exception — the handler has
+    to stay attached, it just must not reach the app.
+  - **`stop()` also cancels a dial that has not resolved yet.** A connect always outlives
+    the decision to abandon it, so a pending socket is parked (`_pending`) and an
+    `_abortDial` hook settles the in-flight `start()` immediately. Without it, two things
+    go wrong minutes apart: the socket opens *after* `stop()` and hands the app a link it
+    asked not to have, and the 20 s dial timeout then rejects a `start()` promise nobody
+    is holding any more — an unhandled rejection, i.e. a `pageerror` on a page whose whole
+    point is to keep working offline. `start()` on an already-live bus resolves rather
+    than returning a promise that never settles.
+  - **A HOST session never answers `PING`** — `_rxHost` has no PING branch (it lives in
+    `_rxClient`, `mp.js:688`), so the server is silent to one. Probe a server room with
+    the lobby `BEACON` it emits on its own schedule, or with `JOIN_REQ`→`JOIN_ACK`.
+    `listener.js`'s own PING/PONG echo is socket-level and is not this.
+  - **`normalizeUrl` defaults the path to `/ws`** (`listener.WS_PATH`), because an
+    upgrade on any other path is a 404 that reaches the app as a bare "connection
+    closed" — a symptom that names nothing. It also accepts `http(s)://` and a bare
+    `host:port`, which is what a Phase 7 settings field will actually receive.
+  - **Dial and redial timers are `unref`'d when the runtime allows it** (Node only —
+    the browser's `setTimeout` returns a number). Same lesson as 1.2's
+    `room.unrefTimeout`: an armed reconnect must not be a reason for a test process to
+    stay alive.
+  - **Three things Phase 7 needs that `PeerBus` does not offer**, added because the
+    review found each one leading somewhere the UI cannot recover from:
+    - **`onGiveUp()`** — fires when the redial budget is spent. `PeerBus` only logs
+      here (`net.js:529`), and a reconnect banner that clears on `onReup` would then
+      say „наваксвам…" forever, with nothing left running that could ever clear it.
+      It is the one exit from a reconnect state `onReup` will never reach.
+    - **`err.aborted === true`** on the `start()` rejection `stop()` causes. Otherwise
+      a player cancelling their own lobby is indistinguishable at the call site from a
+      dial that failed, and the UI shows them a connection error they caused on purpose.
+    - **An `rx-drop` log line** for a frame that did not arrive as bytes. `binaryType =
+      'arraybuffer'` is set inside a swallowing `try/catch`, and the one runtime where
+      that fails is exactly the one where every frame is a `Blob` — the bus would look
+      connected (`onPeers(1)`, `send()` still resolving 1) while being permanently deaf.
 - [ ] **1.4 End-to-end lobby over WS.** With server + browser `SocketBus`, drive a
   full lobby handshake (beacon/join/roster/ready) against a real server process in a
   scripted integration test. *DoD:* a headless client joins a server room and reaches
@@ -508,3 +568,43 @@ the durable "why" that complements the commit history.
   Also retired `listener.js`'s `echoPingPong` default handler: the room is the real
   one now, so the stand-in was dead code in production and moved to the listener's
   own tests, which are the only thing that still wants it.
+- **2026-09-17 — Phase 1.3: the browser transport is UMD, and that is on purpose.**
+  `features/net/socket-bus.js` carries `mp.js`'s UMD wrapper rather than living inside
+  `net.js`'s IIFE, so `test/server/socket-bus-client.test.js` can `require()` the very
+  file the browser loads and point it at a real server with `ws` injected as
+  `opts.WebSocket`. *Why:* the task's Definition of Done is "connects to a locally-run
+  server", and a transport exercised against a mock socket only demonstrates that the
+  mock and the transport were written by the same hand. The cost is one documented
+  exception to "`features/**` is browser-only" (root `CLAUDE.md`) — acceptable because
+  this file is genuinely DOM-free, which is exactly the property that makes the
+  exception safe. *Consequence:* keep it DOM-free. The moment it touches `document` or
+  `settings`, the Node test dies and the wire coverage goes with it — so Phase 7's UI
+  wiring belongs in `net.js`, and this file gains only injected callbacks (`onLog`,
+  `onPeers`, …).
+- **2026-09-17 — Phase 1.3: `stop()` silences before it closes, and cancels a dial in
+  flight.** The browser bus replaces `onmessage`/`onclose`/`onerror` with no-ops *before*
+  calling `close()`, so a deliberate teardown never reaches the app as `onLost` and never
+  re-arms the redial loop through the close event it just cancelled. *Why it is worth
+  writing down:* it is the same rule `server/socket-bus.js` states from the other side
+  ("`onLost` fires only for a socket that went away on its own"), and both exist because
+  Phase 2 must not report a player drop when it is the one tearing the room down. A close
+  handler is the natural place to put reconnect logic and the natural place to get this
+  wrong. Two details cost a test each to find: (a) *muting* is not *unhooking* — nulling
+  the handlers made `ws` close a still-connecting socket with no `'error'` listener
+  attached, which is an uncaught exception, so the listeners must remain and simply do
+  nothing; (b) a socket that has not opened yet is invisible to `stop()` unless it is
+  parked somewhere, so an abandoned dial would still open afterwards and its 20 s timeout
+  would later reject a `start()` promise nobody holds — an unhandled rejection, which in
+  the browser is a `pageerror`. An independent review of the same file, run in parallel,
+  reproduced both bugs before the fixes landed — worth noting because both are *lifecycle*
+  faults with no unhappy-path test to catch them, which is the shape of defect this file
+  will keep producing.
+- **2026-09-17 — Phase 1.3: silence is the failure mode to design against.** Three of the
+  review's findings were the same shape — a state the transport can enter that the app is
+  never told about, and from which nothing is still trying: a spent redial budget
+  (`onGiveUp`), a cancelled dial reported as a connection error (`err.aborted`), and a
+  frame dropped for not being binary (`rx-drop`). None of them break a test; each one
+  leaves the Phase 7 UI stuck on a reassuring message while nothing is happening. The rule
+  for anything added to this file: **every terminal state gets a callback or a log line.**
+  `PeerBus` does not follow it (`net.js:529` only logs), which is precisely why 7.1 must
+  take the hole into account rather than copying the shape.

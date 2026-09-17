@@ -19,7 +19,7 @@ protocol)** — there is no server, bundler, or transpile step.
 
 ## Run & verify
 - **Open:** just open `index.html` in a browser, or `file://<abs-path>/index.html`.
-- **Unit tests:** `node --test` (engine + net/session logic + `test/server/`; currently **268 tests**).
+- **Unit tests:** `node --test` (engine + net/session logic + `test/server/`; currently **283 tests**).
 - **UI smoke (headless, over file://):** the app game-loop has **no unit tests** — puppeteer is the
   app-level safety net. Write a short script (puppeteer is in `node_modules`) that loads
   `file://$PWD/index.html`, drives `#playBtn` (dispatch real `pointerdown`+`pointerup`+`click`),
@@ -43,11 +43,14 @@ Two layers, loaded in this order (see `index.html`):
 > `mp.js` is now just **framing + session + game codecs** — what WebRTC actually uses.
 
 **2. App (UI + game loop) — `features/<name>/*.js`, classic global scope:**
-Load order: `core → setup → net → game → exp → game/ai → modals → summary → history → tutorial → settings → core/boot` (**boot runs last**).
+Load order: `core → setup → net/socket-bus → net → game → exp → game/ai → modals → summary → history → tutorial → settings → core/boot` (**boot runs last**).
 - `features/core/core.js` — bootstrap: binds G/EV/X, EV tables, analytics, `settings`, storage/resume, owner helpers, `$`, `gExp()`.
 - `features/core/boot.js` — app init, runs after every global is defined.
 - `features/setup/setup.js` — muster/start screen, roster, ruleset & local/network selectors.
 - `features/net/net.js` — WebRTC multiplayer: lobby, host/join, QR invite + scan-to-join, spectating, sync.
+- `features/net/socket-bus.js` — WebSocket transport to our own server (`MP.Session`'s L0, client side).
+  UMD + DOM-free like `mp.js` (so Node tests can drive the real file against a real server) and
+  **not wired into the UI yet** — see `docs/backend/PLAN.md`.
 - `features/game/game.js` — **the core game loop**: state, board render, manual mode, dice interaction, commit/turn flow.
 - `features/game/ai.js` — bots, speech bubbles, combo tooltip.
 - `features/exp/exp.js` — experimental ruleset engine glue: the exp turn flow (`expBeginTurn`/`expCommit`/…),

@@ -101,6 +101,18 @@ We want a **true authoritative server**:
   - **`Session` timers are unref'd** (`room.unrefTimeout`). The lobby beacon re-arms
     every few seconds for as long as the room is open; under Node that keeps the
     event loop alive, so the process would outlive its own listener.
+- **Already built (Phase 1.3):** `features/net/socket-bus.js` is the **browser** end —
+  the client half of `PeerBus` over a WebSocket to the server, with the same
+  `send`/`onReceive` + `start()`/`stop()` surface, so Phase 7 can hand either bus to
+  `newSessionWith()` (`net.js:334`). It is loaded by `index.html` and **called by
+  nothing yet**. Two things to know before touching it:
+  - **It is UMD and DOM-free on purpose** — a documented exception to "`features/**`
+    is browser-only" — so `test/server/socket-bus-client.test.js` can `require()` the
+    real file and drive it against a real server with `ws` injected as
+    `opts.WebSocket`. Keep it DOM-free; UI wiring belongs in `net.js`.
+  - **A HOST session never answers `PING`** (`_rxHost` has no PING branch — it is in
+    `_rxClient`, `mp.js:688`). To probe a server room, wait for the lobby `BEACON` or
+    send `JOIN_REQ`. The listener's own PING/PONG echo is socket-level, not this.
 
 **Wire protocol (in `mp.js`):**
 
@@ -179,7 +191,7 @@ Phase 0 has landed, so this is real now:
 ```
 npm install                     # one manifest at the repo root (Decision D1)
 node server/index.js            # listener + one open room; Ctrl-C / SIGTERM drains and exits 0
-node --test                     # engine + protocol + server suites (268 tests)
+node --test                     # engine + protocol + server suites (283 tests)
 node scripts/smoke.js           # the frontend's file:// smoke — required if you touched mp.js
 ```
 

@@ -139,6 +139,25 @@ const path = require('path');
     return true;
   }
 
+  // The server transport (features/net/socket-bus.js) is not wired into the UI yet, so the
+  // only thing the app-level net can regress about it is loading: a classic script that a
+  // file:// page can parse, and a constructor that runs without touching the DOM or the
+  // network. Everything it does on the wire is covered in test/server/socket-bus-client.test.js.
+  async function serverTransportLoads() {
+    const before = errors.length;
+    await page.goto(url, { waitUntil: 'load' });
+    const res = await page.evaluate(() => {
+      if (typeof SocketBus !== 'function') return { ok: false, why: 'SocketBus global missing' };
+      const bus = new SocketBus({ url: 'localhost:8787' });   // constructed, never started
+      return { ok: bus.url === 'ws://localhost:8787/ws' && typeof bus.send === 'function' && typeof bus.onReceive === 'function', url: bus.url };
+    });
+    const newErrs = errors.slice(before);
+    if (newErrs.length) { console.error('FAIL net/socket-bus\n  ' + newErrs.join('\n  ')); return false; }
+    if (!res.ok) { console.error('FAIL net/socket-bus — ' + (res.why || 'unexpected shape: ' + JSON.stringify(res))); return false; }
+    console.log('ok   net/socket-bus (loads over file://, constructs → ' + res.url + ')');
+    return true;
+  }
+
   let ok = true;
   for (const rs of ['standard', 'experimental'])
     for (const manual of [false, true])
@@ -146,6 +165,7 @@ const path = require('path');
   for (const rs of ['standard', 'experimental'])
     ok = (await resumeRoundTrip(rs)) && ok;
   ok = (await replayRoundTrip()) && ok;
+  ok = (await serverTransportLoads()) && ok;
 
   await browser.close();
   if (!ok) { console.error('SMOKE FAILED'); process.exit(1); }
